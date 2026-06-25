@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8081;
+const PORT = process.env.PORT || 8081;
 const DATA_FILE     = path.join(__dirname, 'tasks.json');
 const PROJECTS_FILE = path.join(__dirname, 'projects.json');
 const USERS_FILE    = path.join(__dirname, 'users.json');
