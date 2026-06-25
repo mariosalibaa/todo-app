@@ -1,46 +1,35 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin
+const serviceAccount = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase-service-account.json'), 'utf8'));
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  projectId: serviceAccount.project_id
+});
+
+const db = admin.firestore();
+const auth = admin.auth();
 
 const PORT = process.env.PORT || 8081;
-const DATA_FILE     = path.join(__dirname, 'tasks.json');
-const PROJECTS_FILE = path.join(__dirname, 'projects.json');
-const USERS_FILE    = path.join(__dirname, 'users.json');
-const DEPTS_FILE    = path.join(__dirname, 'departments.json');
-const COMPANIES_FILE  = path.join(__dirname, 'companies.json');
-const STATUSES_FILE   = path.join(__dirname, 'statuses.json');
-const CHANGELOG_FILE    = path.join(__dirname, 'changelog.json');
-const PRIORITIES_FILE   = path.join(__dirname, 'priorities.json');
 
-if (!fs.existsSync(DATA_FILE))      fs.writeFileSync(DATA_FILE,      '[]', 'utf8');
-if (!fs.existsSync(PROJECTS_FILE))  fs.writeFileSync(PROJECTS_FILE,  '{}', 'utf8');
-if (!fs.existsSync(USERS_FILE))     fs.writeFileSync(USERS_FILE,     '[]', 'utf8');
-if (!fs.existsSync(DEPTS_FILE))     fs.writeFileSync(DEPTS_FILE,     JSON.stringify([
-  { id: 'accounting',  name: 'Accounting',  color: '#a6e3a1' },
-  { id: 'engineering', name: 'Engineering', color: '#89b4fa' },
-  { id: 'sales',       name: 'Sales',       color: '#fab387' },
-  { id: 'marketing',   name: 'Marketing',   color: '#cba6f7' },
-  { id: 'operations',  name: 'Operations',  color: '#f9e2af' },
-  { id: 'hr',          name: 'HR',          color: '#94e2d5' },
-  { id: 'personal',    name: 'Personal',    color: '#f38ba8' }
-], null, 2), 'utf8');
-if (!fs.existsSync(CHANGELOG_FILE)) fs.writeFileSync(CHANGELOG_FILE, '[]', 'utf8');
-if (!fs.existsSync(PRIORITIES_FILE)) fs.writeFileSync(PRIORITIES_FILE, JSON.stringify([
-  { id: 'high',   name: 'High',   color: '#f38ba8' },
-  { id: 'medium', name: 'Medium', color: '#fab387' },
-  { id: 'low',    name: 'Low',    color: '#a6e3a1' }
-], null, 2), 'utf8');
-if (!fs.existsSync(STATUSES_FILE))  fs.writeFileSync(STATUSES_FILE,  JSON.stringify([
-  { id: 'lead',    name: 'Lead',    color: '#f9e2af' },
-  { id: 'active',  name: 'Active',  color: '#a6e3a1' },
-  { id: 'on-hold', name: 'On Hold', color: '#fab387' },
-  { id: 'done-p',  name: 'Done',    color: '#585b70' }
-], null, 2), 'utf8');
-if (!fs.existsSync(COMPANIES_FILE)) fs.writeFileSync(COMPANIES_FILE, JSON.stringify([
-  { id: 'shift-dev',   name: 'Shift Development' },
-  { id: 'shift-group', name: 'Shift Group' },
-  { id: 'personal',    name: 'Personal' }
-], null, 2), 'utf8');
+// Auth middleware: verify Firebase ID token
+async function verifyToken(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.slice(7);
+  try {
+    const decodedToken = await auth.verifyIdToken(token);
+    return decodedToken;
+  } catch (e) {
+    console.error('Token verification failed:', e.message);
+    return null;
+  }
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -49,149 +38,309 @@ const MIME = {
   '.json': 'application/json',
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = req.url.split('?')[0];
 
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS,PUT,DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  if (url === '/api/tasks' && req.method === 'GET') {
-    try {
-      const data = fs.readFileSync(DATA_FILE, 'utf8');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(data);
-    } catch { res.writeHead(500); res.end('read error'); }
+  // Public endpoints (no auth required)
+  if (url === '/') {
+    const html = fs.readFileSync(path.join(__dirname, 'todo.html'), 'utf8');
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
     return;
-  }
-
-  if (url === '/api/tasks' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const tasks = JSON.parse(body);
-        fs.writeFileSync(DATA_FILE, JSON.stringify(tasks, null, 2), 'utf8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, count: tasks.length }));
-        console.log(`Saved ${tasks.length} tasks`);
-      } catch { res.writeHead(400); res.end('bad json'); }
-    });
-    return;
-  }
-
-  if (url === '/api/projects' && req.method === 'GET') {
-    try {
-      const data = fs.readFileSync(PROJECTS_FILE, 'utf8');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(data);
-    } catch { res.writeHead(500); res.end('read error'); }
-    return;
-  }
-
-  if (url === '/api/projects' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const meta = JSON.parse(body);
-        fs.writeFileSync(PROJECTS_FILE, JSON.stringify(meta, null, 2), 'utf8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true }));
-      } catch { res.writeHead(400); res.end('bad json'); }
-    });
-    return;
-  }
-
-  if (url === '/api/users' && req.method === 'GET') {
-    try {
-      const data = fs.readFileSync(USERS_FILE, 'utf8');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(data);
-    } catch { res.writeHead(500); res.end('read error'); }
-    return;
-  }
-
-  if (url === '/api/users' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const users = JSON.parse(body);
-        fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true }));
-      } catch { res.writeHead(400); res.end('bad json'); }
-    });
-    return;
-  }
-
-  if (url === '/api/changelog' && req.method === 'GET') {
-    try { res.writeHead(200,{'Content-Type':'application/json'}); res.end(fs.readFileSync(CHANGELOG_FILE,'utf8')); } catch { res.writeHead(500); res.end('error'); }
-    return;
-  }
-  if (url === '/api/changelog' && req.method === 'POST') {
-    let body=''; req.on('data',c=>body+=c); req.on('end',()=>{
-      try { fs.writeFileSync(CHANGELOG_FILE,body,'utf8'); res.writeHead(200,{'Content-Type':'application/json'}); res.end('{"ok":true}'); }
-      catch { res.writeHead(400); res.end('bad json'); }
-    }); return;
-  }
-
-  if (url === '/api/statuses' && req.method === 'GET') {
-    try { res.writeHead(200,{'Content-Type':'application/json'}); res.end(fs.readFileSync(STATUSES_FILE,'utf8')); } catch { res.writeHead(500); res.end('error'); }
-    return;
-  }
-  if (url === '/api/statuses' && req.method === 'POST') {
-    let body=''; req.on('data',c=>body+=c); req.on('end',()=>{
-      try { fs.writeFileSync(STATUSES_FILE,body,'utf8'); res.writeHead(200,{'Content-Type':'application/json'}); res.end('{"ok":true}'); }
-      catch { res.writeHead(400); res.end('bad json'); }
-    }); return;
-  }
-
-  if (url === '/api/departments' && req.method === 'GET') {
-    try { res.writeHead(200,{'Content-Type':'application/json'}); res.end(fs.readFileSync(DEPTS_FILE,'utf8')); } catch { res.writeHead(500); res.end('error'); }
-    return;
-  }
-  if (url === '/api/departments' && req.method === 'POST') {
-    let body=''; req.on('data',c=>body+=c); req.on('end',()=>{
-      try { fs.writeFileSync(DEPTS_FILE,body,'utf8'); res.writeHead(200,{'Content-Type':'application/json'}); res.end('{"ok":true}'); }
-      catch { res.writeHead(400); res.end('bad json'); }
-    }); return;
-  }
-  if (url === '/api/priorities' && req.method === 'GET') {
-    try { res.writeHead(200,{'Content-Type':'application/json'}); res.end(fs.readFileSync(PRIORITIES_FILE,'utf8')); } catch { res.writeHead(500); res.end('error'); }
-    return;
-  }
-  if (url === '/api/priorities' && req.method === 'POST') {
-    let body=''; req.on('data',c=>body+=c); req.on('end',()=>{
-      try { fs.writeFileSync(PRIORITIES_FILE,body,'utf8'); res.writeHead(200,{'Content-Type':'application/json'}); res.end('{"ok":true}'); }
-      catch { res.writeHead(400); res.end('bad json'); }
-    }); return;
-  }
-
-  if (url === '/api/companies' && req.method === 'GET') {
-    try { res.writeHead(200,{'Content-Type':'application/json'}); res.end(fs.readFileSync(COMPANIES_FILE,'utf8')); } catch { res.writeHead(500); res.end('error'); }
-    return;
-  }
-  if (url === '/api/companies' && req.method === 'POST') {
-    let body=''; req.on('data',c=>body+=c); req.on('end',()=>{
-      try { fs.writeFileSync(COMPANIES_FILE,body,'utf8'); res.writeHead(200,{'Content-Type':'application/json'}); res.end('{"ok":true}'); }
-      catch { res.writeHead(400); res.end('bad json'); }
-    }); return;
   }
 
   // Static files
-  const filePath = url === '/' ? path.join(__dirname, 'todo.html') : path.join(__dirname, url);
-  if (!filePath.startsWith(__dirname)) { res.writeHead(403); res.end('forbidden'); return; }
+  if (!url.startsWith('/api/')) {
+    const filePath = path.join(__dirname, url);
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath);
+      const contentType = MIME[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(fs.readFileSync(filePath));
+    } else {
+      res.writeHead(404);
+      res.end('not found');
+    }
+    return;
+  }
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404); res.end('not found'); return; }
-    const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'text/plain' });
-    res.end(data);
-  });
+  // All API endpoints require auth
+  const user = await verifyToken(req);
+  if (!user) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unauthorized' }));
+    return;
+  }
+
+  const userId = user.uid;
+
+  // ═══════════════════════════════════════════════════════════════
+  // WORKSPACES
+  // ═══════════════════════════════════════════════════════════════
+
+  if (url === '/api/workspaces' && req.method === 'GET') {
+    try {
+      const userDoc = await db.collection('users').doc(userId).get();
+      const userData = userDoc.data() || { workspaces: [] };
+      const workspaceIds = (userData.workspaces || []).map(w => w.workspaceId);
+
+      const workspaces = [];
+      for (const wsId of workspaceIds) {
+        const wsDoc = await db.collection('workspaces').doc(wsId).get();
+        if (wsDoc.exists) {
+          workspaces.push({ id: wsId, ...wsDoc.data() });
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(workspaces));
+    } catch (e) {
+      console.error('GET /api/workspaces error:', e);
+      res.writeHead(500);
+      res.end('server error');
+    }
+    return;
+  }
+
+  if (url === '/api/workspaces' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { name } = JSON.parse(body);
+        const workspaceId = db.collection('workspaces').doc().id;
+        const now = new Date().toISOString();
+
+        await db.collection('workspaces').doc(workspaceId).set({
+          id: workspaceId,
+          name,
+          type: 'shared',
+          ownerId: userId,
+          createdAt: now,
+          members: [{ uid: userId, email: user.email, name: user.name || 'User', role: 'owner' }],
+          invites: []
+        });
+
+        await db.collection('users').doc(userId).update({
+          workspaces: admin.firestore.FieldValue.arrayUnion({ workspaceId, role: 'owner' })
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ id: workspaceId, name, ownerId: userId }));
+      } catch (e) {
+        console.error('POST /api/workspaces error:', e);
+        res.writeHead(400);
+        res.end('bad request');
+      }
+    });
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // TASKS (workspace-scoped)
+  // ═══════════════════════════════════════════════════════════════
+
+  const tasksMatch = url.match(/^\/api\/workspaces\/([^\/]+)\/tasks$/);
+  if (tasksMatch && req.method === 'GET') {
+    const workspaceId = tasksMatch[1];
+    try {
+      const tasksSnap = await db.collection('workspaces').doc(workspaceId)
+        .collection('tasks').orderBy('createdAt', 'desc').get();
+      const tasks = tasksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(tasks));
+    } catch (e) {
+      console.error('GET tasks error:', e);
+      res.writeHead(500);
+      res.end('server error');
+    }
+    return;
+  }
+
+  if (tasksMatch && req.method === 'POST') {
+    const workspaceId = tasksMatch[1];
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const tasks = JSON.parse(body);
+        const batch = db.batch();
+
+        for (const task of tasks) {
+          const taskRef = db.collection('workspaces').doc(workspaceId)
+            .collection('tasks').doc(task.id);
+          batch.set(taskRef, { ...task, workspaceId });
+        }
+
+        await batch.commit();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, count: tasks.length }));
+      } catch (e) {
+        console.error('POST tasks error:', e);
+        res.writeHead(400);
+        res.end('bad request');
+      }
+    });
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PROJECTS (workspace-scoped)
+  // ═══════════════════════════════════════════════════════════════
+
+  const projectsMatch = url.match(/^\/api\/workspaces\/([^\/]+)\/projects$/);
+  if (projectsMatch && req.method === 'GET') {
+    const workspaceId = projectsMatch[1];
+    try {
+      const projectsSnap = await db.collection('workspaces').doc(workspaceId)
+        .collection('projects').get();
+      const projects = {};
+      projectsSnap.docs.forEach(doc => {
+        projects[doc.data().name] = doc.data();
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(projects));
+    } catch (e) {
+      console.error('GET projects error:', e);
+      res.writeHead(500);
+      res.end('server error');
+    }
+    return;
+  }
+
+  if (projectsMatch && req.method === 'POST') {
+    const workspaceId = projectsMatch[1];
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const projectMeta = JSON.parse(body);
+        const batch = db.batch();
+
+        for (const [name, data] of Object.entries(projectMeta)) {
+          const projectRef = db.collection('workspaces').doc(workspaceId)
+            .collection('projects').doc(name);
+          batch.set(projectRef, { name, ...data });
+        }
+
+        await batch.commit();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        console.error('POST projects error:', e);
+        res.writeHead(400);
+        res.end('bad request');
+      }
+    });
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // REFERENCE DATA (departments, statuses, companies, priorities)
+  // ═══════════════════════════════════════════════════════════════
+
+  const refDataMatch = url.match(/^\/api\/workspaces\/([^\/]+)\/(departments|statuses|companies|priorities|changelog)$/);
+  if (refDataMatch && req.method === 'GET') {
+    const [, workspaceId, collection] = refDataMatch;
+    try {
+      const snap = await db.collection('workspaces').doc(workspaceId).collection(collection).get();
+      const items = snap.docs.map(doc => doc.data());
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(items));
+    } catch (e) {
+      console.error(`GET ${collection} error:`, e);
+      res.writeHead(500);
+      res.end('server error');
+    }
+    return;
+  }
+
+  if (refDataMatch && req.method === 'POST') {
+    const [, workspaceId, collection] = refDataMatch;
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const items = JSON.parse(body);
+        const batch = db.batch();
+
+        for (const item of items) {
+          const ref = db.collection('workspaces').doc(workspaceId).collection(collection).doc(item.id);
+          batch.set(ref, item);
+        }
+
+        await batch.commit();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        console.error(`POST ${collection} error:`, e);
+        res.writeHead(400);
+        res.end('bad request');
+      }
+    });
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // USERS/MEMBERS
+  // ═══════════════════════════════════════════════════════════════
+
+  const usersMatch = url.match(/^\/api\/workspaces\/([^\/]+)\/users$/);
+  if (usersMatch && req.method === 'GET') {
+    const workspaceId = usersMatch[1];
+    try {
+      const wsDoc = await db.collection('workspaces').doc(workspaceId).get();
+      const members = wsDoc.data().members || [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(members));
+    } catch (e) {
+      console.error('GET members error:', e);
+      res.writeHead(500);
+      res.end('server error');
+    }
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // INVITES
+  // ═══════════════════════════════════════════════════════════════
+
+  const inviteMatch = url.match(/^\/api\/workspaces\/([^\/]+)\/invite$/);
+  if (inviteMatch && req.method === 'POST') {
+    const workspaceId = inviteMatch[1];
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { email, role } = JSON.parse(body);
+        await db.collection('workspaces').doc(workspaceId).update({
+          invites: admin.firestore.FieldValue.arrayUnion({ email, role, invitedAt: new Date().toISOString() })
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        console.error('POST invite error:', e);
+        res.writeHead(400);
+        res.end('bad request');
+      }
+    });
+    return;
+  }
+
+  // 404
+  res.writeHead(404);
+  res.end('not found');
 });
 
-server.listen(PORT, () => console.log(`To-Do → http://localhost:${PORT}/`));
+server.listen(PORT, () => {
+  console.log(`Todo app listening on port ${PORT}`);
+  console.log(`Firebase project: ${serviceAccount.project_id}`);
+});

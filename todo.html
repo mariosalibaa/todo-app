@@ -715,10 +715,90 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--surface2); }
+
+    /* Login Screen */
+    .login-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--base); display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .login-card {
+      background: var(--mantle); border: 1px solid var(--surface0); border-radius: 12px;
+      padding: 40px; text-align: center; max-width: 400px;
+    }
+    .login-card h1 { color: var(--text); margin-bottom: 12px; font-size: 1.8rem; }
+    .login-card p { color: var(--subtext0); margin-bottom: 28px; font-size: 0.95rem; }
+    .google-signin-btn {
+      background: #fff; color: #000; border: none; border-radius: 6px;
+      padding: 12px 24px; font-weight: 500; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; font-size: 0.95rem; transition: background 0.15s;
+    }
+    .google-signin-btn:hover { background: #f5f5f5; }
+    .google-signin-btn:before { content: '🔐'; font-size: 1.2rem; }
+
+    /* Workspace Switcher */
+    .workspace-switcher {
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      padding: 6px 10px; border-radius: 6px; transition: background 0.15s;
+    }
+    .workspace-switcher:hover { background: var(--surface0); }
+    .workspace-name { font-weight: 600; color: var(--text); }
+    .ws-dropdown-menu {
+      position: absolute; top: 50px; left: 16px; background: var(--mantle);
+      border: 1px solid var(--surface0); border-radius: 8px; min-width: 200px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000; max-height: 300px; overflow-y: auto;
+    }
+    .ws-item {
+      padding: 10px 16px; color: var(--text); cursor: pointer;
+      border-bottom: 1px solid var(--surface0); transition: background 0.1s;
+    }
+    .ws-item:hover { background: var(--surface0); }
+    .ws-item.active { background: var(--accent); color: #fff; }
+    .ws-item-last { border-bottom: none; }
+    .ws-new-btn {
+      padding: 10px 16px; color: var(--accent); cursor: pointer;
+      font-weight: 500; transition: background 0.1s;
+    }
+    .ws-new-btn:hover { background: var(--surface0); }
+    .user-menu {
+      display: flex; align-items: center; gap: 8px; margin-left: auto; cursor: pointer;
+      padding: 6px 10px; border-radius: 6px; transition: background 0.15s;
+    }
+    .user-menu:hover { background: var(--surface0); }
+    .user-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--surface1);
+      display: flex; align-items: center; justify-content: center; color: var(--text); font-weight: 600;
+    }
+    .user-dropdown {
+      position: absolute; top: 50px; right: 16px; background: var(--mantle);
+      border: 1px solid var(--surface0); border-radius: 8px; min-width: 150px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000;
+    }
+    .user-dropdown-item {
+      padding: 10px 16px; color: var(--text); cursor: pointer;
+      border-bottom: 1px solid var(--surface0); transition: background 0.1s;
+    }
+    .user-dropdown-item:hover { background: var(--surface0); }
+    .user-dropdown-item.logout { color: var(--red); }
+    .user-dropdown-item-last { border-bottom: none; }
   </style>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
 </head>
 <body>
-<div class="app">
+<!-- Login Screen -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <h1>✓ Todo App</h1>
+    <p>Sign in with your Google account to continue</p>
+    <button class="google-signin-btn" onclick="signInWithGoogle()">Sign in with Google</button>
+  </div>
+</div>
+
+<div class="app" style="display:none;" id="app-container">
 
   <!-- ── Sidebar ── -->
   <aside class="sidebar">
@@ -1047,6 +1127,123 @@
 </div>
 
 <script>
+// ── Firebase Configuration ─────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCRw6jemaSb8XvSUPfSTYamaeU3SNj0DBg",
+  authDomain: "todo-app-f5c0d.firebaseapp.com",
+  projectId: "todo-app-f5c0d",
+  storageBucket: "todo-app-f5c0d.firebasestorage.app",
+  messagingSenderId: "913223477512",
+  appId: "1:913223477512:web:cdcfc6d54a927c4dc6a4bd"
+};
+
+firebase.initializeApp(firebaseConfig);
+const firebaseAuth = firebase.auth();
+const firebaseDb = firebase.firestore();
+
+// ── Auth State ─────────────────────────────────────────────────────────────────
+let currentUser = null;
+let currentWorkspaceId = null;
+let idToken = null;
+
+// Initialize auth
+firebaseAuth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentUser = user;
+    idToken = await user.getIdToken();
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app-container').style.display = 'flex';
+    await initializeApp();
+  } else {
+    currentUser = null;
+    document.getElementById('login-overlay').style.display = 'flex';
+    document.getElementById('app-container').style.display = 'none';
+  }
+});
+
+// Google Sign-In
+async function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    const result = await firebaseAuth.signInWithPopup(provider);
+    currentUser = result.user;
+    idToken = await currentUser.getIdToken();
+  } catch (error) {
+    console.error('Sign-in failed:', error);
+    alert('Failed to sign in: ' + error.message);
+  }
+}
+
+// Sign Out
+async function signOut() {
+  try {
+    await firebaseAuth.signOut();
+    currentUser = null;
+    currentWorkspaceId = null;
+  } catch (error) {
+    console.error('Sign-out failed:', error);
+  }
+}
+
+// API Helper (adds auth token)
+async function apiCall(method, path, body = null) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${idToken}`
+  };
+  const options = { method, headers };
+  if (body) options.body = JSON.stringify(body);
+
+  const response = await fetch(path, options);
+  if (!response.ok) {
+    if (response.status === 401) {
+      signOut();
+      throw new Error('Unauthorized');
+    }
+    throw new Error(`API error: ${response.status}`);
+  }
+  return response.json();
+}
+
+// Initialize App
+async function initializeApp() {
+  // Create personal workspace if it doesn't exist
+  try {
+    const workspaces = await apiCall('GET', '/api/workspaces');
+    if (workspaces.length === 0) {
+      // Create personal workspace
+      const newWs = await apiCall('POST', '/api/workspaces', { name: 'Personal' });
+      currentWorkspaceId = newWs.id;
+    } else {
+      currentWorkspaceId = workspaces[0].id;
+    }
+
+    // Load workspace data
+    await loadWorkspaceData();
+  } catch (error) {
+    console.error('Failed to initialize app:', error);
+  }
+}
+
+async function loadWorkspaceData() {
+  if (!currentWorkspaceId) return;
+  try {
+    await Promise.all([
+      loadTasks(),
+      loadProjectMeta(),
+      loadUsers(),
+      loadDepartments(),
+      loadCompanies(),
+      loadStatuses(),
+      loadPriorities(),
+      loadChangelog()
+    ]);
+    renderAll();
+  } catch (error) {
+    console.error('Failed to load workspace data:', error);
+  }
+}
+
 // ── State ─────────────────────────────────────────────────────────────────
 let tasks = [];
 let filterProject  = 'All';
@@ -1100,17 +1297,19 @@ function saveColOrder() {
 
 // ── Project metadata (status) ─────────────────────────────────────────────
 async function loadProjectMeta() {
-  try { const r = await fetch('/api/projects'); projectMeta = await r.json(); }
-  catch { projectMeta = {}; }
+  try {
+    projectMeta = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/projects`);
+  } catch (error) {
+    console.error('Failed to load projects:', error);
+    projectMeta = {};
+  }
 }
 async function saveProjectMeta() {
   try {
-    await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(projectMeta)
-    });
-  } catch {}
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/projects`, projectMeta);
+  } catch (error) {
+    console.error('Failed to save projects:', error);
+  }
 }
 
 function cycleProjectStatus(e, projName) {
@@ -1154,17 +1353,19 @@ function projStatus(name) {
 const USER_COLORS = ['#89b4fa','#cba6f7','#f38ba8','#fab387','#a6e3a1','#f9e2af','#94e2d5','#89dceb'];
 
 async function loadUsers() {
-  try { const r = await fetch('/api/users'); users = await r.json(); }
-  catch { users = []; }
+  try {
+    users = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/users`);
+  } catch (error) {
+    console.error('Failed to load users:', error);
+    users = [];
+  }
 }
 async function saveUsers() {
   try {
-    await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(users)
-    });
-  } catch {}
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/users`, users);
+  } catch (error) {
+    console.error('Failed to save users:', error);
+  }
 }
 
 function userById(id) { return users.find(u => u.id === id); }
@@ -1314,12 +1515,19 @@ function addUserFromModal() {
 
 // ── Departments ───────────────────────────────────────────────────────────
 async function loadDepartments() {
-  try { const r = await fetch('/api/departments'); departments = await r.json(); }
-  catch { departments = []; }
+  try {
+    departments = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/departments`);
+  } catch (error) {
+    console.error('Failed to load departments:', error);
+    departments = [];
+  }
 }
 async function saveDepartments() {
-  try { await fetch('/api/departments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(departments) }); }
-  catch {}
+  try {
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/departments`, departments);
+  } catch (error) {
+    console.error('Failed to save departments:', error);
+  }
 }
 function deptById(id) { return departments.find(d => d.id === id); }
 
@@ -1369,12 +1577,19 @@ function selectDept(id) {
 
 // ── Companies ─────────────────────────────────────────────────────────────
 async function loadCompanies() {
-  try { const r = await fetch('/api/companies'); companies = await r.json(); }
-  catch { companies = []; }
+  try {
+    companies = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/companies`);
+  } catch (error) {
+    console.error('Failed to load companies:', error);
+    companies = [];
+  }
 }
 async function saveCompanies() {
-  try { await fetch('/api/companies', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(companies) }); }
-  catch {}
+  try {
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/companies`, companies);
+  } catch (error) {
+    console.error('Failed to save companies:', error);
+  }
 }
 function companyById(id) { return companies.find(c => c.id === id); }
 function projCompany(name) { return projectMeta[name]?.company || null; }
@@ -1405,12 +1620,19 @@ function toggleCompanyFilter(id) { // kept for sidebar company header clicks
 let changelog = [];
 
 async function loadChangelog() {
-  try { const r = await fetch('/api/changelog'); changelog = await r.json(); }
-  catch { changelog = []; }
+  try {
+    changelog = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/changelog`);
+  } catch (error) {
+    console.error('Failed to load changelog:', error);
+    changelog = [];
+  }
 }
 async function saveChangelog() {
-  try { await fetch('/api/changelog', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(changelog) }); }
-  catch {}
+  try {
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/changelog`, changelog);
+  } catch (error) {
+    console.error('Failed to save changelog:', error);
+  }
 }
 
 function openChangelogModal() {
@@ -1453,20 +1675,34 @@ function deleteChangelogEntry(idx) {
 
 // ── Statuses ──────────────────────────────────────────────────────────────
 async function loadStatuses() {
-  try { const r = await fetch('/api/statuses'); statuses = await r.json(); }
-  catch { statuses = []; }
+  try {
+    statuses = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/statuses`);
+  } catch (error) {
+    console.error('Failed to load statuses:', error);
+    statuses = [];
+  }
 }
 async function saveStatuses() {
-  try { await fetch('/api/statuses', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(statuses) }); }
-  catch {}
+  try {
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/statuses`, statuses);
+  } catch (error) {
+    console.error('Failed to save statuses:', error);
+  }
 }
 async function loadPriorities() {
-  try { const r = await fetch('/api/priorities'); priorities = await r.json(); }
-  catch { priorities = [{id:'high',name:'High',color:'#f38ba8'},{id:'medium',name:'Medium',color:'#fab387'},{id:'low',name:'Low',color:'#a6e3a1'}]; }
+  try {
+    priorities = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/priorities`);
+  } catch (error) {
+    console.error('Failed to load priorities:', error);
+    priorities = [{id:'high',name:'High',color:'#f38ba8'},{id:'medium',name:'Medium',color:'#fab387'},{id:'low',name:'Low',color:'#a6e3a1'}];
+  }
 }
 async function savePriorities() {
-  try { await fetch('/api/priorities', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(priorities) }); }
-  catch {}
+  try {
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/priorities`, priorities);
+  } catch (error) {
+    console.error('Failed to save priorities:', error);
+  }
 }
 function priorityById(id) { return priorities.find(p => p.id === id); }
 function priorityColor(id) { return priorityById(id)?.color || 'var(--overlay0)'; }
@@ -2292,9 +2528,12 @@ function cleanupSidebarDrag() {
 
 // ── Persistence ───────────────────────────────────────────────────────────
 async function loadTasks() {
-  try { const r = await fetch('/api/tasks'); tasks = await r.json(); }
-  catch { tasks = []; }
-  renderAll();
+  try {
+    tasks = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/tasks`);
+  } catch (error) {
+    console.error('Failed to load tasks:', error);
+    tasks = [];
+  }
 }
 
 let saveTimer = null;
@@ -2304,13 +2543,11 @@ function scheduleSave() {
 }
 async function doSave() {
   try {
-    await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tasks)
-    });
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/tasks`, tasks);
     updateLastSaved();
-  } catch {}
+  } catch (error) {
+    console.error('Failed to save tasks:', error);
+  }
 }
 
 function updateLastSaved() {
