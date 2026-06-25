@@ -4,7 +4,20 @@ const path = require('path');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin
-const serviceAccount = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase-service-account.json'), 'utf8'));
+let serviceAccount;
+try {
+  // Try to read from environment variable first (Render)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  } else {
+    // Fall back to file (local development)
+    serviceAccount = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase-service-account.json'), 'utf8'));
+  }
+} catch (e) {
+  console.error('Failed to load Firebase credentials:', e.message);
+  process.exit(1);
+}
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   projectId: serviceAccount.project_id
