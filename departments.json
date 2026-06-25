@@ -1,0 +1,37 @@
+[
+  {
+    "id": "accounting",
+    "name": "Accounting",
+    "color": "#a6e3a1"
+  },
+  {
+    "id": "engineering",
+    "name": "Engineering",
+    "color": "#89b4fa"
+  },
+  {
+    "id": "sales",
+    "name": "Sales",
+    "color": "#fab387"
+  },
+  {
+    "id": "marketing",
+    "name": "Marketing",
+    "color": "#cba6f7"
+  },
+  {
+    "id": "operations",
+    "name": "Operations",
+    "color": "#f9e2af"
+  },
+  {
+    "id": "hr",
+    "name": "HR",
+    "color": "#94e2d5"
+  },
+  {
+    "id": "personal",
+    "name": "Personal",
+    "color": "#f38ba8"
+  }
+]

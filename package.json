@@ -1,0 +1,16 @@
+{
+  "name": "todo-app",
+  "version": "1.0.0",
+  "description": "Team task management app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["todo", "tasks", "team"],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": "18"
+  }
+}

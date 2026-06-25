@@ -1,0 +1,25 @@
+{
+  "AJALTOUN": {
+    "status": "active",
+    "company": "shift-dev"
+  },
+  "PALM JOUNIEH": {
+    "status": "lead",
+    "company": "shift-group"
+  },
+  "BOOKSTOP": {
+    "status": "active",
+    "company": "shift-group"
+  },
+  "FTC Solar": {
+    "status": "lead",
+    "company": "shift-group"
+  },
+  "Charbel Akiki": {
+    "status": "active",
+    "company": "shift-group"
+  },
+  "R&D": {
+    "company": "shift-group"
+  }
+}

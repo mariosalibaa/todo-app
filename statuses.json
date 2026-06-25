@@ -1,0 +1,22 @@
+[
+  {
+    "id": "lead",
+    "name": "Lead",
+    "color": "#f9e2af"
+  },
+  {
+    "id": "active",
+    "name": "Active",
+    "color": "#a6e3a1"
+  },
+  {
+    "id": "on-hold",
+    "name": "On Hold",
+    "color": "#fab387"
+  },
+  {
+    "id": "done-p",
+    "name": "Done",
+    "color": "#585b70"
+  }
+]

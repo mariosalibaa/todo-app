@@ -1,0 +1,120 @@
+[
+  {
+    "id": "mqm3cgaox22to",
+    "done": false,
+    "doneAt": null,
+    "createdAt": "2026-06-20T08:23:46.560Z",
+    "title": "PREFAB",
+    "project": "AJALTOUN",
+    "due": "2026-06-20",
+    "priority": "high",
+    "notes": "",
+    "subtasks": [
+      {
+        "id": "mqm3c7vl2woos",
+        "text": "DRAWING",
+        "done": true,
+        "doneAt": "2026-06-20T11:33:47.629Z"
+      },
+      {
+        "id": "mqm3x5yksiuff",
+        "text": "ROLLING SHUTTER",
+        "done": false,
+        "doneAt": null
+      }
+    ]
+  },
+  {
+    "id": "mqm3dc9cmjucb",
+    "done": false,
+    "doneAt": null,
+    "createdAt": "2026-06-20T08:24:27.984Z",
+    "title": "GHADA BILLS",
+    "project": "BOOKSTOP",
+    "due": "",
+    "priority": "medium",
+    "notes": "VICTOR APPROVAL",
+    "subtasks": [],
+    "assignees": [],
+    "taskType": "task",
+    "department": "accounting",
+    "acctPartner": "",
+    "acctBalance": null,
+    "acctPartnerId": ""
+  },
+  {
+    "id": "mqm3e4a8ewj0k",
+    "done": false,
+    "doneAt": null,
+    "createdAt": "2026-06-20T08:25:04.304Z",
+    "title": "JEAN MEETING",
+    "project": "AJALTOUN",
+    "due": "",
+    "priority": "",
+    "notes": "",
+    "subtasks": []
+  },
+  {
+    "id": "mqm553mvj078t",
+    "done": false,
+    "doneAt": null,
+    "createdAt": "2026-06-20T09:14:02.791Z",
+    "title": "samo aoun follow up",
+    "project": "PALM JOUNIEH",
+    "due": "",
+    "priority": "",
+    "notes": "",
+    "subtasks": []
+  },
+  {
+    "id": "mqm5kjjihwje6",
+    "done": false,
+    "doneAt": null,
+    "createdAt": "2026-06-20T09:26:03.246Z",
+    "title": "Roger Meeting",
+    "project": "FTC Solar",
+    "due": "2026-06-23",
+    "priority": "",
+    "notes": "",
+    "subtasks": []
+  },
+  {
+    "id": "mqm6fki4zocnf",
+    "done": false,
+    "doneAt": null,
+    "createdAt": "2026-06-20T09:50:10.828Z",
+    "title": "Accounting",
+    "project": "Charbel Akiki",
+    "due": "",
+    "priority": "",
+    "notes": "",
+    "subtasks": [],
+    "assignees": [
+      "mqm8ox86u03q5"
+    ],
+    "taskType": "task",
+    "department": "accounting",
+    "acctPartner": "",
+    "acctBalance": null,
+    "acctPartnerId": "",
+    "archived": false
+  },
+  {
+    "id": "mqt6fxe558707",
+    "done": false,
+    "doneAt": null,
+    "createdAt": "2026-06-25T07:24:50.765Z",
+    "title": "TEST",
+    "project": "R&D",
+    "due": "",
+    "priority": "",
+    "notes": "",
+    "subtasks": [],
+    "assignees": [],
+    "taskType": "task",
+    "department": null,
+    "acctPartner": "",
+    "acctBalance": null,
+    "acctPartnerId": ""
+  }
+]
