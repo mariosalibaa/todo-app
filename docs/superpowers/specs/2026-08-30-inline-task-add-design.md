@@ -12,8 +12,13 @@ key, the per-project and kanban buttons, and the post-project-creation flow.
 
 The List view already has a `＋ Add task` row (`nlInlineAdd`, todo.html:7833),
 but it accepts a title and nothing else, so any task needing an assignee or a
-due date still goes through the modal. Table mode has no add affordance at all,
-and an empty list shows a hint that points at a button rather than an inline row.
+due date still goes through the modal. An empty list shows a hint that points at
+a button rather than an inline row, so it has no inline path at all.
+
+Table mode is already correct: `listAddRow` (todo.html:9128) draws a full
+`＋` row at the top of the grid with project, client, department, title,
+priority, vendor, assignee, due date and status inputs. It is the model the
+List view's inline row should match, and it is left alone.
 
 ## Goal
 
@@ -77,14 +82,7 @@ re-renders the chip strip. The menus themselves are not duplicated.
 named functions and become thin wrappers onto the inline row, so no call site
 needs hunting down.
 
-### 3. Table mode add row
-
-`renderListTable` (todo.html:8980) gains a final `<tr>` whose first cell is a
-name input. `Enter` creates the task and reopens the row. Table mode's cells are
-already `<input>` / `<select>` bound through `setField`, so the remaining fields
-are filled by tabbing across the row once it exists — no chip strip there.
-
-### 4. Slide-over task detail
+### 3. Slide-over task detail
 
 The `#task-modal` markup, `openEditModal` and `saveTask` are unchanged. Only the
 shell moves:
@@ -103,8 +101,13 @@ rename, unchanged — renaming is far more frequent than opening.
 The other modals in the file (settings, new project, new user, and the rest) are
 untouched.
 
+The task object built by the inline row matches `listAddRow`'s shape field for
+field — including `notes`, `taskType`, `clientName` and `clientId` — so a task
+created in the List view is indistinguishable from one added in Table mode.
+
 ## Out of scope
 
+- Table mode. Its add row already does everything this spec asks for.
 - Gantt view gets no add path; it has none today.
 - No change to the Firestore documents, the Odoo sync, or `server.js`.
 - No new fields on the task object.
