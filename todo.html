@@ -5072,7 +5072,7 @@ function renderKanban() {
       <div class="kanban-cards">
         ${col.tasks.map(t => kanbanCardHtml(t)).join('')}
       </div>
-      <button class="kanban-add-btn" onclick="openAddModalForProject('${esc(col.name === '—' ? '' : col.name)}')">+ Add task</button>
+      ${kanbanAddCardHtml('project', col.name === '—' ? '' : col.name)}
     </div>
   `;}).join('');
 
@@ -5104,7 +5104,7 @@ function renderProjectByDept(el, projTasks) {
         <div class="kanban-cards">
           ${colTasks.map(t => kanbanCardHtml(t)).join('')}
         </div>
-        <button class="kanban-add-btn" onclick="openAddModalForDept('${col.id}')">+ Add task</button>
+        ${kanbanAddCardHtml('dept', col.id)}
       </div>`;
   }).join('') + `
     <div class="kanban-col" style="border-style:dashed;cursor:pointer;align-items:center;justify-content:center;min-height:80px;" onclick="addDeptFromBoard()">
@@ -5129,6 +5129,79 @@ function onDeptDrop(e, deptId) {
   scheduleSave();
   renderAll();
 }
+// A blank card at the foot of a column. The column supplies the project or the
+// department; Enter saves and reopens so a column can be filled in one go.
+let _kbAdd = null;   // { kind: 'project'|'dept', key }
+
+function kanbanInlineAdd(kind, key) {
+  _kbAdd = { kind, key: String(key || '') };
+  renderAll();
+  setTimeout(() => document.getElementById('kb-add-input')?.focus(), 0);
+}
+function kanbanAddCardHtml(kind, key) {
+  if (!_kbAdd || _kbAdd.kind !== kind || _kbAdd.key !== String(key || '')) {
+    return `<button class="kanban-add-btn" onclick="kanbanInlineAdd('${kind}','${escAttr(String(key || ''))}')">+ Add task</button>`;
+  }
+  return `
+    <div class="kanban-card" style="border:1px solid var(--accent);">
+      <input id="kb-add-input" type="text" autocomplete="off"
+             placeholder="Task name — Enter to save, Esc to close"
+             onkeydown="kanbanAddKey(event)" onblur="kanbanAddBlur()"
+             style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:0.8rem;font-family:inherit;">
+    </div>`;
+}
+function kanbanAddCommit(title) {
+  const proj = _kbAdd.kind === 'project' ? _kbAdd.key : (filterProject !== 'All' ? filterProject : '');
+  const t = {
+    id: uid(),
+    title,
+    done: false,
+    doneAt: null,
+    createdAt: new Date().toISOString(),
+    project: proj,
+    taskStatus: '',
+    department: _kbAdd.kind === 'dept' ? (_kbAdd.key || null) : null,
+    priority: '',
+    due: '',
+    partner: '',
+    notes: '',
+    taskType: 'task',
+    clientName: projectMeta[proj]?.clientName || '',
+    clientId: projectMeta[proj]?.clientId || null,
+    subtasks: [],
+    assignees: [],
+  };
+  tasks.push(t);
+  scheduleSave();
+  return t;
+}
+function kanbanAddKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); _kbAdd = null; renderAll(); return; }
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const title = e.target.value.trim();
+  if (!title) { _kbAdd = null; renderAll(); return; }
+  const ctx = _kbAdd;
+  kanbanAddCommit(title);
+  _kbAdd = ctx;                    // keep the column open for the next one
+  renderAll();
+  setTimeout(() => document.getElementById('kb-add-input')?.focus(), 0);
+}
+function kanbanAddBlur() {
+  setTimeout(() => {
+    const inp = document.getElementById('kb-add-input');
+    if (!_kbAdd || !inp) return;
+    // Enter reopens a fresh input and refocuses it, which orphans this blur's
+    // original target and fires a second, stale blur on it — if focus is
+    // back on the (new) input, this is that stale callback, so leave it open.
+    if (document.activeElement === inp) return;
+    const title = inp.value.trim();
+    if (title) kanbanAddCommit(title);
+    _kbAdd = null;
+    renderAll();
+  }, 150);
+}
+
 function openAddModalForDept(deptId) {
   if (currentView !== 'list') setView('list');
   setTimeout(() => nlOpenInlineAdd(deptId ? 'dept' : '', deptId || ''), 0);
