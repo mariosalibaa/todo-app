@@ -3551,6 +3551,7 @@ function renderProjectsList() {
     const company = projCompany(p);
     const statusName = status ? statusLabel(status) : '—';
     const companyName = company ? (companyById(company)?.name || company) : '—';
+    const clientName = projectMeta[p]?.clientName || '';
     const createdDate = tasks.find(t => t.project === p)?.createdAt || '—';
     const displayDate = createdDate !== '—' ? new Date(createdDate).toLocaleDateString() : '—';
     const taskCount = allT.length;
@@ -3558,6 +3559,8 @@ function renderProjectsList() {
       <tr data-proj="${esc(p)}" class="plist-row">
         <td class="plist-name-cell" ondblclick="startProjNameEdit('${esc(p)}')"><span class="plist-name" onclick="openProjectTasks('${esc(p)}')">${esc(p)}</span></td>
         <td class="plist-company-cell" onclick="startProjCompanyEdit('${esc(p)}')">${esc(companyName)}</td>
+        <td class="plist-client-cell" onclick="startProjClientEdit('${esc(p)}')" title="Click to set the client">${
+          clientName ? esc(clientName) : '<span style="color:var(--overlay0);">—</span>'}</td>
         <td class="plist-status-cell" onclick="startProjStatusEdit('${esc(p)}')">
           ${status ? `<span style="background:${statusColor(status)}22;color:${statusColor(status)};padding:2px 8px;border-radius:4px;font-weight:500;font-size:0.75rem;">${esc(statusName)}</span>` : statusName}
         </td>
@@ -3580,7 +3583,7 @@ function renderProjectsList() {
     const color = st !== '—' ? statusColor(st) : 'var(--overlay0)';
     const label = st !== '—' ? statusLabel(st) : 'No Status';
     const nTasks = projs.reduce((n, p) => n + tasks.filter(t => t.project === p && !t.archived && !t.done).length, 0);
-    rows += `<tr><td colspan="8" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
+    rows += `<tr><td colspan="9" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
       <span style="width:9px;height:9px;border-radius:50%;background:${color};display:inline-block;margin-right:7px;"></span>${esc(label)}
       <span style="color:var(--overlay0);font-weight:400;text-transform:none;margin-left:6px;font-size:0.66rem;">${projs.length} projects · ${nTasks} open tasks</span></td></tr>`;
     rows += projs.map(projRowHtml).join('');
@@ -3595,6 +3598,7 @@ function renderProjectsList() {
         <tr>
           <th>Project</th>
           <th>Company</th>
+          <th>Client</th>
           <th>Status</th>
           <th>Tasks</th>
           <th>Open</th>
@@ -3646,6 +3650,45 @@ function startProjNameEdit(projName) {
   inp.addEventListener('keydown', e => {
     if (e.key === 'Enter') inp.blur();
     if (e.key === 'Escape') renderProjectsList();
+  });
+}
+
+// Client is free text backed by the shared client datalist: an unknown name is
+// kept as typed, a known one also carries its Odoo id, matching the popover.
+function startProjClientEdit(projName) {
+  const row = document.querySelector(`tr[data-proj="${escAttr(projName)}"]`);
+  const cell = row.querySelector('.plist-client-cell');
+  const cur = projectMeta[projName]?.clientName || '';
+  const inp = document.createElement('input');
+  inp.className = 'plist-edit-select';
+  inp.type = 'text';
+  inp.value = cur;
+  inp.setAttribute('list', 'client-datalist');
+  inp.placeholder = 'Client name';
+  inp.autocomplete = 'off';
+  cell.innerHTML = '';
+  cell.appendChild(inp);
+  inp.focus();
+  inp.select();
+  let closed = false;
+  function commit() {
+    if (closed) return;
+    closed = true;
+    const name = inp.value.trim();
+    if (name !== cur) {
+      if (!projectMeta[projName]) projectMeta[projName] = {};
+      const matched = clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+      projectMeta[projName].clientName = name || null;
+      projectMeta[projName].clientId   = matched ? matched.odooId : null;
+      saveProjectMeta();
+    }
+    renderProjectsList();
+  }
+  inp.addEventListener('change', commit);
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    else if (e.key === 'Escape') { closed = true; renderProjectsList(); }
   });
 }
 
