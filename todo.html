@@ -465,6 +465,20 @@
       cursor: pointer; border-radius: 6px;
     }
     .nl-add:hover { color: var(--accent); background: var(--surface0); }
+    .nl-addrow { background: var(--surface0); }
+    .nl-addrow .nl-inline-input {
+      background: transparent; border: 1px solid var(--accent); border-radius: 5px;
+      color: var(--text); font-size: 0.8rem; font-family: inherit; padding: 3px 8px;
+    }
+    .nl-dchips { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .nl-dchip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 6px; border-radius: 6px; cursor: pointer;
+      font-size: 0.72rem; color: var(--overlay0);
+      border: 1px dashed var(--surface1);
+    }
+    .nl-dchip:hover { color: var(--accent); border-color: var(--accent); background: var(--surface1); }
+    .nl-dchip.set { color: var(--text); border-style: solid; }
 
     /* ── View tabs (ClickUp-style: Board | List | + View) ── */
     .view-tabs {
@@ -6096,11 +6110,16 @@ function _renderTasksBody() {
 
   if (filtered.length === 0) {
     el.innerHTML = `
-      <div class="empty-state">
+      <div class="empty-state" style="padding-bottom:6px;">
         <div class="empty-icon">✓</div>
         <div>No tasks here</div>
-        <div class="empty-hint">Press <b>N</b> or click "+ Add task" to create one</div>
+      </div>
+      <div class="nl-wrap" style="--nl-cols:${nlGridTemplate()};">
+        ${nlDraft && _nlAddCtx && !_nlAddCtx.field
+          ? nlDraftRowHtml()
+          : `<div class="nl-add" onclick="nlInlineAdd(event,'','')">＋ Add task</div>`}
       </div>`;
+    if (nlDraft) setTimeout(() => document.getElementById('nl-inline-input')?.focus(), 0);
     return;
   }
 
@@ -6721,7 +6740,9 @@ function renderNiceList(filtered, el) {
         </div>
         ${!open ? '' : last
           ? colHead + nlSortTasks(g.tasks).map(rowHtml).join('') +
-            `<div class="nl-add" onclick="nlInlineAdd(event,'${f}','${escAttr(String(k))}')">＋ Add task</div>`
+            ((nlDraft && _nlAddCtx && _nlAddCtx.field === f && _nlAddCtx.key === String(k))
+              ? nlDraftRowHtml()
+              : `<div class="nl-add" onclick="nlInlineAdd(event,'${f}','${escAttr(String(k))}')">＋ Add task</div>`)
           : groupBlock(g.tasks, depth + 1, path)}
       </div>`;
     }).join('');
@@ -6755,7 +6776,9 @@ function renderNiceList(filtered, el) {
 
   // Flat when nothing is grouped: one header row, then every task
   const flatHtml = () => colHead + nlSortTasks(pool).map(rowHtml).join('')
-    + `<div class="nl-add" onclick="nlInlineAdd(event,'','')">＋ Add task</div>`;
+    + ((nlDraft && _nlAddCtx && !_nlAddCtx.field)
+        ? nlDraftRowHtml()
+        : `<div class="nl-add" onclick="nlInlineAdd(event,'','')">＋ Add task</div>`);
 
   el.innerHTML = `<div class="nl-wrap ${nlWrapText ? 'wrap-text' : ''}" style="--nl-cols:${nlGridTemplate()};">`
     + (pool.length ? (fields.length ? groupBlock(nlSortTasks(pool), 0, '') : flatHtml()) : `
@@ -7220,9 +7243,6 @@ function nlFind(id) {
   if (nlIsDraft(id)) return nlDraft;
   return tasks.find(x => x.id === id);
 }
-// Replaced in Task 2 by a repaint of the inline row's chip strip.
-function nlDraftChanged() {}
-
 // Department / due date / priority pickers for a task row
 function nlDeptMenu(e, id) {
   e.stopPropagation();
@@ -7852,36 +7872,141 @@ function nlSetStatus(id, val) {
   renderAll();
 }
 
-// "＋ Add task" → inline input row, Enter creates the task in that group
+// "＋ Add task" → a live row on the list's own grid. The name is typed in
+// place; the six chips beside it open the same pickers the saved rows use,
+// so a task can be given an owner and a date before it exists.
+let _nlAddCtx = null;            // { field, key } the row was opened from
+
 function nlInlineAdd(e, field, key) {
-  const row = e.currentTarget;
-  row.outerHTML = `
-    <div class="nl-row" id="nl-inline-add">
+  if (e && e.currentTarget) e.currentTarget.remove();
+  nlOpenInlineAdd(field, key);
+}
+
+function nlOpenInlineAdd(field, key) {
+  _nlAddCtx = { field: field || '', key: key || '' };
+  nlDraft = {
+    id: NL_DRAFT_ID,
+    title: '',
+    assignees: [],
+    due: '',
+    priority: '',
+    taskStatus: field === 'taskstatus' ? (key || '') : '',
+    department: field === 'dept' && key ? key : null,
+    partner: '',
+    done: false,
+  };
+  renderTasks();
+  setTimeout(() => document.getElementById('nl-inline-input')?.focus(), 0);
+}
+
+function nlCloseInlineAdd() {
+  nlDraft = null;
+  _nlAddCtx = null;
+  renderTasks();
+}
+
+// The six chips. A chip that has a value shows the value instead of its icon.
+function nlDraftChipsHtml() {
+  const d = nlDraft;
+  if (!d) return '';
+  const u = userById((d.assignees || [])[0]);
+  const pr = priorityById(d.priority);
+  const dep = deptById(d.department);
+  const chip = (act, title, inner, set) => `
+    <span class="nl-dchip ${set ? 'set' : ''}" onclick="${act}" title="${title}">${inner}</span>`;
+  return `
+    ${chip(`nlAssigneeMenu(event,'${NL_DRAFT_ID}')`, 'Assign', u ? userAvatarHtml(u, 'sm') : '👤', !!u)}
+    ${chip(`nlDueMenu(event,'${NL_DRAFT_ID}')`, 'Due date', d.due ? '📅 ' + formatDate(d.due) : '📅', !!d.due)}
+    ${chip(`nlPrioMenu(event,'${NL_DRAFT_ID}')`, 'Priority', pr ? `<span style="color:${pr.color};">⚑</span> ${esc(pr.name)}` : '⚑', !!pr)}
+    ${chip(`nlStatusMenu(event,'${NL_DRAFT_ID}')`, 'Status',
+        d.taskStatus ? `<span class="nl-status-pill" style="background:${taskStatusColor(d.taskStatus)};">${esc(d.taskStatus.toUpperCase())}</span>` : '◉', !!d.taskStatus)}
+    ${chip(`nlDeptMenu(event,'${NL_DRAFT_ID}')`, 'Department',
+        dep ? `<span class="nl-tag" style="background:${dep.color}22;color:${dep.color};">${esc(dep.name)}</span>` : '🏷', !!dep)}
+    ${chip(`nlVendorMenu(event,'${NL_DRAFT_ID}',null)`, 'Vendor', d.partner ? esc(d.partner) : '🏢', !!d.partner)}`;
+}
+
+// One row on the list grid: name cell, then a blank cell per remaining column.
+function nlDraftRowHtml() {
+  const nCols = nlVisibleCols().length;
+  return `
+    <div class="nl-row nl-addrow" id="nl-inline-add">
       <span class="nl-c-name" style="gap:8px;">
         <span style="color:var(--accent);font-weight:700;">＋</span>
-        <input id="nl-inline-input" type="text" placeholder="Task name… (Enter to save, Esc to cancel)"
-          style="flex:1;background:transparent;border:1px solid var(--accent);border-radius:5px;color:var(--text);font-size:0.8rem;padding:3px 8px;"
-          onkeydown="nlInlineKey(event,'${field}','${escAttr(String(key))}')" onclick="event.stopPropagation()">
+        <input id="nl-inline-input" class="nl-inline-input" type="text" autocomplete="off"
+               placeholder="Task name — Enter to save, Esc to close"
+               value="${escAttr(nlDraft.title || '')}"
+               oninput="nlDraft && (nlDraft.title = this.value)"
+               onkeydown="nlInlineKey(event)" onblur="nlInlineBlur()"
+               onclick="event.stopPropagation()"
+               style="flex:1;min-width:120px;">
+        <span class="nl-dchips">${nlDraftChipsHtml()}</span>
       </span>
+      ${Array.from({ length: Math.max(0, nCols - 1) }, () => '<span></span>').join('')}<span></span><span></span>
     </div>`;
-  document.getElementById('nl-inline-input').focus();
 }
-function nlInlineKey(e, field, key) {
-  if (e.key === 'Escape') { renderTasks(); return; }
-  if (e.key !== 'Enter') return;
-  const title = e.target.value.trim();
-  if (!title) { renderTasks(); return; }
+
+// Repaint only the chips, so a picker can be used without losing the caret.
+function nlDraftChanged() {
+  const host = document.querySelector('#nl-inline-add .nl-dchips');
+  if (host) host.innerHTML = nlDraftChipsHtml();
+}
+
+// Write the draft into tasks[]. Returns the new task, or null if unnamed.
+// The shape matches listAddRow() exactly — same fields, same client lookup —
+// so a task created here is indistinguishable from one added in Table mode.
+function nlCommitDraft() {
+  const d = nlDraft;
+  if (!d) return null;
+  const title = (d.title || '').trim();
+  if (!title) return null;
+  const ctx = _nlAddCtx || { field: '', key: '' };
+  const proj = ctx.field === 'project' && ctx.key ? ctx.key : (filterProject !== 'All' ? filterProject : '');
   const t = {
-    id: uid(), title, done: false, doneAt: null, createdAt: new Date().toISOString(),
-    project: field === 'project' && key ? key : (filterProject !== 'All' ? filterProject : ''),
-    taskStatus: field === 'taskstatus' ? key : '',
-    department: field === 'dept' && key ? key : null,
-    priority: field === 'priority' ? key : '',
-    subtasks: [], assignees: [],
+    id: uid(),
+    title,
+    done: false,
+    doneAt: null,
+    createdAt: new Date().toISOString(),
+    project: proj,
+    taskStatus: d.taskStatus || '',
+    department: d.department || null,
+    priority: d.priority || '',
+    due: d.due || '',
+    partner: d.partner || '',
+    notes: '',
+    taskType: 'task',
+    clientName: projectMeta[proj]?.clientName || '',
+    clientId: projectMeta[proj]?.clientId || null,
+    subtasks: [],
+    assignees: [...(d.assignees || [])],
   };
   tasks.push(t);
   scheduleSave();
-  renderTasks();
+  return t;
+}
+
+function nlInlineKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); nlCloseInlineAdd(); return; }
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const ctx = _nlAddCtx || { field: '', key: '' };
+  const t = nlCommitDraft();
+  if (!t) { nlCloseInlineAdd(); return; }
+  // Saved — reopen a blank row in the same group, so several tasks can be
+  // typed without reaching for the mouse.
+  nlOpenInlineAdd(ctx.field, ctx.key);
+}
+
+// Clicking away keeps a named task rather than discarding what was typed.
+// Deferred, so clicking a chip (which steals focus) does not close the row.
+function nlInlineBlur() {
+  setTimeout(() => {
+    if (!nlDraft) return;
+    if (document.getElementById('ov-prio-menu')) return;   // a picker is open
+    if (document.activeElement?.closest?.('#nl-inline-add')) return;
+    if ((nlDraft.title || '').trim()) nlCommitDraft();
+    nlCloseInlineAdd();
+  }, 150);
 }
 
 function nlNewStatus(name) {
