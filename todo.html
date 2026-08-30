@@ -6785,7 +6785,7 @@ function renderNiceList(filtered, el) {
   // drew nothing at all. Draw it once, at the top of the list, above every
   // group, so it's visible without scrolling; a group-scoped draft (from a
   // group's own "＋ Add task") still renders only inside that group.
-  const topDraftHtml = (fields.length && pool.length && nlDraft && _nlAddCtx && !_nlAddCtx.field)
+  const topDraftHtml = (fields.length && nlDraft && _nlAddCtx && !_nlAddCtx.field)
     ? nlDraftRowHtml() : '';
 
   el.innerHTML = `<div class="nl-wrap ${nlWrapText ? 'wrap-text' : ''}" style="--nl-cols:${nlGridTemplate()};">`
