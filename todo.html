@@ -6778,7 +6778,18 @@ function renderNiceList(filtered, el) {
         ? nlDraftRowHtml()
         : `<div class="nl-add" onclick="nlInlineAdd(event,'','')">＋ Add task</div>`);
 
+  // An ungrouped-context draft (sidebar "+ Add task" / the N shortcut) has
+  // no group of its own to render inside once grouping is on — groupBlock()
+  // only ever draws a draft whose _nlAddCtx.field matches that group's
+  // field. Without this, opening it while grouped set nlDraft/_nlAddCtx but
+  // drew nothing at all. Draw it once, at the top of the list, above every
+  // group, so it's visible without scrolling; a group-scoped draft (from a
+  // group's own "＋ Add task") still renders only inside that group.
+  const topDraftHtml = (fields.length && pool.length && nlDraft && _nlAddCtx && !_nlAddCtx.field)
+    ? nlDraftRowHtml() : '';
+
   el.innerHTML = `<div class="nl-wrap ${nlWrapText ? 'wrap-text' : ''}" style="--nl-cols:${nlGridTemplate()};">`
+    + topDraftHtml
     + (pool.length ? (fields.length ? groupBlock(nlSortTasks(pool), 0, '') : flatHtml()) : `
       <div style="padding:24px 10px;color:var(--overlay0);font-size:0.85rem;">
         Nothing here${nlStatusFilter !== null ? ` with status “${esc(nlStatusCounts().find(c => c.key === nlStatusFilter)?.name || '')}”` : ''}.
