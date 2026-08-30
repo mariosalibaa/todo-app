@@ -877,6 +877,24 @@
     }
     .modal-close:hover { background: rgba(255,255,255,0.15); }
 
+    /* Opening a task docks a panel to the right; the list stays usable. */
+    .modal-overlay.slideover {
+      left: auto; right: 0; background: none;
+      align-items: stretch; justify-content: flex-end;
+      pointer-events: none;
+    }
+    .modal-overlay.slideover .modal {
+      pointer-events: auto;
+      width: 440px; max-width: 96vw; height: 100vh; max-height: 100vh;
+      border-radius: 0; border: none; border-left: 1px solid var(--surface1);
+      box-shadow: -12px 0 40px rgba(0,0,0,0.45);
+      animation: nl-slide-in 0.16s ease-out;
+    }
+    @keyframes nl-slide-in {
+      from { transform: translateX(24px); opacity: 0.6; }
+      to   { transform: none; opacity: 1; }
+    }
+
     .modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 
     .form-group { display: flex; flex-direction: column; gap: 5px; }
@@ -9894,6 +9912,7 @@ function openEditModal(id) {
   renderModalAssignees();
   renderSubtaskList();
   refreshPartnerDatalist();
+  document.getElementById('task-modal').classList.add('slideover');
   openModal('task-modal');
   setTimeout(() => document.getElementById('m-title').focus(), 60);
 }
@@ -10058,7 +10077,11 @@ function saveNewProject() {
 // ── Modal helpers ─────────────────────────────────────────────────────────
 function openModal(id)   { document.getElementById(id).classList.add('open'); }
 function closeModal()    { closeModalById('task-modal'); }
-function closeModalById(id) { document.getElementById(id).classList.remove('open'); }
+function closeModalById(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('open');
+  el.classList.remove('slideover');
+}
 function onOverlayClick(e, id) {
   if (e.target.id !== id) return;
   if (id === 'task-modal') { closeTaskModal(); return; }
