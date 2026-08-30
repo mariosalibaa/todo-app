@@ -7883,6 +7883,11 @@ function nlInlineAdd(e, field, key) {
 }
 
 function nlOpenInlineAdd(field, key) {
+  // A different group's "+ Add task" was clicked while a named draft was
+  // still open — commit it (in its own group, via the current _nlAddCtx)
+  // before it's replaced below, instead of silently discarding the typed
+  // name. A blank draft has nothing worth keeping.
+  if (nlDraft && (nlDraft.title || '').trim()) nlCommitDraft();
   _nlAddCtx = { field: field || '', key: key || '' };
   nlDraft = {
     id: NL_DRAFT_ID,
@@ -7946,9 +7951,20 @@ function nlDraftRowHtml() {
 }
 
 // Repaint only the chips, so a picker can be used without losing the caret.
+// A picker write replaces DOM under the chip strip, which drops focus to
+// <body> — return it to the name input (caret at the end) so Enter still
+// saves the row. The assignee menu is left open across this: it stays open
+// only because its row clicks call e.stopPropagation(), not because of
+// focus, so refocusing the input here does not touch that behaviour.
 function nlDraftChanged() {
   const host = document.querySelector('#nl-inline-add .nl-dchips');
   if (host) host.innerHTML = nlDraftChipsHtml();
+  const inp = document.getElementById('nl-inline-input');
+  if (inp) {
+    inp.focus();
+    const len = inp.value.length;
+    inp.setSelectionRange(len, len);
+  }
 }
 
 // Write the draft into tasks[]. Returns the new task, or null if unnamed.
@@ -7992,8 +8008,10 @@ function nlInlineKey(e) {
   const ctx = _nlAddCtx || { field: '', key: '' };
   const t = nlCommitDraft();
   if (!t) { nlCloseInlineAdd(); return; }
-  // Saved — reopen a blank row in the same group, so several tasks can be
-  // typed without reaching for the mouse.
+  // Saved — clear the now-stale draft before reopening a blank row in the
+  // same group, so nlOpenInlineAdd's own commit-if-named guard doesn't
+  // re-commit this same draft a second time.
+  nlDraft = null;
   nlOpenInlineAdd(ctx.field, ctx.key);
 }
 
