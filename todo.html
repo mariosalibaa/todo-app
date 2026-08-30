@@ -5130,10 +5130,8 @@ function onDeptDrop(e, deptId) {
   renderAll();
 }
 function openAddModalForDept(deptId) {
-  openAddModalForProject(filterProject);
-  editingDept = deptId || null;
-  selectDept(editingDept);
-  renderModalDepts();
+  if (currentView !== 'list') setView('list');
+  setTimeout(() => nlOpenInlineAdd(deptId ? 'dept' : '', deptId || ''), 0);
 }
 function addDeptFromBoard() {
   const name = prompt('New department name:');
@@ -9701,10 +9699,16 @@ function onSubCheck(e, taskId, subId) {
   renderAll();
 }
 
-function openAddModalForProject(proj) {
-  openAddModal();
-  document.getElementById('m-project').value = proj;
+// Creating a task is inline now. These names survive because call sites all
+// over the file use them; they route into the list's inline row.
+function nlStartAdd(proj) {
+  if (proj && proj !== 'All') filterProject = proj;
+  if (currentView !== 'list') setView('list');
+  else renderAll();
+  setTimeout(() => nlOpenInlineAdd('', ''), 0);
 }
+function openAddModal() { nlStartAdd(null); }
+function openAddModalForProject(proj) { nlStartAdd(proj); }
 
 function onCheck(e, id) {
   e.stopPropagation();
@@ -9724,39 +9728,6 @@ function onCheck(e, id) {
 function pushDoneToOdoo(task) { /* disabled: manual sync only */ }
 
 // ── Task modal ────────────────────────────────────────────────────────────
-function openAddModal() {
-  editingId        = null;
-  editingPriority  = '';
-  editingSubtasks  = [];
-  editingAssignees = [];
-  editingTaskType  = 'task';
-  editingDept      = null;
-  window._showAddUserForm = false;
-  document.getElementById('modal-title').textContent = 'New Task';
-  document.getElementById('m-title').value   = '';
-  document.getElementById('m-project').value = filterProject !== 'All' ? filterProject : '';
-  document.getElementById('m-start').value   = '';
-  document.getElementById('m-due').value     = '';
-  document.getElementById('m-notes').value   = '';
-  document.getElementById('m-client').value  = filterProject !== 'All' ? (projectMeta[filterProject]?.clientName || '') : '';
-  renderTaskStatusPicker('');
-  document.getElementById('m-task-partner').value = '';
-  document.getElementById('m-partner').value    = '';
-  document.getElementById('m-balance').value    = '';
-  document.getElementById('m-partner-id').value = '';
-  document.getElementById('delete-btn').style.display  = 'none';
-  document.getElementById('archive-btn').style.display = 'none';
-  document.getElementById('m-audit').style.display = 'none';
-  setPriorityUI('');
-  selectDept(null);
-  renderModalDepts();
-  renderModalAssignees();
-  renderSubtaskList();
-  refreshPartnerDatalist();
-  openModal('task-modal');
-  setTimeout(() => document.getElementById('m-title').focus(), 60);
-}
-
 function openEditModal(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
