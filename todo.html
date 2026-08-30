@@ -7210,10 +7210,23 @@ function nlEditText(e, kind, taskId, subId) {
   inp.select();
 }
 
+// ── The pending inline new task ───────────────────────────────────────────
+// The list's field pickers all resolve their target with nlFind, so the same
+// menus that edit a saved task also fill in a task that does not exist yet.
+const NL_DRAFT_ID = '__draft__';
+let nlDraft = null;
+function nlIsDraft(id) { return id === NL_DRAFT_ID; }
+function nlFind(id) {
+  if (nlIsDraft(id)) return nlDraft;
+  return tasks.find(x => x.id === id);
+}
+// Replaced in Task 2 by a repaint of the inline row's chip strip.
+function nlDraftChanged() {}
+
 // Department / due date / priority pickers for a task row
 function nlDeptMenu(e, id) {
   e.stopPropagation();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   const rows = departments.map(d => `
       <div class="nl-pick-row" onclick="nlSetTaskField('${id}','department','${d.id}')" style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-radius:6px;font-size:0.78rem;font-weight:${t.department === d.id ? 700 : 400};"
@@ -7322,7 +7335,7 @@ function nlNewDept(e, taskId) {
 
 function nlPrioMenu(e, id) {
   e.stopPropagation();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   const rows = priorities.map(pr => nlPickRow(
       `<span style="color:${pr.color};">⚑</span> ${esc(pr.name)}`,
@@ -7332,7 +7345,7 @@ function nlPrioMenu(e, id) {
 }
 function nlDueMenu(e, id) {
   e.stopPropagation();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   const rows = `<div style="padding:6px 10px;" onclick="event.stopPropagation()">
@@ -7347,9 +7360,10 @@ function nlDueMenu(e, id) {
 }
 function nlSetTaskField(id, field, value) {
   closeOvMenu();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t || t[field] === value) return;
   t[field] = value;
+  if (nlIsDraft(id)) { nlDraftChanged(); return; }
   scheduleSave();
   renderAll();
 }
@@ -7395,7 +7409,7 @@ function nlAllVendors() {
 // taskId alone = the task's vendor; with subId = that subtask's vendor
 function nlVendorMenu(e, taskId, subId) {
   e.stopPropagation();
-  const t = tasks.find(x => x.id === taskId);
+  const t = nlFind(taskId);
   if (!t) return;
   const x = subId ? (t.subtasks || []).find(y => y.id === subId) : null;
   if (subId && !x) return;
@@ -7417,9 +7431,10 @@ function nlVendorMenu(e, taskId, subId) {
 function nlSetVendor(taskId, subId, value) {
   closeOvMenu();
   if (subId) { setSubField(taskId, subId, 'partner', value); return; }
-  const t = tasks.find(x => x.id === taskId);
+  const t = nlFind(taskId);
   if (!t) return;
   t.partner = value;
+  if (nlIsDraft(taskId)) { nlDraftChanged(); return; }
   scheduleSave();
   if (typeof refreshPartnerDatalist === 'function') refreshPartnerDatalist();
   renderAll();
@@ -7731,7 +7746,7 @@ function nlAssigneeItems(t) {
 function nlAssigneeMenu(e, id) {
   e.stopPropagation();
   closeOvMenu();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   const m = document.createElement('div');
   m.id = 'ov-prio-menu';
@@ -7750,6 +7765,12 @@ function nlAssigneeMenu(e, id) {
 }
 // Repaint just this cell and the ticks, so the menu stays open for multi-select
 function nlRefreshAssignee(t) {
+  if (nlIsDraft(t.id)) {
+    nlDraftChanged();
+    const dm = document.getElementById('ov-prio-menu');
+    if (dm && dm.dataset.task === t.id) dm.innerHTML = nlAssigneeItems(t);
+    return;
+  }
   const cell = document.querySelector(`.nl-c-assignee[data-task="${t.id}"]`);
   if (cell) cell.innerHTML = nlAssigneeCellInner(t);
   const m = document.getElementById('ov-prio-menu');
@@ -7757,25 +7778,25 @@ function nlRefreshAssignee(t) {
 }
 function nlToggleAssignee(e, id, userId) {
   e.stopPropagation();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   if (!Array.isArray(t.assignees)) t.assignees = [];
   const i = t.assignees.indexOf(userId);
   if (i < 0) t.assignees.push(userId); else t.assignees.splice(i, 1);
-  scheduleSave();
+  if (!nlIsDraft(id)) scheduleSave();
   nlRefreshAssignee(t);
 }
 function nlClearAssignees(e, id) {
   e.stopPropagation();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   t.assignees = [];
-  scheduleSave();
+  if (!nlIsDraft(id)) scheduleSave();
   nlRefreshAssignee(t);
 }
 function nlNewAssignee(e, id) {
   e.stopPropagation();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   const name = (prompt('New person name:') || '').trim();
   if (!name) return;
@@ -7783,7 +7804,7 @@ function nlNewAssignee(e, id) {
   if (!u) return;
   if (!Array.isArray(t.assignees)) t.assignees = [];
   if (!t.assignees.includes(u.id)) t.assignees.push(u.id);
-  scheduleSave();
+  if (!nlIsDraft(id)) scheduleSave();
   nlRefreshAssignee(t);
 }
 
@@ -7791,7 +7812,7 @@ function nlNewAssignee(e, id) {
 function nlStatusMenu(e, id) {
   e.stopPropagation();
   closeOvMenu();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   const m = document.createElement('div');
   m.id = 'ov-prio-menu';
@@ -7818,7 +7839,7 @@ function nlStatusMenu(e, id) {
 }
 function nlSetStatus(id, val) {
   closeOvMenu();
-  const t = tasks.find(x => x.id === id);
+  const t = nlFind(id);
   if (!t) return;
   if (val === '__done__') {
     t.done = true; t.doneAt = new Date().toISOString();
@@ -7826,6 +7847,7 @@ function nlSetStatus(id, val) {
     if (t.done) { t.done = false; t.doneAt = null; }
     t.taskStatus = val;
   }
+  if (nlIsDraft(id)) { nlDraftChanged(); return; }
   scheduleSave();
   renderAll();
 }
