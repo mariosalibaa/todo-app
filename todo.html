@@ -801,7 +801,6 @@
     .task-list { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px; }
     .empty-state { margin: 50px auto; text-align: center; color: var(--overlay0); font-size: 0.9rem; }
     .empty-icon { font-size: 2.4rem; margin-bottom: 10px; }
-    .empty-hint { font-size: 0.78rem; margin-top: 5px; color: var(--surface2); }
     .group-header {
       font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.09em; color: var(--overlay0);
@@ -1656,7 +1655,7 @@
 <div class="modal-overlay" id="task-modal" onclick="onOverlayClick(event,'task-modal')">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title" id="modal-title">New Task</span>
+      <span class="modal-title" id="modal-title">Edit Task</span>
       <button class="modal-close" onclick="closeTaskModal()">×</button>
     </div>
     <div class="modal-body">
@@ -5207,7 +5206,7 @@ function kanbanAddCardHtml(kind, key) {
     <div class="kanban-card" style="border:1px solid var(--accent);">
       <input id="kb-add-input" type="text" autocomplete="off"
              placeholder="Task name — Enter to save, Esc to close"
-             onkeydown="kanbanAddKey(event)" onblur="kanbanAddBlur()"
+             onkeydown="kanbanAddKey(event)" onblur="kanbanAddBlur(event)"
              style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:0.8rem;font-family:inherit;">
     </div>`;
 }
@@ -5244,29 +5243,41 @@ function kanbanAddKey(e) {
   if (!title) { _kbAdd = null; renderAll(); return; }
   const ctx = _kbAdd;
   kanbanAddCommit(title);
+  e.target.value = '';             // so this input's stale blur has nothing to re-save
   _kbAdd = ctx;                    // keep the column open for the next one
   renderAll();
   setTimeout(() => document.getElementById('kb-add-input')?.focus(), 0);
 }
-function kanbanAddBlur() {
+function kanbanAddBlur(e) {
+  // Capture the text and the column now: by the time the delay is over the
+  // board may have been re-rendered (another column's card was opened) and
+  // #kb-add-input is then a different, empty input belonging to that column.
+  // Like the List view's inline row, what was typed is kept, not dropped.
+  const title = ((e && e.target && e.target.value) || '').trim();
+  const ctx = _kbAdd;
   setTimeout(() => {
     const inp = document.getElementById('kb-add-input');
-    if (!_kbAdd || !inp) return;
-    // Enter reopens a fresh input and refocuses it, which orphans this blur's
-    // original target and fires a second, stale blur on it — if focus is
-    // back on the (new) input, this is that stale callback, so leave it open.
-    if (document.activeElement === inp) return;
-    const title = inp.value.trim();
-    if (title) kanbanAddCommit(title);
+    const moved = !!inp && document.activeElement === inp;
+    // _kbAdd is null only when Escape closed the card — that discards on purpose.
+    const save = title && ctx && _kbAdd;
+    if (save) {
+      const cur = _kbAdd;
+      _kbAdd = ctx;                // commit into the column the text was typed in
+      kanbanAddCommit(title);
+      _kbAdd = cur;
+    }
+    if (moved) {                   // a fresh card has focus — leave it open
+      if (save) {
+        renderAll();
+        setTimeout(() => document.getElementById('kb-add-input')?.focus(), 0);
+      }
+      return;
+    }
     _kbAdd = null;
     renderAll();
   }, 150);
 }
 
-function openAddModalForDept(deptId) {
-  if (currentView !== 'list') setView('list');
-  setTimeout(() => nlOpenInlineAdd(deptId ? 'dept' : '', deptId || ''), 0);
-}
 function addDeptFromBoard() {
   const name = prompt('New department name:');
   if (!name || !name.trim()) return;
@@ -6235,6 +6246,7 @@ function _renderTasksBody() {
   renderGroupBar();
   const el = document.getElementById('task-list');
   const filtered = getFiltered();
+  _nlDraftShown = false;
 
   document.getElementById('toolbar-title').textContent = toolbarCrumbs();
   document.getElementById('task-count').textContent =
@@ -6251,6 +6263,7 @@ function _renderTasksBody() {
           ? nlDraftRowHtml()
           : `<div class="nl-add" onclick="nlInlineAdd(event,'','')">＋ Add task</div>`}
       </div>`;
+    nlDropUndrawnDraft();
     if (nlDraft) setTimeout(() => document.getElementById('nl-inline-input')?.focus(), 0);
     return;
   }
@@ -6258,6 +6271,7 @@ function _renderTasksBody() {
   // Default: ClickUp-style clean list; "Table" toggle switches to the editing grid
   if (listMode === 'table') renderListTable(filtered, el);
   else renderNiceList(filtered, el);
+  nlDropUndrawnDraft();
   return;
 
   // eslint-disable-next-line no-unreachable
@@ -6919,7 +6933,9 @@ function renderNiceList(filtered, el) {
   // drew nothing at all. Draw it once, at the top of the list, above every
   // group, so it's visible without scrolling; a group-scoped draft (from a
   // group's own "＋ Add task") still renders only inside that group.
-  const topDraftHtml = (fields.length && nlDraft && _nlAddCtx && !_nlAddCtx.field)
+  // Drawn at the top too when a filter has emptied the list, so the row stays
+  // visible instead of being discarded by nlDropUndrawnDraft().
+  const topDraftHtml = ((fields.length || !pool.length) && nlDraft && _nlAddCtx && !_nlAddCtx.field)
     ? nlDraftRowHtml() : '';
 
   el.innerHTML = `<div class="nl-wrap ${nlWrapText ? 'wrap-text' : ''}" style="--nl-cols:${nlGridTemplate()};">`
@@ -7491,8 +7507,10 @@ function nlNewDept(e, taskId) {
   const palette = ['#f5c2e7', '#eba0ac', '#74c7ec', '#b4befe', '#a6e3a1', '#f9e2af', '#89b4fa', '#cba6f7'];
   departments.push({ id, name, color: palette[departments.length % palette.length] });
   saveDepartments();
-  const t = tasks.find(x => x.id === taskId);
-  if (t) { t.department = id; scheduleSave(); }
+  const t = nlFind(taskId);
+  if (t) t.department = id;
+  if (nlIsDraft(taskId)) { nlDraftChanged(); return; }   // keep the draft row and its focus
+  if (t) scheduleSave();
   renderAll();
 }
 
@@ -8038,7 +8056,11 @@ function nlOpenInlineAdd(field, key) {
     assignees: [],
     due: '',
     priority: '',
-    taskStatus: field === 'taskstatus' ? (key || '') : '',
+    // A live status filter would hide the row the moment it is saved, so the
+    // draft starts in that status. '__done__' is not a taskStatus value —
+    // nlCommitDraft clears the filter instead for that one.
+    taskStatus: field === 'taskstatus' ? (key || '')
+      : (nlStatusFilter && nlStatusFilter !== '__done__' ? nlStatusFilter : ''),
     department: field === 'dept' && key ? key : null,
     partner: '',
     done: false,
@@ -8073,8 +8095,21 @@ function nlDraftChipsHtml() {
     ${chip(`nlVendorMenu(event,'${NL_DRAFT_ID}',null)`, 'Vendor', d.partner ? esc(d.partner) : '🏢', !!d.partner)}`;
 }
 
+// A draft only lives as long as its row is on screen. Every render marks
+// whether the row was actually drawn; nlDropUndrawnDraft() then throws away a
+// draft the user can no longer see (the group bar changed, its group was
+// collapsed, a filter removed it), so it can never be committed later into a
+// context that no longer exists. Discarding beats saving behind their back.
+let _nlDraftShown = false;
+function nlDropUndrawnDraft() {
+  if (!nlDraft || _nlDraftShown) return;
+  nlDraft = null;
+  _nlAddCtx = null;
+}
+
 // One row on the list grid: name cell, then a blank cell per remaining column.
 function nlDraftRowHtml() {
+  _nlDraftShown = true;
   const nCols = nlVisibleCols().length;
   return `
     <div class="nl-row nl-addrow" id="nl-inline-add">
@@ -8123,8 +8158,8 @@ function nlCommitDraft() {
   const t = {
     id: uid(),
     title,
-    done: false,
-    doneAt: null,
+    done: !!d.done,
+    doneAt: d.doneAt || null,
     createdAt: new Date().toISOString(),
     project: proj,
     taskStatus: d.taskStatus || '',
@@ -8140,6 +8175,11 @@ function nlCommitDraft() {
     assignees: [...(d.assignees || [])],
   };
   tasks.push(t);
+  // A status filter that excludes the new task would hide it the instant it is
+  // created, which reads as a save that failed. The draft pre-fills the filtered
+  // status where it can; where it cannot (the "Done" pseudo-status, or a chip
+  // that changed the status by hand) drop the filter so the result stays in view.
+  if (nlStatusFilter !== null && nlStatusKey(t) !== nlStatusFilter) nlStatusFilter = null;
   scheduleSave();
   return t;
 }
@@ -8155,6 +8195,9 @@ function nlInlineKey(e) {
   // same group, so nlOpenInlineAdd's own commit-if-named guard doesn't
   // re-commit this same draft a second time.
   nlDraft = null;
+  // The pickers tick against the draft id, so one left open would look like it
+  // still belongs to the task just saved — close it before the blank row opens.
+  closeOvMenu();
   nlOpenInlineAdd(ctx.field, ctx.key);
 }
 
@@ -8196,13 +8239,6 @@ function nlToggle(enc) {
   const k = decodeURIComponent(enc);
   _nlCollapsed.has(k) ? _nlCollapsed.delete(k) : _nlCollapsed.add(k);
   renderTasks();
-}
-
-function nlAddTask(field, key) {
-  openAddModalForProject(field === 'project' && key ? key : (filterProject !== 'All' ? filterProject : ''));
-  if (field === 'dept' && key) { editingDept = key; selectDept(key); renderModalDepts(); }
-  if (field === 'taskstatus' && key) renderTaskStatusPicker(key);
-  if (field === 'priority' && key) { editingPriority = key; setPriorityUI(key); }
 }
 
 function updateDatalist() {
@@ -9850,6 +9886,12 @@ function nlStartAdd(proj) {
   if (proj && proj !== 'All') filterProject = proj;
   if (currentView !== 'list') setView('list');
   else renderAll();
+  // Table mode never draws the inline draft row — it has its own add row at the
+  // top of the grid, so focus that instead of setting a draft nothing can show.
+  if (listMode === 'table') {
+    setTimeout(() => { _listAddFocus = true; renderTasks(); }, 0);
+    return;
+  }
   setTimeout(() => nlOpenInlineAdd('', ''), 0);
 }
 function openAddModal() { nlStartAdd(null); }
@@ -9876,6 +9918,10 @@ function pushDoneToOdoo(task) { /* disabled: manual sync only */ }
 function openEditModal(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
+  // Switching task inside the open slide-over would throw away unsaved edits.
+  // Gated on the panel being open: editingId is not cleared on close, so an
+  // ungated guard would write stale field values over a later inline rename.
+  if (document.getElementById('task-modal').classList.contains('open') && editingId && editingId !== id) saveTask();
   editingId        = id;
   editingPriority  = t.priority || '';
   editingSubtasks  = (t.subtasks || []).map(s => ({ ...s }));
