@@ -234,6 +234,10 @@
 
     /* ── ClickUp-style list ── */
     .nl-wrap { padding: 6px 4px; overflow-x: auto; }
+    /* The nice list scrolls inside .nl-wrap so its header row can stay frozen;
+       the Table mode keeps scrolling on .task-list (its own sticky <th>). */
+    .task-list:has(> .nl-wrap) { overflow: hidden; }
+    .task-list > .nl-wrap { flex: 1; min-height: 0; overflow: auto; }
     .nl-group { margin-bottom: 18px; }
     .nl-group-head {
       display: flex; align-items: center; gap: 8px;
@@ -295,6 +299,11 @@
       font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em;
       text-transform: uppercase; color: var(--overlay0);
       border-bottom: 1px solid var(--surface1); padding-top: 6px;
+      /* Frozen title row (Excel "Freeze Top Row"), same as the Project List's
+         header: .nl-wrap is the scroller, so the header pins right under the
+         (also frozen) column-filter row. */
+      position: sticky; top: 30px; z-index: 6;
+      background: var(--surface0);
     }
     .nl-row { cursor: pointer; font-size: 0.8rem; }
     .nl-row:hover { background: var(--surface0); }
@@ -1111,8 +1120,75 @@
       cursor: pointer; font-size: 0.66rem; transition: all 0.1s;
     }
     .plist-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .plist-name-cell, .plist-company-cell, .plist-status-cell { cursor: pointer; transition: background 0.1s; }
-    .plist-name-cell:hover, .plist-company-cell:hover, .plist-status-cell:hover { background: var(--surface0); }
+    .plist-company-cell, .plist-status-cell, .plist-client-cell { cursor: pointer; transition: background 0.1s; }
+    .plist-company-cell:hover, .plist-status-cell:hover, .plist-client-cell:hover { background: var(--surface0); }
+    /* Project name: always an input, exactly like the task-title cell */
+    .content-add-bar { padding: 12px 16px 4px; display: flex; gap: 8px; flex: 0 0 auto; }
+    /* ── Search palette (Ctrl+K, ClickUp-style) ── */
+    .sp-overlay { align-items: flex-start; justify-content: center; }
+    .sp-panel {
+      margin-top: 90px; width: 620px; max-width: calc(100vw - 32px);
+      background: var(--mantle); border: 1px solid var(--surface1); border-radius: 12px;
+      box-shadow: 0 16px 48px #000a; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sp-input {
+      background: transparent; border: none; outline: none; color: var(--text);
+      font-size: 0.95rem; padding: 14px 16px; border-bottom: 1px solid var(--surface0); font-family: inherit;
+    }
+    .sp-chips { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--surface0); flex-wrap: wrap; }
+    .sp-chip {
+      font-size: 0.7rem; color: var(--overlay1); border: 1px solid var(--surface1);
+      border-radius: 12px; padding: 2px 10px; cursor: pointer; white-space: nowrap;
+    }
+    .sp-chip:hover { color: var(--text); border-color: var(--surface2); }
+    .sp-chip.on {
+      color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+    .sp-chip .sp-n { opacity: 0.6; margin-left: 3px; }
+    .sp-results { max-height: 52vh; overflow-y: auto; padding: 4px 0 8px; }
+    .sp-ghead {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--overlay0); padding: 9px 16px 3px;
+    }
+    .sp-row { display: flex; align-items: center; gap: 9px; padding: 6px 16px; cursor: pointer; font-size: 0.82rem; color: var(--text); }
+    .sp-row.hl { background: var(--surface0); }
+    .sp-ic { width: 18px; text-align: center; flex-shrink: 0; opacity: 0.85; }
+    .sp-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .sp-row.done .sp-name { text-decoration: line-through; color: var(--overlay1); }
+    .sp-ctx { color: var(--overlay0); font-size: 0.7rem; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .sp-when { margin-left: auto; color: var(--overlay0); font-size: 0.66rem; flex-shrink: 0; }
+    .sp-status-pill { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.05em; color: #11111b; padding: 1px 7px; border-radius: 8px; flex-shrink: 0; }
+    .sp-more { padding: 4px 16px 6px; font-size: 0.72rem; color: var(--accent); cursor: pointer; }
+    .sp-more:hover { text-decoration: underline; }
+    .sp-empty { padding: 22px 16px; color: var(--overlay0); font-size: 0.8rem; }
+    /* ── Task-list column filter row (same idea as .plist-filter-row) ── */
+    .nl-frow {
+      display: grid;
+      grid-template-columns: var(--nl-cols, 320px 110px 130px 110px 105px 130px 26px minmax(0, 1fr));
+      gap: 8px; align-items: center;
+      padding: 4px 8px 4px 26px; min-width: max-content;
+      position: sticky; top: 0; z-index: 7;
+      background: var(--mantle); border-bottom: 1px solid var(--surface1);
+    }
+    .nl-finp {
+      width: 100%; box-sizing: border-box; background: var(--base); color: var(--text);
+      border: 1px solid var(--surface1); border-radius: 4px; height: 21px;
+      padding: 2px 6px; font-size: 0.7rem; font-family: inherit; outline: none;
+    }
+    .nl-finp:focus { border-color: var(--accent); }
+    .nl-finp.set { border-color: var(--accent); background: rgba(30,102,245,0.10); }
+    select.nl-finp { cursor: pointer; }
+    .nl-fclear { cursor: pointer; color: var(--overlay0); font-size: 0.7rem; text-align: center; border-radius: 4px; }
+    .nl-fclear:hover { color: var(--red, #f38ba8); background: var(--surface0); }
+    .plist-name-wrap { display: flex; align-items: center; gap: 4px; }
+    .plist-name-inp {
+      flex: 1; min-width: 0; background: transparent;
+      border: 1px solid transparent; border-radius: 4px;
+      color: var(--accent); font-weight: 600; font-size: 0.8rem; padding: 3px 5px;
+    }
+    .plist-name-inp:hover { border-color: var(--surface1); }
+    .plist-name-inp:focus { border-color: var(--accent); outline: none; background: var(--base); color: var(--text); }
     .plist-edit-input {
       background: var(--surface1); border: 1px solid var(--accent); border-radius: 4px;
       color: var(--text); padding: 3px 6px; font-size: 0.8rem; outline: none;
@@ -1574,7 +1650,6 @@
     <div class="sidebar-divider"></div>
     <div id="views-section"></div>
     <div class="sidebar-footer">
-      <button class="add-btn" onclick="openAddModal()" style="width:100%;margin-bottom:2px;">+ Add task</button>
       <button class="add-project-btn" id="sb-settings-btn" onclick="toggleSbSettings()" title="Show/hide the settings menu"><span id="sb-settings-caret">▸</span> ⚙ Settings</button>
       <div id="sb-settings-group" style="display:none;flex-direction:column;gap:4px;padding-left:8px;">
         <button class="add-project-btn" onclick="syncOdoo(this)">⇅ Sync Odoo</button>
@@ -1598,8 +1673,10 @@
       <span class="toolbar-title" id="toolbar-title" onclick="selectProject('All')" style="cursor:pointer;" title="Show all tasks">All Tasks</span>
       <span class="task-count" id="task-count"></span>
       <input class="search-input" type="text" placeholder="Task…" id="search-input" oninput="onSearch(this.value)">
+      <button class="tb-btn" id="palette-btn" onclick="spOpen()" title="Search everything (Ctrl+K)">🔍 <span class="vb-label">Ctrl+K</span></button>
       <div class="tb-pop-wrap" id="filters-wrap">
-      <button class="tb-btn tb-pop-btn" id="filters-btn" onclick="toggleTbPop(event,'filters-wrap')">&#9662; Filters</button>
+      <!-- Filters popover retired 2026-08-31 (palette + column filters replace it); elements kept for the filter renderers -->
+      <button class="tb-btn tb-pop-btn" id="filters-btn" style="display:none;" onclick="toggleTbPop(event,'filters-wrap')">&#9662; Filters</button>
       <div class="tb-pop">
       <input class="search-input" type="text" placeholder="Project…" id="project-search-input" oninput="onProjectSearch(this.value)">
       <div class="filter-group">
@@ -1623,7 +1700,8 @@
       </div>
       </div>
       <div class="tb-pop-wrap" id="options-wrap">
-      <button class="tb-btn tb-pop-btn" id="options-btn" onclick="toggleTbPop(event,'options-wrap')">&#9662; Options</button>
+      <!-- Options popover retired 2026-08-31; elements kept because view code toggles them by id -->
+      <button class="tb-btn tb-pop-btn" id="options-btn" style="display:none;" onclick="toggleTbPop(event,'options-wrap')">&#9662; Options</button>
       <div class="tb-pop">
       <button class="tb-btn active" id="show-done-btn" onclick="toggleShowDone()">Show done</button>
       <button class="tb-btn" id="show-archived-btn" onclick="toggleShowArchived()">Archived</button>
@@ -1659,6 +1737,10 @@
     <div class="view-tabs" id="view-tabs"></div>
     <div class="gb-bar" id="gb-bar"></div>
     <div class="active-filters-bar" id="active-filters-bar" style="display:none;"></div>
+    <!-- Same spot as the Project List's "+ New Project": top-left, above the table -->
+    <div class="content-add-bar" id="content-add-bar" style="display:none;">
+      <button class="save-btn" onclick="openAddModal()" style="padding:6px 14px;font-size:0.82rem;">+ Add task</button>
+    </div>
     <div class="task-list" id="task-list" style="display:none"></div>
     <div id="classic-view" style="display:none;flex:1;overflow:auto;"></div>
     <div class="kanban-board" id="kanban-board"></div>
@@ -1670,6 +1752,17 @@
     <div id="gantt-view"></div>
     <div id="dashboard-view"></div>
     <div id="trash-view" style="display:none;flex:1;overflow-y:auto;padding:14px 18px;"></div>
+  </div>
+</div>
+
+<!-- ── Search palette (Ctrl+K) ── -->
+<div class="modal-overlay sp-overlay" id="sp-overlay" onclick="if(event.target.id==='sp-overlay') spClose()">
+  <div class="sp-panel">
+    <input class="sp-input" id="sp-input" type="text" placeholder="Search tasks, projects, clients, people, departments…"
+           autocomplete="off" spellcheck="false"
+           oninput="spQuery(this.value)" onkeydown="spKey(event)">
+    <div class="sp-chips" id="sp-chips"></div>
+    <div class="sp-results" id="sp-results"></div>
   </div>
 </div>
 
@@ -3689,7 +3782,15 @@ function renderProjectsList() {
     const taskCount = allT.length;
     return `
       <tr data-proj="${esc(p)}" class="plist-row">
-        <td class="plist-name-cell" ondblclick="startProjNameEdit('${esc(p)}')"><span class="plist-name" onclick="openProjectTasks('${esc(p)}')">${esc(p)}</span></td>
+        <td class="plist-name-cell">
+          <div class="plist-name-wrap">
+            <button class="tt-open-btn" onclick="openProjectTasks('${esc(p)}')" title="Open this project's tasks">⛶</button>
+            <input class="plist-name-inp" type="text" value="${esc(p)}" title="Type to rename · Enter to save · Esc to cancel"
+                   onfocus="this.select()"
+                   onchange="commitProjNameEdit(this,'${esc(p)}')"
+                   onkeydown="plistNameKey(event,this,'${esc(p)}')">
+          </div>
+        </td>
         <td class="plist-company-cell" onclick="startProjCompanyEdit('${esc(p)}')">${esc(companyName)}</td>
         <td class="plist-client-cell" onclick="startProjClientEdit('${esc(p)}')" title="Click to set the client">${
           clientName ? esc(clientName) : '<span style="color:var(--overlay0);">—</span>'}</td>
@@ -3799,26 +3900,25 @@ function renameProject(oldName, newName) {
   return true;
 }
 
+// The name cell is a live input (same pattern as the task-title cell): typing
+// and leaving the field renames the project everywhere.
+function commitProjNameEdit(inp, oldName) {
+  const newName = inp.value.trim();
+  if (!newName || newName === oldName) { inp.value = oldName; return; }
+  if (renameProject(oldName, newName)) renderProjectsList();
+  else inp.value = oldName;   // duplicate / rejected — put the old name back
+}
+
+function plistNameKey(e, inp, oldName) {
+  if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+  else if (e.key === 'Escape') { e.preventDefault(); inp.value = oldName; inp.blur(); }
+}
+
+// Focus the name input of a row (used by anything that wants to start a rename)
 function startProjNameEdit(projName) {
   const row = document.querySelector(`tr[data-proj="${escAttr(projName)}"]`);
-  const cell = row.querySelector('.plist-name-cell');
-  const inp = document.createElement('input');
-  inp.className = 'plist-edit-input';
-  inp.value = projName;
-  inp.style.width = '150px';
-  cell.innerHTML = '';
-  cell.appendChild(inp);
-  inp.focus();
-  inp.select();
-  function commit() {
-    renameProject(projName, inp.value.trim());
-    renderProjectsList();
-  }
-  inp.addEventListener('blur', commit);
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') inp.blur();
-    if (e.key === 'Escape') renderProjectsList();
-  });
+  const inp = row && row.querySelector('.plist-name-inp');
+  if (inp) { inp.focus(); inp.select(); }
 }
 
 // Client is free text backed by the shared client datalist: an unknown name is
@@ -5065,6 +5165,10 @@ function setView(v, keepStack) {
   document.getElementById('gantt-view').style.display        = isGantt       ? 'block' : 'none';
   document.getElementById('dashboard-view').style.display    = isDashboard   ? 'block' : 'none';
   document.getElementById('trash-view').style.display        = isTrash       ? 'block' : 'none';
+  // "+ Add task" sits above the table in every task view; the Project List has
+  // its own "+ New Project" button in that same slot.
+  document.getElementById('content-add-bar').style.display =
+    (isList || isKanban || isClassic || isStatusBoard || isGantt) ? '' : 'none';
   if (isTrash) renderTrash();
   document.getElementById('view-statusboard-btn').classList.toggle('active', isStatusBoard);
   document.getElementById('view-gantt-btn').classList.toggle('active', isGantt);
@@ -6795,6 +6899,8 @@ function nlHeadUp() {
 }
 
 function renderNiceList(filtered, el) {
+  // Per-column filter row (same idea as the Project List's) narrows first
+  filtered = filtered.filter(nlColFilterMatch);
   // Every level in the group bar nests inside the one before it.
   // No levels means a flat list — not a hidden default grouping.
   const fields = listGroupLevels.filter(f => f !== 'subtask');
@@ -7090,6 +7196,7 @@ function renderNiceList(filtered, el) {
     ? nlDraftRowHtml() : '';
 
   el.innerHTML = `<div class="nl-wrap ${nlWrapText ? 'wrap-text' : ''}" style="--nl-cols:${nlGridTemplate()};">`
+    + nlFilterRowHtml()
     + topDraftHtml
     + (pool.length ? (fields.length ? groupBlock(nlSortTasks(pool), 0, '') : flatHtml()) : `
       <div style="padding:24px 10px;color:var(--overlay0);font-size:0.85rem;">
@@ -10291,9 +10398,298 @@ function closeTaskModal() {
   else closeModal();
 }
 
+// ── Search palette (Ctrl+K, ClickUp-style) ────────────────────────────────
+let spText = '', spType = 'all', spHl = 0, spRows = [];
+const SP_TYPES = [
+  ['all', 'All'], ['task', 'Tasks'], ['project', 'Projects'], ['client', 'Clients'],
+  ['person', 'People'], ['dept', 'Departments'], ['company', 'Companies'], ['vendor', 'Vendors']
+];
+const SP_ICONS = { task: '☑', project: '▦', client: '🏷', person: '👤', dept: '🏬', company: '🏢', vendor: '🚚' };
+
+function spOpen() {
+  spText = ''; spType = 'all'; spHl = 0;
+  const inp = document.getElementById('sp-input');
+  inp.value = '';
+  document.getElementById('sp-overlay').classList.add('open');
+  spRender();
+  setTimeout(() => inp.focus(), 0);
+}
+function spClose() { document.getElementById('sp-overlay').classList.remove('open'); }
+function spQuery(v) { spText = v; spHl = 0; spRender(); }
+function spSetType(t) { spType = t; spHl = 0; spRender(); document.getElementById('sp-input').focus(); }
+
+function spTaskStatus(t) {
+  if (t.done) return { name: 'Done', color: 'var(--green)' };
+  const st = taskStatuses.find(s => s.name === t.taskStatus);
+  return st ? { name: st.name, color: st.color } : { name: 'To Do', color: 'var(--surface2)' };
+}
+
+// All matches for the current query, grouped by type. Starts-with beats
+// contains; tasks then sort most-recent first with done ones last.
+function spMatches() {
+  const q = spText.trim().toLowerCase();
+  const res = { task: [], project: [], client: [], person: [], dept: [], company: [], vendor: [] };
+  if (!q) return res;
+  const rk = name => (name || '').toLowerCase().startsWith(q) ? 0 : 1;
+
+  tasks.filter(t => !t.archived).forEach(t => {
+    const hay = (t.title + ' ' + (t.notes || '') + ' ' + (t.partner || t.acctPartner || '') + ' '
+      + (t.subtasks || []).filter(s => !s.deleted).map(s => s.text).join(' ')).toLowerCase();
+    if (!hay.includes(q)) return;
+    const st = spTaskStatus(t);
+    res.task.push({
+      type: 'task', icon: SP_ICONS.task, name: t.title, done: t.done,
+      ctx: t.project ? 'in ' + t.project : '', pill: st,
+      when: nlAgo(t.updatedAt || t.createdAt), _rk: rk(t.title), _ts: t.updatedAt || t.createdAt || '',
+      act: () => { spClose(); openEditModal(t.id); }
+    });
+  });
+  res.task.sort((a, b) => (a.done - b.done) || (a._rk - b._rk) || (a._ts < b._ts ? 1 : -1));
+
+  getProjects().forEach(p => {
+    const client = projectMeta[p]?.clientName || '';
+    if (!(p.toLowerCase().includes(q) || client.toLowerCase().includes(q))) return;
+    const open = tasks.filter(t => t.project === p && !t.archived && !t.done).length;
+    res.project.push({
+      type: 'project', icon: SP_ICONS.project, name: p,
+      ctx: client || (open ? open + ' open' : ''), _rk: rk(p),
+      act: () => { spClose(); openProjectTasks(p); }
+    });
+  });
+  res.project.sort((a, b) => (a._rk - b._rk) || a.name.localeCompare(b.name));
+
+  clients.forEach(c => {
+    if (!(c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q))) return;
+    res.client.push({
+      type: 'client', icon: SP_ICONS.client, name: c.name, ctx: c.email || '', _rk: rk(c.name),
+      act: () => {
+        spClose(); setView('clients');
+        const tb = document.getElementById('search-input'); if (tb) tb.value = c.name;
+        onSearch(c.name);
+      }
+    });
+  });
+
+  const jump = fn => () => { spClose(); selectProject('All'); setView('list'); fn(); };
+  users.forEach(u => {
+    if (!u.name.toLowerCase().includes(q)) return;
+    res.person.push({ type: 'person', icon: SP_ICONS.person, name: u.name,
+      ctx: tasks.filter(t => !t.archived && !t.done && (t.assignees || []).includes(u.id)).length + ' open',
+      _rk: rk(u.name), act: jump(() => onUserFilter(u.id)) });
+  });
+  departments.forEach(d => {
+    if (!d.name.toLowerCase().includes(q)) return;
+    res.dept.push({ type: 'dept', icon: SP_ICONS.dept, name: d.name,
+      ctx: tasks.filter(t => !t.archived && !t.done && t.department === d.id).length + ' open',
+      _rk: rk(d.name), act: jump(() => onDeptFilter(d.id)) });
+  });
+  companies.forEach(c => {
+    if (!c.name.toLowerCase().includes(q)) return;
+    res.company.push({ type: 'company', icon: SP_ICONS.company, name: c.name,
+      ctx: '', _rk: rk(c.name), act: jump(() => onCompanyFilter(c.id)) });
+  });
+
+  // Vendors have no global filter: picking one narrows the palette itself
+  const vendors = new Set();
+  tasks.forEach(t => { const v = t.partner || t.acctPartner; if (v) vendors.add(v); });
+  [...vendors].sort().forEach(v => {
+    if (!v.toLowerCase().includes(q)) return;
+    res.vendor.push({ type: 'vendor', icon: SP_ICONS.vendor, name: v,
+      ctx: tasks.filter(t => !t.archived && (t.partner || t.acctPartner) === v).length + ' tasks',
+      _rk: rk(v),
+      act: () => {
+        spType = 'task'; spText = v; spHl = 0;
+        document.getElementById('sp-input').value = v;
+        spRender();
+      } });
+  });
+  ['client', 'person', 'dept', 'company', 'vendor'].forEach(k =>
+    res[k].sort((a, b) => (a._rk - b._rk) || a.name.localeCompare(b.name)));
+  return res;
+}
+
+function spRender() {
+  const res = spMatches();
+  const q = spText.trim();
+
+  document.getElementById('sp-chips').innerHTML = SP_TYPES.map(([k, label]) => {
+    const n = k === 'all'
+      ? Object.values(res).reduce((s, a) => s + a.length, 0)
+      : res[k].length;
+    return `<span class="sp-chip ${spType === k ? 'on' : ''}" onclick="spSetType('${k}')">${label}${q ? `<span class="sp-n">${n}</span>` : ''}</span>`;
+  }).join('');
+
+  spRows = [];
+  let html = '';
+  const rowHtml = r => {
+    const i = spRows.length; spRows.push(r);
+    return `<div class="sp-row ${i === spHl ? 'hl' : ''} ${r.done ? 'done' : ''}" onclick="spGo(${i})" onmousemove="spHover(${i})">
+      <span class="sp-ic">${r.icon}</span><span class="sp-name">${esc(r.name)}</span>
+      ${r.pill ? `<span class="sp-status-pill" style="background:${r.pill.color};">${esc(r.pill.name)}</span>` : ''}
+      ${r.ctx ? `<span class="sp-ctx">${esc(r.ctx)}</span>` : ''}
+      ${r.when ? `<span class="sp-when">${esc(r.when)}</span>` : ''}
+    </div>`;
+  };
+  if (!q) {
+    html = `<div class="sp-empty">Type to search everything — tasks, projects, clients, people, departments, companies, vendors.</div>`;
+  } else if (spType === 'all') {
+    for (const [k, label] of SP_TYPES.slice(1)) {
+      const list = res[k];
+      if (!list.length) continue;
+      html += `<div class="sp-ghead">${label}</div>`;
+      html += list.slice(0, 5).map(rowHtml).join('');
+      if (list.length > 5) html += `<div class="sp-more" onclick="spSetType('${k}')">Show all ${list.length} →</div>`;
+    }
+    if (!html) html = `<div class="sp-empty">No matches for “${esc(q)}”.</div>`;
+  } else {
+    const list = res[spType];
+    html = list.length ? list.map(rowHtml).join('')
+      : `<div class="sp-empty">No ${SP_TYPES.find(x => x[0] === spType)[1].toLowerCase()} match “${esc(q)}”.</div>`;
+  }
+  document.getElementById('sp-results').innerHTML = html;
+}
+
+function spGo(i) { const r = spRows[i]; if (r) r.act(); }
+function spHover(i) {
+  if (i === spHl) return;
+  spHl = i;
+  document.querySelectorAll('#sp-results .sp-row').forEach((el, j) => el.classList.toggle('hl', j === i));
+}
+function spKey(e) {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!spRows.length) return;
+    spHl = (spHl + (e.key === 'ArrowDown' ? 1 : -1) + spRows.length) % spRows.length;
+    const rows = document.querySelectorAll('#sp-results .sp-row');
+    rows.forEach((el, j) => el.classList.toggle('hl', j === spHl));
+    rows[spHl]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault(); spGo(spHl);
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    const keys = SP_TYPES.map(x => x[0]);
+    const i = keys.indexOf(spType);
+    spSetType(keys[(i + (e.shiftKey ? -1 : 1) + keys.length) % keys.length]);
+  } else if (e.key === 'Escape') {
+    e.stopPropagation(); spClose();
+  }
+}
+
+// ── Task-list column filters (same pattern as the Project List's filter row) ──
+let nlColFilters = {};
+try { nlColFilters = JSON.parse(localStorage.getItem('todo_nl_colfilters') || '{}') || {}; } catch {}
+let _nlFilterFocus = null;
+
+function nlSaveColFilters() {
+  try {
+    if (Object.values(nlColFilters).some(v => v)) localStorage.setItem('todo_nl_colfilters', JSON.stringify(nlColFilters));
+    else localStorage.removeItem('todo_nl_colfilters');
+  } catch {}
+}
+function nlSetColFilter(key, value) {
+  nlColFilters[key] = value;
+  _nlFilterFocus = key;
+  nlSaveColFilters();
+  renderAll();
+  const inp = document.querySelector(`.nl-frow [data-fkey="${key}"]`);
+  if (inp) {
+    inp.focus();
+    if (inp.tagName === 'INPUT') { const L = inp.value.length; inp.setSelectionRange(L, L); }
+  }
+}
+function nlClearColFilters() {
+  nlColFilters = {};
+  _nlFilterFocus = null;
+  nlSaveColFilters();
+  renderAll();
+}
+
+// Text a column matches against — the same strings the cells display
+function nlColText(t, key) {
+  switch (key) {
+    case 'name':    return (t.title + ' ' + (t.notes || '')).toLowerCase();
+    case 'project': return (t.project || '').toLowerCase();
+    case 'vendor':  return (t.partner || t.acctPartner || '').toLowerCase();
+    case 'due':     return t.due ? (t.due + ' ' + new Date(t.due).toLocaleDateString()).toLowerCase() : '';
+    case 'updated': {
+      const iso = t.updatedAt || t.createdAt || '';
+      return (iso.slice(0, 10) + ' ' + nlAgo(iso) + ' ' + (t.updatedBy || t.createdBy || '')).toLowerCase();
+    }
+    default:        return '';
+  }
+}
+function nlColFilterMatch(t) {
+  for (const [key, v] of Object.entries(nlColFilters)) {
+    if (!v) continue;
+    switch (key) {
+      case 'assignee':
+        if (v === '__none__') { if ((t.assignees || []).length) return false; }
+        else if (!(t.assignees || []).includes(v)) return false;
+        break;
+      case 'dept':
+        if (v === '__none__') { if (t.department) return false; }
+        else if (t.department !== v) return false;
+        break;
+      case 'prio':
+        if (v === '__none__') { if (t.priority) return false; }
+        else if (t.priority !== v) return false;
+        break;
+      case 'company': {
+        const co = projCompany(t.project) || '';
+        if (v === '__none__') { if (co) return false; }
+        else if (co !== v) return false;
+        break;
+      }
+      case 'status': {
+        const k = nlStatusKey(t);
+        if (v === '__todo__') { if (k !== '') return false; }
+        else if (k !== v) return false;
+        break;
+      }
+      default:
+        if (!nlColText(t, key).includes(v.toLowerCase())) return false;
+    }
+  }
+  return true;
+}
+
+function nlFilterRowHtml() {
+  const cols = nlVisibleCols();
+  const txt = (key, ph) => `<input class="nl-finp ${nlColFilters[key] ? 'set' : ''}" data-fkey="${key}" type="text"
+      placeholder="${esc(ph)}" value="${esc(nlColFilters[key] || '')}" autocomplete="off" spellcheck="false"
+      oninput="nlSetColFilter('${key}', this.value)" onclick="event.stopPropagation()">`;
+  const sel = (key, opts) => `<select class="nl-finp ${nlColFilters[key] ? 'set' : ''}" data-fkey="${key}"
+      onchange="nlSetColFilter('${key}', this.value)" onclick="event.stopPropagation()">
+      <option value="">All</option>
+      ${opts.map(([v, label]) => `<option value="${escAttr(String(v))}" ${nlColFilters[key] === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+    </select>`;
+  const cell = c => {
+    switch (c.key) {
+      case 'name':     return txt('name', 'Search task…');
+      case 'project':  return txt('project', 'Search project…');
+      case 'vendor':   return txt('vendor', 'Search vendor…');
+      case 'due':      return txt('due', 'Date…');
+      case 'updated':  return txt('updated', 'Who / when…');
+      case 'assignee': return sel('assignee', [...users.map(u => [u.id, u.name]), ['__none__', '( none )']]);
+      case 'dept':     return sel('dept', [...departments.map(d => [d.id, d.name]), ['__none__', '( none )']]);
+      case 'prio':     return sel('prio', [...priorities.map(p => [p.id, p.name]), ['__none__', '( none )']]);
+      case 'company':  return sel('company', [...companies.map(co => [co.id, co.name]), ['__none__', '( none )']]);
+      case 'status':   return sel('status', [['__todo__', 'To Do'], ...taskStatuses.map(s => [s.name, s.name]), ['__done__', 'Done']]);
+      default:         return '';
+    }
+  };
+  const anySet = Object.values(nlColFilters).some(v => v);
+  return `<div class="nl-frow">
+    ${cols.map(c => `<span>${cell(c)}</span>`).join('')}
+    <span class="nl-fclear" ${anySet ? `onclick="nlClearColFilters()" title="Clear all column filters"` : ''}>${anySet ? '✕' : ''}</span>
+  </div>`;
+}
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); spOpen(); return; }
   if (e.key === 'Escape') {
+    if (document.getElementById('sp-overlay').classList.contains('open')) { spClose(); return; }
     if (document.getElementById('task-modal').classList.contains('open')) { closeTaskModal(); return; }
     if (document.getElementById('proj-modal').classList.contains('open')) { closeNewProjectModal(); return; }
     if (document.getElementById('save-view-modal').classList.contains('open')) { closeModalById('save-view-modal'); return; }
