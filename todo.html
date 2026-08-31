@@ -1672,7 +1672,7 @@
       <button class="tb-btn" id="back-btn" onclick="navBack()" style="display:none;margin-right:8px;" title="Back to previous screen">← Back</button>
       <span class="toolbar-title" id="toolbar-title" onclick="selectProject('All')" style="cursor:pointer;" title="Show all tasks">All Tasks</span>
       <span class="task-count" id="task-count"></span>
-      <input class="search-input" type="text" placeholder="Task…" id="search-input" oninput="onSearch(this.value)">
+      <input class="search-input" type="text" placeholder="Search everything…" id="search-input" oninput="onSearch(this.value)" title="Filters the table on every field: task, project, client, assignee, department, company, vendor, status">
       <button class="tb-btn" id="palette-btn" onclick="spOpen()" title="Search everything (Ctrl+K)">🔍 <span class="vb-label">Ctrl+K</span></button>
       <div class="tb-pop-wrap" id="filters-wrap">
       <!-- Filters popover retired 2026-08-31 (palette + column filters replace it); elements kept for the filter renderers -->
@@ -4441,12 +4441,28 @@ function getFiltered() {
     if (projectSearchQuery &&
         !(t.project || '').toLowerCase().includes(projectSearchQuery.toLowerCase())) return false;
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (!t.title.toLowerCase().includes(q) &&
-          !(t.notes  || '').toLowerCase().includes(q)) return false;
+      // Master search: one box matches everything shown on the row, so
+      // "anthony" finds the task named anthony AND anthony-the-vendor's
+      // tasks AND anthony-the-assignee's tasks, etc.
+      if (!taskHaystack(t).includes(searchQuery.toLowerCase())) return false;
     }
     return true;
   });
+}
+
+// Every searchable string a task row carries, lowercased once
+function taskHaystack(t) {
+  return [
+    t.title, t.notes,
+    (t.subtasks || []).filter(s => !s.deleted).map(s => s.text).join(' '),
+    t.project, t.clientName,
+    (t.assignees || []).map(id => userById(id)?.name || '').join(' '),
+    deptById(t.department)?.name,
+    companyById(projCompany(t.project))?.name,
+    t.partner, t.acctPartner,
+    t.taskStatus, priorityById(t.priority)?.name,
+    t.updatedBy, t.createdBy
+  ].filter(Boolean).join(' ').toLowerCase();
 }
 
 // ── Active filter chips bar ────────────────────────────────────────────────
