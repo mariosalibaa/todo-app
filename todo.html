@@ -1076,6 +1076,28 @@
       font-size: 0.8rem; color: var(--text);
     }
     .projects-list-table tr:hover { background: var(--surface0); }
+    /* per-column search / filter row under the header */
+    .projects-list-table tr.plist-filter-row th {
+      position: sticky; top: 25px; z-index: 3;
+      background: var(--mantle, var(--surface0)); padding: 4px 6px;
+      box-shadow: inset 0 -1px 0 var(--surface1); text-transform: none;
+    }
+    .projects-list-table tr.plist-filter-row:hover { background: transparent; }
+    .plist-filter-input {
+      width: 100%; box-sizing: border-box;
+      background: var(--base); color: var(--text);
+      border: 1px solid var(--surface1); border-radius: 4px;
+      padding: 3px 6px; font-size: 0.72rem; font-family: inherit; outline: none;
+    }
+    .plist-filter-input:focus { border-color: var(--accent); }
+    .plist-filter-input::placeholder { color: var(--overlay0); font-weight: 400; }
+    .plist-filter-input.num { text-align: center; }
+    .plist-filter-clear {
+      background: none; border: none; color: var(--overlay0); cursor: pointer;
+      font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; text-transform: none;
+      letter-spacing: normal; font-weight: 500;
+    }
+    .plist-filter-clear:hover { background: var(--surface1); color: var(--text); }
     .plist-name {
       font-weight: 600; cursor: pointer; color: var(--accent);
     }
@@ -3528,6 +3550,65 @@ function renderProjectsBoard() {
   initPBDrag();
 }
 
+// --- Project List: per-column search / filter -------------------------------
+const PLIST_FILTER_KEYS = ['project','company','client','status','tasks','open','done','created'];
+const plistFilters = Object.fromEntries(PLIST_FILTER_KEYS.map(k => [k, '']));
+// Filters survive a reload (per browser), like the other view preferences
+(function loadPlistFilters() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('todo_plist_filters') || '{}');
+    PLIST_FILTER_KEYS.forEach(k => { if (typeof saved[k] === 'string') plistFilters[k] = saved[k]; });
+  } catch {}
+})();
+function savePlistFilters() {
+  try {
+    if (plistHasFilters()) localStorage.setItem('todo_plist_filters', JSON.stringify(plistFilters));
+    else localStorage.removeItem('todo_plist_filters');
+  } catch {}
+}
+let plistFocusKey = null;   // column whose input keeps focus across a re-render
+
+// Text columns: case-insensitive substring match.
+function plistTextMatch(value, q) {
+  if (!q) return true;
+  return String(value || '').toLowerCase().includes(q.toLowerCase());
+}
+// Number columns: plain number = equals; also accepts >5, >=5, <5, <=5, =5, 3-7.
+function plistNumMatch(value, q) {
+  q = (q || '').trim();
+  if (!q) return true;
+  const n = Number(value);
+  let m = q.match(/^(>=|<=|>|<|=)?\s*(-?\d+(?:\.\d+)?)$/);
+  if (m) {
+    const v = parseFloat(m[2]);
+    switch (m[1]) {
+      case '>':  return n >  v;
+      case '<':  return n <  v;
+      case '>=': return n >= v;
+      case '<=': return n <= v;
+      default:   return n === v;
+    }
+  }
+  m = q.match(/^(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)$/);
+  if (m) return n >= parseFloat(m[1]) && n <= parseFloat(m[2]);
+  return String(value).includes(q);
+}
+function plistHasFilters() {
+  return Object.values(plistFilters).some(v => String(v).trim() !== '');
+}
+function setPlistFilter(key, value) {
+  plistFilters[key] = value;
+  plistFocusKey = key;
+  savePlistFilters();
+  renderProjectsList();
+}
+function clearPlistFilters() {
+  PLIST_FILTER_KEYS.forEach(k => plistFilters[k] = '');
+  plistFocusKey = null;
+  savePlistFilters();
+  renderProjectsList();
+}
+
 function renderProjectsList() {
   const el = document.getElementById('projects-list-view');
   document.getElementById('toolbar-title').textContent = 'Project List';
@@ -3537,18 +3618,52 @@ function renderProjectsList() {
     .filter((p, i, arr) => arr.indexOf(p) === i)
     .sort();
 
-  document.getElementById('task-count').textContent =
-    allProjects.length ? `${allProjects.length} projects` : '';
-
   if (allProjects.length === 0) {
+    document.getElementById('task-count').textContent = '';
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">✓</div><div>No projects yet</div></div>`;
     return;
   }
 
+  // Row values each column searches against — same strings the cells display
+  const plistRowData = p => {
+    const allT = tasks.filter(t => t.project === p && !t.archived);
+    const status = projStatus(p);
+    const company = projCompany(p);
+    const created = tasks.find(t => t.project === p)?.createdAt || '';
+    return {
+      project: p,
+      company: company ? (companyById(company)?.name || company) : '',
+      client: projectMeta[p]?.clientName || '',
+      status: status || '',
+      statusName: status ? statusLabel(status) : '',
+      tasks: allT.length,
+      open: allT.filter(t => !t.done).length,
+      done: allT.filter(t => t.done).length,
+      created: created ? new Date(created).toLocaleDateString() : ''
+    };
+  };
+
+  const visibleProjects = allProjects.filter(p => {
+    const d = plistRowData(p);
+    return plistTextMatch(d.project, plistFilters.project)
+        && plistTextMatch(d.company, plistFilters.company)
+        && plistTextMatch(d.client,  plistFilters.client)
+        && (!plistFilters.status || d.status === plistFilters.status
+            || (plistFilters.status === '__none__' && !d.status))
+        && plistNumMatch(d.tasks, plistFilters.tasks)
+        && plistNumMatch(d.open,  plistFilters.open)
+        && plistNumMatch(d.done,  plistFilters.done)
+        && plistTextMatch(d.created, plistFilters.created);
+  });
+
+  document.getElementById('task-count').textContent = plistHasFilters()
+    ? `${visibleProjects.length} of ${allProjects.length} projects`
+    : `${allProjects.length} projects`;
+
   // Group projects by status, in the statuses-list order (No Status last)
   const statusIds = statuses.map(s => s.id);
   const byStatus = new Map();
-  allProjects.forEach(p => {
+  visibleProjects.forEach(p => {
     const st = projStatus(p) || '—';
     if (!byStatus.has(st)) byStatus.set(st, []);
     byStatus.get(st).push(p);
@@ -3594,6 +3709,20 @@ function renderProjectsList() {
       </tr>`;
   };
 
+  const filterInput = (key, placeholder, num) => `
+    <input class="plist-filter-input${num ? ' num' : ''}" data-fkey="${key}" type="text"
+           placeholder="${esc(placeholder)}" value="${esc(plistFilters[key])}"
+           autocomplete="off" spellcheck="false"
+           ${num ? 'title="Number filter: 5, &gt;5, &lt;=5 or 3-7"' : ''}
+           oninput="setPlistFilter('${key}', this.value)">`;
+
+  const statusFilterSelect = () => `
+    <select class="plist-filter-input" data-fkey="status" onchange="setPlistFilter('status', this.value)">
+      <option value=""${plistFilters.status === '' ? ' selected' : ''}>All</option>
+      ${statuses.map(st => `<option value="${esc(st.id)}"${plistFilters.status === st.id ? ' selected' : ''}>${esc(statusLabel(st.id))}</option>`).join('')}
+      <option value="__none__"${plistFilters.status === '__none__' ? ' selected' : ''}>No Status</option>
+    </select>`;
+
   let rows = '';
   for (const st of stKeys) {
     const projs = byStatus.get(st);
@@ -3623,11 +3752,33 @@ function renderProjectsList() {
           <th>Created</th>
           <th style="text-align:right;width:140px;">Actions</th>
         </tr>
+        <tr class="plist-filter-row">
+          <th>${filterInput('project', 'Search project…')}</th>
+          <th>${filterInput('company', 'Search company…')}</th>
+          <th>${filterInput('client', 'Search client…')}</th>
+          <th>${statusFilterSelect()}</th>
+          <th>${filterInput('tasks', '#', true)}</th>
+          <th>${filterInput('open', '#', true)}</th>
+          <th>${filterInput('done', '#', true)}</th>
+          <th>${filterInput('created', 'Search date…')}</th>
+          <th style="text-align:right;">${plistHasFilters()
+            ? `<button class="plist-filter-clear" onclick="clearPlistFilters()" title="Clear all column filters">✕ Clear</button>`
+            : ''}</th>
+        </tr>
       </thead>
       <tbody>
-        ${rows}
+        ${rows || `<tr><td colspan="9" style="padding:18px 12px;text-align:center;color:var(--overlay0);">No projects match these filters</td></tr>`}
       </tbody>
     </table>`;
+
+  // keep typing uninterrupted: restore focus/caret into the column just edited
+  if (plistFocusKey) {
+    const inp = el.querySelector(`[data-fkey="${plistFocusKey}"]`);
+    if (inp) {
+      inp.focus();
+      if (inp.tagName === 'INPUT') inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
+  }
 }
 
 // Shared rename: updates tasks, projectMeta, column order, and active filter
