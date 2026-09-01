@@ -5,3 +5,12 @@ node_modules/
 .DS_Store
 firebase-service-account.json
 firebase-service-account.json.json
+
+.vercel
+.env*
+todo-app-f5c0d-firebase-adminsdk*.json
+*.bak*
+.vercel
+.env.local
+sandbox-*.log
+srv-*.log

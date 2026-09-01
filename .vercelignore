@@ -1,0 +1,14 @@
+node_modules
+*.log
+*.bak*
+todo.html.bak*
+server.js.bak*
+firebase-service-account.json
+firebase-service-account.json.json
+todo-app-f5c0d-firebase-adminsdk*.json
+docs
+.superpowers
+migrate-json-to-firestore.js
+update-statuses.js
+start-todo*.bat
+render.yaml

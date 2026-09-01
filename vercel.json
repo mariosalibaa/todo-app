@@ -1,10 +1,9 @@
 {
-  "version": 2,
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "{todo.html,manifest.json,sw.js,icons/**}",
-      "maxDuration": 30
-    }
-  }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "todo-app": { "root": ".", "runtime": "node", "entrypoint": "server.js" }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "todo-app" } }
+  ]
 }

@@ -65,6 +65,17 @@ async function odooCall(model, method, args = [], kwargs = {}) {
 
 const PORT = process.env.PORT || 8081;
 
+// Vercel bundles only statically-traceable files: these literal references
+// make the PWA assets ship with the deployment (never actually executed).
+if (process.env.__BUNDLE_TRACE__) {
+  fs.readFileSync(path.join(__dirname, 'todo.html'));
+  fs.readFileSync(path.join(__dirname, 'manifest.json'));
+  fs.readFileSync(path.join(__dirname, 'sw.js'));
+  fs.readFileSync(path.join(__dirname, 'icons/icon-192.png'));
+  fs.readFileSync(path.join(__dirname, 'icons/icon-512.png'));
+  fs.readFileSync(path.join(__dirname, 'icons/apple-touch-icon.png'));
+}
+
 // Single shared team workspace — everyone who signs in works on the same board.
 const TEAM_ID = process.env.TEAM_ID || 'team';  // override for an isolated sandbox board
 
@@ -865,9 +876,9 @@ const handler = async (req, res) => {
   res.end('not found');
 };
 
-// Vercel runs the handler as a serverless function; everywhere else we listen.
+// Importable (tests/serverless) and runnable (local, Render, Vercel service)
 module.exports = handler;
-if (!process.env.VERCEL) {
+if (require.main === module) {
   const server = http.createServer(handler);
   server.listen(PORT, () => {
     console.log(`Todo app listening on port ${PORT}`);
