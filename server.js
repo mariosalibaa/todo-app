@@ -31,8 +31,12 @@ const os = require('os');
 let odooCreds = null, odooUid = null;
 function loadOdooCreds() {
   if (!odooCreds) {
-    const raw = fs.readFileSync(path.join(os.homedir(), '.odoo-creds.json'), 'utf8');
-    odooCreds = JSON.parse(raw.replace(/^﻿/, ''));
+    if (process.env.ODOO_CREDS_JSON) {          // cloud (Render/Vercel)
+      odooCreds = JSON.parse(process.env.ODOO_CREDS_JSON);
+    } else {                                     // local file
+      const raw = fs.readFileSync(path.join(os.homedir(), '.odoo-creds.json'), 'utf8');
+      odooCreds = JSON.parse(raw.replace(/^﻿/, ''));
+    }
   }
   return odooCreds;
 }
@@ -352,7 +356,8 @@ async function ensureTeamMember(user) {
 
 // Local mode: no sign-in required. Auth is enforced automatically when the app
 // runs on Render (RENDER env var is set there), or when REQUIRE_AUTH=1 is set.
-const AUTH_DISABLED = !process.env.RENDER && process.env.REQUIRE_AUTH !== '1';
+// Sign-in is enforced on any cloud host (Render, Vercel) and can be forced locally
+const AUTH_DISABLED = !process.env.RENDER && !process.env.VERCEL && process.env.REQUIRE_AUTH !== '1';
 
 // Auth middleware: verify Firebase ID token
 async function verifyToken(req) {
@@ -378,9 +383,12 @@ const MIME = {
   '.js':   'application/javascript',
   '.css':  'text/css',
   '.json': 'application/json',
+  '.png':  'image/png',
+  '.svg':  'image/svg+xml',
+  '.ico':  'image/x-icon',
 };
 
-const server = http.createServer(async (req, res) => {
+const handler = async (req, res) => {
   const url = req.url.split('?')[0];
 
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -855,9 +863,14 @@ const server = http.createServer(async (req, res) => {
   // 404
   res.writeHead(404);
   res.end('not found');
-});
+};
 
-server.listen(PORT, () => {
-  console.log(`Todo app listening on port ${PORT}`);
-  console.log(`Firebase project: ${serviceAccount.project_id}`);
-});
+// Vercel runs the handler as a serverless function; everywhere else we listen.
+module.exports = handler;
+if (!process.env.VERCEL) {
+  const server = http.createServer(handler);
+  server.listen(PORT, () => {
+    console.log(`Todo app listening on port ${PORT}`);
+    console.log(`Firebase project: ${serviceAccount.project_id}`);
+  });
+}

@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>To-Do</title>
+  <!-- PWA: installable from the browser menu / Add to Home Screen -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1e2030">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <script>
+    if ('serviceWorker' in navigator && location.protocol === 'https:')
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+  </script>
   <style>
     :root {
       --base:     #1e1e2e;
