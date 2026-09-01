@@ -4190,6 +4190,8 @@ function renderProjectsList() {
     };
   };
 
+  [...plSel].forEach(p => { if (!allProjects.includes(p)) plSel.delete(p); });
+
   const visibleProjects = allProjects.filter(p => {
     const d = plistRowData(p);
     return plistTextMatch(d.project, plistFilters.project)
@@ -4237,9 +4239,11 @@ function renderProjectsList() {
     const displayDate = createdDate !== '—' ? new Date(createdDate).toLocaleDateString() : '—';
     const taskCount = allT.length;
     return `
-      <tr data-proj="${esc(p)}" data-stgroup="${esc(status || '')}" class="plist-row">
+      <tr data-proj="${esc(p)}" data-stgroup="${esc(status || '')}" class="plist-row${plSel.has(p) ? ' nl-selected' : ''}">
         <td class="plist-name-cell">
           <div class="plist-name-wrap">
+            <input type="checkbox" class="nl-check" ${plSel.has(p) ? 'checked' : ''}
+                   onclick="plToggleSel(event,'${esc(p)}')" title="Select (Shift-click for a range)">
             <span class="pl-drag" draggable="true" title="Drag to another status group">⠿</span>
             <button class="tt-open-btn" onclick="openProjectTasks('${esc(p)}')" title="Open this project's tasks">⛶</button>
             <input class="plist-name-inp" type="text" value="${esc(p)}" title="Type to rename · Enter to save · Esc to cancel"
@@ -4339,7 +4343,8 @@ function renderProjectsList() {
       <tbody>
         ${rows || `<tr><td colspan="11" style="padding:18px 12px;text-align:center;color:var(--overlay0);">No projects match these filters</td></tr>`}
       </tbody>
-    </table>`;
+    </table>
+    ${plBulkBarHtml()}`;
 
   // keep typing uninterrupted: restore focus/caret into the column just edited
   if (plistFocusKey) {
@@ -4351,6 +4356,71 @@ function renderProjectsList() {
   }
 
   initPlistDrag(el);
+}
+
+// ── Project selection: same idea as task rows — checkbox, Shift-range, bulk bar
+const plSel = new Set();
+let _plLastPicked = null;
+function plRowOrder() {
+  return [...document.querySelectorAll('#projects-list-view tr[data-proj]')].map(r => r.dataset.proj);
+}
+function plToggleSel(e, p) {
+  e.stopPropagation();
+  if (e.shiftKey && _plLastPicked !== null) {
+    const keys = plRowOrder();
+    const a = keys.indexOf(_plLastPicked), b = keys.indexOf(p);
+    if (a !== -1 && b !== -1) keys.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(k => plSel.add(k));
+  } else {
+    plSel.has(p) ? plSel.delete(p) : plSel.add(p);
+  }
+  _plLastPicked = p;
+  renderProjectsList();
+}
+function plClearSel()  { plSel.clear(); _plLastPicked = null; renderProjectsList(); }
+function plSelectAll() { plRowOrder().forEach(p => plSel.add(p)); renderProjectsList(); }
+function plBulkBarHtml() {
+  if (!plSel.size) return '';
+  const btn = (label, act, extra) => `<span class="nl-bulk-btn" onclick="${act}" ${extra || ''}>${label}</span>`;
+  return `
+    <div class="nl-bulkbar">
+      <span class="nl-bulk-count">${plSel.size} project${plSel.size === 1 ? '' : 's'} selected</span>
+      ${btn('Status ▾', 'plBulkStatus(event)')}
+      ${btn('🗑 Delete', 'plBulkDelete()', 'style="color:var(--red,#f38ba8);"')}
+      <span style="flex:1;"></span>
+      ${btn('Select all', 'plSelectAll()')}
+      ${btn('✕ Clear', 'plClearSel()')}
+    </div>`;
+}
+function plBulkStatus(e) {
+  e.stopPropagation();
+  const rows = statuses.map(s => nlPickRow(
+      `<span style="color:${s.color};">●</span> ${esc(s.name)}`, `plBulkSetStatus('${s.id}')`)).join('')
+    + nlPickRow('<span style="color:var(--overlay0);">No status</span>', "plBulkSetStatus('')");
+  nlPickMenu(e, rows, `Status for ${plSel.size} selected`, 220);
+}
+function plBulkSetStatus(stId) {
+  closeOvMenu();
+  plSel.forEach(p => {
+    if (!projectMeta[p]) projectMeta[p] = {};
+    projectMeta[p].status = stId || null;
+  });
+  saveProjectMeta();
+  renderAll();
+}
+function plBulkDelete() {
+  const names = [...plSel];
+  if (!names.length) return;
+  const nT = tasks.filter(t => plSel.has(t.project)).length;
+  const msg = `Delete ${names.length} project${names.length > 1 ? 's' : ''}?\n\n${names.join(', ')}`
+    + (nT ? `\n\nThis also deletes their ${nT} task${nT > 1 ? 's' : ''}. This cannot be undone.` : '');
+  if (!confirm(msg)) return;
+  tasks = tasks.filter(t => !plSel.has(t.project));
+  names.forEach(p => { delete projectMeta[p]; });
+  colOrder = colOrder.filter(p => !plSel.has(p));
+  if (plSel.has(filterProject)) filterProject = 'All';
+  plSel.clear(); _plLastPicked = null;
+  saveColOrder(); saveProjectMeta(); scheduleSave();
+  renderAll();
 }
 
 // Drag a project row (by its ⠿ handle) onto another status group to move it
