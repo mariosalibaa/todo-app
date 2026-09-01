@@ -1740,6 +1740,10 @@
     <!-- Same spot as the Project List's "+ New Project": top-left, above the table -->
     <div class="content-add-bar" id="content-add-bar" style="display:none;">
       <button class="save-btn" onclick="openAddModal()" style="padding:6px 14px;font-size:0.82rem;">+ Add task</button>
+      <div id="line-count" style="margin-left:auto;text-align:right;align-self:center;">
+        <div id="line-count-n" style="font-size:0.78rem;font-weight:700;color:var(--subtext0);"></div>
+        <div id="line-count-note" style="font-size:0.64rem;color:var(--overlay0);max-width:560px;"></div>
+      </div>
     </div>
     <div class="task-list" id="task-list" style="display:none"></div>
     <div id="classic-view" style="display:none;flex:1;overflow:auto;"></div>
@@ -3626,6 +3630,7 @@ function renderProjectsBoard() {
             <span class="pb-stat open" title="Open tasks" ${!open ? 'style="opacity:.45"' : ''}>${open}</span>
             ${done ? `<span class="pb-stat done" title="Done tasks">${done}</span>` : ''}
             ${od   ? `<span class="pb-stat overdue" title="Overdue">${od}</span>` : ''}
+            ${projectMeta[p]?.due ? `<span class="pb-stat ${projectMeta[p].due < todayStr() ? 'overdue' : ''}" title="Project due date">📅 ${esc(new Date(projectMeta[p].due).toLocaleDateString())}</span>` : ''}
           </div>
         </div>`;
     }).join('');
@@ -3644,7 +3649,7 @@ function renderProjectsBoard() {
 }
 
 // --- Project List: per-column search / filter -------------------------------
-const PLIST_FILTER_KEYS = ['project','company','client','status','tasks','open','done','created'];
+const PLIST_FILTER_KEYS = ['project','company','client','status','due','tasks','open','done','created'];
 const plistFilters = Object.fromEntries(PLIST_FILTER_KEYS.map(k => [k, '']));
 // Filters survive a reload (per browser), like the other view preferences
 (function loadPlistFilters() {
@@ -3729,6 +3734,7 @@ function renderProjectsList() {
       client: projectMeta[p]?.clientName || '',
       status: status || '',
       statusName: status ? statusLabel(status) : '',
+      due: projectMeta[p]?.due ? (projectMeta[p].due + ' ' + new Date(projectMeta[p].due).toLocaleDateString()) : '',
       tasks: allT.length,
       open: allT.filter(t => !t.done).length,
       done: allT.filter(t => t.done).length,
@@ -3743,6 +3749,7 @@ function renderProjectsList() {
         && plistTextMatch(d.client,  plistFilters.client)
         && (!plistFilters.status || d.status === plistFilters.status
             || (plistFilters.status === '__none__' && !d.status))
+        && plistTextMatch(d.due, plistFilters.due)
         && plistNumMatch(d.tasks, plistFilters.tasks)
         && plistNumMatch(d.open,  plistFilters.open)
         && plistNumMatch(d.done,  plistFilters.done)
@@ -3777,6 +3784,7 @@ function renderProjectsList() {
     const statusName = status ? statusLabel(status) : '—';
     const companyName = company ? (companyById(company)?.name || company) : '—';
     const clientName = projectMeta[p]?.clientName || '';
+    const projDue = projectMeta[p]?.due || '';
     const createdDate = tasks.find(t => t.project === p)?.createdAt || '—';
     const displayDate = createdDate !== '—' ? new Date(createdDate).toLocaleDateString() : '—';
     const taskCount = allT.length;
@@ -3796,6 +3804,10 @@ function renderProjectsList() {
           clientName ? esc(clientName) : '<span style="color:var(--overlay0);">—</span>'}</td>
         <td class="plist-status-cell" onclick="startProjStatusEdit('${esc(p)}')">
           ${status ? `<span style="background:${statusColor(status)}22;color:${statusColor(status)};padding:2px 8px;border-radius:4px;font-weight:500;font-size:0.75rem;">${esc(statusName)}</span>` : statusName}
+        </td>
+        <td class="plist-due-cell" onclick="startProjDueEdit('${esc(p)}')" title="Click to set the project's due date"
+            style="text-align:center;font-size:0.75rem;color:${projDue && projDue < todayStr() ? 'var(--red)' : 'var(--subtext0)'};${projDue && projDue < todayStr() ? 'font-weight:700;' : ''}">
+          ${projDue ? new Date(projDue).toLocaleDateString() : '<span style="color:var(--overlay0);">—</span>'}
         </td>
         <td style="text-align:center;font-weight:600;">${taskCount}</td>
         <td style="text-align:center;color:${open ? 'var(--blue)' : 'var(--overlay0)'};font-weight:600;">${open}</td>
@@ -3830,7 +3842,7 @@ function renderProjectsList() {
     const color = st !== '—' ? statusColor(st) : 'var(--overlay0)';
     const label = st !== '—' ? statusLabel(st) : 'No Status';
     const nTasks = projs.reduce((n, p) => n + tasks.filter(t => t.project === p && !t.archived && !t.done).length, 0);
-    rows += `<tr><td colspan="9" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
+    rows += `<tr><td colspan="10" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
       <span style="width:9px;height:9px;border-radius:50%;background:${color};display:inline-block;margin-right:7px;"></span>${esc(label)}
       <span style="color:var(--overlay0);font-weight:400;text-transform:none;margin-left:6px;font-size:0.66rem;">${projs.length} projects · ${nTasks} open tasks</span></td></tr>`;
     rows += projs.map(projRowHtml).join('');
@@ -3847,6 +3859,7 @@ function renderProjectsList() {
           <th>Company</th>
           <th>Client</th>
           <th>Status</th>
+          <th>Due</th>
           <th>Tasks</th>
           <th>Open</th>
           <th>Done</th>
@@ -3858,6 +3871,7 @@ function renderProjectsList() {
           <th>${filterInput('company', 'Search company…')}</th>
           <th>${filterInput('client', 'Search client…')}</th>
           <th>${statusFilterSelect()}</th>
+          <th>${filterInput('due', 'Date…')}</th>
           <th>${filterInput('tasks', '#', true)}</th>
           <th>${filterInput('open', '#', true)}</th>
           <th>${filterInput('done', '#', true)}</th>
@@ -3868,7 +3882,7 @@ function renderProjectsList() {
         </tr>
       </thead>
       <tbody>
-        ${rows || `<tr><td colspan="9" style="padding:18px 12px;text-align:center;color:var(--overlay0);">No projects match these filters</td></tr>`}
+        ${rows || `<tr><td colspan="10" style="padding:18px 12px;text-align:center;color:var(--overlay0);">No projects match these filters</td></tr>`}
       </tbody>
     </table>`;
 
@@ -3983,6 +3997,37 @@ function startProjCompanyEdit(projName) {
   sel.addEventListener('change', commit);
   sel.addEventListener('blur', commit);
   sel.addEventListener('keydown', e => { if (e.key === 'Escape') renderProjectsList(); });
+}
+
+function startProjDueEdit(projName) {
+  const row = document.querySelector(`tr[data-proj="${escAttr(projName)}"]`);
+  const cell = row.querySelector('.plist-due-cell');
+  const cur = projectMeta[projName]?.due || '';
+  const inp = document.createElement('input');
+  inp.type = 'date';
+  inp.className = 'plist-edit-select';
+  inp.value = cur;
+  cell.innerHTML = '';
+  cell.appendChild(inp);
+  inp.focus();
+  let closed = false;
+  function commit() {
+    if (closed) return;
+    closed = true;
+    const v = inp.value || null;
+    if (v !== (cur || null)) {
+      if (!projectMeta[projName]) projectMeta[projName] = {};
+      projectMeta[projName].due = v;
+      saveProjectMeta();
+    }
+    renderProjectsList();
+  }
+  inp.addEventListener('change', commit);
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { closed = true; renderProjectsList(); }
+  });
 }
 
 function startProjStatusEdit(projName) {
@@ -5185,6 +5230,7 @@ function setView(v, keepStack) {
   // its own "+ New Project" button in that same slot.
   document.getElementById('content-add-bar').style.display =
     (isList || isKanban || isClassic || isStatusBoard || isGantt) ? '' : 'none';
+  if (!isList) updateLineCount(null);   // the counter reflects the List table only
   if (isTrash) renderTrash();
   document.getElementById('view-statusboard-btn').classList.toggle('active', isStatusBoard);
   document.getElementById('view-gantt-btn').classList.toggle('active', isGantt);
@@ -6536,6 +6582,7 @@ function _renderTasksBody() {
       </div>`;
     nlDropUndrawnDraft();
     if (nlDraft) setTimeout(() => document.getElementById('nl-inline-input')?.focus(), 0);
+    updateLineCount(0);
     return;
   }
 
@@ -7222,6 +7269,7 @@ function renderNiceList(filtered, el) {
     + (fields.length && field === 'taskstatus' ? `
     <div class="nl-add" style="padding-left:8px;" onclick="nlNewStatus()">＋ New status</div>` : '')
     + `</div>` + nlSelectionBar();
+  updateLineCount(el.querySelectorAll('.nl-row').length);
 }
 
 // Row hover buttons: quick subtask, rename in place, and a small task menu
@@ -9767,6 +9815,7 @@ function renderListTable(filtered, el) {
   refreshPartnerDatalist();
   const add = document.getElementById('list-add-title');
   if (add && _listAddFocus) { add.focus(); _listAddFocus = false; }
+  updateLineCount(rows.length);
 }
 
 // ── Excel-style fill down ────────────────────────────────────────────────
@@ -10412,6 +10461,39 @@ function closeTaskModal() {
   const hasTitle = document.getElementById('m-title').value.trim();
   if (hasTitle) saveTask();        // saveTask persists + closes
   else closeModal();
+}
+
+// ── Line counter + "what's filtering the table" note ──────────────────────
+function lineCountNote() {
+  const parts = [];
+  if (doneOnly) parts.push('✓ done only');
+  if (showArchived) parts.push('archived view');
+  if (nlStatusFilter !== null) {
+    const c = nlStatusCounts().find(x => x.key === nlStatusFilter);
+    parts.push(`status: ${c?.name || nlStatusFilter}`);
+  }
+  if (searchQuery) parts.push(`search “${searchQuery}”`);
+  if (projectSearchQuery) parts.push(`project search “${projectSearchQuery}”`);
+  if (filterPriority && filterPriority !== 'All') parts.push(`priority: ${priorityById(filterPriority)?.name || filterPriority}`);
+  if (filterStatus) parts.push(`proj status: ${statusLabel(filterStatus)}`);
+  if (filterUser) parts.push(`user: ${userById(filterUser)?.name || filterUser}`);
+  if (filterDept) parts.push(`dept: ${deptById(filterDept)?.name || filterDept}`);
+  if (filterCompany) parts.push(`company: ${companyById(filterCompany)?.name || filterCompany}`);
+  const nCol = Object.values(nlColFilters).filter(v => v).length;
+  if (nCol) parts.push(`${nCol} column filter${nCol > 1 ? 's' : ''}`);
+  let note = parts.length ? 'filtered: ' + parts.join(' · ') : '';
+  // The auto-hide rule (done > 7 days → archived) explains "missing" lines
+  const stale = !showArchived ? tasks.filter(t => !t.deleted && !t.archived && isStaleDone(t)).length : 0;
+  if (stale) note += (note ? ' · ' : '') + `+${stale} old done auto-hidden`;
+  return note;
+}
+function updateLineCount(n) {
+  const nEl = document.getElementById('line-count-n');
+  const noteEl = document.getElementById('line-count-note');
+  if (!nEl) return;
+  if (n === null) { nEl.textContent = ''; noteEl.textContent = ''; return; }
+  nEl.textContent = `${n} line${n === 1 ? '' : 's'}`;
+  noteEl.textContent = lineCountNote();
 }
 
 // ── Search palette (Ctrl+K, ClickUp-style) ────────────────────────────────
