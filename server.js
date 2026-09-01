@@ -943,7 +943,7 @@ const handler = async (req, res) => {
   // REFERENCE DATA (departments, statuses, companies, priorities)
   // ═══════════════════════════════════════════════════════════════
 
-  const refDataMatch = url.match(/^\/api\/workspaces\/([^\/]+)\/(departments|statuses|companies|priorities|changelog|users|clients|taskstatuses|folders|views)$/);
+  const refDataMatch = url.match(/^\/api\/workspaces\/([^\/]+)\/(departments|statuses|companies|priorities|changelog|users|clients|taskstatuses|folders|views|events)$/);
   if (refDataMatch && req.method === 'GET') {
     const collection = refDataMatch[2];
     const workspaceId = TEAM_ID;

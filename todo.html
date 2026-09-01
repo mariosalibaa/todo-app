@@ -470,6 +470,12 @@
     .nl-c-follow:hover { color: var(--text); }
     .nl-c-follow.stuck { color: var(--peach, #fab387); font-weight: 600; }
     .nl-nudge-n { font-size: 0.62rem; color: var(--overlay0); }
+    .nl-name-nudge {
+      background: var(--surface1); color: var(--subtext0); cursor: pointer;
+      font-weight: 600; white-space: nowrap;
+    }
+    .nl-name-nudge:hover { outline: 1px solid var(--accent); }
+    .nl-name-nudge.stuck { background: color-mix(in srgb, var(--peach, #fab387) 22%, transparent); color: var(--peach, #fab387); }
     /* Reminder popover - a small form, so it survives clicks inside itself */
     .rm-pop {
       position: fixed; z-index: 1200; width: 268px; background: var(--mantle);
@@ -2478,6 +2484,7 @@ async function loadWorkspaceData() {
       loadFolders(),
       loadEvents()
     ]);
+    logProjectActivity();   // seed the project-status snapshot, logs nothing yet
     await syncSavedViews();
     // Open the default view: this device's starred one, else the server's,
     // else — when there is exactly one saved view — that one.
@@ -2636,6 +2643,7 @@ async function saveProjectMeta() {
     Object.entries(projectMeta).forEach(([key, meta]) => {
       if (meta && meta.name !== key) projectMeta[key] = { ...meta, name: key };
     });
+    logProjectActivity();
     await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/projects`, projectMeta);
   } catch (error) {
     console.error('Failed to save projects:', error);
@@ -3904,7 +3912,7 @@ function applyView(id) {
   listGroupLevels = Array.isArray(v.state.listGroupLevels) ? [...v.state.listGroupLevels]
                   : (groupByProject ? ['project'] : []);
   if (v.state.listGroupDir) listGroupDir = { ...v.state.listGroupDir };
-  if (Array.isArray(v.state.nlColOrder) && v.state.nlColOrder.length) nlColOrder = [...v.state.nlColOrder];
+  if (Array.isArray(v.state.nlColOrder) && v.state.nlColOrder.length) nlColOrder = nlBackfillCols(v.state.nlColOrder);
   if (v.state.nlColWidths) nlColWidths = { ...v.state.nlColWidths };
   if (Array.isArray(v.state.nlColHidden)) nlColHidden = new Set(v.state.nlColHidden);
   if (v.state.nlColLabels) nlColLabels = { ...v.state.nlColLabels };
@@ -4823,6 +4831,66 @@ function snapshotTasks() {
   tasks.forEach(t => { taskSnapshot[t.id] = taskFingerprint(t); });
   _doneMap = {};
   tasks.forEach(t => { _doneMap[t.id] = !!t.done; });
+  _actSnap = {};
+  tasks.forEach(t => { _actSnap[t.id] = _actFields(t); });
+}
+
+// ── Activity log: each save diffs against the last snapshot and appends
+//    "who did what" events to the same log the 🔔 reminders live in ────────
+let _actSnap = {};
+const ACT_CAP = 1000;   // events kept; oldest fall off
+function _actFields(t) {
+  return { title: t.title, done: !!t.done, taskStatus: t.taskStatus || '',
+           deleted: !!t.deleted, project: t.project || '', due: t.due || '' };
+}
+function logActivity(who, now) {
+  let dirty = false;
+  const add = (t, type, detail) => {
+    events.push({ id: uid(), taskId: t.id, taskTitle: t.title, type,
+                  actor: who, detail: detail || '', at: now });
+    dirty = true;
+  };
+  for (const t of tasks) {
+    const prev = _actSnap[t.id];
+    if (!prev) {
+      if (t.createdBy !== 'automation') add(t, 'created', t.project || '');
+      continue;
+    }
+    const cur = _actFields(t);
+    if (prev.deleted !== cur.deleted) add(t, cur.deleted ? 'deleted' : 'restored');
+    else if (prev.done !== cur.done)  add(t, cur.done ? 'done' : 'reopened');
+    if (prev.title !== cur.title)     add(t, 'renamed', `"${prev.title}" → "${cur.title}"`);
+    if (prev.taskStatus !== cur.taskStatus) add(t, 'status', `${prev.taskStatus || 'To Do'} → ${cur.taskStatus || 'To Do'}`);
+    if (prev.project !== cur.project) add(t, 'moved', `${prev.project || '—'} → ${cur.project || '—'}`);
+    if (prev.due !== cur.due)         add(t, 'due', `${prev.due || '—'} → ${cur.due || '—'}`);
+  }
+  if (dirty) {
+    if (events.length > ACT_CAP) events = events.slice(events.length - ACT_CAP);
+    saveEvents();
+  }
+}
+// Project-level: status moves (List drag, pill, board) logged from the same diff idea
+let _projStSnap = null;
+function logProjectActivity() {
+  const cur = {};
+  Object.keys(projectMeta).forEach(p => { cur[p] = projectMeta[p]?.status || ''; });
+  if (_projStSnap) {
+    let dirty = false;
+    for (const p of Object.keys(cur)) {
+      if (p in _projStSnap && _projStSnap[p] !== cur[p]) {
+        events.push({ id: uid(), taskId: '', taskTitle: p, type: 'project',
+                      actor: whoAmIName(),
+                      detail: `${statusLabel(_projStSnap[p]) || 'No status'} → ${statusLabel(cur[p]) || 'No status'}`,
+                      at: new Date().toISOString() });
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      if (events.length > ACT_CAP) events = events.slice(events.length - ACT_CAP);
+      saveEvents();
+    }
+  }
+  _projStSnap = cur;
 }
 
 async function loadTasks() {
@@ -4950,6 +5018,7 @@ async function doSave() {
     const who = whoAmIName();
     const now = new Date().toISOString();
     autoForwardBillables(who, now);
+    logActivity(who, now);
     for (const t of tasks) {
       if (taskSnapshot[t.id] !== taskFingerprint(t)) {
         if (!(t.id in taskSnapshot) && !t.createdBy) t.createdBy = who;
@@ -6481,6 +6550,58 @@ function dashDue(win) {
   renderAll();
 }
 
+// ── Dashboard activity feed ────────────────────────────────────────────────
+let dashActWho = '';       // '' = everyone
+let dashActLimit = 40;
+function dashActWhoSet(w) { dashActWho = w; dashActLimit = 40; renderDashboard(); }
+function dashActMore()    { dashActLimit += 60; renderDashboard(); }
+const ACT_META = {
+  created:  ['➕', 'created'],        done:    ['✅', 'completed'],
+  reopened: ['↩️', 'reopened'],       status:  ['🔄', 'moved'],
+  renamed:  ['✏️', 'renamed'],        moved:   ['📦', 'moved'],
+  due:      ['📅', 'rescheduled'],    deleted: ['🗑', 'deleted'],
+  restored: ['♻️', 'restored'],       reminder:['🔔', 'reminded'],
+  project:  ['📋', 'project'],
+};
+function dashActHtml() {
+  const all = [...events].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  const actors = [...new Set(all.map(e => e.actor).filter(Boolean))].sort();
+  const feed = dashActWho ? all.filter(e => e.actor === dashActWho) : all;
+  const shown = feed.slice(0, dashActLimit);
+  const today = todayStr(), yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const dayLbl = d => d === today ? 'Today' : d === yest ? 'Yesterday' : new Date(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  let lastDay = '', rows = '';
+  for (const e of shown) {
+    const d = (e.at || '').slice(0, 10);
+    if (d !== lastDay) { rows += `<div style="font-size:0.64rem;text-transform:uppercase;letter-spacing:.05em;color:var(--overlay0);margin:9px 0 4px;">${dayLbl(d)}</div>`; lastDay = d; }
+    const [icon, verb] = ACT_META[e.type] || ['·', e.type];
+    const time = new Date(e.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const title = e.taskId
+      ? `<span style="color:var(--blue);cursor:pointer;" onclick="openEditModal('${e.taskId}')">${esc(e.taskTitle || '?')}</span>`
+      : `<strong>${esc(e.taskTitle || '?')}</strong>`;
+    const detail = e.type === 'reminder'
+      ? `→ ${esc(e.target || '?')} <span style="color:var(--overlay0);">${esc(RM_CHAN_LABEL[e.channel] || e.channel || '')}${e.note ? ' — ' + esc(e.note) : ''}</span>`
+      : (e.detail ? `<span style="color:var(--overlay1);">${esc(e.detail)}</span>` : '');
+    rows += `<div style="display:flex;gap:7px;align-items:baseline;padding:2px 0;font-size:0.78rem;">
+      <span style="flex:0 0 auto;">${icon}</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <strong>${esc(e.actor || '?')}</strong> ${verb} ${title} ${detail}</span>
+      <span style="flex:0 0 auto;color:var(--overlay0);font-size:0.66rem;">${time}</span>
+    </div>`;
+  }
+  const chip = (w, lbl) => `<span onclick="dashActWhoSet('${escAttr(w)}')" style="cursor:pointer;padding:2px 9px;border-radius:10px;font-size:0.68rem;border:1px solid ${dashActWho === w ? 'var(--accent)' : 'var(--surface1)'};color:${dashActWho === w ? 'var(--accent)' : 'var(--subtext0)'};">${esc(lbl)}</span>`;
+  return `
+    <div class="dash-section" style="margin-bottom:14px;">
+      <h3 style="display:flex;align-items:center;gap:10px;">📜 Activity
+        <span style="display:flex;gap:5px;font-weight:400;text-transform:none;letter-spacing:0;">
+          ${chip('', 'Everyone')}${actors.map(a => chip(a, a)).join('')}</span></h3>
+      <div style="max-height:340px;overflow-y:auto;">
+        ${rows || '<div style="color:var(--overlay0);font-size:0.8rem;">Nothing logged yet — activity appears here as the team works.</div>'}
+        ${feed.length > dashActLimit ? `<div onclick="dashActMore()" style="cursor:pointer;color:var(--blue);font-size:0.72rem;margin-top:7px;">Show ${Math.min(60, feed.length - dashActLimit)} more…</div>` : ''}
+      </div>
+    </div>`;
+}
+
 function renderDashboard() {
   const el = document.getElementById('dashboard-view');
   document.getElementById('toolbar-title').textContent = 'Dashboard';
@@ -6594,6 +6715,7 @@ function renderDashboard() {
           <div class="dash-label">${c.label}</div>
         </div>`).join('')}
     </div>
+    ${dashActHtml()}
     <div class="dash-cols">
       <div class="dash-section">
         <h3>Open tasks by project</h3>
@@ -7425,17 +7547,20 @@ const nlLoad = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); 
 let nlColWidths = nlLoad('todo_nl_col_widths', {});
 let nlColHidden = new Set(nlLoad('todo_nl_col_hidden', []));
 let nlColLabels = nlLoad('todo_nl_col_labels', {});
-let nlColOrder  = (() => {
-  const order = nlLoad('todo_nl_col_order', []).filter(nlColDef);
+// A column added in a later version lands where it belongs, not at the far
+// right - and not nowhere at all, which is what happened to a saved view or a
+// stored order written before the column existed.
+function nlBackfillCols(saved) {
+  const order = (saved || []).filter(nlColDef);
   if (!order.length) return NL_COLS.map(c => c.key);
-  // A column added in a later version lands where it belongs, not at the far right
   NL_COLS.forEach((c, i) => {
     if (order.includes(c.key)) return;
     const before = NL_COLS.slice(0, i).map(x => x.key).filter(k => order.includes(k)).pop();
     order.splice(before ? order.indexOf(before) + 1 : 0, 0, c.key);
   });
   return order;
-})();
+}
+let nlColOrder = nlBackfillCols(nlLoad('todo_nl_col_order', []));
 let nlSortKey = localStorage.getItem('todo_nl_sort_key') ?? 'updated';
 let nlSortDir = localStorage.getItem('todo_nl_sort_dir') === null
   ? -1 : (+(localStorage.getItem('todo_nl_sort_dir') || 1) < 0 ? -1 : 1);
@@ -7829,6 +7954,8 @@ function renderNiceList(filtered, el) {
             ? `<span class="nl-tag nl-name-dept" style="background:${d.color}22;color:${d.color};" onclick="nlDeptMenu(event,'${t.id}')" title="Department — click to change">${esc(d.name)}</span>` : ''}
           ${!listGroupLevels.includes('partner') && (t.partner || t.acctPartner)
             ? `<span class="nl-tag nl-name-vendor" onclick="nlVendorMenu(event,'${t.id}')" title="Vendor — click to change">${esc(t.partner || t.acctPartner)}</span>` : ''}
+          ${t.lastNudgeAt ? `<span class="nl-tag nl-name-nudge ${nudgeStuck(t) ? 'stuck' : ''}" onclick="rmOpen(event,'${t.id}')"
+              title="${escAttr(`Reminded ${t.waitingOn || 'someone'} · ${fmtDateTimeFull(t.lastNudgeAt)}${t.nudgeCount > 1 ? ` · ${t.nudgeCount} reminders` : ''}${nudgeStuck(t) ? ' — nothing has moved since' : ''}`)}">🔔 ${esc(t.waitingOn || '')} · ${esc(nlAgo(t.lastNudgeAt))}</span>` : ''}
           ${t.billing ? `<span class="nl-tag" onclick="nlCycleBilling(event,'${t.id}')" title="Billing stage — click to advance" style="background:color-mix(in srgb, ${BILLING_COLOR[t.billing]} 25%, transparent);color:${BILLING_COLOR[t.billing]};cursor:pointer;">${BILLING_LABEL[t.billing]}</span>` : ''}
           <span class="nl-acts">
             <span class="nl-act" onclick="rmOpen(event,'${t.id}')" title="Log a reminder you sent about this task">🔔</span>
