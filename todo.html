@@ -2109,6 +2109,44 @@ let currentWorkspaceId = null;
 let idToken = null;
 let authDisabled = false;
 
+// App session: a server-minted token in localStorage that outlives Firebase's
+// IndexedDB session (which this machine wipes on browser exit) — sign in once,
+// stay signed in for 60 days.
+let sessionToken = null;
+let sessionUser = null;          // { email, name } for edit attribution
+try {
+  sessionToken = localStorage.getItem('todo_session') || null;
+  sessionUser = JSON.parse(localStorage.getItem('todo_session_user') || 'null');
+} catch {}
+
+async function mintAppSession() {
+  try {
+    const r = await fetch('/api/session', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` } });
+    if (!r.ok) return;
+    const s = await r.json();
+    sessionToken = s.token;
+    sessionUser = { email: s.email, name: s.name };
+    localStorage.setItem('todo_session', s.token);
+    localStorage.setItem('todo_session_user', JSON.stringify(sessionUser));
+  } catch (e) { console.warn('Could not mint app session:', e); }
+}
+
+function dropAppSession() {
+  sessionToken = null; sessionUser = null;
+  try { localStorage.removeItem('todo_session'); localStorage.removeItem('todo_session_user'); } catch {}
+}
+
+// True if the stored session token still opens the workspace
+async function tryRestoreAppSession() {
+  if (!sessionToken) return false;
+  try {
+    const r = await fetch('/api/workspaces', { headers: { 'Authorization': `Bearer ${sessionToken}` } });
+    if (r.ok) return true;
+    if (r.status === 401) dropAppSession();
+    return false;
+  } catch { return false; }
+}
+
 // Local mode: if the server doesn't require sign-in, go straight to the app
 (async () => {
   try {
@@ -2134,12 +2172,23 @@ firebaseAuth.onAuthStateChanged(async (user) => {
     currentUser = user;
     idToken = await user.getIdToken();
     try { localStorage.setItem('todo_had_session', user.email || '1'); } catch {}
+    // Sign in once, stay signed in: keep a valid stored session, mint a
+    // fresh one if there is none or the stored one has expired
+    if (!(await tryRestoreAppSession())) await mintAppSession();
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('app-container').style.display = 'flex';
     await initializeApp();
   } else {
     if (authDisabled) return;  // local mode — no login screen
     currentUser = null;
+    // Firebase lost its session (IndexedDB wiped) — our own token may still
+    // be good: restore silently instead of asking to sign in again.
+    if (await tryRestoreAppSession()) {
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('app-container').style.display = 'flex';
+      await initializeApp();
+      return;
+    }
     document.getElementById('login-msg').textContent = 'Sign in with your Google account to continue';
     document.getElementById('login-btn').style.display = '';
     // Diagnose why there is no session: was one ever saved in this browser?
@@ -2171,9 +2220,19 @@ async function signInWithGoogle() {
 // Sign Out
 async function signOut() {
   try {
+    if (sessionToken) {
+      fetch('/api/session', { method: 'DELETE', headers: { 'Authorization': `Bearer ${sessionToken}` } }).catch(() => {});
+    }
+    dropAppSession();
     await firebaseAuth.signOut();
     currentUser = null;
     currentWorkspaceId = null;
+    // With Firebase already signed out, onAuthStateChanged won't refire —
+    // show the login screen ourselves
+    if (!authDisabled) {
+      document.getElementById('login-overlay').style.display = 'flex';
+      document.getElementById('app-container').style.display = 'none';
+    }
   } catch (error) {
     console.error('Sign-out failed:', error);
   }
@@ -2185,9 +2244,10 @@ async function apiCall(method, path, body = null) {
     // getIdToken() serves a cached token and auto-refreshes it when expired,
     // so requests never go out with a stale token after the tab sat idle
     if (currentUser) idToken = await currentUser.getIdToken(forceRefresh);
+    const bearer = currentUser ? idToken : (sessionToken || idToken);
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${idToken}`
+      'Authorization': `Bearer ${bearer}`
     };
     const options = { method, headers };
     if (body) options.body = JSON.stringify(body);
@@ -4384,7 +4444,9 @@ function scheduleSave() {
 }
 async function doSave() {
   try {
-    const who = currentUser?.displayName || currentUser?.email || (authDisabled ? 'Mario' : 'unknown');
+    const who = currentUser?.displayName || currentUser?.email
+      || sessionUser?.name || sessionUser?.email
+      || (authDisabled ? 'Mario' : 'unknown');
     const now = new Date().toISOString();
     for (const t of tasks) {
       if (taskSnapshot[t.id] !== taskFingerprint(t)) {

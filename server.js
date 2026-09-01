@@ -371,6 +371,58 @@ async function ensureTeamMember(user) {
 const AUTH_DISABLED = !process.env.RENDER && !process.env.VERCEL && process.env.REQUIRE_AUTH !== '1';
 
 // Auth middleware: verify Firebase ID token
+// ── App session tokens ─────────────────────────────────────────────────────
+// Firebase keeps its session in IndexedDB, which Mario's browser wipes on
+// exit (localStorage survives). So after a Google sign-in the client trades
+// its Firebase token for a long-lived app session token kept in localStorage;
+// only the SHA-256 hash of the token is stored server-side.
+const crypto = require('crypto');
+const SESSION_DAYS = 60;
+const sessionCache = new Map();   // tokenHash -> { user, expires }
+const hashToken = t => crypto.createHash('sha256').update(t).digest('hex');
+
+async function createSession(user) {
+  const token = 'st_' + crypto.randomBytes(36).toString('base64url');
+  const h = hashToken(token);
+  const expires = Date.now() + SESSION_DAYS * 86400000;
+  const u = { uid: user.uid, email: user.email || '', name: user.name || user.email || '' };
+  await db.collection('appSessions').doc(h).set({ ...u, expires, createdAt: Date.now() });
+  sessionCache.set(h, { user: u, expires });
+  return { token, expires };
+}
+
+async function verifySessionToken(token) {
+  const h = hashToken(token);
+  const cached = sessionCache.get(h);
+  if (cached) {
+    if (cached.expires < Date.now()) { sessionCache.delete(h); return null; }
+    return cached.user;
+  }
+  try {
+    const doc = await db.collection('appSessions').doc(h).get();
+    if (!doc.exists) return null;
+    const d = doc.data();
+    if (d.expires < Date.now()) { db.collection('appSessions').doc(h).delete().catch(() => {}); return null; }
+    // Sliding renewal: top back up to 60 days once under 30 remain
+    if (d.expires - Date.now() < (SESSION_DAYS / 2) * 86400000) {
+      d.expires = Date.now() + SESSION_DAYS * 86400000;
+      db.collection('appSessions').doc(h).update({ expires: d.expires }).catch(() => {});
+    }
+    const user = { uid: d.uid, email: d.email, name: d.name };
+    sessionCache.set(h, { user, expires: d.expires });
+    return user;
+  } catch (e) {
+    console.error('Session lookup failed:', e.message);
+    return null;
+  }
+}
+
+async function deleteSession(token) {
+  const h = hashToken(token);
+  sessionCache.delete(h);
+  await db.collection('appSessions').doc(h).delete().catch(() => {});
+}
+
 async function verifyToken(req) {
   if (AUTH_DISABLED) {
     return { uid: 'local-user', email: 'local@shift', name: 'Mario' };
@@ -380,6 +432,7 @@ async function verifyToken(req) {
     return null;
   }
   const token = authHeader.slice(7);
+  if (token.startsWith('st_')) return verifySessionToken(token);
   try {
     const decodedToken = await auth.verifyIdToken(token);
     return decodedToken;
@@ -450,6 +503,26 @@ const handler = async (req, res) => {
   }
 
   const userId = user.uid;
+
+  // ── App sessions: mint on sign-in, revoke on sign-out ──
+  if (url === '/api/session' && req.method === 'POST') {
+    try {
+      const s = await createSession(user);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ token: s.token, expires: s.expires,
+        email: user.email || '', name: user.name || user.displayName || user.email || '' }));
+    } catch (e) {
+      console.error('POST /api/session error:', e);
+      res.writeHead(500); res.end('server error');
+    }
+    return;
+  }
+  if (url === '/api/session' && req.method === 'DELETE') {
+    const t = (req.headers.authorization || '').slice(7);
+    if (t.startsWith('st_')) await deleteSession(t);
+    res.writeHead(204); res.end();
+    return;
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // WORKSPACES
