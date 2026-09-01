@@ -1265,6 +1265,10 @@
       #line-count-note { max-width: 100%; }
     }
     .plist-name-wrap { display: flex; align-items: center; gap: 4px; }
+    .pl-drag { cursor: grab; color: var(--overlay0); font-size: 0.78rem; letter-spacing: -2px; padding: 0 3px; user-select: none; flex: 0 0 auto; }
+    .pl-drag:hover { color: var(--text); }
+    tr.is-dragging-pl { opacity: 0.45; }
+    tr.plist-drop-over td { background: rgba(96,165,250,0.13) !important; }
     .plist-name-inp {
       flex: 1; min-width: 0; background: transparent;
       border: 1px solid transparent; border-radius: 4px;
@@ -4028,9 +4032,10 @@ function renderProjectsList() {
     const displayDate = createdDate !== '—' ? new Date(createdDate).toLocaleDateString() : '—';
     const taskCount = allT.length;
     return `
-      <tr data-proj="${esc(p)}" class="plist-row">
+      <tr data-proj="${esc(p)}" data-stgroup="${esc(status || '')}" class="plist-row">
         <td class="plist-name-cell">
           <div class="plist-name-wrap">
+            <span class="pl-drag" draggable="true" title="Drag to another status group">⠿</span>
             <button class="tt-open-btn" onclick="openProjectTasks('${esc(p)}')" title="Open this project's tasks">⛶</button>
             <input class="plist-name-inp" type="text" value="${esc(p)}" title="Type to rename · Enter to save · Esc to cancel"
                    onfocus="this.select()"
@@ -4085,7 +4090,7 @@ function renderProjectsList() {
     const color = st !== '—' ? statusColor(st) : 'var(--overlay0)';
     const label = st !== '—' ? statusLabel(st) : 'No Status';
     const nTasks = projs.reduce((n, p) => n + tasks.filter(t => t.project === p && !t.archived && !t.done).length, 0);
-    rows += `<tr><td colspan="11" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
+    rows += `<tr data-stgroup="${esc(st === '—' ? '' : st)}"><td colspan="11" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
       <span style="width:9px;height:9px;border-radius:50%;background:${color};display:inline-block;margin-right:7px;"></span>${esc(label)}
       <span style="color:var(--overlay0);font-weight:400;text-transform:none;margin-left:6px;font-size:0.66rem;">${projs.length} projects · ${nTasks} open tasks</span></td></tr>`;
     rows += projs.map(projRowHtml).join('');
@@ -4139,6 +4144,57 @@ function renderProjectsList() {
       if (inp.tagName === 'INPUT') inp.setSelectionRange(inp.value.length, inp.value.length);
     }
   }
+
+  initPlistDrag(el);
+}
+
+// Drag a project row (by its ⠿ handle) onto another status group to move it
+let _plDragProj = null;
+function initPlistDrag(el) {
+  if (el._plDragInited) return;
+  el._plDragInited = true;
+
+  el.addEventListener('dragstart', e => {
+    const h = e.target.closest && e.target.closest('.pl-drag');
+    if (!h) { if (e.target.classList?.contains('plist-name-inp')) e.preventDefault(); return; }
+    const row = h.closest('tr[data-proj]');
+    _plDragProj = row.dataset.proj;
+    row.classList.add('is-dragging-pl');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', _plDragProj);
+    e.dataTransfer.setDragImage(row, 12, 12);
+  });
+  el.addEventListener('dragend', () => {
+    _plDragProj = null;
+    el.querySelectorAll('.is-dragging-pl').forEach(r => r.classList.remove('is-dragging-pl'));
+    el.querySelectorAll('.plist-drop-over').forEach(r => r.classList.remove('plist-drop-over'));
+  });
+  el.addEventListener('dragover', e => {
+    if (!_plDragProj) return;
+    const tr = e.target.closest && e.target.closest('tr[data-stgroup]');
+    if (!tr) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.querySelectorAll('.plist-drop-over').forEach(r => r.classList.remove('plist-drop-over'));
+    tr.classList.add('plist-drop-over');
+  });
+  el.addEventListener('drop', e => {
+    // never let dragged text land inside a project-name input (accidental rename)
+    if (e.target.classList?.contains('plist-name-inp')) { e.preventDefault(); return; }
+    if (!_plDragProj) return;
+    const tr = e.target.closest && e.target.closest('tr[data-stgroup]');
+    if (!tr) return;
+    e.preventDefault();
+    const newSt = tr.dataset.stgroup || null;
+    const p = _plDragProj;
+    _plDragProj = null;
+    if ((projStatus(p) || null) !== newSt) {
+      if (!projectMeta[p]) projectMeta[p] = {};
+      projectMeta[p].status = newSt;
+      saveProjectMeta();
+    }
+    renderProjectsList();
+  }, true);
 }
 
 // Shared rename: updates tasks, projectMeta, column order, and active filter
