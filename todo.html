@@ -1836,9 +1836,9 @@
   <div class="phone-shell">
     <div class="phone-bar">
       <select class="phone-size" id="phone-size" onchange="phoneApplySize()">
-        <option value="390x844" selected>iPhone 14 · 390×844</option>
+        <option value="390x844">iPhone 14 · 390×844</option>
         <option value="375x667">iPhone SE · 375×667</option>
-        <option value="430x932">iPhone 15 Pro Max · 430×932</option>
+        <option value="430x932" selected>iPhone 15 Pro Max · 430×932</option>
         <option value="744x1133">iPad mini · 744×1133</option>
       </select>
       <button class="tb-btn" onclick="phoneRotate()" title="Rotate">⟳ Rotate</button>
@@ -2436,6 +2436,7 @@ let filterStatus = null;
 let filterUser   = null;
 let filterDept   = null;
 let filterCompany = null;
+let dueWindow = null;   // null | 'overdue' | 'today' | 'soon' — set from the Dashboard's Today panel
 let users        = [];
 let departments  = [];
 let companies    = [];
@@ -4758,6 +4759,14 @@ function getFiltered() {
     if (filterCompany && projCompany(t.project)  !== filterCompany) return false;
     if (projectSearchQuery &&
         !(t.project || '').toLowerCase().includes(projectSearchQuery.toLowerCase())) return false;
+    if (dueWindow) {
+      if (t.done || !t.due) return false;
+      const today = todayStr();
+      const soonLim = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+      if (dueWindow === 'overdue' && !(t.due < today)) return false;
+      if (dueWindow === 'today'   && t.due !== today) return false;
+      if (dueWindow === 'soon'    && !(t.due > today && t.due <= soonLim)) return false;
+    }
     if (searchQuery) {
       // Master search: one box matches everything shown on the row, so
       // "anthony" finds the task named anthony AND anthony-the-vendor's
@@ -4789,6 +4798,10 @@ function renderActiveFiltersBar() {
   if (!bar) return;
   const chips = [];
 
+  if (dueWindow) {
+    const lbl = { overdue: '🔴 Overdue', today: '🟡 Due today', soon: '⚪ Due in 3 days' }[dueWindow];
+    chips.push({ label: lbl, clear: () => { dueWindow = null; renderAll(); } });
+  }
   if (filterPriority && filterPriority !== 'All') {
     chips.push({ label: `Priority: ${filterPriority}`, clear: () => { filterPriority = 'All'; const el = document.getElementById('priority-filter'); if(el){el.value='All';el.classList.remove('filter-active');} renderAll(); } });
   }
@@ -4827,7 +4840,7 @@ function clearFilterChip(i) {
 }
 
 function clearAllFilters() {
-  filterPriority = 'All'; filterStatus = null; filterCompany = null; filterDept = null; filterUser = null;
+  filterPriority = 'All'; filterStatus = null; filterCompany = null; filterDept = null; filterUser = null; dueWindow = null;
   ['priority-filter','status-filter','company-filter','dept-filter','user-filter'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -6157,17 +6170,49 @@ function isCompletedStatusId(id) {
   const nm = statusLabel(id).toLowerCase();
   return /done|complete|closed|finish/.test(nm);
 }
+// Today-panel jump: open the list narrowed to a due-date window
+function dashDue(win) {
+  dueWindow = win;
+  filterProject = 'All';
+  setView('list');
+  renderAll();
+}
+
 function renderDashboard() {
   const el = document.getElementById('dashboard-view');
   document.getElementById('toolbar-title').textContent = 'Dashboard';
   document.getElementById('task-count').textContent = '';
 
   const projects = getProjects();
-  const live = tasks.filter(t => !t.archived);
+  const live = tasks.filter(t => !t.archived && !t.deleted);
   const completedProjects = projects.filter(p => isCompletedStatusId(projStatus(p)));
   const activeProjects = projects.filter(p => !isCompletedStatusId(projStatus(p)));
   const openTasks = live.filter(t => !t.done);
   const overdue = openTasks.filter(t => isOverdue(t.due, t.done));
+
+  // Today panel: overdue / due today / next 3 days (open tasks only)
+  const today = todayStr();
+  const soonLim = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  const dueToday = openTasks.filter(t => t.due === today);
+  const dueSoon  = openTasks.filter(t => t.due > today && t.due <= soonLim);
+
+  // Done in the last 7 days, per person (from the updatedBy stamp on completion)
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const doneWeek = tasks.filter(t => t.done && (t.doneAt || t.updatedAt || '') >= weekAgo && !t.deleted);
+  const perPerson = {};
+  doneWeek.forEach(t => { const w = t.updatedBy || 'unknown'; perPerson[w] = (perPerson[w] || 0) + 1; });
+  const personRows = Object.entries(perPerson).sort((a, b) => b[1] - a[1]);
+  const maxPerson = Math.max(1, ...personRows.map(x => x[1]));
+
+  // Open tasks nobody touched in 14+ days (our honest "stuck" proxy)
+  const staleLim = new Date(Date.now() - 14 * 86400000).toISOString();
+  const untouched = openTasks
+    .filter(t => (t.updatedAt || t.createdAt || '') < staleLim && !t.deleted)
+    .sort((a, b) => (a.updatedAt || a.createdAt || '').localeCompare(b.updatedAt || b.createdAt || ''));
+
+  // Billing pipeline from the automation's per-task stage
+  const billing = { to_bill: 0, billed: 0, paid: 0 };
+  tasks.forEach(t => { if (t.billing && !t.deleted && !t.archived) billing[t.billing] = (billing[t.billing] || 0) + 1; });
 
   const cards = [
     { num: activeProjects.length,    label: 'Active Projects',    color: 'var(--blue)',   go: "setView('projects')" },
@@ -6209,6 +6254,20 @@ function renderDashboard() {
   const maxMonth = Math.max(1, ...months.map(m => Math.max(m.created, m.done)));
 
   el.innerHTML = `
+    <div class="dash-cards" style="grid-template-columns:repeat(3, 1fr);margin-bottom:14px;">
+      <div class="dash-card" style="border-left-color:var(--red);" onclick="dashDue('overdue')" title="Open the list showing only overdue tasks">
+        <div class="dash-num" style="color:var(--red);">${overdue.length}</div>
+        <div class="dash-label">🔴 Overdue</div>
+      </div>
+      <div class="dash-card" style="border-left-color:var(--yellow);" onclick="dashDue('today')" title="Open the list showing tasks due today">
+        <div class="dash-num" style="color:var(--yellow);">${dueToday.length}</div>
+        <div class="dash-label">🟡 Due today</div>
+      </div>
+      <div class="dash-card" style="border-left-color:var(--overlay1);" onclick="dashDue('soon')" title="Open the list showing tasks due in the next 3 days">
+        <div class="dash-num" style="color:var(--subtext0);">${dueSoon.length}</div>
+        <div class="dash-label">⚪ Next 3 days</div>
+      </div>
+    </div>
     <div class="dash-cards">
       ${cards.map(c => `
         <div class="dash-card" style="border-left-color:${c.color};" onclick="${c.go}">
@@ -6232,6 +6291,34 @@ function renderDashboard() {
           <span style="color:var(--blue);">■</span> open &nbsp;<span style="color:var(--green);">■</span> done</div>
       </div>
       <div>
+        <div class="dash-section">
+          <h3>Done this week — per person</h3>
+          ${personRows.map(([w, n]) => `
+            <div class="dash-hbar-row">
+              <span class="dash-hbar-label" title="${esc(w)}">${esc(w)}</span>
+              <div class="dash-hbar-track"><div style="width:${(n / maxPerson) * 100}%;background:var(--green);"></div></div>
+              <span class="dash-hbar-num">${n}</span>
+            </div>`).join('') || '<div style="color:var(--overlay0);font-size:0.8rem;">Nothing completed in the last 7 days</div>'}
+        </div>
+        <div class="dash-section">
+          <h3>💰 Billing pipeline</h3>
+          <div style="display:flex;gap:10px;">
+            ${[['to_bill', 'To bill', 'var(--peach, #fab387)'], ['billed', 'Billed', 'var(--blue)'], ['paid', 'Paid', 'var(--green)']].map(([k, lbl, c]) => `
+              <div class="dash-card" style="flex:1;border-left-color:${c};" onclick="openProjectTasks(acctQueueProject())" title="Open the accounting queue">
+                <div class="dash-num" style="color:${c};">${billing[k] || 0}</div>
+                <div class="dash-label">${lbl}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div class="dash-section">
+          <h3>😴 Untouched for 14+ days — ${untouched.length} open task${untouched.length === 1 ? '' : 's'}</h3>
+          ${untouched.slice(0, 10).map(t => `
+            <div class="dash-hbar-row" style="cursor:pointer;" onclick="openEditModal('${t.id}')" title="Open this task">
+              <span class="dash-hbar-label" style="flex:1;max-width:none;">${esc(t.title)}</span>
+              <span style="font-size:0.68rem;color:var(--overlay0);white-space:nowrap;">${esc(t.project || '—')} · ${nlAgo(t.updatedAt || t.createdAt)}</span>
+            </div>`).join('') || '<div style="color:var(--overlay0);font-size:0.8rem;">Everything has been touched recently 🎉</div>'}
+          ${untouched.length > 10 ? `<div style="font-size:0.7rem;color:var(--overlay0);margin-top:6px;">…and ${untouched.length - 10} more</div>` : ''}
+        </div>
         <div class="dash-section">
           <h3>Projects by status</h3>
           ${perStatus.map(s => `
@@ -6383,7 +6470,10 @@ function renderSidebar() {
          onclick="openProjectTasks('All')">
       <span class="proj-dot"></span>
       <span class="proj-label">All Tasks</span>
-      <span class="sb-counts"><span class="sb-cnt sb-cnt-t" title="${sbOpenN} open${sbDoneN ? ` · ${sbDoneN} done shown` : ''}">${allActive}t</span></span>
+      <span class="sb-counts">${(() => {
+        const od = sbVisibleTasks.filter(t => !t.done && isOverdue(t.due, t.done)).length;
+        return od ? `<span class="sb-cnt" style="background:color-mix(in srgb, var(--red) 25%, transparent);color:var(--red);" title="${od} overdue — click to open the Dashboard" onclick="event.stopPropagation();setView('dashboard')">🔴${od}</span>` : '';
+      })()}<span class="sb-cnt sb-cnt-t" title="${sbOpenN} open${sbDoneN ? ` · ${sbDoneN} done shown` : ''}">${allActive}t</span></span>
     </div>`;
 
   // ClickUp-style tree: Space (company) → Folder → Project, all drag & drop
@@ -10782,7 +10872,7 @@ async function removeAllowedEmail(email) {
 
 // ── Phone preview: the real app in an iframe — media queries follow the
 // iframe's own width, so 390px inside IS the phone rendering ───────────────
-let phoneW = 390, phoneH = 844;
+let phoneW = 430, phoneH = 932;   // Mario's iPhone 15 Pro Max
 function openPhonePreview() {
   document.getElementById('phone-overlay').classList.add('open');
   const f = document.getElementById('phone-iframe');
