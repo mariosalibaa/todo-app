@@ -2323,9 +2323,15 @@ async function loadWorkspaceData() {
       loadTaskStatuses(),
       loadFolders()
     ]);
-    // Open the saved default view if one is set, else the Overview
-    if (defaultViewId && savedViews.some(v => v.id === defaultViewId)) {
-      applyView(defaultViewId);
+    await syncSavedViews();
+    // Open the default view: this device's starred one, else the server's,
+    // else — when there is exactly one saved view — that one.
+    const bootView =
+      (defaultViewId && savedViews.some(v => v.id === defaultViewId)) ? defaultViewId
+      : (savedViews.find(v => v.isDefault)?.id
+         || (savedViews.length === 1 ? savedViews[0].id : null));
+    if (bootView) {
+      applyView(bootView);
     } else {
       setView('list');
       renderAll();
@@ -3518,15 +3524,40 @@ function loadSavedViews() {
   try { savedViews = JSON.parse(localStorage.getItem('todo_saved_views') || '[]'); }
   catch { savedViews = []; }
 }
+
+// Saved views live on the server (workspace `views` collection) so they follow
+// you to every device; localStorage stays as the instant-paint cache. The
+// first load after this upgrade pushes any local-only views up.
+async function syncSavedViews() {
+  try {
+    const remote = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/views`);
+    if (remote.length) {
+      savedViews = remote;
+      try { localStorage.setItem('todo_saved_views', JSON.stringify(savedViews)); } catch {}
+      // a device that starred its own default keeps it; otherwise the server's wins
+      if (!defaultViewId) defaultViewId = savedViews.find(v => v.isDefault)?.id || null;
+    } else if (savedViews.length) {
+      await persistSavedViewsRemote();
+    }
+  } catch (e) { console.warn('Saved-view sync failed:', e); }
+}
+async function persistSavedViewsRemote() {
+  try { await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/views`, savedViews); }
+  catch (e) { console.warn('Saving views to server failed:', e); }
+}
 function toggleDefaultView(e, id) {
   e.stopPropagation();
   defaultViewId = (defaultViewId === id) ? null : id;
   if (defaultViewId) localStorage.setItem('todo_default_view', defaultViewId);
   else localStorage.removeItem('todo_default_view');
+  // carry the choice to other devices too
+  savedViews.forEach(v => v.isDefault = v.id === defaultViewId);
+  persistSavedViews();
   renderViewsSection();
 }
 function persistSavedViews() {
   localStorage.setItem('todo_saved_views', JSON.stringify(savedViews));
+  persistSavedViewsRemote();   // fire-and-forget; localStorage covers a failure
 }
 
 function captureViewState() {
