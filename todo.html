@@ -2732,6 +2732,7 @@ function removeUser(id) {
   // Remove from tasks
   tasks.forEach(t => {
     if (t.assignees) t.assignees = t.assignees.filter(a => a !== id);
+    (t.subtasks || []).forEach(sx => { if (sx.assignee === id) sx.assignee = ''; });
   });
   if (filterUser === id) filterUser = null;
   saveUsers();
@@ -8309,11 +8310,25 @@ function nlSubAssignee(e, taskId, subId) {
   e.stopPropagation();
   const [, x] = _subOf(taskId, subId);
   if (!x) return;
+  const delX = uid => `<span onclick="nlDeleteUser(event,'${uid}')" title="Remove this person from the team"
+      style="color:var(--surface2);padding:0 5px;border-radius:4px;"
+      onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--surface2)'">✕</span>`;
   const rows = users.map(u => nlPickRow(
-      `${userAvatarHtml(u, 'sm')} ${esc(u.name)}`, `nlSubSet('${taskId}','${subId}','assignee','${u.id}')`, x.assignee === u.id)).join('')
-    + nlPickRow('<span style="color:var(--overlay0);">Unassigned</span>', `nlSubSet('${taskId}','${subId}','assignee','')`, !x.assignee);
-  nlPickMenu(e, rows, 'Assign subtask', 220, users.length > 8);
+      `${userAvatarHtml(u, 'sm')} ${esc(u.name)} ${delX(u.id)}`, `nlSubSet('${taskId}','${subId}','assignee','${u.id}')`, x.assignee === u.id)).join('')
+    + nlPickRow('<span style="color:var(--overlay0);">Unassigned</span>', `nlSubSet('${taskId}','${subId}','assignee','')`, !x.assignee)
+    + `<div class="nl-pick-row nl-pick-keep" onclick="nlSubNewAssignee('${taskId}','${subId}')" style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-radius:6px;font-size:0.78rem;color:var(--accent);"
+         onmouseover="this.style.background='var(--surface0)'" onmouseout="this.style.background=''">＋ New person…</div>`;
+  nlPickMenu(e, rows, 'Assign subtask', 220, true);
 }
+function nlSubNewAssignee(taskId, subId) {
+  const name = (prompt('New person name:') || '').trim();
+  if (!name) return;
+  const u = quickCreateUser(name);
+  if (!u) return;
+  closeOvMenu();
+  nlSubSet(taskId, subId, 'assignee', u.id);
+}
+
 // Every vendor name in use, for the picker
 function nlAllVendors() {
   const set = new Set();
@@ -8650,16 +8665,19 @@ function nlAssigneeCellInner(t) {
 }
 function nlAssigneeItems(t) {
   const on = new Set(t.assignees || []);
-  const row = (label, act, sel, avatar) => `
-    <div class="nl-pick-row" onclick="${act}" style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-radius:6px;font-size:0.78rem;font-weight:${sel ? 700 : 400};"
+  const row = (label, act, sel, avatar, keep) => `
+    <div class="nl-pick-row ${keep ? 'nl-pick-keep' : ''}" onclick="${act}" style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-radius:6px;font-size:0.78rem;font-weight:${sel ? 700 : 400};"
          onmouseover="this.style.background='var(--surface0)'" onmouseout="this.style.background=''">
       ${avatar || '<span style="width:20px;"></span>'}<span style="flex:1;">${label}</span>${sel ? '✓' : ''}
     </div>`;
-  return users.map(u => row(esc(u.name), `nlToggleAssignee(event,'${t.id}','${u.id}')`, on.has(u.id), userAvatarHtml(u, 'sm')))
+  const delX = uid => `<span onclick="nlDeleteUser(event,'${uid}')" title="Remove this person from the team"
+      style="color:var(--surface2);padding:0 5px;border-radius:4px;"
+      onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--surface2)'">✕</span>`;
+  return users.map(u => row(`${esc(u.name)} ${delX(u.id)}`, `nlToggleAssignee(event,'${t.id}','${u.id}')`, on.has(u.id), userAvatarHtml(u, 'sm')))
       .join('')
     + `<div style="height:1px;background:var(--surface1);margin:4px 2px;"></div>`
-    + (on.size ? row('Unassign', `nlClearAssignees(event,'${t.id}')`, false, '<span style="width:20px;text-align:center;">✕</span>') : '')
-    + row('New person…', `nlNewAssignee(event,'${t.id}')`, false, '<span style="width:20px;text-align:center;">＋</span>');
+    + (on.size ? row('Unassign', `nlClearAssignees(event,'${t.id}')`, false, '<span style="width:20px;text-align:center;">✕</span>', true) : '')
+    + row('New person…', `nlNewAssignee(event,'${t.id}')`, false, '<span style="width:20px;text-align:center;">＋</span>', true);
 }
 function nlAssigneeMenu(e, id) {
   e.stopPropagation();
@@ -8670,11 +8688,11 @@ function nlAssigneeMenu(e, id) {
   m.id = 'ov-prio-menu';
   m.dataset.task = id;
   m.style.cssText = 'position:fixed;z-index:950;background:var(--mantle);border:1px solid var(--surface1);border-radius:8px;padding:4px;box-shadow:0 8px 32px #0008;display:flex;flex-direction:column;min-width:190px;max-height:60vh;overflow:auto;';
-  m.innerHTML = (users.length > 8 ? `<div style="padding:2px 8px 6px;position:sticky;top:0;background:var(--mantle);z-index:2;" onclick="event.stopPropagation()">
+  m.innerHTML = `<div style="padding:2px 8px 6px;position:sticky;top:0;background:var(--mantle);z-index:2;" onclick="event.stopPropagation()">
       <input id="nl-pick-search" type="text" placeholder="Search people…" autocomplete="off"
              oninput="nlPickFilter(this)" onkeydown="nlPickFilterKey(event)"
              style="width:100%;background:var(--surface0);border:1px solid var(--surface1);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.76rem;font-family:inherit;">
-    </div>` : '') + nlAssigneeItems(t);
+    </div>` + nlAssigneeItems(t);
   const r = e.currentTarget.getBoundingClientRect();
   m.style.left = Math.min(r.left, window.innerWidth - 210) + 'px';
   m.style.top = Math.min(r.bottom + 4, window.innerHeight - 240) + 'px';
@@ -8712,6 +8730,16 @@ function nlClearAssignees(e, id) {
   if (!nlIsDraft(id)) scheduleSave();
   nlRefreshAssignee(t);
 }
+function nlDeleteUser(e, userId) {
+  e.stopPropagation();
+  const u = users.find(x => x.id === userId);
+  if (!u) return;
+  const n = tasks.filter(t => !t.deleted && (t.assignees || []).includes(userId)).length;
+  if (!confirm(`Remove ${u.name} from the team?${n ? ` They will be unassigned from ${n} task${n === 1 ? '' : 's'}.` : ''}`)) return;
+  closeOvMenu();
+  removeUser(userId);
+}
+
 function nlNewAssignee(e, id) {
   e.stopPropagation();
   const t = nlFind(id);
