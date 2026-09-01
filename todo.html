@@ -11700,7 +11700,8 @@ function nlClearColFilters() {
 // Text a column matches against — the same strings the cells display
 function nlColText(t, key) {
   switch (key) {
-    case 'name':    return (t.title + ' ' + (t.notes || '')).toLowerCase();
+    case 'name':    return (t.title + ' ' + (t.notes || '') + ' '
+      + (t.subtasks || []).filter(s => !s.deleted).map(s => s.text).join(' ')).toLowerCase();
     case 'project': return (t.project || '').toLowerCase();
     case 'vendor':  return (t.partner || t.acctPartner || '').toLowerCase();
     case 'due':     return t.due ? (t.due + ' ' + new Date(t.due).toLocaleDateString()).toLowerCase() : '';
