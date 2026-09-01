@@ -4679,11 +4679,22 @@ function toggleProjBillable(p) {
   renderProjectsList();
 }
 
+// The short team name for the signed-in account: users linked by email show
+// their team name (Mario, Therese); otherwise the Google first name.
+function whoAmIName() {
+  const email = (currentUser?.email || sessionUser?.email || '').toLowerCase();
+  if (email) {
+    const u = users.find(x => (x.email || '').toLowerCase() === email);
+    if (u && u.name) return u.name.charAt(0).toUpperCase() + u.name.slice(1);
+  }
+  const dn = currentUser?.displayName || sessionUser?.name || '';
+  if (dn) return dn.split(' ')[0];
+  return authDisabled ? 'Mario' : (email || 'unknown');
+}
+
 async function doSave() {
   try {
-    const who = currentUser?.displayName || currentUser?.email
-      || sessionUser?.name || sessionUser?.email
-      || (authDisabled ? 'Mario' : 'unknown');
+    const who = whoAmIName();
     const now = new Date().toISOString();
     autoForwardBillables(who, now);
     for (const t of tasks) {
