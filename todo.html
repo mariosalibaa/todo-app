@@ -463,6 +463,42 @@
       display: flex; align-items: baseline; gap: 5px;
     }
     .nl-upd-by { font-size: 0.64rem; color: var(--overlay0); overflow: hidden; text-overflow: ellipsis; }
+    .nl-c-follow {
+      overflow: hidden; white-space: nowrap; font-size: 0.7rem; color: var(--overlay1);
+      display: flex; align-items: baseline; gap: 5px; cursor: pointer;
+    }
+    .nl-c-follow:hover { color: var(--text); }
+    .nl-c-follow.stuck { color: var(--peach, #fab387); font-weight: 600; }
+    .nl-nudge-n { font-size: 0.62rem; color: var(--overlay0); }
+    /* Reminder popover - a small form, so it survives clicks inside itself */
+    .rm-pop {
+      position: fixed; z-index: 1200; width: 268px; background: var(--mantle);
+      border: 1px solid var(--surface1); border-radius: 10px; padding: 10px 12px 12px;
+      box-shadow: 0 10px 36px #000a; font-size: 0.78rem;
+    }
+    .rm-pop h4 { margin: 0 0 8px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--overlay0); font-weight: 700; }
+    .rm-lbl { font-size: 0.64rem; text-transform: uppercase; letter-spacing: .05em; color: var(--overlay0); margin: 8px 0 3px; }
+    .rm-inp {
+      width: 100%; background: var(--surface0); border: 1px solid var(--surface1); color: var(--text);
+      border-radius: 6px; padding: 5px 8px; font-size: 0.78rem; font-family: inherit; box-sizing: border-box;
+    }
+    .rm-chans { display: flex; gap: 4px; flex-wrap: wrap; }
+    .rm-chan {
+      border: 1px solid var(--surface1); border-radius: 6px; padding: 4px 8px; cursor: pointer;
+      font-size: 0.72rem; color: var(--subtext0); background: var(--surface0);
+    }
+    .rm-chan.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+    .rm-go {
+      width: 100%; margin-top: 10px; background: var(--accent); color: var(--base, #1e1e2e); border: 0;
+      border-radius: 7px; padding: 7px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    .rm-hist { margin-top: 10px; border-top: 1px solid var(--surface0); padding-top: 7px; max-height: 150px; overflow: auto; }
+    .rm-hrow { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; font-size: 0.72rem; color: var(--subtext0); }
+    .rm-hrow .rm-when { color: var(--overlay0); font-size: 0.66rem; margin-left: auto; white-space: nowrap; }
+    .rm-hrow .rm-del { color: var(--overlay0); cursor: pointer; opacity: 0; }
+    .rm-hrow:hover .rm-del { opacity: 1; }
+    .rm-hrow .rm-del:hover { color: var(--red, #f38ba8); }
+    .rm-none { color: var(--overlay0); font-size: 0.72rem; margin-top: 6px; }
     .nl-c-vendor { overflow: hidden; white-space: nowrap; cursor: pointer; }
     .nl-vendor-tag { background: var(--surface1); color: var(--subtext0); }
     .nl-row:hover .nl-c-vendor:hover { background: var(--surface0); border-radius: 5px; }
@@ -1986,6 +2022,10 @@
           <button class="add-sub-btn" onclick="addSubtask()">Add</button>
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">Follow-up</label>
+        <div id="m-follow"></div>
+      </div>
       <div id="m-audit" style="display:none;font-size:0.72rem;color:var(--overlay0);margin-top:4px;"></div>
     </div>
     <div class="modal-footer">
@@ -2435,7 +2475,8 @@ async function loadWorkspaceData() {
       loadChangelog(),
       loadClients(),
       loadTaskStatuses(),
-      loadFolders()
+      loadFolders(),
+      loadEvents()
     ]);
     await syncSavedViews();
     // Open the default view: this device's starred one, else the server's,
@@ -2489,6 +2530,7 @@ let statuses    = [];   // project statuses [{ id, name, color }]
 let priorities  = [];   // [{ id, name, color }]
 let taskStatuses = [];  // per-task statuses (Odoo stages) [{ id, name, color }]
 let folders      = [];  // ClickUp-style folders [{ id, name, company, order }]
+let events       = [];  // activity log - today only reminders [{ id, taskId, type, actor, target, channel, note, at }]
 
 function statusById(id)    { return statuses.find(s => s.id === id); }
 function statusLabel(id)   { return statusById(id)?.name  || id || ''; }
@@ -3167,6 +3209,161 @@ async function saveFolders() {
 }
 function folderById(id) { return folders.find(f => f.id === id); }
 function projFolder(name) { return projectMeta[name]?.folder || null; }
+
+// ── Follow-ups ────────────────────────────────────────────────
+// A reminder is a *touch*, not a finished task: it is logged as its own event
+// and never changes the task's status. That keeps "chased 20 people" from
+// looking like "finished 20 tasks" on the dashboard.
+const RM_CHANNELS = [['whatsapp', 'WhatsApp'], ['call', 'Call'], ['email', 'Email'], ['person', 'In person'], ['other', 'Other']];
+const RM_CHAN_LABEL = Object.fromEntries(RM_CHANNELS);
+const NUDGE_STALE_DAYS = 3;
+let _rmChannel = localStorage.getItem('todo_rm_channel') || 'whatsapp';
+
+async function loadEvents() {
+  try {
+    events = await apiCall('GET', `/api/workspaces/${currentWorkspaceId}/events`);
+    events.sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+  } catch (error) {
+    events = [];
+  }
+}
+async function saveEvents() {
+  try {
+    await apiCall('POST', `/api/workspaces/${currentWorkspaceId}/events`, events);
+  } catch (error) {
+    console.error('Failed to save events:', error);
+  }
+}
+function taskEvents(taskId) {
+  return events.filter(e => e.taskId === taskId).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+}
+// Everyone you could be chasing: the team list plus anyone chased before
+function reminderTargets() {
+  const s = new Set(users.map(u => u.name).filter(Boolean));
+  events.forEach(e => { if (e.target) s.add(e.target); });
+  tasks.forEach(t => { if (t.waitingOn) s.add(t.waitingOn); });
+  return [...s].sort((a, b) => a.localeCompare(b));
+}
+// "Chased and nothing moved": the reminder is old and the task still sits in
+// the exact status it was in when we sent it. updatedAt cannot be used for
+// this - logging the reminder is itself an update.
+function nudgeStuck(t) {
+  if (!t.lastNudgeAt || t.done || t.deleted || t.archived) return false;
+  if (t.nudgeStatus != null && nlStatusKey(t) !== t.nudgeStatus) return false;
+  return Date.now() - new Date(t.lastNudgeAt).getTime() > NUDGE_STALE_DAYS * 86400000;
+}
+function logReminder(t, target, channel, note) {
+  const at = new Date().toISOString();
+  events.push({
+    id: uid(), taskId: t.id, taskTitle: t.title, type: 'reminder',
+    actor: whoAmIName(), target, channel, note: note || '', at
+  });
+  t.waitingOn   = target;
+  t.lastNudgeAt = at;
+  t.nudgeCount  = (t.nudgeCount || 0) + 1;
+  t.nudgeStatus = nlStatusKey(t);
+  saveEvents();
+  scheduleSave();
+  if (editingId === t.id) renderModalFollow(t);
+  renderAll();
+}
+function rmClose() {
+  document.getElementById('rm-pop')?.remove();
+  document.removeEventListener('mousedown', _rmOutside, true);
+}
+function _rmOutside(ev) {
+  if (!ev.target.closest('#rm-pop')) rmClose();
+}
+function rmSetChannel(c) {
+  _rmChannel = c;
+  localStorage.setItem('todo_rm_channel', c);
+  document.querySelectorAll('#rm-pop .rm-chan').forEach(b => b.classList.toggle('on', b.dataset.ch === c));
+}
+function rmHistRow(ev) {
+  return `<div class="rm-hrow" title="${escAttr(fmtDateTimeFull(ev.at))}">
+      <span>🔔 <strong>${esc(ev.actor || '?')}</strong> → ${esc(ev.target || '?')}
+        <span style="color:var(--overlay0);">${esc(RM_CHAN_LABEL[ev.channel] || ev.channel || '')}</span>
+        ${ev.note ? `<span style="color:var(--overlay1);">— ${esc(ev.note)}</span>` : ''}</span>
+      <span class="rm-when">${esc(nlAgo(ev.at))}</span>
+      <span class="rm-del" onclick="rmDelete(event,'${ev.id}')" title="Remove this entry">✕</span>
+    </div>`;
+}
+function rmDelete(e, evId) {
+  e.stopPropagation();
+  const ev = events.find(x => x.id === evId);
+  if (!ev) return;
+  events = events.filter(x => x.id !== evId);
+  const t = tasks.find(x => x.id === ev.taskId);
+  if (t) {
+    const left = taskEvents(t.id).filter(x => x.type === 'reminder');
+    t.nudgeCount  = left.length;
+    t.lastNudgeAt = left[0]?.at || '';
+    t.waitingOn   = left[0]?.target || '';
+    if (!left.length) delete t.nudgeStatus;
+    scheduleSave();
+  }
+  saveEvents();
+  if (t && editingId === t.id) renderModalFollow(t);
+  rmClose();
+  renderAll();
+}
+function rmOpen(e, id) {
+  e.stopPropagation();
+  closeOvMenu();
+  rmClose();
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  const suggested = t.waitingOn || userById((t.assignees || [])[0])?.name || '';
+  const hist = taskEvents(id).filter(x => x.type === 'reminder');
+  const m = document.createElement('div');
+  m.id = 'rm-pop';
+  m.className = 'rm-pop';
+  m.innerHTML = `
+    <h4>🔔 Log a reminder</h4>
+    <div style="font-size:0.72rem;color:var(--overlay1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.title)}</div>
+    <div class="rm-lbl">Who did you remind?</div>
+    <input class="rm-inp" id="rm-who" list="rm-who-list" autocomplete="off" placeholder="Name…" value="${escAttr(suggested)}"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();rmSubmit('${id}');}if(event.key==='Escape')rmClose();">
+    <datalist id="rm-who-list">${reminderTargets().map(n => `<option value="${escAttr(n)}"></option>`).join('')}</datalist>
+    <div class="rm-lbl">How?</div>
+    <div class="rm-chans">${RM_CHANNELS.map(([k, lbl]) =>
+      `<span class="rm-chan ${_rmChannel === k ? 'on' : ''}" data-ch="${k}" onclick="rmSetChannel('${k}')">${lbl}</span>`).join('')}</div>
+    <div class="rm-lbl">Note (optional)</div>
+    <input class="rm-inp" id="rm-note" placeholder="e.g. asked for the remaining amount"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();rmSubmit('${id}');}if(event.key==='Escape')rmClose();">
+    <button class="rm-go" onclick="rmSubmit('${id}')">Log reminder</button>
+    ${hist.length ? `<div class="rm-hist">${hist.map(rmHistRow).join('')}</div>`
+                  : '<div class="rm-none">First reminder on this task.</div>'}`;
+  document.body.appendChild(m);
+  const r = e.currentTarget.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 288)) + 'px';
+  m.style.top  = Math.max(8, Math.min(r.bottom + 5, window.innerHeight - m.offsetHeight - 12)) + 'px';
+  setTimeout(() => document.getElementById('rm-who')?.focus(), 0);
+  setTimeout(() => document.addEventListener('mousedown', _rmOutside, true), 0);
+}
+function rmSubmit(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  const whoEl = document.getElementById('rm-who');
+  const who = (whoEl?.value || '').trim();
+  if (!who) { whoEl?.focus(); return; }
+  logReminder(t, who, _rmChannel, (document.getElementById('rm-note')?.value || '').trim());
+  rmClose();
+}
+// The Follow-up block inside the task slide-over
+function renderModalFollow(t) {
+  const el = document.getElementById('m-follow');
+  if (!el) return;
+  const hist = taskEvents(t.id).filter(x => x.type === 'reminder');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
+      <button type="button" class="tb-btn" style="font-size:0.78rem;padding:5px 11px;" onclick="rmOpen(event,'${t.id}')">🔔 Log a reminder</button>
+      ${t.waitingOn ? `<span style="font-size:0.74rem;color:${nudgeStuck(t) ? 'var(--peach, #fab387)' : 'var(--overlay1)'};">
+          waiting on <strong>${esc(t.waitingOn)}</strong> · reminded ${esc(nlAgo(t.lastNudgeAt))}${t.nudgeCount > 1 ? ` · ${t.nudgeCount} times` : ''}</span>` : ''}
+    </div>
+    ${hist.length ? `<div class="rm-hist">${hist.map(rmHistRow).join('')}</div>`
+                  : '<div class="rm-none">No reminders logged yet.</div>'}`;
+}
 
 async function saveStatuses() {
   try {
@@ -4895,7 +5092,7 @@ function taskHaystack(t) {
     companyById(projCompany(t.project))?.name,
     t.partner, t.acctPartner,
     t.taskStatus, priorityById(t.priority)?.name,
-    t.updatedBy, t.createdBy
+    t.updatedBy, t.createdBy, t.waitingOn
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
@@ -6310,11 +6507,27 @@ function renderDashboard() {
   const personRows = Object.entries(perPerson).sort((a, b) => b[1] - a[1]);
   const maxPerson = Math.max(1, ...personRows.map(x => x[1]));
 
+  // Reminders sent in the last 7 days, per person who sent them. Deliberately
+  // a separate counter from "done": chasing is follow-through, not output.
+  const remWeek = events.filter(e => e.type === 'reminder' && (e.at || '') >= weekAgo);
+  const perChaser = {};
+  remWeek.forEach(e => { const w = e.actor || 'unknown'; perChaser[w] = (perChaser[w] || 0) + 1; });
+  const chaseRows = Object.entries(perChaser).sort((a, b) => b[1] - a[1]);
+  const maxChase = Math.max(1, ...chaseRows.map(x => x[1]));
+
   // Open tasks nobody touched in 14+ days (our honest "stuck" proxy)
   const staleLim = new Date(Date.now() - 14 * 86400000).toISOString();
   const untouched = openTasks
     .filter(t => (t.updatedAt || t.createdAt || '') < staleLim && !t.deleted)
     .sort((a, b) => (a.updatedAt || a.createdAt || '').localeCompare(b.updatedAt || b.createdAt || ''));
+
+  // Chased, then nothing happened: reminder older than NUDGE_STALE_DAYS and
+  // the task still sits in the status it had when the reminder went out.
+  const stuckChased = openTasks.filter(nudgeStuck)
+    .sort((a, b) => (a.lastNudgeAt || '').localeCompare(b.lastNudgeAt || ''));
+  // Follow-through: of the stale open tasks, how many did anyone actually chase?
+  const chaseCutoff = new Date(Date.now() - 14 * 86400000).toISOString();
+  const chasedStale = untouched.filter(t => (t.lastNudgeAt || '') >= chaseCutoff).length;
 
   // Billing pipeline from the automation's per-task stage
   const billing = { to_bill: 0, billed: 0, paid: 0 };
@@ -6405,6 +6618,29 @@ function renderDashboard() {
               <div class="dash-hbar-track"><div style="width:${(n / maxPerson) * 100}%;background:var(--green);"></div></div>
               <span class="dash-hbar-num">${n}</span>
             </div>`).join('') || '<div style="color:var(--overlay0);font-size:0.8rem;">Nothing completed in the last 7 days</div>'}
+        </div>
+        <div class="dash-section">
+          <h3>🔔 Reminders sent this week — per person</h3>
+          ${chaseRows.map(([w, n]) => `
+            <div class="dash-hbar-row">
+              <span class="dash-hbar-label" title="${esc(w)}">${esc(w)}</span>
+              <div class="dash-hbar-track"><div style="width:${(n / maxChase) * 100}%;background:var(--peach, #fab387);"></div></div>
+              <span class="dash-hbar-num">${n}</span>
+            </div>`).join('') || '<div style="color:var(--overlay0);font-size:0.8rem;">No reminders logged in the last 7 days</div>'}
+          <div style="font-size:0.68rem;color:var(--overlay0);margin-top:8px;border-top:1px solid var(--surface0);padding-top:7px;">
+            Follow-through: <strong style="color:${untouched.length && chasedStale / untouched.length < 0.5 ? 'var(--peach, #fab387)' : 'var(--green)'};">${chasedStale}</strong>
+            of ${untouched.length} stale task${untouched.length === 1 ? '' : 's'} chased in the last 14 days
+          </div>
+        </div>
+        <div class="dash-section">
+          <h3>🔕 Chased but nothing moved — ${stuckChased.length} task${stuckChased.length === 1 ? '' : 's'}</h3>
+          ${stuckChased.slice(0, 10).map(t => `
+            <div class="dash-hbar-row">
+              <span class="dash-hbar-label" style="flex:1;max-width:none;" onclick="openEditModal('${t.id}')" title="Open this task">${esc(t.title)}</span>
+              <span style="font-size:0.68rem;color:var(--overlay0);white-space:nowrap;">${esc(t.waitingOn || '?')} · ${esc(nlAgo(t.lastNudgeAt))}</span>
+              <span class="nl-act" style="margin-left:8px;cursor:pointer;" onclick="rmOpen(event,'${t.id}')" title="Log another reminder">🔔</span>
+            </div>`).join('') || '<div style="color:var(--overlay0);font-size:0.8rem;">Nothing you chased is sitting still — good.</div>'}
+          ${stuckChased.length > 10 ? `<div style="font-size:0.7rem;color:var(--overlay0);margin-top:6px;">…and ${stuckChased.length - 10} more</div>` : ''}
         </div>
         <div class="dash-section">
           <h3>💰 Billing pipeline</h3>
@@ -7180,6 +7416,7 @@ const NL_COLS = [
   { key: 'prio',     label: 'Priority',   cls: 'nl-c-prio',     w: 105, group: 'priority' },
   { key: 'vendor',   label: 'Vendor',     cls: 'nl-c-vendor',   w: 130, group: 'partner' },
   { key: 'status',   label: 'Status',     cls: 'nl-c-status',   w: 130, group: 'taskstatus' },
+  { key: 'follow',   label: 'Follow-up',  cls: 'nl-c-follow',   w: 130, group: null },
   { key: 'updated',  label: 'Last updated', cls: 'nl-c-updated', w: 135, group: null },
 ];
 const nlColDef = k => NL_COLS.find(c => c.key === k);
@@ -7199,8 +7436,17 @@ let nlColOrder  = (() => {
   });
   return order;
 })();
-let nlSortKey = localStorage.getItem('todo_nl_sort_key') || '';
-let nlSortDir = +(localStorage.getItem('todo_nl_sort_dir') || 1) < 0 ? -1 : 1;
+let nlSortKey = localStorage.getItem('todo_nl_sort_key') ?? 'updated';
+let nlSortDir = localStorage.getItem('todo_nl_sort_dir') === null
+  ? -1 : (+(localStorage.getItem('todo_nl_sort_dir') || 1) < 0 ? -1 : 1);
+// One-time flip (2026-09-01): default is now "last updated — newest on top".
+// Applies once per device; any sort you pick after this sticks as before.
+if (!localStorage.getItem('todo_sort_v2')) {
+  localStorage.setItem('todo_sort_v2', '1');
+  nlSortKey = 'updated'; nlSortDir = -1;
+  localStorage.setItem('todo_nl_sort_key', 'updated');
+  localStorage.setItem('todo_nl_sort_dir', '-1');
+}
 const nlColLabel = k => nlColLabels[k] || nlColDef(k)?.label || k;
 
 function nlSaveCols() {
@@ -7229,6 +7475,7 @@ function nlSortVal(t, key) {
     case 'vendor':   return (t.partner || t.acctPartner || '').toLowerCase();
     case 'prio':     return getPrioOrder(t.priority);
     case 'status':   { const i = taskStatuses.findIndex(s => s.name === t.taskStatus); return i < 0 ? 998 : i; }
+    case 'follow':   return t.lastNudgeAt || '';
     default:         return '';
   }
 }
@@ -7584,6 +7831,7 @@ function renderNiceList(filtered, el) {
             ? `<span class="nl-tag nl-name-vendor" onclick="nlVendorMenu(event,'${t.id}')" title="Vendor — click to change">${esc(t.partner || t.acctPartner)}</span>` : ''}
           ${t.billing ? `<span class="nl-tag" onclick="nlCycleBilling(event,'${t.id}')" title="Billing stage — click to advance" style="background:color-mix(in srgb, ${BILLING_COLOR[t.billing]} 25%, transparent);color:${BILLING_COLOR[t.billing]};cursor:pointer;">${BILLING_LABEL[t.billing]}</span>` : ''}
           <span class="nl-acts">
+            <span class="nl-act" onclick="rmOpen(event,'${t.id}')" title="Log a reminder you sent about this task">🔔</span>
             <span class="nl-act" onclick="nlQuickSub(event,'${t.id}')" title="Add a subtask">＋</span>
             <span class="nl-act" onclick="event.stopPropagation();openEditModal('${t.id}')" title="Open the full task form">⤢</span>
             <span class="nl-act nl-act-del" onclick="deleteTaskById(event,'${t.id}')" title="Delete this task">🗑</span>
@@ -7592,6 +7840,7 @@ function renderNiceList(filtered, el) {
         </span>`,
       company: nlCompanyCell(t),
       project: nlProjectCell(t),
+      follow: nlFollowCell(t),
       updated: nlUpdatedCell(t.updatedAt || t.createdAt, t.updatedBy || t.createdBy),
       vendor: `<span class="nl-c-vendor" onclick="nlVendorMenu(event,'${t.id}')" title="Click to set a vendor">${
         (t.partner || t.acctPartner) ? `<span class="nl-tag nl-vendor-tag">${esc(t.partner || t.acctPartner)}</span>` : '<span class="nl-empty">—</span>'}</span>`,
@@ -7823,6 +8072,7 @@ function nlTaskMenu(e, id) {
     </div>`;
   m.innerHTML =
     item('⤢', 'Open task', `closeOvMenu();openEditModal('${id}')`) +
+    item('🔔', 'Log a reminder', `rmOpen(event,'${id}')`) +
     item('✎', 'Rename', `nlRenameTask(event,'${id}')`) +
     item('＋', 'Add subtask', `nlQuickSub(event,'${id}')`) +
     item('⧉', 'Duplicate', `nlDuplicateTask(event,'${id}')`) +
@@ -8590,6 +8840,19 @@ function nlAgo(iso) {
   const days = Math.floor(hrs / 24);
   if (days < 7) return days + 'd ago';
   return fmtDateTimeFull(iso).slice(0, 10);
+}
+// Follow-up column: when this task was last chased, and who is being waited on.
+// Amber once the reminder is stale and the task has not moved since.
+function nlFollowCell(t) {
+  if (!t.lastNudgeAt) {
+    return `<span class="nl-c-follow" onclick="rmOpen(event,'${t.id}')" title="No reminder logged — click to log one">
+        <span class="nl-empty">🔔</span></span>`;
+  }
+  const stuck = nudgeStuck(t);
+  return `<span class="nl-c-follow ${stuck ? 'stuck' : ''}" onclick="rmOpen(event,'${t.id}')"
+      title="${escAttr(`Reminded ${t.waitingOn || 'someone'} · ${fmtDateTimeFull(t.lastNudgeAt)}${stuck ? ' — nothing has moved since' : ''}`)}">
+      🔔 ${esc(nlAgo(t.lastNudgeAt))}${t.waitingOn ? `<span class="nl-upd-by">${esc(t.waitingOn)}</span>` : ''}${
+        t.nudgeCount > 1 ? `<span class="nl-nudge-n">×${t.nudgeCount}</span>` : ''}</span>`;
 }
 function nlUpdatedCell(iso, who) {
   if (!iso) return '<span class="nl-c-updated"><span class="nl-empty">—</span></span>';
@@ -10813,6 +11076,7 @@ function openEditModal(id) {
   renderModalDepts();
   renderModalAssignees();
   renderSubtaskList();
+  renderModalFollow(t);
   refreshPartnerDatalist();
   document.getElementById('task-modal').classList.add('slideover');
   openModal('task-modal');
@@ -11317,6 +11581,8 @@ function nlColText(t, key) {
       const iso = t.updatedAt || t.createdAt || '';
       return (iso.slice(0, 10) + ' ' + nlAgo(iso) + ' ' + (t.updatedBy || t.createdBy || '')).toLowerCase();
     }
+    case 'follow':  return ((t.waitingOn || '') + ' ' +
+      (t.lastNudgeAt ? t.lastNudgeAt.slice(0, 10) + ' ' + nlAgo(t.lastNudgeAt) : '')).toLowerCase();
     default:        return '';
   }
 }
@@ -11372,6 +11638,7 @@ function nlFilterRowHtml() {
       case 'vendor':   return txt('vendor', 'Search vendor…');
       case 'due':      return txt('due', 'Date…');
       case 'updated':  return txt('updated', 'Who / when…');
+      case 'follow':   return txt('follow', 'Waiting on…');
       case 'assignee': return sel('assignee', [...users.map(u => [u.id, u.name]), ['__none__', '( none )']]);
       case 'dept':     return sel('dept', [...departments.map(d => [d.id, d.name]), ['__none__', '( none )']]);
       case 'prio':     return sel('prio', [...priorities.map(p => [p.id, p.name]), ['__none__', '( none )']]);
