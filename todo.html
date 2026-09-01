@@ -904,7 +904,7 @@
     }
     .modal-overlay.slideover .modal {
       pointer-events: auto;
-      width: 440px; max-width: 96vw; height: 100vh; max-height: 100vh;
+      width: 480px; max-width: 96vw; height: 100vh; max-height: 100vh;
       border-radius: 0; border: none; border-left: 1px solid var(--surface1);
       box-shadow: -12px 0 40px rgba(0,0,0,0.45);
       animation: nl-slide-in 0.16s ease-out;
@@ -914,21 +914,38 @@
       to   { transform: none; opacity: 1; }
     }
 
-    .modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .modal-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 9px; }
 
-    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .form-label {
-      font-size: 0.72rem; font-weight: 700; color: var(--subtext0);
+      font-size: 0.6rem; font-weight: 700; color: var(--overlay0);
       text-transform: uppercase; letter-spacing: 0.06em;
     }
+    .lbl-hint { color: var(--overlay0); font-weight: 400; text-transform: none; }
     .form-input, .form-textarea, .form-select {
       background: var(--surface0); border: 1px solid var(--surface1);
-      color: var(--text); border-radius: 6px; padding: 8px 12px;
-      font-size: 0.875rem; font-family: inherit; transition: border-color 0.15s;
+      color: var(--text); border-radius: 6px; padding: 6px 9px;
+      font-size: 0.8rem; font-family: inherit; transition: border-color 0.15s;
     }
+    /* the title is the hero field, ClickUp-style */
+    .m-title-big {
+      font-size: 0.95rem !important; font-weight: 600;
+      background: transparent !important; border-color: transparent !important;
+      padding: 7px 9px !important;
+    }
+    .m-title-big:hover { border-color: var(--surface1) !important; }
+    .m-title-big:focus { border-color: var(--accent) !important; background: var(--surface0) !important; }
+    /* single-line, sideways-scrolling chip rows keep the form short */
+    #m-dept-row, .assignee-row {
+      display: flex; gap: 5px; flex-wrap: nowrap; overflow-x: auto;
+      scrollbar-width: none; padding: 2px 0; margin-top: 0;
+    }
+    #m-dept-row::-webkit-scrollbar, .assignee-row::-webkit-scrollbar { display: none; }
+    #m-dept-row > *, .assignee-row > * { flex-shrink: 0; }
+    .subtask-list { max-height: 140px; overflow-y: auto; }
     .form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: var(--accent); }
     .form-input::placeholder, .form-textarea::placeholder { color: var(--overlay0); }
-    .form-textarea { resize: vertical; min-height: 76px; }
+    .form-textarea { resize: vertical; min-height: 44px; }
     .form-select { cursor: pointer; }
     input[type=date] { color-scheme: dark; }
 
@@ -1888,54 +1905,55 @@
       <button class="modal-close" onclick="closeTaskModal()">×</button>
     </div>
     <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Title</label>
-        <input class="form-input" type="text" id="m-title" placeholder="What needs to be done?"
-          onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)) saveTask()">
-      </div>
+      <input class="form-input m-title-big" type="text" id="m-title" placeholder="What needs to be done?"
+        onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)) saveTask()">
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Project</label>
           <input class="form-input" type="text" id="m-project" placeholder="Project name" list="proj-datalist" oninput="onProjectFieldInput(this.value)">
           <datalist id="proj-datalist"></datalist>
         </div>
+        <div class="form-group" id="m-taskstatus-group">
+          <label class="form-label">Status</label>
+          <select class="form-input" id="m-taskstatus"></select>
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Start date</label>
+          <label class="form-label">Start</label>
           <input class="form-input" type="date" id="m-start">
         </div>
         <div class="form-group">
-          <label class="form-label">Due date</label>
+          <label class="form-label">Due</label>
           <input class="form-input" type="date" id="m-due">
         </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Client <span style="color:var(--overlay0);font-weight:400">(auto-filled from project)</span></label>
-        <input class="form-input" type="text" id="m-client" placeholder="Client name" list="client-datalist">
       </div>
       <div class="form-group">
         <label class="form-label">Priority</label>
         <div class="priority-row" id="priority-row"></div>
       </div>
-      <div class="form-group" id="m-taskstatus-group">
-        <label class="form-label">Task status</label>
-        <select class="form-input" id="m-taskstatus"></select>
-      </div>
       <div class="form-group">
-        <label class="form-label">Notes</label>
-        <textarea class="form-textarea" id="m-notes" placeholder="Add notes…"></textarea>
+        <label class="form-label">Department</label>
+        <div id="m-dept-row"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Client <span class="lbl-hint">(from project)</span></label>
+          <input class="form-input" type="text" id="m-client" placeholder="Client name" list="client-datalist">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vendor</label>
+          <input class="form-input" type="text" id="m-task-partner" list="partner-datalist" placeholder="e.g. anthony" autocomplete="off">
+          <datalist id="partner-datalist"></datalist>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Assign to</label>
         <div class="assignee-row" id="m-assignees"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Department</label>
-        <div id="m-dept-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;"></div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Partner</label>
-        <input class="form-input" type="text" id="m-task-partner" list="partner-datalist" placeholder="e.g. anthony" autocomplete="off">
-        <datalist id="partner-datalist"></datalist>
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="m-notes" placeholder="Add notes…"></textarea>
       </div>
       <div id="acct-fields" style="display:none">
         <div class="form-row">
