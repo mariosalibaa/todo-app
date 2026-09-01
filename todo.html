@@ -4025,7 +4025,9 @@ function startProjDueEdit(projName) {
   function commit() {
     if (closed) return;
     closed = true;
-    const v = inp.value || null;
+    let v = inp.value || null;
+    // A year still being typed reads as e.g. 0002-02-01 — treat as not-a-date
+    if (v && v < '2000-01-01') v = cur || null;
     if (v !== (cur || null)) {
       if (!projectMeta[projName]) projectMeta[projName] = {};
       projectMeta[projName].due = v;
@@ -4033,7 +4035,8 @@ function startProjDueEdit(projName) {
     }
     renderProjectsList();
   }
-  inp.addEventListener('change', commit);
+  // Commit on blur/Enter only — the date input fires 'change' mid-typing,
+  // which used to save half-typed years like 0002 and close the editor.
   inp.addEventListener('blur', commit);
   inp.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
@@ -6072,7 +6075,9 @@ function renderSidebar() {
   const rawProjects = getProjects();
   const ordered = getOrderedProjects(rawProjects);
   const el = document.getElementById('projects-list');
-  const allActive = tasks.filter(t => !t.done).length;
+  // Open tasks only — and not ones sitting in the recycle bin or archive,
+  // so this badge always agrees with what the table can actually show
+  const allActive = tasks.filter(t => !t.deleted && !t.archived && !t.done).length;
 
   // Project-status summary: a coloured pill per status with its project count,
   // the same idea as the task-status legend over the list. Click one to filter.
