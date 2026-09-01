@@ -5941,6 +5941,7 @@ function kanbanAddCommit(title) {
     assignees: [],
   };
   tasks.push(t);
+  placeNewTaskFirst(t);
   scheduleSave();
   return t;
 }
@@ -7253,6 +7254,17 @@ function nlBaseSort(arr) {
   });
 }
 function nlSortTasks(arr) {
+  const out = _nlSortCore(arr);
+  // Just-created tasks (last hour) stay pinned to the top, newest first, so a
+  // new row is always visible no matter the active sort or grouping. Dragging
+  // one to a spot gives it a manual ord, which releases the pin.
+  const isFresh = t => typeof t.ord !== 'number' && !t.done && t.createdAt
+    && (Date.now() - Date.parse(t.createdAt)) < 3600e3;
+  if (!out.some(isFresh)) return out;
+  const fresh = out.filter(isFresh).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return fresh.concat(out.filter(t => !isFresh(t)));
+}
+function _nlSortCore(arr) {
   if (!nlSortKey) return nlBaseSort(arr);
   const blankLast = ['due', 'assignee', 'dept', 'name', 'company', 'project', 'updated', 'vendor'].includes(nlSortKey);
   return [...arr].sort((a, b) => {
@@ -8157,6 +8169,14 @@ function nlClearManualOrder() {
 }
 const nlHasManualOrder = () => tasks.some(t => typeof t.ord === 'number');
 
+// When manual drag-order is active, ord-less rows sink to the bottom — so a
+// brand-new task must claim an ord smaller than every existing one to land on top
+function placeNewTaskFirst(t) {
+  let min = Infinity;
+  tasks.forEach(x => { if (x !== t && typeof x.ord === 'number' && x.ord < min) min = x.ord; });
+  if (min !== Infinity) t.ord = min - 1;
+}
+
 // ── Inline text editing: the cell turns into an input, no modal ─────────
 function nlEditText(e, kind, taskId, subId) {
   e.stopPropagation();
@@ -9007,6 +9027,7 @@ function nlCommitDraft() {
     assignees: [...(d.assignees || [])],
   };
   tasks.push(t);
+  placeNewTaskFirst(t);
   // A status filter that excludes the new task would hide it the instant it is
   // created, which reads as a save that failed. The draft pre-fills the filtered
   // status where it can; where it cannot (the "Done" pseudo-status, or a chip
@@ -9552,6 +9573,7 @@ function ovQuickAddKey(e, p) {
     clientId: projectMeta[p]?.clientId || null
   };
   tasks.push(t);
+  placeNewTaskFirst(t);
   createInOdooIfLinked(t);   // two-way sync: also lands in Odoo if the project is linked
   scheduleSave();
   renderOverview();
@@ -10472,6 +10494,7 @@ function listAddRow() {
     taskStatus: g('list-add-taskstatus').value || '',
     partner: g('list-add-partner').value.trim()
   });
+  placeNewTaskFirst(tasks[tasks.length - 1]);
   scheduleSave();
   _listAddFocus = true;   // keep focus on the title for rapid entry
   renderTasks();
@@ -10827,6 +10850,7 @@ function saveTask() {
   } else {
     const newTask = { id: uid(), done: false, doneAt: null, createdAt: new Date().toISOString(), ...data };
     tasks.push(newTask);
+    placeNewTaskFirst(newTask);
     createInOdooIfLinked(newTask);
   }
 
