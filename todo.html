@@ -6711,11 +6711,13 @@ function dashActHtml() {
     const detail = e.type === 'reminder'
       ? `→ ${esc(e.target || '?')} <span style="color:var(--overlay0);">${esc(RM_CHAN_LABEL[e.channel] || e.channel || '')}${e.note ? ' — ' + esc(e.note) : ''}</span>`
       : (e.detail ? `<span style="color:var(--overlay1);">${esc(e.detail)}</span>` : '');
+    const proj = e.taskId ? (tasks.find(x => x.id === e.taskId)?.project || '') : '';
     rows += `<div style="display:flex;gap:7px;align-items:baseline;padding:2px 0;font-size:0.78rem;">
       <span style="flex:0 0 auto;">${icon}</span>
-      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        <strong>${esc(e.actor || '?')}</strong> ${verb} ${title} ${detail}</span>
-      <span style="flex:0 0 auto;color:var(--overlay0);font-size:0.66rem;">${time}</span>
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <strong>${esc(e.actor || '?')}</strong> ${verb} ${title} ${detail}${
+          proj ? ` <span style="color:var(--overlay1);">· ${esc(proj)}</span>` : ''}
+        <span style="color:var(--overlay0);font-size:0.66rem;"> · ${time}</span></span>
     </div>`;
   }
   const chip = (w, lbl) => `<span onclick="dashActWhoSet('${escAttr(w)}')" style="cursor:pointer;padding:2px 9px;border-radius:10px;font-size:0.68rem;border:1px solid ${dashActWho === w ? 'var(--accent)' : 'var(--surface1)'};color:${dashActWho === w ? 'var(--accent)' : 'var(--subtext0)'};">${esc(lbl)}</span>`;
