@@ -12159,6 +12159,95 @@ function padEditCommit(evId, inp) {
   padRender();
 }
 
+// ── ✨ Parse my day: dump raw notes, Claude splits + matches, you approve ──
+let _padMulti = false;      // capture box is a multi-line dump
+let _padDump = '';          // dump text survives re-renders
+let _padParsed = null;      // [{text, kind, taskId, taskTitle, action, project, use}]
+let _padParsing = false;
+function padToggleMulti() { _padMulti = !_padMulti; _padParsed = null; padRender(); if (_padMulti) setTimeout(() => document.getElementById('pad-dump')?.focus(), 40); }
+async function padParseDay() {
+  const text = document.getElementById('pad-dump')?.value.trim();
+  if (!text || _padParsing) return;
+  _padParsing = true; padRender();
+  try {
+    const ctx = tasks.filter(t => !t.done && !t.deleted && !t.archived)
+      .map(t => ({ id: t.id, title: t.title, project: t.project || '' }));
+    const r = await apiCall('POST', '/api/ai/parseday', { text, tasks: ctx, projects: getProjects() });
+    _padParsed = (r.entries || []).map(en => ({
+      text: en.text || '', kind: en.kind === 'work' ? 'work' : 'idea',
+      taskId: en.taskId && tasks.some(t => t.id === en.taskId) ? en.taskId : null,
+      taskTitle: en.taskTitle || '',
+      action: ['link', 'link_done', 'create_task', 'log_only'].includes(en.action) ? en.action : 'log_only',
+      project: en.project || '', use: true,
+    })).filter(en => en.text);
+    _padParsed.forEach(en => { if ((en.action === 'link' || en.action === 'link_done') && !en.taskId) en.action = 'log_only'; });
+  } catch (e) {
+    alert('Could not parse: ' + (e.message || e));
+  }
+  _padParsing = false;
+  padRender();
+}
+function padParsedSet(i, field, v) { if (_padParsed?.[i]) { _padParsed[i][field] = field === 'use' ? !!v : v; } }
+function padApplyParsed() {
+  if (!_padParsed) return;
+  const who = whoAmIName(), now = new Date().toISOString();
+  let touched = false;
+  for (const en of _padParsed) {
+    if (!en.use) continue;
+    const ev = { id: uid(), type: en.kind, text: en.text, taskTitle: en.text, actor: who, at: now };
+    if (en.kind === 'idea') ev.ideaState = 'open';
+    if (en.action === 'create_task') {
+      const t = { id: uid(), title: en.text, done: en.kind === 'work', doneAt: en.kind === 'work' ? now : null,
+        createdAt: now, project: en.project || '', taskStatus: '', department: null, priority: '', due: '',
+        partner: '', notes: 'From ✨ Parse my day.', taskType: 'task',
+        clientName: projectMeta[en.project]?.clientName || '', clientId: projectMeta[en.project]?.clientId || null,
+        subtasks: [], assignees: [] };
+      tasks.push(t); placeNewTaskFirst(t);
+      ev.taskId = t.id; ev.linkedTitle = t.title;
+      if (en.kind === 'idea') ev.ideaState = 'task';
+      touched = true;
+    } else if (en.taskId && (en.action === 'link' || en.action === 'link_done')) {
+      const t = tasks.find(x => x.id === en.taskId);
+      if (t) {
+        ev.taskId = t.id; ev.linkedTitle = t.title;
+        if (en.action === 'link_done') { t.done = true; t.doneAt = now; cascadeDone(t); }
+        else { t.updatedAt = now; t.updatedBy = who; }
+        touched = true;
+      }
+    }
+    events.push(ev);
+  }
+  if (events.length > ACT_CAP) events = events.slice(events.length - ACT_CAP);
+  saveEvents();
+  if (touched) { scheduleSave(); renderAll(); }
+  _padParsed = null; _padMulti = false; _padDump = '';
+  padRender();
+}
+function padParsedHtml() {
+  if (_padParsing) return `<div style="padding:10px 14px;color:var(--overlay1);font-size:0.8rem;">✨ Reading your notes…</div>`;
+  if (!_padParsed) return '';
+  if (!_padParsed.length) return `<div style="padding:10px 14px;color:var(--overlay0);font-size:0.8rem;">Nothing recognizable in that text.</div>`;
+  const actOpts = en => {
+    const o = [];
+    o.push(['log_only', 'Log only']);
+    if (en.taskId) { o.push(['link', `🔗 Link: ${en.taskTitle}`]); o.push(['link_done', `✅ Done: ${en.taskTitle}`]); }
+    o.push(['create_task', `＋ New task${en.project ? ' in ' + en.project : ''}`]);
+    return o.map(([v, l]) => `<option value="${v}" ${en.action === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  };
+  return `<div style="padding:8px 14px;border-bottom:1px solid var(--surface0);max-height:38vh;overflow-y:auto;">
+    ${_padParsed.map((en, i) => `
+      <div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:0.78rem;">
+        <input type="checkbox" ${en.use ? 'checked' : ''} onchange="padParsedSet(${i},'use',this.checked)">
+        <span onclick="padParsedSet(${i},'kind','${en.kind === 'idea' ? 'work' : 'idea'}');padRender()" style="cursor:pointer;" title="Click to flip idea/work">${en.kind === 'idea' ? '💡' : '📝'}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(en.text)}">${esc(en.text)}</span>
+        <select onchange="padParsedSet(${i},'action',this.value)" style="max-width:220px;font-size:0.7rem;background:var(--surface0);color:var(--text);border:1px solid var(--surface1);border-radius:6px;padding:2px 4px;">${actOpts(en)}</select>
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="save-btn" style="padding:5px 14px;font-size:0.78rem;" onclick="padApplyParsed()">Apply ${_padParsed.filter(x => x.use).length}</button>
+      <button class="save-btn" style="padding:5px 14px;font-size:0.78rem;background:var(--surface0);color:var(--subtext0);border:1px solid var(--surface1);" onclick="_padParsed=null;padRender()">Cancel</button>
+    </div></div>`;
+}
+
 function padRender(keepInput) {
   padEnsure();
   const prev = keepInput ? (document.getElementById('pad-inp')?.value || '') : '';
@@ -12194,16 +12283,23 @@ function padRender(keepInput) {
     <div class="pad-box" onmousedown="event.stopPropagation()">
       <div class="pad-cap">
         <div class="pad-kind">
-          <span class="pad-kbtn ${_padKind === 'idea' ? 'on' : ''}" onclick="padSetKind('idea')">💡 Idea</span>
-          <span class="pad-kbtn ${_padKind === 'work' ? 'on' : ''}" onclick="padSetKind('work')">📝 Work done</span>
+          <span class="pad-kbtn ${_padKind === 'idea' && !_padMulti ? 'on' : ''}" onclick="_padMulti=false;padSetKind('idea')">💡 Idea</span>
+          <span class="pad-kbtn ${_padKind === 'work' && !_padMulti ? 'on' : ''}" onclick="_padMulti=false;padSetKind('work')">📝 Work done</span>
+          <span class="pad-kbtn ${_padMulti ? 'on' : ''}" onclick="padToggleMulti()" title="Paste or dictate your whole day — AI splits it into entries and matches your tasks">✨ Parse my day</span>
           <span style="flex:1;"></span>
-          <span style="font-size:0.66rem;color:var(--overlay0);">Enter logs it · Esc closes</span>
+          <span style="font-size:0.66rem;color:var(--overlay0);">${_padMulti ? 'One thing per line works best' : 'Enter logs it · Esc closes'}</span>
         </div>
+        ${_padMulti ? `
+        <textarea class="pad-inp" id="pad-dump" rows="5" spellcheck="false" oninput="_padDump=this.value"
+          placeholder="Everything you did / thought of today — one line each…&#10;invoice submitted to mckinsey for 3 days mitri&#10;quotation for mckinsey for edl room&#10;idea: net metering for mahab and mum">${esc(_padDump || '')}</textarea>
+        <div style="margin-top:6px;"><button class="save-btn" style="padding:5px 14px;font-size:0.78rem;" onclick="padParseDay()" ${_padParsing ? 'disabled' : ''}>✨ Parse</button></div>`
+        : `
         <input class="pad-inp" id="pad-inp" type="text" autocomplete="off" spellcheck="false"
                placeholder="${_padKind === 'idea' ? 'Jot the idea… e.g. net metering for mahab and mum projects' : 'What did you do? e.g. quotation for mckinsey for edl room'}"
                value="${escAttr(prev)}" onkeydown="padKey(event)" oninput="padInput()">
-        <div id="pad-sug"></div>
+        <div id="pad-sug"></div>`}
       </div>
+      ${padParsedHtml()}
       <div class="pad-tabs">
         <span class="pad-tab ${_padTab === 'idea' ? 'on' : ''}" onclick="padSetTab('idea')">💡 Ideas${nOpenIdeas ? ` (${nOpenIdeas})` : ''}</span>
         <span class="pad-tab ${_padTab === 'work' ? 'on' : ''}" onclick="padSetTab('work')">📝 Work log</span>

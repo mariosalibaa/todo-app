@@ -582,6 +582,52 @@ const handler = async (req, res) => {
     return;
   }
 
+  // ── AI: parse a raw end-of-day dump into idea/work entries matched to tasks ──
+  if (url === '/api/ai/parseday' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const key = process.env.ANTHROPIC_API_KEY;
+        if (!key) { res.writeHead(501, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'no_api_key' })); return; }
+        const { text, tasks: taskCtx, projects } = JSON.parse(body);
+        if (!text || !String(text).trim()) { res.writeHead(400); res.end('{"error":"empty"}'); return; }
+        const sys = `You turn a person's raw end-of-day notes into structured entries for their to-do app.
+Rules:
+- Split the notes into individual entries, one per idea or piece of work done.
+- kind: "work" for something already done (invoice sent, quotation made, follow-up call, site visit); "idea" for a thought or something to maybe do later.
+- Match an entry to an open task only when it clearly refers to it (same subject, and same project if named). Use the task's id. Never force a weak match.
+- action: "link" (work touches the task, task stays open), "link_done" (the entry says that task is finished now), "create_task" (deserves a task that does not exist; pick the best project from the project list, or "" if unclear), or "log_only".
+- Ideas default to "log_only".
+Answer with ONLY a JSON array: [{"text":"...","kind":"idea|work","taskId":"id or null","taskTitle":"matched task title or null","action":"link|link_done|create_task|log_only","project":"..."}]. Keep each text close to the user's own words.`;
+        const rsp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 2000,
+            system: sys,
+            messages: [{ role: 'user', content:
+              `Open tasks (id | title | project):\n${(taskCtx || []).slice(0, 400).map(t => `${t.id} | ${t.title} | ${t.project || '-'}`).join('\n')}` +
+              `\n\nProjects: ${(projects || []).join(', ')}\n\nNotes:\n${String(text).slice(0, 4000)}` }]
+          })
+        });
+        const data = await rsp.json();
+        if (!rsp.ok) { console.error('anthropic error:', JSON.stringify(data).slice(0, 300)); res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'ai_failed' })); return; }
+        const raw = data?.content?.[0]?.text || '[]';
+        const m = raw.match(/\[[\s\S]*\]/);
+        const entries = JSON.parse(m ? m[0] : '[]');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ entries }));
+      } catch (e) {
+        console.error('parseday error:', e);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── App sessions: mint on sign-in, revoke on sign-out ──
   if (url === '/api/session' && req.method === 'POST') {
     try {
