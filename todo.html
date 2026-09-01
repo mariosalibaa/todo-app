@@ -1868,6 +1868,8 @@
     <!-- Same spot as the Project List's "+ New Project": top-left, above the table -->
     <div class="content-add-bar" id="content-add-bar" style="display:none;">
       <button class="save-btn" onclick="openAddModal()" style="padding:6px 14px;font-size:0.82rem;">+ Add task</button>
+      <button class="save-btn" onclick="printTaskList()" title="Print what the list is showing now (filters, sort and grouping respected) — or Save as PDF from the print dialog"
+              style="padding:6px 11px;font-size:0.82rem;background:var(--surface0);color:var(--subtext0);border:1px solid var(--surface1);">🖨 Print</button>
       <div id="line-count" style="margin-left:auto;text-align:right;align-self:center;">
         <div id="line-count-n" style="font-size:0.78rem;font-weight:700;color:var(--subtext0);"></div>
         <div id="line-count-note" style="font-size:0.64rem;color:var(--overlay0);max-width:560px;"></div>
@@ -4218,6 +4220,12 @@ function renderProjectsList() {
     if (!byStatus.has(st)) byStatus.set(st, []);
     byStatus.get(st).push(p);
   });
+  // Dragged order wins inside a group; projects never dragged stay alphabetical
+  byStatus.forEach(arr => arr.sort((a, b) => {
+    const ao = projectMeta[a]?.ord ?? Infinity, bo = projectMeta[b]?.ord ?? Infinity;
+    if (ao !== bo) return ao - bo;
+    return a < b ? -1 : a > b ? 1 : 0;   // same case-sensitive order the list always had
+  }));
   const stKeys = [...byStatus.keys()].sort((a, b) => {
     const ia = statusIds.indexOf(a), ib = statusIds.indexOf(b);
     if (ia === -1 && ib === -1) return 0;
@@ -4308,6 +4316,8 @@ function renderProjectsList() {
   el.innerHTML = `
     <div style="margin-bottom:14px;display:flex;gap:8px;">
       <button class="save-btn" onclick="openNewProjectFromList()" style="padding:6px 14px;font-size:0.82rem;">+ New Project</button>
+      <button class="save-btn" onclick="printProjectList()" title="Print the project list as shown (filters respected) — or Save as PDF from the print dialog"
+              style="padding:6px 11px;font-size:0.82rem;background:var(--surface0);color:var(--subtext0);border:1px solid var(--surface1);">🖨 Print</button>
     </div>
     <table class="projects-list-table">
       <thead>
@@ -4463,11 +4473,28 @@ function initPlistDrag(el) {
     const newSt = tr.dataset.stgroup || null;
     const p = _plDragProj;
     _plDragProj = null;
-    if ((projStatus(p) || null) !== newSt) {
-      if (!projectMeta[p]) projectMeta[p] = {};
-      projectMeta[p].status = newSt;
-      saveProjectMeta();
+    if (!projectMeta[p]) projectMeta[p] = {};
+    projectMeta[p].status = newSt;
+    const targetProj = tr.dataset.proj;
+    if (targetProj && targetProj !== p) {
+      // dropped on a row: land above or below it depending on which half was hit
+      const order = [...el.querySelectorAll(`tr[data-proj][data-stgroup="${CSS.escape(tr.dataset.stgroup)}"]`)]
+        .map(r => r.dataset.proj).filter(x => x !== p);
+      const rect = tr.getBoundingClientRect();
+      const below = e.clientY > rect.top + rect.height / 2;
+      const at = order.indexOf(targetProj);
+      order.splice(below ? at + 1 : at, 0, p);
+      order.forEach((name, i) => {
+        if (!projectMeta[name]) projectMeta[name] = {};
+        projectMeta[name].ord = i;
+      });
+    } else if (!targetProj) {
+      // dropped on the group heading: end of that group
+      const peers = Object.keys(projectMeta)
+        .filter(n => n !== p && (projectMeta[n]?.status || null) === newSt);
+      projectMeta[p].ord = Math.max(-1, ...peers.map(n => projectMeta[n]?.ord ?? -1)) + 1;
     }
+    saveProjectMeta();
     renderProjectsList();
   }, true);
 }
@@ -11535,6 +11562,101 @@ if (window.self !== window.top) {
 }
 
 // ── Line counter + "what's filtering the table" note ──────────────────────
+// ── 🖨 Print: the current view becomes a clean paper/PDF report ────────────
+function printReport(title, sub, bodyHtml) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('The browser blocked the print window — allow pop-ups for this site.'); return; }
+  w.document.write(`<!doctype html><html><head><title>${esc(title)}</title><style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; background: #fff; margin: 24px; }
+    h1 { font-size: 18px; margin: 0 0 2px; }
+    .rep-sub { color: #555; font-size: 11px; margin-bottom: 14px; }
+    h2 { font-size: 13px; margin: 16px 0 4px; border-bottom: 1px solid #999; padding-bottom: 2px; }
+    h2 .n { color: #777; font-weight: 400; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { text-align: left; border-bottom: 1px solid #333; padding: 3px 6px; font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: #333; }
+    td { border-bottom: 1px solid #ddd; padding: 3px 6px; vertical-align: top; }
+    tr.sub-row td:first-child { padding-left: 22px; color: #444; }
+    tr.done td { text-decoration: line-through; color: #999; }
+    @media print { body { margin: 8mm; } h2 { break-after: avoid; } tr { break-inside: avoid; } }
+  </style></head><body><h1>${esc(title)}</h1><div class="rep-sub">${esc(sub)}</div>${bodyHtml}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 350);
+}
+function printTaskList() {
+  const filtered = getFiltered().filter(nlColFilterMatch);
+  const fields = listGroupLevels.filter(f => f !== 'subtask');
+  const field = fields[0] || '';
+  const labelOf = t => {
+    if (field === 'project')    return t.project || 'No project';
+    if (field === 'dept')       return deptById(t.department)?.name || 'No department';
+    if (field === 'taskstatus') return t.done ? 'Done' : (t.taskStatus || 'To Do');
+    if (field === 'priority')   return priorityById(t.priority)?.name || 'No priority';
+    return (groupValueOf(t, field) || '—').toString().replace(/^— /, '');
+  };
+  const head = `<tr><th style="width:34%;">Task</th><th>Assignee</th><th>Department</th><th>Status</th><th>Due</th><th>Vendor</th></tr>`;
+  const trow = t => `<tr class="${t.done ? 'done' : ''}">
+      <td>${esc(t.title)}</td>
+      <td>${esc((t.assignees || []).map(id => userById(id)?.name || '').filter(Boolean).join(', '))}</td>
+      <td>${esc(deptById(t.department)?.name || '')}</td>
+      <td>${t.done ? 'Done' : esc(t.taskStatus || 'To Do')}</td>
+      <td>${esc(t.due || '')}</td>
+      <td>${esc(t.partner || '')}</td></tr>`
+    + (t.subtasks || []).filter(s => !s.deleted).map(s => `<tr class="sub-row ${s.done ? 'done' : ''}">
+      <td>↳ ${esc(s.text)}</td>
+      <td>${esc(s.assignee ? (userById(s.assignee)?.name || '') : '')}</td><td></td>
+      <td>${s.done ? 'Done' : esc(s.taskStatus || '')}</td>
+      <td>${esc(s.due || '')}</td><td></td></tr>`).join('');
+  let body;
+  if (field) {
+    const groups = new Map();
+    nlSortTasks(filtered).forEach(t => {
+      const k = labelOf(t);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(t);
+    });
+    body = [...groups.entries()].map(([k, arr]) =>
+      `<h2>${esc(k)} <span class="n">· ${arr.length} task${arr.length === 1 ? '' : 's'}</span></h2>
+       <table>${head}${arr.map(trow).join('')}</table>`).join('');
+  } else {
+    body = `<table>${head}${nlSortTasks(filtered).map(trow).join('')}</table>`;
+  }
+  const note = lineCountNote();
+  printReport(toolbarCrumbs(),
+    `${filtered.length} task${filtered.length === 1 ? '' : 's'}${note ? ' · ' + note : ''} · printed ${new Date().toLocaleString('en-GB')}`,
+    body);
+}
+function printProjectList() {
+  // WYSIWYG: read the rows the table is showing right now (filters and drag order included)
+  const view = document.getElementById('projects-list-view');
+  const head = `<tr><th style="width:26%;">Project</th><th>Company</th><th>Client</th><th>Status</th><th>Due</th><th style="text-align:right;">Tasks</th><th style="text-align:right;">Open</th><th style="text-align:right;">Done</th></tr>`;
+  let body = '', cur = null, rows = '';
+  const flush = () => { if (cur !== null) body += `<h2>${esc(cur)}</h2><table>${head}${rows}</table>`; rows = ''; };
+  view.querySelectorAll('tr[data-stgroup]').forEach(tr => {
+    const p = tr.dataset.proj;
+    if (!p) {   // group heading row
+      flush();
+      cur = tr.textContent.trim().replace(/\s+/g, ' ');
+      return;
+    }
+    const st = projStatus(p);
+    const meta = projectMeta[p] || {};
+    const allT = tasks.filter(t => t.project === p && !t.archived);
+    const open = allT.filter(t => !t.done).length;
+    rows += `<tr><td>${esc(p)}</td>
+      <td>${esc(companyById(projCompany(p))?.name || '')}</td>
+      <td>${esc(meta.clientName || '')}</td>
+      <td>${esc(st ? statusLabel(st) : '')}</td>
+      <td>${esc(meta.due || '')}</td>
+      <td style="text-align:right;">${allT.length}</td>
+      <td style="text-align:right;">${open}</td>
+      <td style="text-align:right;">${allT.length - open}</td></tr>`;
+  });
+  flush();
+  const n = view.querySelectorAll('tr[data-proj]').length;
+  printReport('Project List', `${n} project${n === 1 ? '' : 's'} · printed ${new Date().toLocaleString('en-GB')}`, body);
+}
+
 function lineCountNote() {
   const parts = [];
   if (doneOnly) parts.push('✓ done only');
