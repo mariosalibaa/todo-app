@@ -12138,6 +12138,26 @@ function padDelEntry(evId) {
   events = events.filter(x => x.id !== evId);
   saveEvents(); padRender();
 }
+// Click an entry's text to rewrite it in place
+function padEditStart(evId) {
+  const row = document.getElementById('pad-t-' + evId);
+  const ev = events.find(x => x.id === evId);
+  if (!row || !ev || row.querySelector('input')) return;
+  row.innerHTML = `<input class="pad-inp" style="padding:3px 8px;font-size:0.8rem;" value="${escAttr(ev.text)}"
+    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.dataset.cancel='1';this.blur();}"
+    onblur="padEditCommit('${evId}',this)">`;
+  const inp = row.querySelector('input');
+  inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+}
+function padEditCommit(evId, inp) {
+  const ev = events.find(x => x.id === evId);
+  const v = inp.value.trim();
+  if (ev && !inp.dataset.cancel && v && v !== ev.text) {
+    ev.text = v; ev.taskTitle = v;
+    saveEvents();
+  }
+  padRender();
+}
 
 function padRender(keepInput) {
   padEnsure();
@@ -12157,14 +12177,14 @@ function padRender(keepInput) {
     if (ev.type === 'idea') {
       const dn = ev.ideaState === 'done' || ev.ideaState === 'task';
       rowsHtml += `<div class="pad-row ${dn ? 'dn' : ''}">
-        <span>💡</span><span class="t">${esc(ev.text)}</span>${chip}
+        <span>💡</span><span class="t" id="pad-t-${ev.id}" onclick="padEditStart('${ev.id}')" title="Click to edit" style="cursor:text;">${esc(ev.text)}</span>${chip}
         <span class="pad-when">${esc(ev.actor || '')} · ${time}</span>
         ${ev.ideaState === 'task' ? '' : `<span class="pad-act" onclick="padIdeaToTask(event,'${ev.id}')" title="Turn this idea into a task">→ Task</span>
         <span class="pad-act" onclick="padIdeaDone('${ev.id}')" title="Mark handled">${dn ? '↩' : '✓'}</span>`}
         <span class="pad-act" onclick="padDelEntry('${ev.id}')" title="Delete">🗑</span></div>`;
     } else {
       rowsHtml += `<div class="pad-row">
-        <span>📝</span><span class="t">${esc(ev.text)}</span>${chip}
+        <span>📝</span><span class="t" id="pad-t-${ev.id}" onclick="padEditStart('${ev.id}')" title="Click to edit" style="cursor:text;">${esc(ev.text)}</span>${chip}
         <span class="pad-when">${esc(ev.actor || '')} · ${time}</span>
         <span class="pad-act" onclick="padDelEntry('${ev.id}')" title="Delete">🗑</span></div>`;
     }
