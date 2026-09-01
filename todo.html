@@ -1205,6 +1205,26 @@
       box-shadow: 0 24px 80px #000d;
     }
     .phone-frame iframe { border: none; border-radius: 32px; background: var(--base); display: block; }
+    /* ── Phone layout: the header chrome collapses to one scrollable row ──
+       (applies to narrow portrait AND short landscape screens) */
+    @media (max-width: 700px), (max-height: 520px) {
+      .gb-bar {
+        flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+        padding: 4px 10px; gap: 5px;
+      }
+      .gb-bar::-webkit-scrollbar { display: none; }
+      .gb-bar > span:first-child { display: none; }        /* the "GROUP BY" label */
+      .gb-bar .gb-ic, .gb-bar .sv-btn, .gb-bar .sv-caret { display: none; }  /* icon toggles, undo/redo, save-view */
+      .gb-legend {
+        flex-wrap: nowrap; margin-left: 4px; padding-left: 6px;
+        border-left: 1px solid var(--surface1);
+      }
+      .gb-leg-edit { display: none; }
+      .content-add-bar { padding: 6px 10px 2px; align-items: center; }
+      .content-add-bar .save-btn { padding: 4px 10px !important; font-size: 0.76rem !important; }
+      #line-count-n { font-size: 0.72rem; }
+      #line-count-note { font-size: 0.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55vw; }
+    }
     /* ── Phone layout: the List's grid becomes cards ── */
     @media (max-width: 700px) {
       .nl-frow, .nl-hrow { display: none !important; }
