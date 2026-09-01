@@ -1800,7 +1800,8 @@
         <button class="view-btn" id="view-kanban-btn" style="display:none;" onclick="setView('kanban')" title="Kanban view">&#9646;&#9646;<span class="vb-label"> Kanban</span></button>
         <button class="view-btn" id="view-gantt-btn" style="display:none;" onclick="setView('gantt')" title="Gantt chart — timeline of tasks">📊<span class="vb-label"> Gantt</span></button>
         <button class="tb-btn" id="groupby-btn" onclick="openGroupByMenu(event)" title="Group the current view" style="display:none !important;">▾ Group</button>
-        <button class="tb-btn" id="list-mode-btn" onclick="toggleListMode()" title="Switch between the clean list and the editable table" style="display:none;">⊞ Table</button>
+        <!-- Table toggle retired 2026-09-01 (the List covers filtering/inline edits); element kept hidden for setView -->
+        <button class="tb-btn" id="list-mode-btn" onclick="toggleListMode()" style="display:none !important;">⊞ Table</button>
         <span class="view-more-wrap" style="position:relative;display:none;">
           <button class="view-btn" id="view-more-btn" onclick="toggleViewMore(event)" title="More views">⋯<span class="vb-label"> More</span></button>
           <span class="view-more-pop" id="view-more-pop" style="display:none;position:absolute;right:0;top:110%;z-index:600;background:var(--mantle);border:1px solid var(--surface1);border-radius:10px;padding:6px;box-shadow:0 8px 32px #0008;flex-direction:column;gap:2px;min-width:150px;">
@@ -5582,9 +5583,7 @@ function setView(v, keepStack) {
   // "Group by" applies to List, Kanban and Gantt; the More menu hosts the rest
   document.getElementById('groupby-btn').style.display = (isList || isKanban || isGantt) ? '' : 'none';
   updateGroupByBtn();
-  const lmBtn = document.getElementById('list-mode-btn');
-  lmBtn.style.display = isList ? '' : 'none';
-  lmBtn.classList.toggle('active', listMode === 'table');
+  // Table-mode toggle retired: the button stays hidden always
   document.getElementById('view-more-pop').style.display = 'none';
   document.getElementById('view-more-btn').classList.toggle('active',
     isStatusBoard || isDashboard || isClassic || isProjects || isProjectList || isClients || isOverview);
@@ -7091,7 +7090,7 @@ function _renderTasksBody() {
 }
 
 // ── ClickUp-style list ────────────────────────────────────────────────────
-let listMode = localStorage.getItem('todo_list_mode') || 'nice';
+let listMode = 'nice';   // Table mode retired 2026-09-01 — the List does it all now
 function toggleListMode() {
   listMode = listMode === 'nice' ? 'table' : 'nice';
   localStorage.setItem('todo_list_mode', listMode);
