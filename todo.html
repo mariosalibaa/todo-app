@@ -1192,6 +1192,28 @@
     select.nl-finp { cursor: pointer; }
     .nl-fclear { cursor: pointer; color: var(--overlay0); font-size: 0.7rem; text-align: center; border-radius: 4px; }
     .nl-fclear:hover { color: var(--red, #f38ba8); background: var(--surface0); }
+    /* ── Phone layout: the List's grid becomes cards ── */
+    @media (max-width: 700px) {
+      .nl-frow, .nl-hrow { display: none !important; }
+      .task-list { padding: 8px 8px; }
+      .nl-wrap { overflow-x: hidden; padding: 4px 2px; }
+      .nl-row {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px;
+        min-width: 0; padding: 8px 10px 7px;
+        border: 1px solid var(--surface0); border-radius: 10px; margin-bottom: 6px;
+        background: var(--mantle);
+      }
+      .nl-c-name { flex: 1 1 100%; }
+      .nl-title { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+      /* keep what a phone needs: status, due, priority, dept; drop the rest */
+      .nl-c-assignee, .nl-c-company, .nl-c-vendor, .nl-c-projcol { display: none; }
+      .nl-c-updated { margin-left: auto; }
+      /* "—" placeholders just clutter a card */
+      .nl-row .nl-empty { display: none; }
+      .nl-group-head { position: static; }
+      .content-add-bar { flex-wrap: wrap; padding: 10px 10px 4px; }
+      #line-count-note { max-width: 100%; }
+    }
     .plist-name-wrap { display: flex; align-items: center; gap: 4px; }
     .plist-name-inp {
       flex: 1; min-width: 0; background: transparent;
@@ -1717,11 +1739,6 @@
       <button class="tb-btn active" id="show-done-btn" onclick="toggleShowDone()">Show done</button>
       <button class="tb-btn" id="show-archived-btn" onclick="toggleShowArchived()">Archived</button>
       <button class="tb-btn active" id="show-subs-btn" onclick="toggleShowSubs()">Subtasks</button>
-      <button class="tb-btn" id="ov-tasks-btn" onclick="toggleOvTasks()" style="display:none;">Hide tasks</button>
-      <button class="tb-btn" id="ov-prio-btn" onclick="toggleOvGroupPriority()" style="display:none;">Group by priority</button>
-      <button class="tb-btn" id="ov-groupdept-btn" onclick="toggleOvGroupDept()" style="display:none;">Group by dept</button>
-      <button class="tb-btn" id="ov-compact-btn" onclick="toggleOvCompact()" style="display:none;">Compact</button>
-      <button class="tb-btn" id="ov-print-btn" onclick="printOverview()" style="display:none;">🖨 Print</button>
       <button class="tb-btn" id="list-group-btn" onclick="openListMenu(event)" style="display:none;">▾ Group / Sort</button>
       </div>
       </div>
@@ -1762,6 +1779,14 @@
     <div class="projects-board" id="projects-board" style="display:none"></div>
     <div class="projects-list-view" id="projects-list-view" style="display:none;flex:1;overflow-y:auto;padding:14px 16px;"></div>
     <div id="clients-view" style="display:none;flex:1;overflow-y:auto;padding:14px 16px;"></div>
+    <!-- Overview's own controls (moved here when the Options popover was retired) -->
+    <div id="ov-toolbar" style="display:none;gap:6px;flex-wrap:wrap;padding:8px 18px 0;">
+      <button class="tb-btn" id="ov-tasks-btn" onclick="toggleOvTasks()" style="display:none;">Hide tasks</button>
+      <button class="tb-btn" id="ov-prio-btn" onclick="toggleOvGroupPriority()" style="display:none;">Group by priority</button>
+      <button class="tb-btn" id="ov-groupdept-btn" onclick="toggleOvGroupDept()" style="display:none;">Group by dept</button>
+      <button class="tb-btn" id="ov-compact-btn" onclick="toggleOvCompact()" style="display:none;">Compact</button>
+      <button class="tb-btn" id="ov-print-btn" onclick="printOverview()" style="display:none;">🖨 Print</button>
+    </div>
     <div id="overview-view" style="display:none;flex:1;overflow-y:auto;padding:12px 18px;"></div>
     <div class="kanban-board" id="statusboard-view" style="display:none"></div>
     <div id="gantt-view"></div>
@@ -5318,6 +5343,7 @@ function setView(v, keepStack) {
   document.getElementById('view-projects-list-btn').classList.toggle('active', isProjectList);
   document.getElementById('view-clients-btn').classList.toggle('active', isClients);
   document.getElementById('view-overview-btn').classList.toggle('active', isOverview);
+  document.getElementById('ov-toolbar').style.display = isOverview ? 'flex' : 'none';
   document.getElementById('ov-tasks-btn').style.display = isOverview ? '' : 'none';
   const ovPrioBtn = document.getElementById('ov-prio-btn');
   ovPrioBtn.style.display = isOverview ? '' : 'none';
