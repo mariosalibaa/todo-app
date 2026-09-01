@@ -338,6 +338,19 @@ async function executeSyncPlan(direction, odoo, app) {
   return result;
 }
 
+// ── Email allowlist ────────────────────────────────────────────────────────
+// The board is one shared team workspace on a public URL: only approved
+// Google accounts may join. Docs in workspaces/team/allowlist keyed by email.
+let _allowCache = { set: null, at: 0 };
+async function isAllowedEmail(email) {
+  if (!email) return false;
+  if (!_allowCache.set || Date.now() - _allowCache.at > 60000) {
+    const snap = await db.collection('workspaces').doc(TEAM_ID).collection('allowlist').get();
+    _allowCache = { set: new Set(snap.docs.map(d => (d.data().email || d.id).toLowerCase())), at: Date.now() };
+  }
+  return _allowCache.set.has(email.toLowerCase());
+}
+
 async function ensureTeamMember(user) {
   const wsRef = db.collection('workspaces').doc(TEAM_ID);
   const wsDoc = await wsRef.get();
@@ -503,6 +516,71 @@ const handler = async (req, res) => {
   }
 
   const userId = user.uid;
+
+  // Allowlist gate: a valid Google/session token is not enough — the email
+  // must be approved. (Local mode's synthetic user skips this.)
+  if (!AUTH_DISABLED && !(await isAllowedEmail(user.email))) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'not_allowed', email: user.email || '' }));
+    return;
+  }
+
+  // ── Access management: list/add/remove approved emails ──
+  if (url === '/api/allowlist' && req.method === 'GET') {
+    const snap = await db.collection('workspaces').doc(TEAM_ID).collection('allowlist').get();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(snap.docs.map(d => d.data())));
+    return;
+  }
+  if (url === '/api/allowlist' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const email = (JSON.parse(body).email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { res.writeHead(400); res.end('bad email'); return; }
+        await db.collection('workspaces').doc(TEAM_ID).collection('allowlist')
+          .doc(email).set({ email, addedBy: user.email || user.uid, addedAt: new Date().toISOString() });
+        _allowCache.set = null;
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true }));
+      } catch (e) { res.writeHead(500); res.end('server error'); }
+    });
+    return;
+  }
+  if (url === '/api/allowlist' && req.method === 'DELETE') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const email = (JSON.parse(body).email || '').trim().toLowerCase();
+        await db.collection('workspaces').doc(TEAM_ID).collection('allowlist').doc(email).delete();
+        _allowCache.set = null;
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true }));
+      } catch (e) { res.writeHead(500); res.end('server error'); }
+    });
+    return;
+  }
+
+  // ── Telegram notify: dormant until TELEGRAM_BOT_TOKEN is configured ──
+  if (url === '/api/notify' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { text, chatId } = JSON.parse(body);
+        const token = process.env.TELEGRAM_BOT_TOKEN;
+        const chat = chatId || process.env.ACCOUNTING_CHAT_ID;
+        if (!token || !chat || !text) { res.writeHead(204); res.end(); return; }
+        const tg = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chat, text: String(text).slice(0, 4000) })
+        });
+        res.writeHead(tg.ok ? 200 : 502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ sent: tg.ok }));
+      } catch (e) { res.writeHead(500); res.end('server error'); }
+    });
+    return;
+  }
 
   // ── App sessions: mint on sign-in, revoke on sign-out ──
   if (url === '/api/session' && req.method === 'POST') {

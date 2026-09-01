@@ -1701,6 +1701,7 @@
         <button class="add-project-btn" onclick="syncOdoo(this)">⇅ Sync Odoo</button>
         <button class="add-project-btn" onclick="openNewProjectModal()">+ New project</button>
         <button class="add-project-btn phone-preview-btn" onclick="openPhonePreview()">📱 Phone preview</button>
+        <button class="add-project-btn" onclick="openAccessModal()">👥 Access</button>
         <button class="add-project-btn" onclick="openSaveViewModal()">⊞ Save view</button>
         <button class="add-project-btn" onclick="openUsersModal()">👤 Manage users</button>
         <button class="add-project-btn" onclick="openSettingsModal('statuses')">🏷 Project Statuses</button>
@@ -1807,6 +1808,26 @@
     <div id="gantt-view"></div>
     <div id="dashboard-view"></div>
     <div id="trash-view" style="display:none;flex:1;overflow-y:auto;padding:14px 18px;"></div>
+  </div>
+</div>
+
+<!-- ── Access: who may sign in to this board ── -->
+<div class="modal-overlay" id="access-modal" onclick="if(event.target.id==='access-modal') closeModalById('access-modal')">
+  <div class="modal" style="max-width:430px;">
+    <div class="modal-header">
+      <span class="modal-title">👥 Who can sign in</span>
+      <button class="modal-close" onclick="closeModalById('access-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.76rem;color:var(--overlay1);margin:0 0 10px;">
+        Only these Google accounts can open the board at todo.shift-group.co.</p>
+      <div id="access-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input class="form-input" type="email" id="access-email" placeholder="name@gmail.com" style="flex:1;"
+               onkeydown="if(event.key==='Enter') addAllowedEmail()">
+        <button class="save-btn" onclick="addAllowedEmail()" style="padding:6px 14px;">Add</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2194,6 +2215,18 @@ function dropAppSession() {
   try { localStorage.removeItem('todo_session'); localStorage.removeItem('todo_session_user'); } catch {}
 }
 
+// Signed in with Google, but the email is not on the allowlist
+function showAccessDenied() {
+  const email = currentUser?.email || sessionUser?.email || '';
+  document.getElementById('login-msg').textContent =
+    `${email || 'This account'} is not approved for this board yet. Ask Mario to add you, then reload.`;
+  document.getElementById('login-diag').textContent = 'Signed in, waiting for access approval';
+  const btn = document.getElementById('login-btn');
+  if (btn) btn.textContent = 'Try a different Google account';
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('app-container').style.display = 'none';
+}
+
 // True if the stored session token still opens the workspace
 async function tryRestoreAppSession() {
   if (!sessionToken) return false;
@@ -2201,6 +2234,7 @@ async function tryRestoreAppSession() {
     const r = await fetch('/api/workspaces', { headers: { 'Authorization': `Bearer ${sessionToken}` } });
     if (r.ok) return true;
     if (r.status === 401) dropAppSession();
+    if (r.status === 403) { showAccessDenied(); }
     return false;
   } catch { return false; }
 }
@@ -2321,6 +2355,10 @@ async function apiCall(method, path, body = null) {
     if (response.status === 401) {
       signOut();
       throw new Error('Unauthorized');
+    }
+    if (response.status === 403) {
+      showAccessDenied();
+      throw new Error('Not allowed');
     }
     throw new Error(`API error: ${response.status}`);
   }
@@ -3969,6 +4007,10 @@ function renderProjectsList() {
             style="text-align:center;font-size:0.75rem;color:${projDue && projDue < todayStr() ? 'var(--red)' : 'var(--subtext0)'};${projDue && projDue < todayStr() ? 'font-weight:700;' : ''}">
           ${projDue ? new Date(projDue).toLocaleDateString() : '<span style="color:var(--overlay0);">—</span>'}
         </td>
+        <td style="text-align:center;cursor:pointer;" onclick="toggleProjBillable('${esc(p)}')"
+            title="${projectMeta[p]?.billable ? 'Billable — done tasks auto-forward to accounting (click to turn off)' : 'Click to make this project billable'}">
+          ${projectMeta[p]?.billable ? '💰' : '<span style="color:var(--surface2);">—</span>'}
+        </td>
         <td style="text-align:center;font-weight:600;">${taskCount}</td>
         <td style="text-align:center;color:${open ? 'var(--blue)' : 'var(--overlay0)'};font-weight:600;">${open}</td>
         <td style="text-align:center;color:${done ? 'var(--green)' : 'var(--overlay0)'};">${done}</td>
@@ -4002,7 +4044,7 @@ function renderProjectsList() {
     const color = st !== '—' ? statusColor(st) : 'var(--overlay0)';
     const label = st !== '—' ? statusLabel(st) : 'No Status';
     const nTasks = projs.reduce((n, p) => n + tasks.filter(t => t.project === p && !t.archived && !t.done).length, 0);
-    rows += `<tr><td colspan="10" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
+    rows += `<tr><td colspan="11" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
       <span style="width:9px;height:9px;border-radius:50%;background:${color};display:inline-block;margin-right:7px;"></span>${esc(label)}
       <span style="color:var(--overlay0);font-weight:400;text-transform:none;margin-left:6px;font-size:0.66rem;">${projs.length} projects · ${nTasks} open tasks</span></td></tr>`;
     rows += projs.map(projRowHtml).join('');
@@ -4020,6 +4062,7 @@ function renderProjectsList() {
           <th>Client</th>
           <th>Status</th>
           <th>Due</th>
+          <th title="Billable project: done tasks auto-forward to the accounting queue">Bill</th>
           <th>Tasks</th>
           <th>Open</th>
           <th>Done</th>
@@ -4032,6 +4075,7 @@ function renderProjectsList() {
           <th>${filterInput('client', 'Search client…')}</th>
           <th>${statusFilterSelect()}</th>
           <th>${filterInput('due', 'Date…')}</th>
+          <th></th>
           <th>${filterInput('tasks', '#', true)}</th>
           <th>${filterInput('open', '#', true)}</th>
           <th>${filterInput('done', '#', true)}</th>
@@ -4042,7 +4086,7 @@ function renderProjectsList() {
         </tr>
       </thead>
       <tbody>
-        ${rows || `<tr><td colspan="10" style="padding:18px 12px;text-align:center;color:var(--overlay0);">No projects match these filters</td></tr>`}
+        ${rows || `<tr><td colspan="11" style="padding:18px 12px;text-align:center;color:var(--overlay0);">No projects match these filters</td></tr>`}
       </tbody>
     </table>`;
 
@@ -4474,6 +4518,7 @@ function cleanupSidebarDrag() {
 // ── Persistence ───────────────────────────────────────────────────────────
 // Fingerprint ignores the audit fields so stamping a task doesn't mark it changed again
 let taskSnapshot = {};
+let _doneMap = {};   // id -> was-done at last save; drives the billing automation
 function taskFingerprint(t) {
   const { createdBy, updatedBy, updatedAt, ...rest } = t;
   return JSON.stringify(rest);
@@ -4482,6 +4527,8 @@ function snapshotTasks() {
   undoBaseline();
   taskSnapshot = {};
   tasks.forEach(t => { taskSnapshot[t.id] = taskFingerprint(t); });
+  _doneMap = {};
+  tasks.forEach(t => { _doneMap[t.id] = !!t.done; });
 }
 
 async function loadTasks() {
@@ -4531,12 +4578,73 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(doSave, 500);
 }
+// ── Billing automation ─────────────────────────────────────────────────────
+// When a task in a billable project turns Done, a linked "to be billed" task
+// lands in the accounting queue, and accounting gets a Telegram ping (once
+// TELEGRAM_BOT_TOKEN / ACCOUNTING_CHAT_ID are configured on the server).
+const BILLING_STAGES = ['to_bill', 'billed', 'paid'];
+const BILLING_LABEL = { to_bill: 'TO BILL', billed: 'BILLED', paid: 'PAID' };
+const BILLING_COLOR = { to_bill: 'var(--peach, #fab387)', billed: 'var(--blue, #89b4fa)', paid: 'var(--green, #a6e3a1)' };
+
+function acctQueueProject() {
+  const ps = getProjects();
+  return ps.find(p => p.toLowerCase() === 'accounting shift')
+      || ps.find(p => /accounting/i.test(p))
+      || 'Accounting';
+}
+
+function notifyAccounting(text) {
+  apiCall('POST', '/api/notify', { text }).catch(() => {});
+}
+
+function autoForwardBillables(who, now) {
+  const queue = acctQueueProject();
+  const acctDept = departments.find(d => /account/i.test(d.name))?.id || null;
+  for (const t of [...tasks]) {
+    if (!t.done || t.deleted || t.archived) continue;
+    if (!(t.id in _doneMap) || _doneMap[t.id]) continue;   // only fresh open→done flips
+    if (t.billedTaskId || t.billing) continue;
+    if (t.project === queue) continue;                     // never forward the queue itself
+    if (!projectMeta[t.project]?.billable) continue;
+    const q = {
+      id: uid(), title: `💰 Bill: ${t.title}`, project: queue,
+      department: acctDept, taskStatus: '', billing: 'to_bill',
+      done: false, doneAt: null, createdAt: now, due: '', start: '', priority: '',
+      partner: t.partner || '', notes: `Auto-created when "${t.title}" (${t.project || 'no project'}) was marked done by ${who}.`,
+      taskType: 'task', clientName: t.clientName || '', clientId: t.clientId || null,
+      subtasks: [], assignees: [], linkedTaskId: t.id,
+      createdBy: 'automation', updatedBy: who, updatedAt: now
+    };
+    tasks.push(q);
+    t.billedTaskId = q.id;
+    notifyAccounting(`💰 To be billed: "${t.title}"${t.project ? ` (${t.project})` : ''}${t.partner ? ` — vendor ${t.partner}` : ''} — marked done by ${who}`);
+  }
+  tasks.forEach(t => { _doneMap[t.id] = !!t.done; });
+}
+
+function nlCycleBilling(e, id) {
+  e.stopPropagation();
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  t.billing = BILLING_STAGES[(BILLING_STAGES.indexOf(t.billing) + 1) % BILLING_STAGES.length];
+  scheduleSave();
+  renderAll();
+}
+
+function toggleProjBillable(p) {
+  if (!projectMeta[p]) projectMeta[p] = {};
+  projectMeta[p].billable = !projectMeta[p].billable;
+  saveProjectMeta();
+  renderProjectsList();
+}
+
 async function doSave() {
   try {
     const who = currentUser?.displayName || currentUser?.email
       || sessionUser?.name || sessionUser?.email
       || (authDisabled ? 'Mario' : 'unknown');
     const now = new Date().toISOString();
+    autoForwardBillables(who, now);
     for (const t of tasks) {
       if (taskSnapshot[t.id] !== taskFingerprint(t)) {
         if (!(t.id in taskSnapshot) && !t.createdBy) t.createdBy = who;
@@ -7267,6 +7375,7 @@ function renderNiceList(filtered, el) {
             ? `<span class="nl-tag nl-name-dept" style="background:${d.color}22;color:${d.color};" onclick="nlDeptMenu(event,'${t.id}')" title="Department — click to change">${esc(d.name)}</span>` : ''}
           ${!listGroupLevels.includes('partner') && (t.partner || t.acctPartner)
             ? `<span class="nl-tag nl-name-vendor" onclick="nlVendorMenu(event,'${t.id}')" title="Vendor — click to change">${esc(t.partner || t.acctPartner)}</span>` : ''}
+          ${t.billing ? `<span class="nl-tag" onclick="nlCycleBilling(event,'${t.id}')" title="Billing stage — click to advance" style="background:color-mix(in srgb, ${BILLING_COLOR[t.billing]} 25%, transparent);color:${BILLING_COLOR[t.billing]};cursor:pointer;">${BILLING_LABEL[t.billing]}</span>` : ''}
           <span class="nl-acts">
             <span class="nl-act" onclick="nlQuickSub(event,'${t.id}')" title="Add a subtask">＋</span>
             <span class="nl-act" onclick="event.stopPropagation();openEditModal('${t.id}')" title="Open the full task form">⤢</span>
@@ -10640,6 +10749,35 @@ function closeTaskModal() {
   const hasTitle = document.getElementById('m-title').value.trim();
   if (hasTitle) saveTask();        // saveTask persists + closes
   else closeModal();
+}
+
+// ── Access management (email allowlist) ────────────────────────────────────
+async function openAccessModal() {
+  document.getElementById('access-modal').classList.add('open');
+  renderAccessList();
+}
+async function renderAccessList() {
+  const el = document.getElementById('access-list');
+  try {
+    const list = await apiCall('GET', '/api/allowlist');
+    el.innerHTML = list.sort((a, b) => a.email.localeCompare(b.email)).map(e => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surface0);border-radius:6px;font-size:0.8rem;">
+        <span style="flex:1;">${esc(e.email)}</span>
+        <button class="plist-btn" onclick="removeAllowedEmail('${esc(e.email)}')" title="Remove access">✕</button>
+      </div>`).join('') || '<span style="color:var(--overlay0);font-size:0.76rem;">Nobody yet</span>';
+  } catch { el.innerHTML = '<span style="color:var(--red);font-size:0.76rem;">Could not load the list</span>'; }
+}
+async function addAllowedEmail() {
+  const inp = document.getElementById('access-email');
+  const email = inp.value.trim().toLowerCase();
+  if (!email) return;
+  try { await apiCall('POST', '/api/allowlist', { email }); inp.value = ''; renderAccessList(); }
+  catch { alert('Could not add ' + email); }
+}
+async function removeAllowedEmail(email) {
+  if (!confirm(`Remove ${email}? They will lose access on their next request.`)) return;
+  try { await apiCall('DELETE', '/api/allowlist', { email }); renderAccessList(); }
+  catch { alert('Could not remove ' + email); }
 }
 
 // ── Phone preview: the real app in an iframe — media queries follow the
