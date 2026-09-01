@@ -6347,6 +6347,7 @@ function onStatusColDrop(e, key, kind) {
   if (kind === 'done') {
     t.done = true;
     t.doneAt = new Date().toISOString();
+    cascadeDone(t);
   } else {
     if (t.done) { t.done = false; t.doneAt = null; }
     t.taskStatus = key;
@@ -8300,7 +8301,7 @@ function nlBulkSetStatus(v) {
   closeOvMenu();
   const done = v === '__done__';
   nlBulk({
-    task: t => { if (done) { t.done = true; t.doneAt = new Date().toISOString(); } else { t.done = false; t.doneAt = null; t.taskStatus = v; } },
+    task: t => { if (done) { t.done = true; t.doneAt = new Date().toISOString(); cascadeDone(t); } else { t.done = false; t.doneAt = null; t.taskStatus = v; } },
     sub:  x => { if (done) { x.done = true; x.doneAt = new Date().toISOString(); } else { x.done = false; x.doneAt = null; x.taskStatus = v; } },
   });
 }
@@ -9266,6 +9267,7 @@ function nlSetStatus(id, val) {
   if (!t) return;
   if (val === '__done__') {
     t.done = true; t.doneAt = new Date().toISOString();
+    cascadeDone(t);
   } else {
     if (t.done) { t.done = false; t.doneAt = null; }
     t.taskStatus = val;
@@ -11143,15 +11145,19 @@ function nlStartAdd(proj) {
 function openAddModal() { nlStartAdd(null); }
 function openAddModalForProject(proj) { nlStartAdd(proj); }
 
+// A finished parent means finished children: every open subtask closes with it
+function cascadeDone(t) {
+  (t.subtasks || []).forEach(s => {
+    if (!s.deleted && !s.done) { s.done = true; s.doneAt = new Date().toISOString(); }
+  });
+}
 function onCheck(e, id) {
   e.stopPropagation();
   const task = tasks.find(t => t.id === id);
   if (!task) return;
   task.done   = e.target.checked;
   task.doneAt = task.done ? new Date().toISOString() : null;
-  if (task.done && task.subtasks) {
-    task.subtasks.forEach(s => s.done = true);
-  }
+  if (task.done) cascadeDone(task);
   pushDoneToOdoo(task);
   scheduleSave();
   renderAll();
