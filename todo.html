@@ -1192,6 +1192,19 @@
     select.nl-finp { cursor: pointer; }
     .nl-fclear { cursor: pointer; color: var(--overlay0); font-size: 0.7rem; text-align: center; border-radius: 4px; }
     .nl-fclear:hover { color: var(--red, #f38ba8); background: var(--surface0); }
+    /* ── Phone preview: the app in an iPhone frame, for testing from the laptop ── */
+    .phone-shell { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .phone-bar { display: flex; gap: 8px; align-items: center; }
+    .phone-size {
+      background: var(--surface1); border: 1px solid var(--surface2); border-radius: 6px;
+      color: var(--text); padding: 4px 8px; font-size: 0.78rem; font-family: inherit; cursor: pointer;
+    }
+    #phone-fit { overflow: visible; }
+    .phone-frame {
+      background: #0b0b12; border: 1px solid #3a3a4a; border-radius: 46px; padding: 14px;
+      box-shadow: 0 24px 80px #000d;
+    }
+    .phone-frame iframe { border: none; border-radius: 32px; background: var(--base); display: block; }
     /* ── Phone layout: the List's grid becomes cards ── */
     @media (max-width: 700px) {
       .nl-frow, .nl-hrow { display: none !important; }
@@ -1687,6 +1700,7 @@
       <div id="sb-settings-group" style="display:none;flex-direction:column;gap:4px;padding-left:8px;">
         <button class="add-project-btn" onclick="syncOdoo(this)">⇅ Sync Odoo</button>
         <button class="add-project-btn" onclick="openNewProjectModal()">+ New project</button>
+        <button class="add-project-btn phone-preview-btn" onclick="openPhonePreview()">📱 Phone preview</button>
         <button class="add-project-btn" onclick="openSaveViewModal()">⊞ Save view</button>
         <button class="add-project-btn" onclick="openUsersModal()">👤 Manage users</button>
         <button class="add-project-btn" onclick="openSettingsModal('statuses')">🏷 Project Statuses</button>
@@ -1707,6 +1721,7 @@
       <span class="task-count" id="task-count"></span>
       <input class="search-input" type="text" placeholder="Search everything…" id="search-input" oninput="onSearch(this.value)" title="Filters the table on every field: task, project, client, assignee, department, company, vendor, status">
       <button class="tb-btn" id="palette-btn" onclick="spOpen()" title="Search everything (Ctrl+K)">🔍 <span class="vb-label">Ctrl+K</span></button>
+      <button class="tb-btn phone-preview-btn" onclick="openPhonePreview()" title="Preview the app at phone size">📱</button>
       <div class="tb-pop-wrap" id="filters-wrap">
       <!-- Filters popover retired 2026-08-31 (palette + column filters replace it); elements kept for the filter renderers -->
       <button class="tb-btn tb-pop-btn" id="filters-btn" style="display:none;" onclick="toggleTbPop(event,'filters-wrap')">&#9662; Filters</button>
@@ -1792,6 +1807,24 @@
     <div id="gantt-view"></div>
     <div id="dashboard-view"></div>
     <div id="trash-view" style="display:none;flex:1;overflow-y:auto;padding:14px 18px;"></div>
+  </div>
+</div>
+
+<!-- ── Phone preview: test the mobile layout from the laptop ── -->
+<div class="modal-overlay" id="phone-overlay" onclick="if(event.target.id==='phone-overlay') closePhonePreview()">
+  <div class="phone-shell">
+    <div class="phone-bar">
+      <select class="phone-size" id="phone-size" onchange="phoneApplySize()">
+        <option value="390x844" selected>iPhone 14 · 390×844</option>
+        <option value="375x667">iPhone SE · 375×667</option>
+        <option value="430x932">iPhone 15 Pro Max · 430×932</option>
+        <option value="744x1133">iPad mini · 744×1133</option>
+      </select>
+      <button class="tb-btn" onclick="phoneRotate()" title="Rotate">⟳ Rotate</button>
+      <button class="tb-btn" onclick="phoneReload()" title="Reload the preview">↻</button>
+      <button class="tb-btn" onclick="closePhonePreview()" title="Close">✕ Close</button>
+    </div>
+    <div id="phone-fit"><div class="phone-frame" id="phone-frame"><iframe id="phone-iframe" title="Mobile preview"></iframe></div></div>
   </div>
 </div>
 
@@ -6194,9 +6227,20 @@ function renderSidebar() {
   const rawProjects = getProjects();
   const ordered = getOrderedProjects(rawProjects);
   const el = document.getElementById('projects-list');
-  // Open tasks only — and not ones sitting in the recycle bin or archive,
-  // so this badge always agrees with what the table can actually show
-  const allActive = tasks.filter(t => !t.deleted && !t.archived && !t.done).length;
+  // The sidebar counts exactly what the table can currently show: same
+  // recycle-bin/archive/stale rules, and done tasks count while shown.
+  const sbVisible = t => {
+    if (t.deleted) return false;
+    if (showArchived) { if (!t.archived && !isStaleDone(t)) return false; }
+    else { if (t.archived) return false; if (isStaleDone(t)) return false; }
+    if (!showDone && t.done) return false;
+    if (doneOnly && !t.done) return false;
+    return true;
+  };
+  const sbVisibleTasks = tasks.filter(sbVisible);
+  const allActive = sbVisibleTasks.length;
+  const sbOpenN = sbVisibleTasks.filter(t => !t.done).length;
+  const sbDoneN = allActive - sbOpenN;
 
   // Project-status summary: a coloured pill per status with its project count,
   // the same idea as the task-status legend over the list. Click one to filter.
@@ -6231,7 +6275,7 @@ function renderSidebar() {
          onclick="openProjectTasks('All')">
       <span class="proj-dot"></span>
       <span class="proj-label">All Tasks</span>
-      <span class="sb-counts"><span class="sb-cnt sb-cnt-t" title="${allActive} open tasks">${allActive}t</span></span>
+      <span class="sb-counts"><span class="sb-cnt sb-cnt-t" title="${sbOpenN} open${sbDoneN ? ` · ${sbDoneN} done shown` : ''}">${allActive}t</span></span>
     </div>`;
 
   // ClickUp-style tree: Space (company) → Folder → Project, all drag & drop
@@ -6247,7 +6291,7 @@ function renderSidebar() {
     }
     const count  = anyFilter
       ? getFiltered().filter(t => t.project === p).length
-      : tasks.filter(t => t.project === p && !t.done && !t.archived).length;
+      : tasks.filter(t => t.project === p && sbVisible(t)).length;
     const status = projStatus(p);
     const dotStyle = statusDotStyle(status);
     return `
@@ -6274,7 +6318,7 @@ function renderSidebar() {
     if (sbSearch) shown = shown.filter(p => p.toLowerCase().includes(sbSearch));
     if (sbStatusFilter) shown = shown.filter(projMatchesStatus);
     if ((filteredSet || sbSearch || sbStatusFilter) && !shown.length) return '';
-    const nTasks = tasks.filter(t => projs.includes(t.project) && !t.done && !t.archived).length;
+    const nTasks = tasks.filter(t => projs.includes(t.project) && sbVisible(t)).length;
     return `
       <div class="sb-folder" data-folder="${f.id}" style="padding-left:${10 + depth * 14}px;"
            onclick="sbToggle('f:${f.id}')" ondblclick="startFolderRename(event,'${f.id}')"
@@ -6303,7 +6347,7 @@ function renderSidebar() {
       if ((filteredSet || sbSearch || sbStatusFilter) && !shown.length) return '';
       const key = `sg:${spaceId}:${st.id}`;
       const openG = (sbSearch || sbStatusFilter) ? true : !sbCollapsed(key);
-      const nTasks = tasks.filter(t => ps.includes(t.project) && !t.done && !t.archived).length;
+      const nTasks = tasks.filter(t => ps.includes(t.project) && sbVisible(t)).length;
       return `
       <div class="sb-statusgroup" style="padding-left:${10 + depth * 14}px;" onclick="sbToggle('${key}')"
            title="${esc(st.name)} — click to ${openG ? 'collapse' : 'expand'}">
@@ -6329,7 +6373,7 @@ function renderSidebar() {
     const open = (sbSearch || sbStatusFilter) ? true : !sbCollapsed(`s:${sp.id}`);
     const loose = spProjects.filter(p => !projFolder(p) || !folderById(projFolder(p)));
     // projects in this space, and how many of their tasks are still open
-    const spOpen = tasks.filter(t => spProjects.includes(t.project) && !t.done && !t.archived && !t.deleted).length;
+    const spOpen = tasks.filter(t => spProjects.includes(t.project) && sbVisible(t)).length;
     treeHtml += `
       <div class="sb-space ${filterCompany === sp.id ? 'active' : ''}" data-space="${sp.id ?? ''}"
            onclick="sbToggle('s:${sp.id}')" title="Space — click to expand/collapse">
@@ -6342,7 +6386,7 @@ function renderSidebar() {
         ${sp.id ? `<button class="proj-edit-btn sb-addfolder" onclick="addFolder(event,'${sp.id}')" title="New folder in ${esc(sp.label)}">＋</button>` : ''}
         <span class="sb-counts">
           <span class="sb-cnt sb-cnt-p" title="${spProjects.length} project${spProjects.length === 1 ? '' : 's'}">${spProjects.length}p</span>
-          <span class="sb-cnt sb-cnt-t" title="${spOpen} open task${spOpen === 1 ? '' : 's'}">${spOpen}t</span>
+          <span class="sb-cnt sb-cnt-t" title="${spOpen} task${spOpen === 1 ? '' : 's'} shown">${spOpen}t</span>
         </span>
       </div>`;
     if (open) {
@@ -10596,6 +10640,47 @@ function closeTaskModal() {
   const hasTitle = document.getElementById('m-title').value.trim();
   if (hasTitle) saveTask();        // saveTask persists + closes
   else closeModal();
+}
+
+// ── Phone preview: the real app in an iframe — media queries follow the
+// iframe's own width, so 390px inside IS the phone rendering ───────────────
+let phoneW = 390, phoneH = 844;
+function openPhonePreview() {
+  document.getElementById('phone-overlay').classList.add('open');
+  const f = document.getElementById('phone-iframe');
+  if (!f.src) f.src = '/';
+  phoneLayout();
+}
+function closePhonePreview() { document.getElementById('phone-overlay').classList.remove('open'); }
+function phoneReload() { try { document.getElementById('phone-iframe').contentWindow.location.reload(); } catch {} }
+function phoneRotate() { [phoneW, phoneH] = [phoneH, phoneW]; phoneLayout(); }
+function phoneApplySize() {
+  [phoneW, phoneH] = document.getElementById('phone-size').value.split('x').map(Number);
+  phoneLayout();
+}
+function phoneLayout() {
+  const f = document.getElementById('phone-iframe');
+  f.style.width = phoneW + 'px';
+  f.style.height = phoneH + 'px';
+  // Scale the bezel to fit the laptop screen; the iframe keeps its true CSS
+  // width, so the mobile breakpoints behave exactly as on the device
+  const scale = Math.min(1,
+    (window.innerHeight * 0.95 - 60) / (phoneH + 30),
+    (window.innerWidth * 0.95) / (phoneW + 30));
+  const frame = document.getElementById('phone-frame');
+  frame.style.transform = `scale(${scale})`;
+  frame.style.transformOrigin = 'top center';
+  const fit = document.getElementById('phone-fit');
+  fit.style.width  = (phoneW + 30) * scale + 'px';
+  fit.style.height = (phoneH + 30) * scale + 'px';
+}
+window.addEventListener('resize', () => {
+  if (document.getElementById('phone-overlay')?.classList.contains('open')) phoneLayout();
+});
+// Inside the preview itself, hide the preview buttons (no phones in phones)
+if (window.self !== window.top) {
+  document.addEventListener('DOMContentLoaded', () =>
+    document.querySelectorAll('.phone-preview-btn').forEach(b => b.style.display = 'none'));
 }
 
 // ── Line counter + "what's filtering the table" note ──────────────────────
