@@ -1194,6 +1194,35 @@
     .plist-company-cell:hover, .plist-status-cell:hover, .plist-client-cell:hover { background: var(--surface0); }
     /* Project name: always an input, exactly like the task-title cell */
     .content-add-bar { padding: 12px 16px 4px; display: flex; gap: 8px; flex: 0 0 auto; }
+    /* ── 📝 Pad: quick capture for ideas & work done (Ctrl+J) ── */
+    #pad-overlay { position: fixed; inset: 0; z-index: 1300; background: #0008; display: none; }
+    #pad-overlay.open { display: flex; align-items: flex-start; justify-content: center; padding-top: 7vh; }
+    .pad-box { width: min(680px, 94vw); max-height: 80vh; display: flex; flex-direction: column;
+      background: var(--mantle); border: 1px solid var(--surface1); border-radius: 12px; box-shadow: 0 18px 60px #000b; }
+    .pad-cap { padding: 12px 14px 9px; border-bottom: 1px solid var(--surface0); }
+    .pad-kind { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
+    .pad-kbtn { cursor: pointer; font-size: 0.72rem; padding: 3px 10px; border-radius: 12px; border: 1px solid var(--surface1); color: var(--subtext0); }
+    .pad-kbtn.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .pad-inp { width: 100%; box-sizing: border-box; background: var(--surface0); color: var(--text);
+      border: 1px solid var(--surface1); border-radius: 8px; padding: 9px 11px; font-size: 0.9rem; font-family: inherit; }
+    .pad-inp:focus { outline: none; border-color: var(--accent); }
+    .pad-sug-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-size: 0.78rem; border-radius: 6px; }
+    .pad-sug-row:hover { background: var(--surface0); }
+    .pad-sug-act { cursor: pointer; font-size: 0.68rem; border: 1px solid var(--surface1); border-radius: 6px; padding: 2px 7px; color: var(--subtext0); white-space: nowrap; }
+    .pad-sug-act:hover { border-color: var(--accent); color: var(--accent); }
+    .pad-tabs { display: flex; gap: 2px; padding: 8px 14px 0; }
+    .pad-tab { cursor: pointer; font-size: 0.76rem; padding: 5px 12px; color: var(--subtext0); border-bottom: 2px solid transparent; }
+    .pad-tab.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+    .pad-list { overflow-y: auto; padding: 6px 14px 14px; flex: 1; }
+    .pad-day { font-size: 0.62rem; text-transform: uppercase; letter-spacing: .05em; color: var(--overlay0); margin: 10px 0 3px; }
+    .pad-row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 0.8rem; border-bottom: 1px solid var(--surface0); }
+    .pad-row .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .pad-row.dn .t { text-decoration: line-through; color: var(--overlay0); }
+    .pad-when { color: var(--overlay0); font-size: 0.64rem; white-space: nowrap; }
+    .pad-act { cursor: pointer; font-size: 0.68rem; color: var(--overlay1); white-space: nowrap; }
+    .pad-act:hover { color: var(--text); }
+    .pad-task-chip { font-size: 0.64rem; color: var(--blue); cursor: pointer; white-space: nowrap; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+
     /* ── Search palette (Ctrl+K, ClickUp-style) ── */
     .sp-overlay { align-items: flex-start; justify-content: center; }
     .sp-panel {
@@ -1805,6 +1834,7 @@
       <span class="task-count" id="task-count"></span>
       <input class="search-input" type="text" placeholder="Search everything…" id="search-input" oninput="onSearch(this.value)" title="Filters the table on every field: task, project, client, assignee, department, company, vendor, status">
       <button class="tb-btn" id="palette-btn" onclick="spOpen()" title="Search everything (Ctrl+K)">🔍 <span class="vb-label">Ctrl+K</span></button>
+      <button class="tb-btn" onclick="padOpen()" title="Pad — jot an idea or log work done (Ctrl+J)">📝</button>
       <button class="tb-btn phone-preview-btn" onclick="openPhonePreview()" title="Preview the app at phone size">📱</button>
       <div class="tb-pop-wrap" id="filters-wrap">
       <!-- Filters popover retired 2026-08-31 (palette + column filters replace it); elements kept for the filter renderers -->
@@ -6660,6 +6690,7 @@ const ACT_META = {
   due:      ['📅', 'rescheduled'],    deleted: ['🗑', 'deleted'],
   restored: ['♻️', 'restored'],       reminder:['🔔', 'reminded'],
   project:  ['📋', 'project'],
+  idea:     ['💡', 'noted'],          work:    ['📝', 'logged'],
 };
 function dashActHtml() {
   const all = [...events].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
@@ -6692,7 +6723,9 @@ function dashActHtml() {
     <div class="dash-section" style="margin-bottom:14px;">
       <h3 style="display:flex;align-items:center;gap:10px;">📜 Activity
         <span style="display:flex;gap:5px;font-weight:400;text-transform:none;letter-spacing:0;">
-          ${chip('', 'Everyone')}${actors.map(a => chip(a, a)).join('')}</span></h3>
+          ${chip('', 'Everyone')}${actors.map(a => chip(a, a)).join('')}</span>
+        <span style="flex:1;"></span>
+        ${(n => n ? `<span onclick="padOpen('idea')" style="cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0;font-size:0.72rem;color:var(--yellow);">💡 ${n} idea${n === 1 ? '' : 's'} waiting</span>` : '')(events.filter(e => e.type === 'idea' && e.ideaState === 'open').length)}</h3>
       <div style="max-height:340px;overflow-y:auto;">
         ${rows || '<div style="color:var(--overlay0);font-size:0.8rem;">Nothing logged yet — activity appears here as the team works.</div>'}
         ${feed.length > dashActLimit ? `<div onclick="dashActMore()" style="cursor:pointer;color:var(--blue);font-size:0.72rem;margin-top:7px;">Show ${Math.min(60, feed.length - dashActLimit)} more…</div>` : ''}
@@ -11693,9 +11726,10 @@ function updateLineCount(n) {
 let spText = '', spType = 'all', spHl = 0, spRows = [];
 const SP_TYPES = [
   ['all', 'All'], ['task', 'Tasks'], ['project', 'Projects'], ['client', 'Clients'],
-  ['person', 'People'], ['dept', 'Departments'], ['company', 'Companies'], ['vendor', 'Vendors']
+  ['person', 'People'], ['dept', 'Departments'], ['company', 'Companies'], ['vendor', 'Vendors'],
+  ['idea', 'Ideas']
 ];
-const SP_ICONS = { task: '☑', project: '▦', client: '🏷', person: '👤', dept: '🏬', company: '🏢', vendor: '🚚' };
+const SP_ICONS = { task: '☑', project: '▦', client: '🏷', person: '👤', dept: '🏬', company: '🏢', vendor: '🚚', idea: '💡' };
 
 function spOpen() {
   spText = ''; spType = 'all'; spHl = 0;
@@ -11719,8 +11753,17 @@ function spTaskStatus(t) {
 // contains; tasks then sort most-recent first with done ones last.
 function spMatches() {
   const q = spText.trim().toLowerCase();
-  const res = { task: [], project: [], client: [], person: [], dept: [], company: [], vendor: [] };
+  const res = { task: [], project: [], client: [], person: [], dept: [], company: [], vendor: [], idea: [] };
   if (!q) return res;
+
+  events.filter(ev => ev.type === 'idea' && ev.text.toLowerCase().includes(q)).forEach(ev => {
+    res.idea.push({
+      type: 'idea', icon: SP_ICONS.idea, name: ev.text, done: ev.ideaState !== 'open',
+      ctx: ev.actor || '', when: nlAgo(ev.at), _rk: 0, _ts: ev.at || '',
+      act: () => { spClose(); padOpen('idea'); }
+    });
+  });
+  res.idea.sort((a, b) => (a._ts < b._ts ? 1 : -1));
   const rk = name => (name || '').toLowerCase().startsWith(q) ? 0 : 1;
 
   tasks.filter(t => !t.archived).forEach(t => {
@@ -11980,10 +12023,180 @@ function nlFilterRowHtml() {
   </div>`;
 }
 
+// ── 📝 Pad: ideas & work-done capture (Ctrl+J) ────────────────────────────
+let _padKind = 'idea';   // what the capture box records
+let _padTab  = 'idea';   // which list is shown below
+function padEnsure() {
+  if (document.getElementById('pad-overlay')) return;
+  const d = document.createElement('div');
+  d.id = 'pad-overlay';
+  d.addEventListener('mousedown', e => { if (e.target === d) padClose(); });
+  document.body.appendChild(d);
+}
+function padOpen(tab) {
+  padEnsure();
+  if (tab) { _padTab = tab; _padKind = tab === 'work' ? 'work' : 'idea'; }
+  document.getElementById('pad-overlay').classList.add('open');
+  padRender();
+  setTimeout(() => document.getElementById('pad-inp')?.focus(), 40);
+}
+function padClose() { document.getElementById('pad-overlay')?.classList.remove('open'); }
+function padSetKind(k) { _padKind = k; padRender(true); }
+function padSetTab(t)  { _padTab = t; padRender(); }
+
+// Word-overlap matcher: which open tasks is this line talking about?
+function padMatches(text) {
+  const toks = text.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, ' ').split(/\s+/).filter(w => w.length > 2);
+  if (!toks.length) return [];
+  return tasks
+    .filter(t => !t.done && !t.deleted && !t.archived)
+    .map(t => {
+      const title = t.title.toLowerCase(), hay = taskHaystack(t);
+      let score = 0;
+      toks.forEach(w => { if (title.includes(w)) score += 2; else if (hay.includes(w)) score += 1; });
+      return { t, score };
+    })
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+}
+
+function padCommit(taskId, markDone) {
+  const inp = document.getElementById('pad-inp');
+  const text = (inp?.value || '').trim();
+  if (!text) return;
+  const t = taskId ? tasks.find(x => x.id === taskId) : null;
+  const ev = { id: uid(), type: _padKind, text, taskTitle: text, actor: whoAmIName(),
+               at: new Date().toISOString() };
+  if (_padKind === 'idea') ev.ideaState = 'open';
+  if (t) { ev.taskId = t.id; ev.linkedTitle = t.title; }
+  events.push(ev);
+  if (events.length > ACT_CAP) events = events.slice(events.length - ACT_CAP);
+  saveEvents();
+  if (t) {
+    if (markDone) { t.done = true; t.doneAt = new Date().toISOString(); cascadeDone(t); }
+    else { t.updatedAt = new Date().toISOString(); t.updatedBy = whoAmIName(); }  // a logged touch counts as one
+    scheduleSave();
+    renderAll();
+  }
+  _padTab = _padKind;
+  padRender();
+  setTimeout(() => document.getElementById('pad-inp')?.focus(), 40);
+}
+function padKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); padCommit(); }
+  else if (e.key === 'Escape') padClose();
+}
+function padInput() { padRenderSug(); }
+
+function padRenderSug() {
+  const box = document.getElementById('pad-sug');
+  if (!box) return;
+  const text = document.getElementById('pad-inp')?.value.trim() || '';
+  if (_padKind !== 'work' || text.length < 3) { box.innerHTML = ''; return; }
+  const m = padMatches(text);
+  box.innerHTML = m.map(({ t }) => `
+    <div class="pad-sug-row">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        ☑ ${esc(t.title)} <span style="color:var(--overlay0);">${esc(t.project || '')}</span></span>
+      <span class="pad-sug-act" onclick="padCommit('${t.id}',false)" title="Log this line and attach it to the task">🔗 Link</span>
+      <span class="pad-sug-act" onclick="padCommit('${t.id}',true)" title="Log it, attach it, and mark the task done">✅ Link + done</span>
+    </div>`).join('')
+    + (m.length ? '' : '<div style="font-size:0.7rem;color:var(--overlay0);padding:3px 6px;">No matching open task — Enter logs it on its own.</div>');
+}
+
+function padIdeaToTask(e, evId) {
+  e.stopPropagation();
+  const ev = events.find(x => x.id === evId);
+  if (!ev) return;
+  const rows = getProjects().map(p => nlPickRow(esc(p), `padIdeaToTaskGo('${evId}','${escAttr(p)}')`)).join('')
+    + nlPickRow('<span style="color:var(--overlay0);">No project</span>', `padIdeaToTaskGo('${evId}','')`);
+  nlPickMenu(e, rows, 'Create the task in…', 260, true);
+}
+function padIdeaToTaskGo(evId, proj) {
+  closeOvMenu();
+  const ev = events.find(x => x.id === evId);
+  if (!ev) return;
+  const t = { id: uid(), title: ev.text, done: false, doneAt: null, createdAt: new Date().toISOString(),
+    project: proj || '', taskStatus: '', department: null, priority: '', due: '', partner: '', notes: 'From the 📝 pad.',
+    taskType: 'task', clientName: projectMeta[proj]?.clientName || '', clientId: projectMeta[proj]?.clientId || null,
+    subtasks: [], assignees: [] };
+  tasks.push(t);
+  placeNewTaskFirst(t);
+  ev.ideaState = 'task'; ev.taskId = t.id; ev.linkedTitle = t.title;
+  saveEvents(); scheduleSave(); renderAll(); padRender();
+}
+function padIdeaDone(evId) {
+  const ev = events.find(x => x.id === evId);
+  if (!ev) return;
+  ev.ideaState = ev.ideaState === 'done' ? 'open' : 'done';
+  saveEvents(); padRender();
+}
+function padDelEntry(evId) {
+  events = events.filter(x => x.id !== evId);
+  saveEvents(); padRender();
+}
+
+function padRender(keepInput) {
+  padEnsure();
+  const prev = keepInput ? (document.getElementById('pad-inp')?.value || '') : '';
+  const today = todayStr(), yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const dayLbl = d => d === today ? 'Today' : d === yest ? 'Yesterday'
+    : new Date(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const list = events.filter(e => e.type === _padTab)
+    .sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  let lastDay = '', rowsHtml = '';
+  for (const ev of list) {
+    const d = (ev.at || '').slice(0, 10);
+    if (d !== lastDay) { rowsHtml += `<div class="pad-day">${dayLbl(d)}</div>`; lastDay = d; }
+    const time = new Date(ev.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const chip = ev.taskId
+      ? `<span class="pad-task-chip" onclick="openEditModal('${ev.taskId}')" title="Open the linked task">☑ ${esc(ev.linkedTitle || 'task')}</span>` : '';
+    if (ev.type === 'idea') {
+      const dn = ev.ideaState === 'done' || ev.ideaState === 'task';
+      rowsHtml += `<div class="pad-row ${dn ? 'dn' : ''}">
+        <span>💡</span><span class="t">${esc(ev.text)}</span>${chip}
+        <span class="pad-when">${esc(ev.actor || '')} · ${time}</span>
+        ${ev.ideaState === 'task' ? '' : `<span class="pad-act" onclick="padIdeaToTask(event,'${ev.id}')" title="Turn this idea into a task">→ Task</span>
+        <span class="pad-act" onclick="padIdeaDone('${ev.id}')" title="Mark handled">${dn ? '↩' : '✓'}</span>`}
+        <span class="pad-act" onclick="padDelEntry('${ev.id}')" title="Delete">🗑</span></div>`;
+    } else {
+      rowsHtml += `<div class="pad-row">
+        <span>📝</span><span class="t">${esc(ev.text)}</span>${chip}
+        <span class="pad-when">${esc(ev.actor || '')} · ${time}</span>
+        <span class="pad-act" onclick="padDelEntry('${ev.id}')" title="Delete">🗑</span></div>`;
+    }
+  }
+  const nOpenIdeas = events.filter(e => e.type === 'idea' && e.ideaState === 'open').length;
+  document.getElementById('pad-overlay').innerHTML = `
+    <div class="pad-box" onmousedown="event.stopPropagation()">
+      <div class="pad-cap">
+        <div class="pad-kind">
+          <span class="pad-kbtn ${_padKind === 'idea' ? 'on' : ''}" onclick="padSetKind('idea')">💡 Idea</span>
+          <span class="pad-kbtn ${_padKind === 'work' ? 'on' : ''}" onclick="padSetKind('work')">📝 Work done</span>
+          <span style="flex:1;"></span>
+          <span style="font-size:0.66rem;color:var(--overlay0);">Enter logs it · Esc closes</span>
+        </div>
+        <input class="pad-inp" id="pad-inp" type="text" autocomplete="off" spellcheck="false"
+               placeholder="${_padKind === 'idea' ? 'Jot the idea… e.g. net metering for mahab and mum projects' : 'What did you do? e.g. quotation for mckinsey for edl room'}"
+               value="${escAttr(prev)}" onkeydown="padKey(event)" oninput="padInput()">
+        <div id="pad-sug"></div>
+      </div>
+      <div class="pad-tabs">
+        <span class="pad-tab ${_padTab === 'idea' ? 'on' : ''}" onclick="padSetTab('idea')">💡 Ideas${nOpenIdeas ? ` (${nOpenIdeas})` : ''}</span>
+        <span class="pad-tab ${_padTab === 'work' ? 'on' : ''}" onclick="padSetTab('work')">📝 Work log</span>
+      </div>
+      <div class="pad-list">${rowsHtml || '<div style="color:var(--overlay0);font-size:0.8rem;padding:12px 0;">Nothing here yet.</div>'}</div>
+    </div>`;
+  if (keepInput) padRenderSug();
+}
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); spOpen(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') { e.preventDefault(); padOpen(); return; }
   if (e.key === 'Escape') {
+    if (document.getElementById('pad-overlay')?.classList.contains('open')) { padClose(); return; }
     if (document.getElementById('sp-overlay').classList.contains('open')) { spClose(); return; }
     if (document.getElementById('task-modal').classList.contains('open')) { closeTaskModal(); return; }
     if (document.getElementById('proj-modal').classList.contains('open')) { closeNewProjectModal(); return; }
