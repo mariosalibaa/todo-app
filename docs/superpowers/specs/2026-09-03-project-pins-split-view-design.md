@@ -64,7 +64,9 @@ due date and `ord`; pins inherit it. Not addressed here.
 amber when pinned. Unpinned rows stay as visually clean as they are now.
 
 **Bulk pin.** `plBulkBarHtml` gains Pin / Unpin buttons acting on the checkbox
-selection `plSel`, alongside the existing Status and Delete actions.
+selection `plSel`, alongside the existing Status and Delete actions. Like the row
+control, they pin for the current user only — Pin adds `whoAmIName()` to each
+selected project, Unpin removes it, and neither touches other users' entries.
 
 **Grouping.** `renderProjectsList` emits a **Pinned** group before the status
 groups. Pinned projects are removed from `byStatus` first, so:
@@ -85,6 +87,8 @@ re-file a pinned project, unpin it first.
   This is a view preference, so per device is correct — unlike the pins themselves.
 - When on, `visibleProjects` is filtered to `isPinned` **before** grouping, so it
   composes with the existing per-column filters and with `plistHasFilters()`.
+- Every surviving row is by definition pinned, so the result is a single Pinned
+  group with no status group headers beneath it.
 - `#task-count` reads `N pinned projects`.
 - With the toggle on and no pins, the empty state reads:
   *"No pinned projects — click the pin on a row to pin one."*
