@@ -37,16 +37,27 @@ const readBody = req => new Promise((resolve, reject) => {
 const all = async coll => (await coll.get()).docs.map(d => ({ id: d.id, ...d.data() }));
 
 async function whishLines(ws) {
-  // every statement line of every Whish account, flattened for the Budget page
-  const accs = await ws.collection('whishAccounts').get();
+  // every statement line of every Whish account, flattened for the Budget page.
+  // The payee of a line is whoever owns the phone number: whishContacts is filled
+  // from Google Contacts on the Whish page, so the same names show up here.
+  const [accs, contactDocs] = await Promise.all([
+    ws.collection('whishAccounts').get(),
+    ws.collection('whishContacts').get()
+  ]);
+  const contacts = {};
+  for (const d of contactDocs.docs) contacts[d.id] = (d.data() || {}).name || '';
   const out = [];
   for (const a of accs.docs) {
     const tx = await a.ref.collection('tx').get();
     for (const d of tx.docs) {
       const t = d.data();
+      const contact = t.phone ? (contacts[t.phone] || '') : '';
       out.push({
         id: d.id, whishAccount: a.id, date: t.date || '', ref: t.ref || '', service: t.service || '',
-        who: t.contactName || t.name || t.description || (t.phone ? '0' + String(t.phone).replace(/^961/, '') : ''),
+        phone: t.phone || '', contact,
+        // payee = owner of the phone number, else the merchant name on the statement
+        payeeLabel: contact || t.name || t.description || (t.phone ? '0' + String(t.phone).replace(/^961/, '') : ''),
+        who: contact || t.name || t.description || (t.phone ? '0' + String(t.phone).replace(/^961/, '') : ''),
         debit: t.debit || 0, credit: t.credit || 0, balance: t.balance ?? null,
         note: t.note || '', kind: t.kind || '', analyticName: t.analyticName || ''
       });

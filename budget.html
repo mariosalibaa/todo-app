@@ -73,6 +73,18 @@
   .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 12px;height:30px;font-size:13px;cursor:pointer;}
   .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;} .btn.danger{color:var(--red);margin-right:auto;}
   .btn:disabled{opacity:.5;cursor:default;}
+  /* type-to-search account picker */
+  .pick{position:relative;}
+  .pick input{width:100%;}
+  .pick-list{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 4px 4px;max-height:210px;overflow:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.18);}
+  .pick-list.on{display:block;}
+  .pick-list div{padding:5px 8px;cursor:pointer;display:flex;align-items:baseline;gap:8px;font-size:12.5px;}
+  .pick-list div .g{color:var(--muted);font-size:11px;}
+  .pick-list div .b{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11.5px;}
+  .pick-list div.hi{background:#dbeafc;}
+  .pick-list div.none{color:var(--muted);cursor:default;}
+  .pick-list.empty{pointer-events:none;}
+  .band .find{width:210px;}
   /* reports */
   .rep{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;min-height:100%;}
   .rep .card{border:1px solid var(--line);border-radius:6px;padding:12px;background:#fff;}
@@ -108,7 +120,7 @@
 const esc = Admin.esc;
 const API = '/api/accounting/budget/';
 let D = null;                       // everything from /all
-let S = { screen: 'expenses', ym: new Date().toISOString().slice(0, 7), sort: {}, sel: null, ledger: null, q: '', from: '', to: '', repYm: null, open: {}, groups: [] };
+let S = { screen: 'expenses', ym: new Date().toISOString().slice(0, 7), sort: {}, sel: null, ledger: null, q: '', from: '', to: '', repYm: null, open: {}, groups: [], accQ: '' };
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const SCREENS = [
   { id: 'expenses',   ico: '🟥', lbl: 'Expenses',   pill: 'red' },
@@ -149,10 +161,13 @@ function whishRows() {
   return D.whish.map(t => {
     const o = D.whishMap.find(m => m.id === t.id) || {};
     const kindSub = t.kind === 'work' ? 'whish-work' : t.kind === 'personal' ? 'whish-personal' : 'whish-untagged';
-    const label = [t.who, t.note, t.analyticName].filter(Boolean).join(' · ');
+    const label = t.payeeLabel || t.who || '';
+    const note = [t.note, t.analyticName].filter(Boolean).join(' · ');
     return { id: 'w:' + t.id, whish: true, wid: t.id, date: t.date, amount: t.debit || t.credit, currency: 'USD', currencyAmount: t.debit || t.credit,
       accAmount: t.debit || t.credit, accountId: accId, kind: t.debit ? 'expense' : 'income',
-      catId: o.catId || 'whish', subId: o.subId || (o.catId ? '' : kindSub), payeeId: o.payeeId || '', notes: o.notes || label, name: label, service: t.service, balance: t.balance };
+      catId: o.catId || 'whish', subId: o.subId || (o.catId ? '' : kindSub), payeeId: o.payeeId || '',
+      payeeLabel: label, phone: t.phone || '', contact: t.contact || '',
+      notes: o.notes || note, name: label, service: t.service, balance: t.balance };
   });
 }
 const wExpenses = () => whishRows().filter(w => w.kind === 'expense');
@@ -194,6 +209,7 @@ function render() {
   if (monthly) center.innerHTML = `<button class="nav-btn" onclick="shiftMonth(-1)">‹</button><div class="title"><b>${MONTHS[+m - 1]} ${y}</b><span>${sub}</span></div><button class="nav-btn" onclick="shiftMonth(1)">›</button>`;
   else if (S.screen === 'search') center.innerHTML = `<input type="search" placeholder="Search notes, payee, category, account…" value="${esc(S.q)}" oninput="S.q=this.value;draw()" style="width:300px"> <input type="date" value="${S.from}" onchange="S.from=this.value;draw()"> <input type="date" value="${S.to}" onchange="S.to=this.value;draw()"><div class="title"><span>${sub}</span></div>`;
   else if (S.screen === 'reports') center.innerHTML = `<input type="month" value="${S.repYm || S.ym}" onchange="S.repYm=this.value;draw()"><div class="title"><b>Reports</b><span>${sub}</span></div>`;
+  else if (S.screen === 'accounts' && !S.ledger) center.innerHTML = `<input type="search" class="find" id="acc-q" placeholder="Find an account..." value="${esc(S.accQ)}" oninput="S.accQ=this.value;draw()"><div class="title"><b>Accounts</b><span>${sub}</span></div>`;
   else center.innerHTML = `<div class="title"><b>${SCREENS.find(s => s.id === S.screen).lbl}${S.ledger ? ' › ' + esc(accName(S.ledger)) : ''}</b><span>${sub}</span></div>`;
   const grouped = S.screen === 'accounts' && !S.ledger && (S.sort.accounts || {}).k === 'type';
   document.getElementById('band-left').innerHTML = grouped ? `<button class="band-btn" onclick="toggleAllGroups()">${allOpen() ? '⊟ Collapse all' : '⊞ Expand all'}</button>` : '';
@@ -220,7 +236,7 @@ function draw() {
   S.sort[S.screen] = S.sort[S.screen] || { k: 'date', dir: -1 };
   const b = balances();
   if (S.screen === 'expenses') {
-    const rows = sorted(monthExpenses(S.ym).map(e => ({ ...e, cat: catName(e.catId), sub: subName(e.subId), payee: payeeName(e.payeeId), acc: accName(e.accountId) })));
+    const rows = sorted(monthExpenses(S.ym).map(e => ({ ...e, cat: catName(e.catId), sub: subName(e.subId), payee: payeeName(e.payeeId) || e.payeeLabel || '', acc: accName(e.accountId) })));
     table([{ k: 'date', l: 'Date' }, { k: 'cat', l: 'Category' }, { k: 'sub', l: 'SubCategory' }, { k: 'amount', l: 'Amount', num: 1 }, { k: 'payee', l: 'Payee' }, { k: 'acc', l: 'Account' }, { k: 'notes', l: 'Notes' }], rows,
       e => `<tr class="${rowCls(e)}" onclick="select('${e.id}')" ondblclick="edit('expenses','${e.id}')"><td>${dmy(e.date)}</td><td>${wtag(e)}${esc(e.cat)}</td><td>${esc(e.sub)}</td><td class="num">${money(e.amount)}${e.currency !== 'USD' ? ` <small style="color:#999">${esc(e.currency)} ${num(e.currencyAmount)}</small>` : ''}</td><td>${esc(e.payee)}</td><td>${esc(e.acc)}</td><td title="${esc(e.notes)}">${esc(e.notes)}</td></tr>`,
       { left: rows.length + ' entries · double-click to edit', total: 'Total ' + money(sum(rows)), right: '<span class="tag">W</span>= Whish statement line' });
@@ -242,21 +258,23 @@ function draw() {
     const cols = [{ k: 'name', l: 'Account' }, { k: 'type', l: 'Type' }, { k: 'currency', l: 'Currency' }, { k: 'balance', l: 'Balance', num: 1 }, { k: 'usd', l: 'In USD', num: 1 }, { k: 'include', l: 'Included' }];
     // the total always counts every account, collapsed groups included
     const incl = rows.filter(a => a.include).reduce((t, a) => t + a.usd, 0);
+    const q = S.accQ.trim().toLowerCase();
+    const hits = q ? rows.filter(a => (a.name + ' ' + (a.type || '')).toLowerCase().includes(q)) : rows;
     const grouped = S.sort.accounts.k === 'type';
     const groupTotals = {}, groupCount = {};
-    for (const a of rows) { groupTotals[a.type || ''] = (groupTotals[a.type || ''] || 0) + a.usd; groupCount[a.type || ''] = (groupCount[a.type || ''] || 0) + 1; }
-    S.groups = grouped ? [...new Set(rows.map(a => a.type || ''))] : [];
+    for (const a of hits) { groupTotals[a.type || ''] = (groupTotals[a.type || ''] || 0) + a.usd; groupCount[a.type || ''] = (groupCount[a.type || ''] || 0) + 1; }
+    S.groups = grouped ? [...new Set(hits.map(a => a.type || ''))] : [];
     const accRow = a => `<tr class="${S.sel === a.id ? 'on' : ''}" onclick="select('${a.id}')" ondblclick="openLedger('${a.id}')"><td>${esc(a.name)}${a.id === D.settings.whishAccountId ? ' <span class="tag">W</span>' : ''}</td><td>${esc(a.type)}</td><td>${esc(a.currency)}</td><td class="num ${a.balance < 0 ? 'neg' : ''}">${money(a.balance, a.currency)}</td><td class="num ${a.usd < 0 ? 'neg' : ''}">${money(a.usd)}</td><td>${a.include ? '✓' : '<span style="color:#bbb">excluded</span>'}</td></tr>`;
     let html = '';
-    if (!grouped) html = rows.map(accRow).join('');
+    if (!grouped) html = hits.map(accRow).join('');
     else S.groups.forEach((g, i) => {
-      const on = !!S.open[g], n = groupCount[g];
+      const on = !!S.open[g] || !!q, n = groupCount[g];   // searching opens every group that has a match
       html += `<tr class="grp" onclick="toggleGroup(${i})"><td colspan="4"><span class="chev">${on ? '▾' : '▸'}</span>${esc(g || '(no type)')}<span class="cnt">${n} account${n > 1 ? 's' : ''}</span></td><td class="num">${money(groupTotals[g])}</td><td></td></tr>`;
-      if (on) html += rows.filter(a => (a.type || '') === g).map(accRow).join('');
+      if (on) html += hits.filter(a => (a.type || '') === g).map(accRow).join('');
     });
     const s = S.sort[S.screen];
     document.getElementById('wrap').innerHTML = `<table><thead><tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}" onclick="sortBy('${c.k}')">${c.l}${s.k === c.k ? `<span class="arr">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead><tbody>${html}</tbody></table>`;
-    document.getElementById('foot-left').innerHTML = rows.length + ' accounts · double-click = ledger · <span class="lnk" onclick="edit(\'accounts\', S.sel)">edit selected</span>';
+    document.getElementById('foot-left').innerHTML = (q ? `<b>${hits.length}</b> of ${rows.length} accounts match “${esc(S.accQ)}” · <span class="lnk" onclick="clearAccSearch()">clear</span>` : rows.length + ' accounts') + ' · double-click = ledger · <span class="lnk" onclick="edit(\'accounts\', S.sel)">edit selected</span>';
     document.getElementById('foot-total').textContent = 'Total (included) ' + money(incl);
     document.getElementById('foot-right').innerHTML = 'Whish balance comes from the statement';
   } else if (S.screen === 'payees') {
@@ -280,9 +298,74 @@ function draw() {
   } else if (S.screen === 'reports') drawReports();
   else if (S.screen === 'search') drawSearch();
 }
+function clearAccSearch() { S.accQ = ''; render(); }
 function toggleGroup(i) { const g = S.groups[i]; S.open[g] = !S.open[g]; draw(); }
 const allOpen = () => S.groups.length > 0 && S.groups.every(g => S.open[g]);
 function toggleAllGroups() { const close = allOpen(); S.open = {}; if (!close) S.groups.forEach(g => S.open[g] = true); draw(); render(); }
+// Account picker: type to filter, arrow keys to move, Enter or click to choose.
+// Renders a visible text box plus a hidden input carrying the account id, so v('<id>') still works.
+const P = {};
+function pickerHtml(id, selId, allowEmpty) {
+  const a = accById(selId);
+  return `<div class="pick"><input id="${id}-txt" autocomplete="off" placeholder="type to search accounts..." value="${esc(a ? a.name : '')}"
+      data-empty="${allowEmpty ? 1 : 0}" title="type to search, or press ↓ for the full list" oninput="pickFilter('${id}')" onkeydown="pickKey(event,'${id}')" onblur="pickBlur('${id}')">
+    <input type="hidden" id="${id}" value="${esc(selId || '')}">
+    <div class="pick-list" id="${id}-list"></div></div>`;
+}
+function pickMatches(q) {
+  const b = balances(), t = q.trim().toLowerCase();
+  return D.accounts
+    .filter(a => !t || (a.name + ' ' + (a.type || '')).toLowerCase().includes(t))
+    .map(a => ({ ...a, bal: b[a.id] }))
+    .sort(by('name'));
+}
+function pickFilter(id) {
+  const txt = document.getElementById(id + '-txt'), box = document.getElementById(id + '-list');
+  const cur = accById(document.getElementById(id).value);
+  // showing the current pick means "browse everything", not "search for this exact name"
+  const list = pickMatches(cur && txt.value === cur.name ? '' : txt.value);
+  P[id] = { list, hi: Math.max(0, list.findIndex(a => cur && a.id === cur.id)) };
+  box.innerHTML = list.length
+    ? list.map((a, i) => `<div class="${i === P[id].hi ? 'hi' : ''}" onmousedown="event.preventDefault();pickChoose('${id}','${a.id}')"><span>${esc(a.name)}</span><span class="g">${esc(a.type || '')}</span><span class="b">${money(a.bal, a.currency)}</span></div>`).join('')
+    : '<div class="none">no account matches</div>';
+  box.className = 'pick-list on' + (list.length ? '' : ' empty');
+  const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+}
+function pickKey(e, id) {
+  const box = document.getElementById(id + '-list');
+  // first Escape shuts the dropdown, a second one closes the dialog
+  if (e.key === 'Escape') { if (box.className.includes('on')) e.stopPropagation(); box.className = 'pick-list'; return; }
+  if (e.key === 'ArrowDown' && !box.className.includes('on')) { e.preventDefault(); pickFilter(id); return; }
+  const st = P[id];
+  if (!st || !st.list.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    st.hi = Math.min(st.list.length - 1, Math.max(0, st.hi + (e.key === 'ArrowDown' ? 1 : -1)));
+    [...box.children].forEach((c, i) => c.className = i === st.hi ? 'hi' : '');
+    const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') { e.preventDefault(); if (box.className.includes('on')) pickChoose(id, st.list[st.hi].id); }
+}
+function pickChoose(id, accId) {
+  const a = accById(accId); if (!a) return;
+  P[id] = null;
+  document.getElementById(id).value = accId;
+  document.getElementById(id + '-txt').value = a.name;
+  document.getElementById(id + '-list').className = 'pick-list';
+}
+// leaving the box with text that matches no account snaps back to the last valid pick
+function pickBlur(id) {
+  setTimeout(() => {
+    const txt = document.getElementById(id + '-txt'); if (!txt) return;
+    document.getElementById(id + '-list').className = 'pick-list';
+    const hidden = document.getElementById(id);
+    if (!txt.value.trim() && txt.dataset.empty === '1') { hidden.value = ''; return; }
+    const exact = D.accounts.find(a => a.name.toLowerCase() === txt.value.trim().toLowerCase());
+    if (exact) { hidden.value = exact.id; txt.value = exact.name; return; }
+    const cur = accById(hidden.value);
+    txt.value = cur ? cur.name : '';
+    if (!cur) hidden.value = '';
+  }, 160);
+}
 function select(id) { S.sel = id; document.querySelectorAll('tbody tr').forEach(tr => tr.classList.toggle('on', tr.getAttribute('onclick') === `select('${id}')`)); }
 function openLedger(id) { S.screen = 'accounts'; S.ledger = id; S.sel = null; S.sort.accounts = { k: 'date', dir: 1 }; render(); }
 function drawLedger(id, b) {
@@ -292,7 +375,7 @@ function drawLedger(id, b) {
   for (const e of D.expenses) if (e.accountId === id) rows.push({ id: e.id, kind: 'expenses', date: e.date, what: catName(e.catId) + (e.subId ? ' › ' + subName(e.subId) : ''), who: payeeName(e.payeeId), notes: e.notes, delta: -eff(e) });
   for (const e of D.income) if (e.accountId === id) rows.push({ id: e.id, kind: 'income', date: e.date, what: 'Income', who: e.name, notes: e.notes, delta: eff(e) });
   for (const t of D.transfers) { if (t.fromId === id) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer to ' + accName(t.toId), notes: t.notes, delta: -(t.fromAmount != null ? t.fromAmount : t.amount) }); if (t.toId === id) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer from ' + accName(t.fromId), notes: t.notes, delta: t.toAmount != null ? t.toAmount : t.amount }); }
-  for (const w of whishRows()) if (w.accountId === id) rows.push({ id: w.id, whish: true, kind: w.kind === 'expense' ? 'expenses' : 'income', date: w.date, what: catName(w.catId) + (w.subId ? ' › ' + subName(w.subId) : ''), who: w.service, notes: w.notes, delta: w.kind === 'expense' ? -w.amount : w.amount, sbal: w.balance });
+  for (const w of whishRows()) if (w.accountId === id) rows.push({ id: w.id, whish: true, kind: w.kind === 'expense' ? 'expenses' : 'income', date: w.date, what: catName(w.catId) + (w.subId ? ' › ' + subName(w.subId) : ''), who: payeeName(w.payeeId) || w.payeeLabel || w.service, notes: w.notes, delta: w.kind === 'expense' ? -w.amount : w.amount, sbal: w.balance });
   rows.sort((x, y) => by('date')(x, y) || (x.whish && y.whish ? by('id')(x, y) : 0));
   let run = a.opening || 0; for (const r of rows) { run += r.delta; r.run = r.sbal != null ? r.sbal : run; }
   const s = S.sort.accounts; if (s.dir < 0) rows.reverse();
@@ -307,7 +390,7 @@ function drawSearch() {
   const q = S.q.trim().toLowerCase();
   const inRange = d => (!S.from || d >= S.from) && (!S.to || d <= S.to);
   let rows = [];
-  for (const e of [...D.expenses, ...wExpenses()]) rows.push({ id: e.id, kind: 'expenses', date: e.date, what: catName(e.catId) + (e.subId ? ' › ' + subName(e.subId) : ''), who: payeeName(e.payeeId) || (e.whish ? e.service : ''), acc: accName(e.accountId), notes: e.notes, amount: -e.amount, whish: e.whish });
+  for (const e of [...D.expenses, ...wExpenses()]) rows.push({ id: e.id, kind: 'expenses', date: e.date, what: catName(e.catId) + (e.subId ? ' › ' + subName(e.subId) : ''), who: payeeName(e.payeeId) || e.payeeLabel || '', acc: accName(e.accountId), notes: e.notes, amount: -e.amount, whish: e.whish });
   for (const e of [...D.income, ...wIncome()]) rows.push({ id: e.id, kind: 'income', date: e.date, what: 'Income', who: e.name, acc: accName(e.accountId), notes: e.notes, amount: e.amount, whish: e.whish });
   for (const t of D.transfers) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer', who: accName(t.fromId) + ' → ' + accName(t.toId), acc: '', notes: t.notes, amount: t.amount });
   rows = rows.filter(r => inRange(r.date) && (!q || [r.what, r.who, r.acc, r.notes, String(r.amount)].join(' ').toLowerCase().includes(q)));
@@ -376,9 +459,9 @@ function edit(kind, id, extra) {
       <label>SubCategory</label><select id="f-sub">${subOptsFor(catId, e.subId)}</select>
       <label>Amount</label><div class="row"><input type="number" step="0.01" id="f-amt" value="${e.currencyAmount != null ? e.currencyAmount : e.amount || ''}"><select id="f-cur">${curOpts(e.currency)}</select></div>
       <label>Payee</label><select id="f-payee"><option value="">—</option>${opt(D.payees.slice().sort(by('name')), e.payeeId)}</select>
-      <label>Account</label><select id="f-acc"><option value="">— none —</option>${accOpts(e.accountId)}</select>
+      <label>Account</label>${pickerHtml('f-acc', e.accountId, true)}
       <label>Notes</label><textarea id="f-notes">${esc(e.notes || '')}</textarea>
-      <div class="hint">Foreign amounts are converted to USD with the rates in ⚙ settings.</div>`, acts(isNew ? '' : `delEntry('expenses','${id}')`));
+      <div class="hint">Foreign amounts are converted to USD with the rates in ⚙ settings. Leave the account box empty for none.</div>`, acts(isNew ? '' : `delEntry('expenses','${id}')`));
     onSave = async () => {
       const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
       const accountId = v('f-acc');
@@ -392,7 +475,7 @@ function edit(kind, id, extra) {
       <label>Date</label><input type="date" id="f-date" value="${e.date}">
       <label>Name</label><input id="f-name" value="${esc(e.name || '')}" list="income-names"><datalist id="income-names">${[...new Set(D.income.map(i => i.name).filter(Boolean))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <label>Amount</label><div class="row"><input type="number" step="0.01" id="f-amt" value="${e.currencyAmount != null ? e.currencyAmount : e.amount || ''}"><select id="f-cur">${curOpts(e.currency)}</select></div>
-      <label>Account</label><select id="f-acc"><option value="">— none —</option>${accOpts(e.accountId)}</select>
+      <label>Account</label>${pickerHtml('f-acc', e.accountId, true)}
       <label>Notes</label><textarea id="f-notes">${esc(e.notes || '')}</textarea>`, acts(isNew ? '' : `delEntry('income','${id}')`));
     onSave = async () => {
       const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
@@ -405,13 +488,14 @@ function edit(kind, id, extra) {
     const t = isNew ? { date: today(), currency: 'USD', fromId: S.ledger || '' } : D.transfers.find(x => x.id === id);
     dlg(isNew ? 'Add transfer' : 'Edit transfer', `
       <label>Date</label><input type="date" id="f-date" value="${t.date}">
-      <label>From</label><select id="f-from">${accOpts(t.fromId)}</select>
-      <label>To</label><select id="f-to">${accOpts(t.toId)}</select>
+      <label>From</label>${pickerHtml('f-from', t.fromId)}
+      <label>To</label>${pickerHtml('f-to', t.toId)}
       <label>Amount</label><div class="row"><input type="number" step="0.01" id="f-amt" value="${t.currencyAmount != null ? t.currencyAmount : t.amount || ''}"><select id="f-cur">${curOpts(t.currency)}</select></div>
       <label>Notes</label><textarea id="f-notes">${esc(t.notes || '')}</textarea>
       <div class="hint">Between currencies: the amount is converted with the settings rates on each side.</div>`, acts(isNew ? '' : `delEntry('transfers','${id}')`));
     onSave = async () => {
       const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
+      if (!v('f-from') || !v('f-to')) throw new Error('pick both a from and a to account');
       if (v('f-from') === v('f-to')) throw new Error('from and to are the same account');
       const amount = toBase(ca, cur);
       const data = { date: v('f-date'), fromId: v('f-from'), toId: v('f-to'), currency: cur, currencyAmount: ca, amount, fromAmount: inAccCurrency(amount, cur, ca, v('f-from')), toAmount: inAccCurrency(amount, cur, ca, v('f-to')), notes: v('f-notes') };
@@ -459,7 +543,7 @@ function editWhish(wid) {
   const catId = o.catId || 'whish';
   dlg('Whish line — classify', `
     <label>Date</label><div>${dmy(t.date)} · ${esc(t.service)} · tr:${esc(t.ref)}</div>
-    <label>Counterparty</label><div>${esc(t.who)}</div>
+    <label>Counterparty</label><div>${esc(t.payeeLabel || t.who)}${t.phone ? ` <span class="cnt" style="color:#777">0${esc(String(t.phone).replace(/^961/, ''))}${t.contact ? ' · Google contact' : ' · not in contacts'}</span>` : ''}</div>
     <label>Amount</label><div>${t.debit ? 'Out ' + money(t.debit) : 'In ' + money(t.credit)}</div>
     <label>Whish note</label><div>${esc(t.note || '—')} ${t.kind ? '<span class="tag">' + esc(t.kind) + '</span>' : ''} ${esc(t.analyticName || '')}</div>
     <label>Category</label><select id="f-cat" onchange="document.getElementById('f-sub').innerHTML=subOptsFor(this.value,'')">${opt(D.categories.slice().sort((a, b) => (a.seq - b.seq) || by('name')(a, b)), catId)}</select>
