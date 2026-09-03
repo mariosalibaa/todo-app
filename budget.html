@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#3c3c3c">
+<title>Accounting · Budget</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  /* HomeBudget look: dark header bands, light-grey sidebar, striped grid, coloured pill badges */
+  :root{--band:#3c3c3c;--side:#f3f3f3;--line:#d9d9d9;--text:#222;--muted:#777;--red:#e5323a;--purple:#8e44ad;--green:#2eaa4a;--orange:#f39c12;--blue:#2d8fe0;--teal:#16a085;--sel:#e8e8e8;--stripe:#f7f7f7;--wh:#6b5bd6;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;overflow:hidden;}
+  .side{width:250px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .side .head{background:var(--band);color:#fff;height:46px;display:flex;align-items:center;padding:0 10px;gap:8px;}
+  .side .head a{color:#fff;text-decoration:none;opacity:.85;font-size:16px;}
+  .side .head .t{flex:1;text-align:center;line-height:1.1;}
+  .side .head .t b{display:block;font-size:14px;}
+  .side .head .t span{font-size:11px;color:#8fd0ff;}
+  .nav{list-style:none;margin:0;padding:0;}
+  .nav li{display:flex;align-items:center;gap:8px;padding:0 8px;height:31px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;}
+  .nav li:hover{background:#e9e9e9;} .nav li.on{background:var(--sel);font-weight:600;}
+  .nav li .ico{width:18px;text-align:center;font-size:14px;}
+  .nav li .lbl{flex:1;font-size:13.5px;}
+  .pill{color:#fff;border-radius:11px;padding:2px 9px;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .pill.red{background:var(--red);} .pill.green{background:var(--green);} .pill.blue{background:var(--blue);} .pill.teal{background:var(--teal);} .pill.purple{background:var(--purple);} .pill.orange{background:var(--orange);}
+  .side .foot{margin-top:auto;border-top:1px solid var(--line);padding:8px 10px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px;}
+  .side .foot .sp{flex:1;} .side .foot a{color:var(--muted);cursor:pointer;text-decoration:none;font-size:15px;}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .band{background:var(--band);color:#fff;height:46px;display:flex;align-items:center;padding:0 12px;gap:10px;flex:none;}
+  .band .center{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;}
+  .band .nav-btn{width:22px;height:22px;border-radius:50%;background:#fff;color:#333;border:0;cursor:pointer;font-weight:700;line-height:20px;padding:0;}
+  .band .title{text-align:center;line-height:1.1;min-width:170px;}
+  .band .title b{display:block;font-size:15px;} .band .title span{font-size:10px;color:#8fd0ff;letter-spacing:.06em;}
+  .band .add{width:26px;height:26px;border-radius:50%;background:#fff;color:#333;border:0;cursor:pointer;font-size:20px;line-height:24px;padding:0;font-weight:700;}
+  .band input[type=search],.band input[type=month],.band select{border:0;border-radius:4px;padding:4px 7px;font-size:12px;height:26px;}
+  .band .who{font-size:11px;opacity:.8;}
+  .wrap{flex:1;min-height:0;overflow:auto;background:repeating-linear-gradient(#fff 0 22px,var(--stripe) 22px 44px);}
+  table{border-collapse:separate;border-spacing:0;width:100%;}
+  thead th{position:sticky;top:0;background:#e9e9e9;text-align:left;font-weight:500;padding:0 8px;height:22px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#333;z-index:2;cursor:pointer;user-select:none;}
+  thead th .arr{color:var(--blue);font-size:10px;margin-left:3px;}
+  td{padding:0 8px;height:22px;border-right:1px solid #ececec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;}
+  tbody tr{cursor:pointer;} tbody tr:hover td{background:#eef5fc;} tbody tr.on td{background:#dbeafc;}
+  tbody tr.w td{color:var(--wh);} tbody tr.grp td{background:#dcdcdc;font-weight:600;color:#333;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.neg{color:var(--red);} td.pos{color:var(--green);}
+  .tag{display:inline-block;font-size:9.5px;font-weight:700;border:1px solid var(--wh);color:var(--wh);border-radius:3px;padding:0 3px;margin-right:4px;line-height:12px;vertical-align:1px;}
+  .foot{flex:none;height:38px;border-top:1px solid var(--line);background:#fafafa;display:flex;align-items:center;padding:0 14px;gap:16px;font-size:12px;color:var(--muted);}
+  .foot .tot{margin-left:auto;margin-right:auto;font-weight:700;color:var(--blue);font-size:13px;}
+  .foot .lnk{color:var(--blue);cursor:pointer;}
+  .empty{padding:60px 20px;text-align:center;color:var(--muted);background:#fff;}
+  .msg{position:fixed;left:50%;bottom:50px;transform:translateX(-50%);background:#333;color:#fff;padding:7px 14px;border-radius:6px;font-size:12px;display:none;z-index:50;}
+  .msg.on{display:block;}
+  /* modal */
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:100;}
+  .ov.on{display:flex;}
+  .dlg{background:#fff;border-radius:8px;width:440px;max-width:95vw;max-height:92vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  .dlg h3{margin:0;background:var(--band);color:#fff;font-size:14px;font-weight:600;padding:10px 14px;border-radius:8px 8px 0 0;}
+  .dlg .body{padding:12px 14px;display:grid;grid-template-columns:110px 1fr;gap:8px 10px;align-items:center;}
+  .dlg label{font-size:12px;color:#555;}
+  .dlg input,.dlg select,.dlg textarea{width:100%;border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13px;font-family:inherit;}
+  .dlg textarea{height:54px;resize:vertical;}
+  .dlg .row{display:flex;gap:6px;} .dlg .row select{width:auto;}
+  .dlg .hint{grid-column:1/-1;font-size:11px;color:var(--muted);}
+  .dlg .acts{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 12px;height:30px;font-size:13px;cursor:pointer;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;} .btn.danger{color:var(--red);margin-right:auto;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  /* reports */
+  .rep{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fff;min-height:100%;}
+  .rep .card{border:1px solid var(--line);border-radius:6px;padding:12px;background:#fff;}
+  .rep .card h4{margin:0 0 8px;font-size:13px;color:#444;}
+  .rep .card.wide{grid-column:1/-1;}
+  .rep table{width:100%;} .rep td,.rep th{height:22px;}
+  @media (max-width:800px){.side{width:200px;} .rep{grid-template-columns:1fr;} .band .title{min-width:120px;}}
+</style>
+</head>
+<body>
+<div class="side">
+  <div class="head"><a href="/accounting" title="Whish statements">‹</a><div class="t"><b>Budget</b><span id="side-month"></span></div><a href="/admin" title="Hub">⌂</a></div>
+  <ul class="nav" id="nav"></ul>
+  <div class="foot"><span id="who"></span><span class="sp"></span><a onclick="openSettings()" title="Currencies & settings">⚙</a></div>
+</div>
+<div class="main">
+  <div class="band">
+    <span id="band-left"></span>
+    <div class="center" id="band-center"></div>
+    <button class="add" id="btn-add" onclick="addCurrent()" title="Add">+</button>
+  </div>
+  <div class="wrap" id="wrap"></div>
+  <div class="foot"><span id="foot-left"></span><span class="tot" id="foot-total"></span><span id="foot-right"></span></div>
+</div>
+<div class="msg" id="msg"></div>
+<div class="ov" id="ov" onclick="if(event.target===this)closeDlg()"><div class="dlg" id="dlg"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const esc = Admin.esc;
+const API = '/api/accounting/budget/';
+let D = null;                       // everything from /all
+let S = { screen: 'expenses', ym: new Date().toISOString().slice(0, 7), sort: {}, sel: null, ledger: null, q: '', from: '', to: '', repYm: null };
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const SCREENS = [
+  { id: 'expenses',   ico: '🟥', lbl: 'Expenses',   pill: 'red' },
+  { id: 'income',     ico: '💵', lbl: 'Income',     pill: 'green' },
+  { id: 'transfers',  ico: '🔁', lbl: 'Transfers',  pill: 'teal' },
+  { id: 'accounts',   ico: '🏦', lbl: 'Accounts',   pill: 'blue' },
+  { id: 'payees',     ico: '👥', lbl: 'Payees' },
+  { id: 'categories', ico: '🗂', lbl: 'Categories' },
+  { id: 'reports',    ico: '📈', lbl: 'Reports' },
+  { id: 'search',     ico: '🔍', lbl: 'Search' },
+];
+const money = (n, cur) => (n < 0 ? '-' : '') + (cur && cur !== 'USD' ? cur + ' ' : '$') + Math.abs(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const num = n => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dmy = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(2, 4) : '';
+const today = () => new Date().toISOString().slice(0, 10);
+const by = k => (a, b) => (a[k] || '') < (b[k] || '') ? -1 : (a[k] || '') > (b[k] || '') ? 1 : 0;
+function say(t) { const m = document.getElementById('msg'); m.textContent = t; m.className = 'msg on'; clearTimeout(say.t); say.t = setTimeout(() => m.className = 'msg', 2500); }
+
+// ── lookups ──
+const accById = id => D.accounts.find(a => a.id === String(id));
+const catName = id => (D.categories.find(c => c.id === String(id)) || {}).name || '';
+const subName = id => (D.subCategories.find(c => c.id === String(id)) || {}).name || '';
+const payeeName = id => (D.payees.find(c => c.id === String(id)) || {}).name || '';
+const accName = id => (accById(id) || {}).name || '';
+const rate = code => { if (!code || code === D.settings.baseCurrency) return 1; const c = (D.settings.currencies || []).find(x => x.code === code); return c && c.rate ? c.rate : 1; };
+const toBase = (v, code) => Math.round(v * rate(code) * 100) / 100;
+// amount in the account's own currency (what moves its balance)
+function inAccCurrency(amountBase, currency, currencyAmount, accId) {
+  const a = accById(accId); if (!a) return amountBase;
+  if (a.currency === currency && currencyAmount != null) return currencyAmount;
+  if (a.currency === D.settings.baseCurrency) return amountBase;
+  return Math.round(amountBase / rate(a.currency) * 100) / 100;
+}
+
+// ── Whish statement lines as virtual entries of the whish account ──
+function whishRows() {
+  const accId = D.settings.whishAccountId; if (!accId) return [];
+  return D.whish.map(t => {
+    const o = D.whishMap.find(m => m.id === t.id) || {};
+    const kindSub = t.kind === 'work' ? 'whish-work' : t.kind === 'personal' ? 'whish-personal' : 'whish-untagged';
+    const label = [t.who, t.note, t.analyticName].filter(Boolean).join(' · ');
+    return { id: 'w:' + t.id, whish: true, wid: t.id, date: t.date, amount: t.debit || t.credit, currency: 'USD', currencyAmount: t.debit || t.credit,
+      accAmount: t.debit || t.credit, accountId: accId, kind: t.debit ? 'expense' : 'income',
+      catId: o.catId || 'whish', subId: o.subId || (o.catId ? '' : kindSub), payeeId: o.payeeId || '', notes: o.notes || label, name: label, service: t.service, balance: t.balance };
+  });
+}
+const wExpenses = () => whishRows().filter(w => w.kind === 'expense');
+const wIncome = () => whishRows().filter(w => w.kind === 'income');
+
+// ── balances ──
+function balances() {
+  const b = {}; for (const a of D.accounts) b[a.id] = a.opening || 0;
+  const eff = e => e.accAmount != null ? e.accAmount : e.amount;
+  for (const e of D.expenses) if (b[e.accountId] != null) b[e.accountId] -= eff(e);
+  for (const e of D.income) if (b[e.accountId] != null) b[e.accountId] += eff(e);
+  for (const t of D.transfers) { if (b[t.fromId] != null) b[t.fromId] -= t.fromAmount != null ? t.fromAmount : t.amount; if (b[t.toId] != null) b[t.toId] += t.toAmount != null ? t.toAmount : t.amount; }
+  const w = whishRows();
+  if (w.length && b[D.settings.whishAccountId] != null) {
+    // the statement carries its own running balance — trust the latest line
+    const last = w.slice().sort((x, y) => (x.date + x.wid) < (y.date + y.wid) ? 1 : -1)[0];
+    if (last && last.balance != null) b[D.settings.whishAccountId] = last.balance;
+  }
+  return b;
+}
+const inMonth = (d, ym) => (d || '').slice(0, 7) === ym;
+const monthExpenses = ym => [...D.expenses, ...wExpenses()].filter(e => inMonth(e.date, ym));
+const monthIncome = ym => [...D.income, ...wIncome()].filter(e => inMonth(e.date, ym));
+const monthTransfers = ym => D.transfers.filter(e => inMonth(e.date, ym));
+const sum = (list, k = 'amount') => list.reduce((s, x) => s + (Number(x[k]) || 0), 0);
+
+// ── rendering ──
+function render() {
+  const [y, m] = S.ym.split('-');
+  document.getElementById('side-month').textContent = MONTHS[+m - 1] + ' ' + y;
+  const bal = balances();
+  const incl = D.accounts.filter(a => a.include).reduce((s, a) => s + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
+  const pills = { expenses: money(sum(monthExpenses(S.ym))), income: money(sum(monthIncome(S.ym))), transfers: money(sum(monthTransfers(S.ym))), accounts: money(incl) };
+  document.getElementById('nav').innerHTML = SCREENS.map(s => `<li class="${S.screen === s.id ? 'on' : ''}" onclick="go('${s.id}')"><span class="ico">${s.ico}</span><span class="lbl">${s.lbl}</span>${s.pill ? `<span class="pill ${s.pill}">${pills[s.id]}</span>` : ''}</li>`).join('');
+  document.getElementById('who').textContent = (Admin.me && Admin.me.email) || '';
+  const monthly = ['expenses', 'income', 'transfers'].includes(S.screen);
+  const sub = { expenses: 'EXPENSES', income: 'INCOME', transfers: 'TRANSFERS', accounts: 'ACCOUNTS', payees: 'PAYEES', categories: 'CATEGORIES', reports: 'REPORTS', search: 'SEARCH' }[S.screen];
+  const center = document.getElementById('band-center');
+  if (monthly) center.innerHTML = `<button class="nav-btn" onclick="shiftMonth(-1)">‹</button><div class="title"><b>${MONTHS[+m - 1]} ${y}</b><span>${sub}</span></div><button class="nav-btn" onclick="shiftMonth(1)">›</button>`;
+  else if (S.screen === 'search') center.innerHTML = `<input type="search" placeholder="Search notes, payee, category, account…" value="${esc(S.q)}" oninput="S.q=this.value;draw()" style="width:300px"> <input type="date" value="${S.from}" onchange="S.from=this.value;draw()"> <input type="date" value="${S.to}" onchange="S.to=this.value;draw()"><div class="title"><span>${sub}</span></div>`;
+  else if (S.screen === 'reports') center.innerHTML = `<input type="month" value="${S.repYm || S.ym}" onchange="S.repYm=this.value;draw()"><div class="title"><b>Reports</b><span>${sub}</span></div>`;
+  else center.innerHTML = `<div class="title"><b>${SCREENS.find(s => s.id === S.screen).lbl}${S.ledger ? ' › ' + esc(accName(S.ledger)) : ''}</b><span>${sub}</span></div>`;
+  document.getElementById('btn-add').style.visibility = ['reports', 'search'].includes(S.screen) ? 'hidden' : 'visible';
+  draw();
+}
+function go(id) { S.screen = id; S.ledger = null; S.sel = null; render(); }
+function shiftMonth(n) { const d = new Date(S.ym + '-15'); d.setMonth(d.getMonth() + n); S.ym = d.toISOString().slice(0, 7); render(); }
+function sortBy(k) { const s = S.sort[S.screen] || {}; S.sort[S.screen] = { k, dir: s.k === k ? -s.dir : 1 }; draw(); }
+function sorted(list, def) {
+  const s = S.sort[S.screen] || def;
+  return list.slice().sort((a, b) => { const va = s.v ? s.v(a) : a[s.k], vb = s.v ? s.v(b) : b[s.k]; return (va < vb ? -1 : va > vb ? 1 : 0) * s.dir; });
+}
+function table(cols, rows, rowFn, foot) {
+  const s = S.sort[S.screen] || {};
+  const head = cols.map(c => `<th class="${c.num ? 'num' : ''}" onclick="sortBy('${c.k}')">${c.l}${s.k === c.k ? `<span class="arr">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('');
+  document.getElementById('wrap').innerHTML = rows.length ? `<table><thead><tr>${head}</tr></thead><tbody>${rows.map(rowFn).join('')}</tbody></table>` : `<table><thead><tr>${head}</tr></thead></table><div class="empty">Nothing here for this period. Press + to add.</div>`;
+  document.getElementById('foot-left').innerHTML = foot.left || ''; document.getElementById('foot-total').innerHTML = foot.total || ''; document.getElementById('foot-right').innerHTML = foot.right || '';
+}
+const rowCls = e => (S.sel === e.id ? 'on ' : '') + (e.whish ? 'w' : '');
+const wtag = e => e.whish ? '<span class="tag">W</span>' : '';
+
+function draw() {
+  S.sort[S.screen] = S.sort[S.screen] || { k: 'date', dir: -1 };
+  const b = balances();
+  if (S.screen === 'expenses') {
+    const rows = sorted(monthExpenses(S.ym).map(e => ({ ...e, cat: catName(e.catId), sub: subName(e.subId), payee: payeeName(e.payeeId), acc: accName(e.accountId) })));
+    table([{ k: 'date', l: 'Date' }, { k: 'cat', l: 'Category' }, { k: 'sub', l: 'SubCategory' }, { k: 'amount', l: 'Amount', num: 1 }, { k: 'payee', l: 'Payee' }, { k: 'acc', l: 'Account' }, { k: 'notes', l: 'Notes' }], rows,
+      e => `<tr class="${rowCls(e)}" onclick="select('${e.id}')" ondblclick="edit('expenses','${e.id}')"><td>${dmy(e.date)}</td><td>${wtag(e)}${esc(e.cat)}</td><td>${esc(e.sub)}</td><td class="num">${money(e.amount)}${e.currency !== 'USD' ? ` <small style="color:#999">${esc(e.currency)} ${num(e.currencyAmount)}</small>` : ''}</td><td>${esc(e.payee)}</td><td>${esc(e.acc)}</td><td title="${esc(e.notes)}">${esc(e.notes)}</td></tr>`,
+      { left: rows.length + ' entries · double-click to edit', total: 'Total ' + money(sum(rows)), right: '<span class="tag">W</span>= Whish statement line' });
+  } else if (S.screen === 'income') {
+    const rows = sorted(monthIncome(S.ym).map(e => ({ ...e, acc: accName(e.accountId) })));
+    table([{ k: 'date', l: 'Date' }, { k: 'name', l: 'Name' }, { k: 'amount', l: 'Amount', num: 1 }, { k: 'acc', l: 'Account' }, { k: 'notes', l: 'Notes' }], rows,
+      e => `<tr class="${rowCls(e)}" onclick="select('${e.id}')" ondblclick="edit('income','${e.id}')"><td>${dmy(e.date)}</td><td>${wtag(e)}${esc(e.name)}</td><td class="num">${money(e.amount)}${e.currency !== 'USD' ? ` <small style="color:#999">${esc(e.currency)} ${num(e.currencyAmount)}</small>` : ''}</td><td>${esc(e.acc)}</td><td title="${esc(e.notes)}">${esc(e.notes)}</td></tr>`,
+      { left: rows.length + ' entries', total: 'Total ' + money(sum(rows)) });
+  } else if (S.screen === 'transfers') {
+    const rows = sorted(monthTransfers(S.ym).map(t => ({ ...t, from: accName(t.fromId), to: accName(t.toId) })));
+    table([{ k: 'date', l: 'Date' }, { k: 'from', l: 'From' }, { k: 'to', l: 'To' }, { k: 'amount', l: 'Amount', num: 1 }, { k: 'notes', l: 'Notes' }], rows,
+      t => `<tr class="${rowCls(t)}" onclick="select('${t.id}')" ondblclick="edit('transfers','${t.id}')"><td>${dmy(t.date)}</td><td>${esc(t.from)}</td><td>${esc(t.to)}</td><td class="num">${money(t.amount)}${t.currency !== 'USD' ? ` <small style="color:#999">${esc(t.currency)} ${num(t.currencyAmount)}</small>` : ''}</td><td>${esc(t.notes)}</td></tr>`,
+      { left: rows.length + ' transfers', total: 'Total ' + money(sum(rows)) });
+  } else if (S.screen === 'accounts' && S.ledger) {
+    drawLedger(S.ledger, b);
+  } else if (S.screen === 'accounts') {
+    S.sort[S.screen] = S.sort[S.screen].k === 'date' ? { k: 'type', dir: 1 } : S.sort[S.screen];
+    const rows = sorted(D.accounts.map(a => ({ ...a, balance: b[a.id], usd: a.currency === D.settings.baseCurrency ? b[a.id] : toBase(b[a.id], a.currency) })), { k: 'type', dir: 1 });
+    let html = '', grp = null, gsum = 0, incl = 0;
+    const cols = [{ k: 'name', l: 'Account' }, { k: 'type', l: 'Type' }, { k: 'currency', l: 'Currency' }, { k: 'balance', l: 'Balance', num: 1 }, { k: 'usd', l: 'In USD', num: 1 }, { k: 'include', l: 'Included' }];
+    const groupTotals = {}; for (const a of rows) groupTotals[a.type] = (groupTotals[a.type] || 0) + a.usd;
+    for (const a of rows) {
+      if ((S.sort.accounts.k === 'type') && a.type !== grp) { grp = a.type; html += `<tr class="grp"><td colspan="4">${esc(grp || '(no type)')}</td><td class="num">${money(groupTotals[grp])}</td><td></td></tr>`; }
+      if (a.include) incl += a.usd;
+      html += `<tr class="${S.sel === a.id ? 'on' : ''}" onclick="select('${a.id}')" ondblclick="openLedger('${a.id}')"><td>${esc(a.name)}${a.id === D.settings.whishAccountId ? ' <span class="tag">W</span>' : ''}</td><td>${esc(a.type)}</td><td>${esc(a.currency)}</td><td class="num ${a.balance < 0 ? 'neg' : ''}">${money(a.balance, a.currency)}</td><td class="num ${a.usd < 0 ? 'neg' : ''}">${money(a.usd)}</td><td>${a.include ? '✓' : '<span style="color:#bbb">excluded</span>'}</td></tr>`;
+    }
+    const s = S.sort[S.screen];
+    document.getElementById('wrap').innerHTML = `<table><thead><tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}" onclick="sortBy('${c.k}')">${c.l}${s.k === c.k ? `<span class="arr">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead><tbody>${html}</tbody></table>`;
+    document.getElementById('foot-left').innerHTML = rows.length + ' accounts · double-click = ledger · <span class="lnk" onclick="edit(\'accounts\', S.sel)">edit selected</span>';
+    document.getElementById('foot-total').textContent = 'Total (included) ' + money(incl);
+    document.getElementById('foot-right').innerHTML = 'Whish balance comes from the statement';
+  } else if (S.screen === 'payees') {
+    const stats = {}; for (const e of D.expenses) if (e.payeeId) { stats[e.payeeId] = stats[e.payeeId] || { n: 0, t: 0 }; stats[e.payeeId].n++; stats[e.payeeId].t += e.amount; }
+    const rows = sorted(D.payees.map(p => ({ ...p, n: (stats[p.id] || {}).n || 0, t: (stats[p.id] || {}).t || 0 })), { k: 'name', dir: 1 });
+    if (S.sort[S.screen].k === 'date') S.sort[S.screen] = { k: 'name', dir: 1 };
+    table([{ k: 'name', l: 'Payee' }, { k: 'phone', l: 'Phone' }, { k: 'n', l: 'Expenses', num: 1 }, { k: 't', l: 'Total', num: 1 }, { k: 'notes', l: 'Notes' }], rows,
+      p => `<tr class="${S.sel === p.id ? 'on' : ''}" onclick="select('${p.id}')" ondblclick="edit('payees','${p.id}')"><td>${esc(p.name)}</td><td>${esc(p.phone)}</td><td class="num">${p.n}</td><td class="num">${money(p.t)}</td><td>${esc(p.notes)}</td></tr>`,
+      { left: rows.length + ' payees', total: '' });
+  } else if (S.screen === 'categories') {
+    const stats = {}; for (const e of [...D.expenses, ...wExpenses()]) { stats[e.catId] = (stats[e.catId] || 0) + e.amount; stats['s' + e.subId] = (stats['s' + e.subId] || 0) + e.amount; }
+    const cats = D.categories.slice().sort((a, b) => (a.seq - b.seq) || by('name')(a, b));
+    let html = '';
+    for (const c of cats) {
+      html += `<tr class="grp" ondblclick="edit('categories','${c.id}')"><td>${esc(c.name)}</td><td class="num">${money(stats[c.id])}</td><td><span class="lnk" style="color:var(--blue);font-weight:400" onclick="event.stopPropagation();edit('subCategories',null,'${c.id}')">+ subcategory</span></td></tr>`;
+      for (const s of D.subCategories.filter(s => s.catId === c.id).sort((a, b) => (a.seq - b.seq) || by('name')(a, b)))
+        html += `<tr ondblclick="edit('subCategories','${s.id}')"><td style="padding-left:28px">${esc(s.name)}</td><td class="num">${money(stats['s' + s.id])}</td><td></td></tr>`;
+    }
+    document.getElementById('wrap').innerHTML = `<table><thead><tr><th>Category / subcategory</th><th class="num">All-time expenses</th><th></th></tr></thead><tbody>${html}</tbody></table>`;
+    document.getElementById('foot-left').textContent = cats.length + ' categories, ' + D.subCategories.length + ' subcategories · double-click to rename'; document.getElementById('foot-total').textContent = ''; document.getElementById('foot-right').textContent = '';
+  } else if (S.screen === 'reports') drawReports();
+  else if (S.screen === 'search') drawSearch();
+}
+function select(id) { S.sel = id; document.querySelectorAll('tbody tr').forEach(tr => tr.classList.toggle('on', tr.getAttribute('onclick') === `select('${id}')`)); }
+function openLedger(id) { S.screen = 'accounts'; S.ledger = id; S.sel = null; S.sort.accounts = { k: 'date', dir: 1 }; render(); }
+function drawLedger(id, b) {
+  const a = accById(id); if (!a) return;
+  const eff = e => e.accAmount != null ? e.accAmount : e.amount;
+  let rows = [];
+  for (const e of D.expenses) if (e.accountId === id) rows.push({ id: e.id, kind: 'expenses', date: e.date, what: catName(e.catId) + (e.subId ? ' › ' + subName(e.subId) : ''), who: payeeName(e.payeeId), notes: e.notes, delta: -eff(e) });
+  for (const e of D.income) if (e.accountId === id) rows.push({ id: e.id, kind: 'income', date: e.date, what: 'Income', who: e.name, notes: e.notes, delta: eff(e) });
+  for (const t of D.transfers) { if (t.fromId === id) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer to ' + accName(t.toId), notes: t.notes, delta: -(t.fromAmount != null ? t.fromAmount : t.amount) }); if (t.toId === id) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer from ' + accName(t.fromId), notes: t.notes, delta: t.toAmount != null ? t.toAmount : t.amount }); }
+  for (const w of whishRows()) if (w.accountId === id) rows.push({ id: w.id, whish: true, kind: w.kind === 'expense' ? 'expenses' : 'income', date: w.date, what: catName(w.catId) + (w.subId ? ' › ' + subName(w.subId) : ''), who: w.service, notes: w.notes, delta: w.kind === 'expense' ? -w.amount : w.amount, sbal: w.balance });
+  rows.sort((x, y) => by('date')(x, y) || (x.whish && y.whish ? by('id')(x, y) : 0));
+  let run = a.opening || 0; for (const r of rows) { run += r.delta; r.run = r.sbal != null ? r.sbal : run; }
+  const s = S.sort.accounts; if (s.dir < 0) rows.reverse();
+  document.getElementById('wrap').innerHTML = `<table><thead><tr><th>Date</th><th>Type</th><th>Detail</th><th>Payee / name</th><th>Notes</th><th class="num">Amount (${esc(a.currency)})</th><th class="num">Balance</th></tr></thead><tbody>
+    <tr class="grp"><td></td><td>Opening</td><td colspan="3">Opening balance</td><td></td><td class="num">${num(a.opening)}</td></tr>
+    ${rows.map(r => `<tr class="${r.whish ? 'w' : ''}" ondblclick="edit('${r.kind}','${r.id}')"><td>${dmy(r.date)}</td><td>${r.whish ? '<span class="tag">W</span>' : ''}${r.kind}</td><td>${esc(r.what)}</td><td>${esc(r.who || '')}</td><td title="${esc(r.notes)}">${esc(r.notes || '')}</td><td class="num ${r.delta < 0 ? 'neg' : 'pos'}">${num(r.delta)}</td><td class="num">${num(r.run)}</td></tr>`).join('')}</tbody></table>`;
+  document.getElementById('foot-left').innerHTML = `<span class="lnk" onclick="S.ledger=null;render()">‹ all accounts</span> · ${rows.length} movements · <span class="lnk" onclick="edit('accounts','${id}')">edit account</span> · <span class="lnk" onclick="sortBy('date')">flip order</span>`;
+  document.getElementById('foot-total').textContent = 'Balance ' + money(b[id], a.currency);
+  document.getElementById('foot-right').textContent = a.include ? 'included in total' : 'excluded from total';
+}
+function drawSearch() {
+  const q = S.q.trim().toLowerCase();
+  const inRange = d => (!S.from || d >= S.from) && (!S.to || d <= S.to);
+  let rows = [];
+  for (const e of [...D.expenses, ...wExpenses()]) rows.push({ id: e.id, kind: 'expenses', date: e.date, what: catName(e.catId) + (e.subId ? ' › ' + subName(e.subId) : ''), who: payeeName(e.payeeId) || (e.whish ? e.service : ''), acc: accName(e.accountId), notes: e.notes, amount: -e.amount, whish: e.whish });
+  for (const e of [...D.income, ...wIncome()]) rows.push({ id: e.id, kind: 'income', date: e.date, what: 'Income', who: e.name, acc: accName(e.accountId), notes: e.notes, amount: e.amount, whish: e.whish });
+  for (const t of D.transfers) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer', who: accName(t.fromId) + ' → ' + accName(t.toId), acc: '', notes: t.notes, amount: t.amount });
+  rows = rows.filter(r => inRange(r.date) && (!q || [r.what, r.who, r.acc, r.notes, String(r.amount)].join(' ').toLowerCase().includes(q)));
+  rows = sorted(rows);
+  table([{ k: 'date', l: 'Date' }, { k: 'kind', l: 'Type' }, { k: 'what', l: 'Category' }, { k: 'who', l: 'Payee / name' }, { k: 'acc', l: 'Account' }, { k: 'amount', l: 'Amount', num: 1 }, { k: 'notes', l: 'Notes' }], rows.slice(0, 1000),
+    r => `<tr class="${r.whish ? 'w' : ''}" ondblclick="edit('${r.kind}','${r.id}')"><td>${dmy(r.date)}</td><td>${r.whish ? '<span class="tag">W</span>' : ''}${r.kind}</td><td>${esc(r.what)}</td><td>${esc(r.who)}</td><td>${esc(r.acc)}</td><td class="num ${r.amount < 0 ? 'neg' : 'pos'}">${num(r.amount)}</td><td title="${esc(r.notes)}">${esc(r.notes)}</td></tr>`,
+    { left: rows.length + ' matches' + (rows.length > 1000 ? ' (first 1000 shown)' : ''),
+      total: 'In ' + money(sum(rows.filter(r => r.kind === 'income'))) + ' · Out ' + money(-sum(rows.filter(r => r.kind === 'expenses'))) + ' · Net ' + money(sum(rows.filter(r => r.kind !== 'transfers'))),
+      right: rows.some(r => r.kind === 'transfers') ? 'transfers shown but not counted in the net' : '' });
+}
+let charts = [];
+function drawReports() {
+  const ym = S.repYm || S.ym, year = ym.slice(0, 4);
+  const exp = monthExpenses(ym), inc = monthIncome(ym);
+  const byCat = {}; for (const e of exp) byCat[e.catId] = (byCat[e.catId] || 0) + e.amount;
+  const cats = Object.entries(byCat).map(([id, v]) => ({ name: catName(id) || '(none)', v })).sort((a, b) => b.v - a.v);
+  const months = []; for (let i = 11; i >= 0; i--) { const d = new Date(ym + '-15'); d.setMonth(d.getMonth() - i); months.push(d.toISOString().slice(0, 7)); }
+  const mExp = months.map(m => sum(monthExpenses(m))), mInc = months.map(m => sum(monthIncome(m)));
+  const yExp = [...D.expenses, ...wExpenses()].filter(e => (e.date || '').startsWith(year)), yByCat = {}; for (const e of yExp) yByCat[e.catId] = (yByCat[e.catId] || 0) + e.amount;
+  const ycats = Object.entries(yByCat).map(([id, v]) => ({ name: catName(id) || '(none)', v })).sort((a, b) => b.v - a.v);
+  document.getElementById('wrap').innerHTML = `<div class="rep">
+    <div class="card"><h4>${MONTHS[+ym.slice(5) - 1]} ${year} — expenses by category (${money(sum(exp))})</h4><canvas id="c1" height="240"></canvas></div>
+    <div class="card"><h4>Category detail</h4><table><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">%</th></tr></thead><tbody>${cats.map(c => `<tr><td>${esc(c.name)}</td><td class="num">${money(c.v)}</td><td class="num">${sum(exp) ? Math.round(c.v / sum(exp) * 100) : 0}%</td></tr>`).join('')}</tbody></table>
+      <p style="margin:10px 0 0;color:#555">Income ${money(sum(inc))} · Expenses ${money(sum(exp))} · <b style="color:${sum(inc) - sum(exp) < 0 ? 'var(--red)' : 'var(--green)'}">Net ${money(sum(inc) - sum(exp))}</b></p></div>
+    <div class="card wide"><h4>Last 12 months — income vs expenses</h4><canvas id="c2" height="90"></canvas></div>
+    <div class="card wide"><h4>${year} year to date by category (${money(sum(yExp))})</h4><table><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">Monthly avg</th></tr></thead><tbody>${ycats.map(c => `<tr><td>${esc(c.name)}</td><td class="num">${money(c.v)}</td><td class="num">${money(c.v / Math.max(1, new Set(yExp.map(e => e.date.slice(0, 7))).size))}</td></tr>`).join('')}</tbody></table></div>
+  </div>`;
+  ['foot-left', 'foot-total', 'foot-right'].forEach(i => document.getElementById(i).textContent = '');
+  charts.forEach(c => c.destroy()); charts = [];
+  if (!window.Chart) return;
+  const palette = ['#2d8fe0', '#e5323a', '#2eaa4a', '#f39c12', '#8e44ad', '#16a085', '#d35400', '#7f8c8d', '#c0392b', '#27ae60', '#2980b9', '#f1c40f'];
+  charts.push(new Chart(document.getElementById('c1'), { type: 'doughnut', data: { labels: cats.map(c => c.name), datasets: [{ data: cats.map(c => c.v), backgroundColor: cats.map((_, i) => palette[i % palette.length]) }] }, options: { plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false } }));
+  charts.push(new Chart(document.getElementById('c2'), { type: 'bar', data: { labels: months.map(m => MONTHS[+m.slice(5) - 1].slice(0, 3) + ' ' + m.slice(2, 4)), datasets: [{ label: 'Income', data: mInc, backgroundColor: '#2eaa4a' }, { label: 'Expenses', data: mExp, backgroundColor: '#e5323a' }] }, options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'top' } } } }));
+}
+
+// ── modals ──
+function closeDlg() { document.getElementById('ov').className = 'ov'; }
+function dlg(title, fields, acts) {
+  document.getElementById('dlg').innerHTML = `<h3>${title}</h3><div class="body">${fields}</div><div class="acts">${acts}</div>`;
+  document.getElementById('ov').className = 'ov on';
+  const f = document.querySelector('#dlg input:not([type=date]),#dlg select'); if (f) f.focus();
+}
+const opt = (list, sel, label = x => x.name) => list.map(x => `<option value="${esc(x.id)}" ${String(sel) === String(x.id) ? 'selected' : ''}>${esc(label(x))}</option>`).join('');
+const curOpts = sel => [{ code: D.settings.baseCurrency }, ...(D.settings.currencies || []).filter(c => c.code !== D.settings.baseCurrency)].map(c => `<option ${c.code === (sel || D.settings.baseCurrency) ? 'selected' : ''}>${esc(c.code)}</option>`).join('');
+const accOpts = sel => opt(D.accounts.slice().sort(by('name')), sel, a => a.name + (a.currency !== 'USD' ? ' (' + a.currency + ')' : ''));
+const subOptsFor = (catId, sel) => `<option value="">—</option>` + opt(D.subCategories.filter(s => s.catId === String(catId)).sort((a, b) => (a.seq - b.seq) || by('name')(a, b)), sel);
+function addCurrent() { if (S.screen === 'accounts' && S.ledger) return edit('expenses', null); edit(S.screen, null); }
+const v = id => { const el = document.getElementById(id); return el ? (el.type === 'checkbox' ? el.checked : el.value) : undefined; };
+const acts = (del, saveLbl = 'Save') => `${del ? `<button class="btn danger" onclick="${del}">Delete</button>` : ''}<span style="flex:1"></span><button class="btn" onclick="closeDlg()">Cancel</button><button class="btn primary" id="btn-save" onclick="saveDlg()">${saveLbl}</button>`;
+let onSave = null;
+async function saveDlg() { const b = document.getElementById('btn-save'); b.disabled = true; try { await onSave(); closeDlg(); } catch (e) { say('Error: ' + e.message); } b.disabled = false; }
+async function post(kind, body) { return Admin.api('POST', API + kind, body); }
+async function del(kind, id) { return Admin.api('DELETE', API + kind + '/' + id); }
+function upsert(list, id, data) { const i = list.findIndex(x => x.id === id); if (i >= 0) list[i] = { ...list[i], ...data }; else list.push({ id, ...data }); }
+function remove(list, id) { const i = list.findIndex(x => x.id === id); if (i >= 0) list.splice(i, 1); }
+
+function edit(kind, id, extra) {
+  if (id && String(id).startsWith('w:')) return editWhish(id.slice(2));
+  const isNew = !id;
+  if (kind === 'expenses') {
+    const e = isNew ? { date: today(), currency: 'USD', accountId: (D.expenses.slice().sort(by('ts')).pop() || {}).accountId || S.ledger || '' } : D.expenses.find(x => x.id === id);
+    const catId = e.catId || (D.categories[0] || {}).id;
+    dlg(isNew ? 'Add expense' : 'Edit expense', `
+      <label>Date</label><input type="date" id="f-date" value="${e.date}">
+      <label>Category</label><select id="f-cat" onchange="document.getElementById('f-sub').innerHTML=subOptsFor(this.value,'')">${opt(D.categories.slice().sort((a, b) => (a.seq - b.seq) || by('name')(a, b)), catId)}</select>
+      <label>SubCategory</label><select id="f-sub">${subOptsFor(catId, e.subId)}</select>
+      <label>Amount</label><div class="row"><input type="number" step="0.01" id="f-amt" value="${e.currencyAmount != null ? e.currencyAmount : e.amount || ''}"><select id="f-cur">${curOpts(e.currency)}</select></div>
+      <label>Payee</label><select id="f-payee"><option value="">—</option>${opt(D.payees.slice().sort(by('name')), e.payeeId)}</select>
+      <label>Account</label><select id="f-acc"><option value="">— none —</option>${accOpts(e.accountId)}</select>
+      <label>Notes</label><textarea id="f-notes">${esc(e.notes || '')}</textarea>
+      <div class="hint">Foreign amounts are converted to USD with the rates in ⚙ settings.</div>`, acts(isNew ? '' : `delEntry('expenses','${id}')`));
+    onSave = async () => {
+      const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
+      const accountId = v('f-acc');
+      const data = { date: v('f-date'), catId: v('f-cat'), subId: v('f-sub'), currency: cur, currencyAmount: ca, amount: toBase(ca, cur), payeeId: v('f-payee'), accountId, notes: v('f-notes'), ts: e.ts || new Date().toISOString() };
+      data.accAmount = accountId ? inAccCurrency(data.amount, cur, ca, accountId) : null;
+      const r = await post('expenses', { id: isNew ? undefined : id, ...data }); upsert(D.expenses, r.id, data); say('Saved'); render();
+    };
+  } else if (kind === 'income') {
+    const e = isNew ? { date: today(), currency: 'USD', accountId: (D.income.slice().sort(by('ts')).pop() || {}).accountId || S.ledger || '' } : D.income.find(x => x.id === id);
+    dlg(isNew ? 'Add income' : 'Edit income', `
+      <label>Date</label><input type="date" id="f-date" value="${e.date}">
+      <label>Name</label><input id="f-name" value="${esc(e.name || '')}" list="income-names"><datalist id="income-names">${[...new Set(D.income.map(i => i.name).filter(Boolean))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <label>Amount</label><div class="row"><input type="number" step="0.01" id="f-amt" value="${e.currencyAmount != null ? e.currencyAmount : e.amount || ''}"><select id="f-cur">${curOpts(e.currency)}</select></div>
+      <label>Account</label><select id="f-acc"><option value="">— none —</option>${accOpts(e.accountId)}</select>
+      <label>Notes</label><textarea id="f-notes">${esc(e.notes || '')}</textarea>`, acts(isNew ? '' : `delEntry('income','${id}')`));
+    onSave = async () => {
+      const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
+      const accountId = v('f-acc');
+      const data = { date: v('f-date'), name: v('f-name'), currency: cur, currencyAmount: ca, amount: toBase(ca, cur), accountId, notes: v('f-notes'), ts: e.ts || new Date().toISOString() };
+      data.accAmount = accountId ? inAccCurrency(data.amount, cur, ca, accountId) : null;
+      const r = await post('income', { id: isNew ? undefined : id, ...data }); upsert(D.income, r.id, data); say('Saved'); render();
+    };
+  } else if (kind === 'transfers') {
+    const t = isNew ? { date: today(), currency: 'USD', fromId: S.ledger || '' } : D.transfers.find(x => x.id === id);
+    dlg(isNew ? 'Add transfer' : 'Edit transfer', `
+      <label>Date</label><input type="date" id="f-date" value="${t.date}">
+      <label>From</label><select id="f-from">${accOpts(t.fromId)}</select>
+      <label>To</label><select id="f-to">${accOpts(t.toId)}</select>
+      <label>Amount</label><div class="row"><input type="number" step="0.01" id="f-amt" value="${t.currencyAmount != null ? t.currencyAmount : t.amount || ''}"><select id="f-cur">${curOpts(t.currency)}</select></div>
+      <label>Notes</label><textarea id="f-notes">${esc(t.notes || '')}</textarea>
+      <div class="hint">Between currencies: the amount is converted with the settings rates on each side.</div>`, acts(isNew ? '' : `delEntry('transfers','${id}')`));
+    onSave = async () => {
+      const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
+      if (v('f-from') === v('f-to')) throw new Error('from and to are the same account');
+      const amount = toBase(ca, cur);
+      const data = { date: v('f-date'), fromId: v('f-from'), toId: v('f-to'), currency: cur, currencyAmount: ca, amount, fromAmount: inAccCurrency(amount, cur, ca, v('f-from')), toAmount: inAccCurrency(amount, cur, ca, v('f-to')), notes: v('f-notes') };
+      const r = await post('transfers', { id: isNew ? undefined : id, ...data }); upsert(D.transfers, r.id, data); say('Saved'); render();
+    };
+  } else if (kind === 'accounts') {
+    if (!isNew && !accById(id)) return;
+    const a = isNew ? { currency: 'USD', include: true, opening: 0, type: '' } : accById(id);
+    dlg(isNew ? 'Add account' : 'Edit account', `
+      <label>Name</label><input id="f-name" value="${esc(a.name || '')}">
+      <label>Type / group</label><input id="f-type" value="${esc(a.type || '')}" list="acc-types"><datalist id="acc-types">${[...new Set(D.accounts.map(x => x.type).filter(Boolean))].sort().map(t => `<option value="${esc(t)}">`).join('')}</datalist>
+      <label>Currency</label><select id="f-cur">${curOpts(a.currency)}</select>
+      <label>Opening balance</label><input type="number" step="0.01" id="f-open" value="${a.opening || 0}">
+      <label>Included in total</label><input type="checkbox" id="f-incl" ${a.include ? 'checked' : ''} style="width:auto">
+      <div class="hint">Types with "Excluded" in the name were excluded in HomeBudget; the checkbox is what counts here.</div>`, acts(isNew ? '' : `delEntry('accounts','${id}')`));
+    onSave = async () => {
+      const data = { name: v('f-name').trim(), type: v('f-type').trim(), currency: v('f-cur'), opening: Number(v('f-open')) || 0, include: v('f-incl'), seq: a.seq || 0 };
+      if (!data.name) throw new Error('name required');
+      const r = await post('accounts', { id: isNew ? undefined : id, ...data }); upsert(D.accounts, r.id, data); say('Saved'); render();
+    };
+  } else if (kind === 'payees') {
+    const p = isNew ? {} : D.payees.find(x => x.id === id);
+    dlg(isNew ? 'Add payee' : 'Edit payee', `<label>Name</label><input id="f-name" value="${esc(p.name || '')}"><label>Phone</label><input id="f-phone" value="${esc(p.phone || '')}"><label>Notes</label><textarea id="f-notes">${esc(p.notes || '')}</textarea>`, acts(isNew ? '' : `delEntry('payees','${id}')`));
+    onSave = async () => { const data = { name: v('f-name').trim(), phone: v('f-phone'), notes: v('f-notes') }; if (!data.name) throw new Error('name required'); const r = await post('payees', { id: isNew ? undefined : id, ...data }); upsert(D.payees, r.id, data); say('Saved'); render(); };
+  } else if (kind === 'categories') {
+    const c = isNew ? {} : D.categories.find(x => x.id === id);
+    dlg(isNew ? 'Add category' : 'Edit category', `<label>Name</label><input id="f-name" value="${esc(c.name || '')}"><label>Order</label><input type="number" id="f-seq" value="${c.seq || 0}">`, acts(isNew ? '' : `delEntry('categories','${id}')`));
+    onSave = async () => { const data = { name: v('f-name').trim(), seq: Number(v('f-seq')) || 0, icon: c.icon || '' }; if (!data.name) throw new Error('name required'); const r = await post('categories', { id: isNew ? undefined : id, ...data }); upsert(D.categories, r.id, data); say('Saved'); render(); };
+  } else if (kind === 'subCategories') {
+    const s = isNew ? { catId: extra || (D.categories[0] || {}).id } : D.subCategories.find(x => x.id === id);
+    dlg(isNew ? 'Add subcategory' : 'Edit subcategory', `<label>Category</label><select id="f-cat">${opt(D.categories.slice().sort(by('name')), s.catId)}</select><label>Name</label><input id="f-name" value="${esc(s.name || '')}"><label>Order</label><input type="number" id="f-seq" value="${s.seq || 0}">`, acts(isNew ? '' : `delEntry('subCategories','${id}')`));
+    onSave = async () => { const data = { catId: v('f-cat'), name: v('f-name').trim(), seq: Number(v('f-seq')) || 0, icon: s.icon || '' }; if (!data.name) throw new Error('name required'); const r = await post('subCategories', { id: isNew ? undefined : id, ...data }); upsert(D.subCategories, r.id, data); say('Saved'); render(); };
+  }
+}
+async function delEntry(kind, id) {
+  if (!confirm('Delete this ' + kind.replace(/s$/, '').replace('subCategorie', 'subcategory').replace('categorie', 'category') + '?')) return;
+  try { await del(kind, id); } catch (e) { return say('Error: ' + e.message); }
+  remove(D[kind], id); if (kind === 'categories') D.subCategories = D.subCategories.filter(s => s.catId !== id);
+  closeDlg(); say('Deleted'); render();
+}
+// Whish lines are read-only (they come from the statement); only their budget classification can change
+function editWhish(wid) {
+  const t = D.whish.find(x => x.id === wid); if (!t) return;
+  const o = D.whishMap.find(m => m.id === wid) || {};
+  const catId = o.catId || 'whish';
+  dlg('Whish line — classify', `
+    <label>Date</label><div>${dmy(t.date)} · ${esc(t.service)} · tr:${esc(t.ref)}</div>
+    <label>Counterparty</label><div>${esc(t.who)}</div>
+    <label>Amount</label><div>${t.debit ? 'Out ' + money(t.debit) : 'In ' + money(t.credit)}</div>
+    <label>Whish note</label><div>${esc(t.note || '—')} ${t.kind ? '<span class="tag">' + esc(t.kind) + '</span>' : ''} ${esc(t.analyticName || '')}</div>
+    <label>Category</label><select id="f-cat" onchange="document.getElementById('f-sub').innerHTML=subOptsFor(this.value,'')">${opt(D.categories.slice().sort((a, b) => (a.seq - b.seq) || by('name')(a, b)), catId)}</select>
+    <label>SubCategory</label><select id="f-sub">${subOptsFor(catId, o.subId || '')}</select>
+    <label>Payee</label><select id="f-payee"><option value="">—</option>${opt(D.payees.slice().sort(by('name')), o.payeeId)}</select>
+    <label>Budget note</label><input id="f-notes" value="${esc(o.notes || '')}" placeholder="leave empty to show the Whish note">
+    <div class="hint">Amount, date and counterparty come from the Whish statement — edit those on the Whish page.</div>`,
+    `${o.catId ? `<button class="btn danger" onclick="clearWhish('${wid}')">Reset</button>` : ''}<span style="flex:1"></span><button class="btn" onclick="closeDlg()">Cancel</button><button class="btn primary" id="btn-save" onclick="saveDlg()">Save</button>`);
+  onSave = async () => { const data = { catId: v('f-cat'), subId: v('f-sub'), payeeId: v('f-payee'), notes: v('f-notes') }; await post('whish', { id: wid, ...data }); upsert(D.whishMap, wid, data); say('Saved'); render(); };
+}
+async function clearWhish(wid) { await del('whish', wid); remove(D.whishMap, wid); closeDlg(); render(); }
+function openSettings() {
+  const cs = D.settings.currencies || [];
+  dlg('Settings — currencies', `
+    <label>Base currency</label><div><b>${esc(D.settings.baseCurrency)}</b></div>
+    <div class="hint">Rate = how many ${esc(D.settings.baseCurrency)} one unit is worth (EUR 1.16 → €1 = $1.16; LBP 0.0000112 → 89,000 LBP per $).</div>
+    ${cs.map((c, i) => `<label>${esc(c.code)}</label><input type="number" step="any" id="f-rate-${i}" value="${c.rate == null ? '' : c.rate}" placeholder="not set">`).join('')}
+    <label>New currency</label><div class="row"><input id="f-newcode" placeholder="code" style="width:70px"><input type="number" step="any" id="f-newrate" placeholder="rate"></div>
+    <label>Whish account</label><select id="f-wacc"><option value="">— none —</option>${accOpts(D.settings.whishAccountId)}</select>
+    <div class="hint">Statement lines of the Whish page appear inside this account, marked <span class="tag">W</span>.</div>`, acts(''));
+  onSave = async () => {
+    const currencies = cs.map((c, i) => ({ ...c, rate: v('f-rate-' + i) === '' ? null : Number(v('f-rate-' + i)) }));
+    const nc = (v('f-newcode') || '').trim().toUpperCase(); if (nc && !currencies.some(c => c.code === nc)) currencies.push({ code: nc, name: nc, rate: Number(v('f-newrate')) || null });
+    const data = { currencies, whishAccountId: v('f-wacc') };
+    await post('settings', data); Object.assign(D.settings, data); say('Saved'); render();
+  };
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDlg(); });
+
+// ── boot ──
+Admin.require('accounting', async () => {
+  document.getElementById('wrap').innerHTML = '<div class="empty">Loading…</div>';
+  try { D = await Admin.api('GET', API + 'all'); }
+  catch (e) { document.getElementById('wrap').innerHTML = `<div class="empty">Could not load: ${esc(e.message)}</div>`; return; }
+  D.whishMap = D.whishMap || []; D.whish = D.whish || [];
+  render();
+});
+</script>
+</body>
+</html>

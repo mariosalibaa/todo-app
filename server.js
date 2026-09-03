@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const admin = require('firebase-admin');
 const accounting = require('./accounting');   // /api/accounting/* (Whish statements)
+const budget = require('./budget');           // /api/accounting/budget/* (HomeBudget replica)
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -77,6 +78,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'icons/apple-touch-icon.png'));
   fs.readFileSync(path.join(__dirname, 'hub.html'));
   fs.readFileSync(path.join(__dirname, 'accounting.html'));
+  fs.readFileSync(path.join(__dirname, 'budget.html'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
 }
 
@@ -568,7 +570,7 @@ const handler = async (req, res) => {
     res.end();
     return;
   }
-  const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/accounting': 'accounting.html', '/accounting/whish': 'accounting.html' };
+  const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/accounting': 'accounting.html', '/accounting/whish': 'accounting.html', '/accounting/budget': 'budget.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(path.join(__dirname, page), 'utf8');
@@ -678,7 +680,8 @@ const handler = async (req, res) => {
   if (url.startsWith('/api/accounting/')) {
     if (!access.apps.includes('accounting')) return noApp('accounting');
     try {
-      const handled = await accounting.handle(req, res, url, user, { db, admin, TEAM_ID, odooCall });
+      const ctx = { db, admin, TEAM_ID, odooCall };
+      const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx) : await accounting.handle(req, res, url, user, ctx);
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {
       console.error('accounting error:', e);
