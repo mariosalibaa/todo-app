@@ -447,7 +447,7 @@ async function sendDueDigest(dry) {
       parts.push('…and ' + (overdue.length - show.length) + ' more');
     }
   }
-  parts.push('', 'https://todo.shift-group.co');
+  parts.push('', 'https://hub.shift-group.co/todo');
   const text = parts.join('\n');
 
   const result = { today, dueToday: dueToday.length, overdue: overdue.length };
@@ -559,9 +559,14 @@ const handler = async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   // ── Pages ──
-  // hub.shift-group.co → hub; todo.shift-group.co (and localhost) → To-Do.
-  // Every page is also reachable by path, whatever the host.
+  // hub.shift-group.co is THE link (hub at /, apps under /todo, /accounting);
+  // the old todo.shift-group.co redirects there. localhost serves To-Do at /.
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
+  if (host === 'todo.shift-group.co') {
+    res.writeHead(301, { Location: 'https://hub.shift-group.co' + (url === '/' ? '/todo' : url) });
+    res.end();
+    return;
+  }
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/accounting': 'accounting.html', '/accounting/whish': 'accounting.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {

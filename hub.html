@@ -78,6 +78,8 @@ const APPS = [
 const esc = Admin.esc;
 
 Admin.require(null, me => {
+  // one app only (and not admin) → straight into it, no tile page in the way
+  if (!me.admin && me.apps.length === 1 && !location.search.includes('stay')) { location.replace('/' + me.apps[0]); return; }
   document.getElementById('who').innerHTML =
     `<span>${esc(me.name || me.email)}${me.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</span>` +
     (me.local ? '<span style="color:var(--overlay0)">local</span>' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
