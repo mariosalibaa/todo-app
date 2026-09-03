@@ -1338,6 +1338,29 @@
     .plist-name-wrap { display: flex; align-items: center; gap: 4px; }
     .pl-drag { cursor: grab; color: var(--overlay0); font-size: 0.78rem; letter-spacing: -2px; padding: 0 3px; user-select: none; flex: 0 0 auto; }
     .pl-drag:hover { color: var(--text); }
+    /* Pin: quiet until you hover the row, solid once pinned */
+    .pl-pin { cursor: pointer; background: none; border: 0; padding: 0 2px; font-size: 0.8rem;
+              line-height: 1; opacity: 0; filter: grayscale(1); flex: 0 0 auto; }
+    .projects-list-table tr:hover .pl-pin { opacity: .55; }
+    .pl-pin:hover { opacity: 1 !important; filter: none; }
+    .pl-pin.on { opacity: 1; filter: none; }
+    .projects-list-table tr.pl-active > td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .projects-list-table tr.pl-active > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+    /* Split: project table on top, the selected project's tasks below */
+    .projects-list-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+    #pl-top { overflow-y: auto; padding: 14px 16px; flex: 1 1 auto; min-height: 0; }
+    #pl-divider { flex: 0 0 6px; cursor: row-resize; background: var(--surface1);
+                  border-top: 1px solid var(--surface0); border-bottom: 1px solid var(--surface0); }
+    #pl-divider:hover, #pl-divider.dragging { background: var(--accent); }
+    #pl-split { display: flex; flex-direction: column; min-height: 0; background: var(--mantle); }
+    #pl-split-head { display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+                     border-bottom: 1px solid var(--surface1); font-size: 0.82rem; flex: 0 0 auto; }
+    #pl-split-head .pl-sh-name { font-weight: 600; }
+    #pl-split-head .pl-sh-btn { background: var(--surface0); border: 1px solid var(--surface1);
+                                color: var(--subtext0); border-radius: 5px; padding: 3px 8px;
+                                font-size: 0.74rem; cursor: pointer; }
+    #pl-split-head .pl-sh-btn:hover { background: var(--surface1); color: var(--text); }
+    #pl-split-body { flex: 1 1 auto; overflow: auto; min-height: 0; padding: 6px 10px 14px; }
     tr.is-dragging-pl { opacity: 0.45; }
     tr.plist-drop-over td { background: rgba(96,165,250,0.13) !important; }
     .plist-name-inp {
@@ -1909,7 +1932,7 @@
     <div id="classic-view" style="display:none;flex:1;overflow:auto;"></div>
     <div class="kanban-board" id="kanban-board"></div>
     <div class="projects-board" id="projects-board" style="display:none"></div>
-    <div class="projects-list-view" id="projects-list-view" style="display:none;flex:1;overflow-y:auto;padding:14px 16px;"></div>
+    <div class="projects-list-view" id="projects-list-view" style="display:none;"></div>
     <div id="clients-view" style="display:none;flex:1;overflow-y:auto;padding:14px 16px;"></div>
     <!-- Overview's own controls (moved here when the Options popover was retired) -->
     <div id="ov-toolbar" style="display:none;gap:6px;flex-wrap:wrap;padding:8px 18px 0;">
@@ -4187,6 +4210,51 @@ function clearPlistFilters() {
   renderProjectsList();
 }
 
+// ── Project pins ─────────────────────────────────────────────────────────
+// Per user, but carried on the shared project record as a list of short names,
+// so a pin follows you to your phone without a per-user store on the server.
+function pinnedList(p) { const a = projectMeta[p]?.pinnedBy; return Array.isArray(a) ? a : []; }
+function isPinned(p)   { return pinnedList(p).includes(whoAmIName()); }
+function setPinned(p, on) {
+  const me = whoAmIName();
+  const rest = pinnedList(p).filter(n => n !== me);   // never touch anyone else's pin
+  if (on) rest.push(me);
+  if (!projectMeta[p]) projectMeta[p] = {};
+  if (rest.length) projectMeta[p].pinnedBy = rest; else delete projectMeta[p].pinnedBy;
+}
+function togglePin(e, p) {
+  if (e) e.stopPropagation();
+  setPinned(p, !isPinned(p));
+  saveProjectMeta();
+  renderProjectsList();
+}
+
+// Showing only pinned projects is a view preference, so it stays on this device
+let plPinnedOnly = localStorage.getItem('todo_pl_pinned_only') === '1';
+function togglePinnedOnly() {
+  plPinnedOnly = !plPinnedOnly;
+  localStorage.setItem('todo_pl_pinned_only', plPinnedOnly ? '1' : '0');
+  renderProjectsList();
+}
+
+// ── Split pane: which project's tasks show below, and how tall that pane is ──
+let plSplitProj = localStorage.getItem('todo_pl_split_proj') || null;
+let plSplitH = (() => {
+  const v = parseFloat(localStorage.getItem('todo_pl_split_h'));
+  return Number.isFinite(v) ? Math.min(80, Math.max(20, v)) : 50;
+})();
+function plSelectProject(p) {
+  if (plSplitProj === p) return;
+  plSplitProj = p;
+  localStorage.setItem('todo_pl_split_proj', p);
+  renderProjectsList();
+}
+function plCloseSplit() {
+  plSplitProj = null;
+  localStorage.removeItem('todo_pl_split_proj');
+  renderProjectsList();
+}
+
 function renderProjectsList() {
   const el = document.getElementById('projects-list-view');
   document.getElementById('toolbar-title').textContent = 'Project List';
@@ -4223,8 +4291,14 @@ function renderProjectsList() {
   };
 
   [...plSel].forEach(p => { if (!allProjects.includes(p)) plSel.delete(p); });
+  // A project that was renamed or deleted elsewhere can't stay in the pane
+  if (plSplitProj && !allProjects.includes(plSplitProj)) {
+    plSplitProj = null;
+    localStorage.removeItem('todo_pl_split_proj');
+  }
 
   const visibleProjects = allProjects.filter(p => {
+    if (plPinnedOnly && !isPinned(p)) return false;
     const d = plistRowData(p);
     return plistTextMatch(d.project, plistFilters.project)
         && plistTextMatch(d.company, plistFilters.company)
@@ -4238,24 +4312,31 @@ function renderProjectsList() {
         && plistTextMatch(d.created, plistFilters.created);
   });
 
-  document.getElementById('task-count').textContent = plistHasFilters()
-    ? `${visibleProjects.length} of ${allProjects.length} projects`
-    : `${allProjects.length} projects`;
+  document.getElementById('task-count').textContent = plPinnedOnly
+    ? `${visibleProjects.length} pinned project${visibleProjects.length === 1 ? '' : 's'}`
+    : plistHasFilters()
+      ? `${visibleProjects.length} of ${allProjects.length} projects`
+      : `${allProjects.length} projects`;
 
   // Group projects by status, in the statuses-list order (No Status last)
   const statusIds = statuses.map(s => s.id);
   const byStatus = new Map();
-  visibleProjects.forEach(p => {
+  // Pinned projects are lifted out of their status group, so every project shows
+  // exactly once and the status headers keep counting only what's under them
+  const pinnedProjs = visibleProjects.filter(isPinned);
+  visibleProjects.filter(p => !isPinned(p)).forEach(p => {
     const st = projStatus(p) || '—';
     if (!byStatus.has(st)) byStatus.set(st, []);
     byStatus.get(st).push(p);
   });
   // Dragged order wins inside a group; projects never dragged stay alphabetical
-  byStatus.forEach(arr => arr.sort((a, b) => {
+  const byOrdThenName = (a, b) => {
     const ao = projectMeta[a]?.ord ?? Infinity, bo = projectMeta[b]?.ord ?? Infinity;
     if (ao !== bo) return ao - bo;
     return a < b ? -1 : a > b ? 1 : 0;   // same case-sensitive order the list always had
-  }));
+  };
+  byStatus.forEach(arr => arr.sort(byOrdThenName));
+  pinnedProjs.sort(byOrdThenName);
   const stKeys = [...byStatus.keys()].sort((a, b) => {
     const ia = statusIds.indexOf(a), ib = statusIds.indexOf(b);
     if (ia === -1 && ib === -1) return 0;
@@ -4263,7 +4344,7 @@ function renderProjectsList() {
     return ia - ib;
   });
 
-  const projRowHtml = p => {
+  const projRowHtml = (p, inPinned) => {
     const allT = tasks.filter(t => t.project === p && !t.archived);
     const open = allT.filter(t => !t.done).length;
     const done = allT.filter(t => t.done).length;
@@ -4277,30 +4358,36 @@ function renderProjectsList() {
     const displayDate = createdDate !== '—' ? new Date(createdDate).toLocaleDateString() : '—';
     const taskCount = allT.length;
     return `
-      <tr data-proj="${esc(p)}" data-stgroup="${esc(status || '')}" class="plist-row${plSel.has(p) ? ' nl-selected' : ''}">
+      <tr data-proj="${esc(p)}" data-stgroup="${inPinned ? '__pinned__' : esc(status || '')}"${inPinned ? ' data-pinnedrow="1"' : ''}
+          class="plist-row${plSel.has(p) ? ' nl-selected' : ''}${plSplitProj === p ? ' pl-active' : ''}"
+          onclick="plSelectProject('${esc(p)}')" title="Click to show this project's tasks below">
         <td class="plist-name-cell">
           <div class="plist-name-wrap">
             <input type="checkbox" class="nl-check" ${plSel.has(p) ? 'checked' : ''}
                    onclick="plToggleSel(event,'${esc(p)}')" title="Select (Shift-click for a range)">
-            <span class="pl-drag" draggable="true" title="Drag to another status group">⠿</span>
-            <button class="tt-open-btn" onclick="openProjectTasks('${esc(p)}')" title="Open this project's tasks">⛶</button>
+            <span class="pl-drag" draggable="${inPinned ? 'false' : 'true'}" onclick="event.stopPropagation()"
+                  title="${inPinned ? 'Unpin to move this project between status groups' : 'Drag to another status group'}">⠿</span>
+            <button class="pl-pin${isPinned(p) ? ' on' : ''}" onclick="togglePin(event,'${esc(p)}')"
+                    title="${isPinned(p) ? 'Pinned — click to unpin' : 'Pin to the top of the list'}">📌</button>
+            <button class="tt-open-btn" onclick="event.stopPropagation();openProjectTasks('${esc(p)}')" title="Open this project's tasks full screen">⛶</button>
             <input class="plist-name-inp" type="text" value="${esc(p)}" title="Type to rename · Enter to save · Esc to cancel"
+                   onclick="event.stopPropagation()"
                    onfocus="this.select()"
                    onchange="commitProjNameEdit(this,'${esc(p)}')"
                    onkeydown="plistNameKey(event,this,'${esc(p)}')">
           </div>
         </td>
-        <td class="plist-company-cell" onclick="startProjCompanyEdit('${esc(p)}')">${esc(companyName)}</td>
-        <td class="plist-client-cell" onclick="startProjClientEdit('${esc(p)}')" title="Click to set the client">${
+        <td class="plist-company-cell" onclick="event.stopPropagation();startProjCompanyEdit('${esc(p)}')">${esc(companyName)}</td>
+        <td class="plist-client-cell" onclick="event.stopPropagation();startProjClientEdit('${esc(p)}')" title="Click to set the client">${
           clientName ? esc(clientName) : '<span style="color:var(--overlay0);">—</span>'}</td>
-        <td class="plist-status-cell" onclick="startProjStatusEdit('${esc(p)}')">
+        <td class="plist-status-cell" onclick="event.stopPropagation();startProjStatusEdit('${esc(p)}')">
           ${status ? `<span style="background:${statusColor(status)}22;color:${statusColor(status)};padding:2px 8px;border-radius:4px;font-weight:500;font-size:0.75rem;">${esc(statusName)}</span>` : statusName}
         </td>
-        <td class="plist-due-cell" onclick="startProjDueEdit('${esc(p)}')" title="Click to set the project's due date"
-            style="text-align:center;font-size:0.75rem;color:${projDue && projDue < todayStr() ? 'var(--red)' : 'var(--subtext0)'};${projDue && projDue < todayStr() ? 'font-weight:700;' : ''}">
-          ${projDue ? new Date(projDue).toLocaleDateString() : '<span style="color:var(--overlay0);">—</span>'}
+        <td class="plist-due-cell" style="text-align:center;">
+          <span class="nl-c-due ${projDue && projDue < todayStr() ? 'late' : ''}" onclick="event.stopPropagation();plistDueMenu(event,'${esc(p)}')"
+                title="Click to set a due date">${projDue ? '📅 ' + formatDate(projDue) : '<span class="nl-empty">📅</span>'}</span>
         </td>
-        <td style="text-align:center;cursor:pointer;" onclick="toggleProjBillable('${esc(p)}')"
+        <td style="text-align:center;cursor:pointer;" onclick="event.stopPropagation();toggleProjBillable('${esc(p)}')"
             title="${projectMeta[p]?.billable ? 'Billable — done tasks auto-forward to accounting (click to turn off)' : 'Click to make this project billable'}">
           ${projectMeta[p]?.billable ? '💰' : '<span style="color:var(--surface2);">—</span>'}
         </td>
@@ -4310,8 +4397,8 @@ function renderProjectsList() {
         <td style="text-align:center;color:var(--overlay0);font-size:0.75rem;">${esc(displayDate)}</td>
         <td>
           <div class="plist-actions">
-            <button class="plist-btn" onclick="deleteProject('${esc(p)}')" title="Delete">🗑</button>
-            <button class="plist-btn" onclick="openAddModalForProject('${esc(p)}')" title="Add task">+ Task</button>
+            <button class="plist-btn" onclick="event.stopPropagation();deleteProject('${esc(p)}')" title="Delete">🗑</button>
+            <button class="plist-btn" onclick="event.stopPropagation();openAddModalForProject('${esc(p)}')" title="Add task">+ Task</button>
           </div>
         </td>
       </tr>`;
@@ -4332,6 +4419,13 @@ function renderProjectsList() {
     </select>`;
 
   let rows = '';
+  if (pinnedProjs.length) {
+    const nT = pinnedProjs.reduce((n, p) => n + tasks.filter(t => t.project === p && !t.archived && !t.done).length, 0);
+    rows += `<tr data-stgroup="__pinned__"><td colspan="11" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--yellow,#f9e2af);border-bottom:1px solid var(--surface1);">
+      <span style="margin-right:7px;">📌</span>Pinned
+      <span style="color:var(--overlay0);font-weight:400;text-transform:none;margin-left:6px;font-size:0.66rem;">${pinnedProjs.length} project${pinnedProjs.length === 1 ? '' : 's'} · ${nT} open tasks</span></td></tr>`;
+    rows += pinnedProjs.map(p => projRowHtml(p, true)).join('');
+  }
   for (const st of stKeys) {
     const projs = byStatus.get(st);
     const color = st !== '—' ? statusColor(st) : 'var(--overlay0)';
@@ -4340,12 +4434,19 @@ function renderProjectsList() {
     rows += `<tr data-stgroup="${esc(st === '—' ? '' : st)}"><td colspan="11" style="padding:12px 8px 5px;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:.05em;color:${color};border-bottom:1px solid var(--surface1);">
       <span style="width:9px;height:9px;border-radius:50%;background:${color};display:inline-block;margin-right:7px;"></span>${esc(label)}
       <span style="color:var(--overlay0);font-weight:400;text-transform:none;margin-left:6px;font-size:0.66rem;">${projs.length} projects · ${nTasks} open tasks</span></td></tr>`;
-    rows += projs.map(projRowHtml).join('');
+    rows += projs.map(p => projRowHtml(p, false)).join('');
   }
 
-  el.innerHTML = `
+  // Both panes keep their place across the re-render a task edit triggers
+  const _topScroll  = document.getElementById('pl-top')?.scrollTop || 0;
+  const _paneScroll = document.getElementById('pl-split-body')?.scrollTop || 0;
+
+  const topHtml = `
     <div style="margin-bottom:14px;display:flex;gap:8px;">
       <button class="save-btn" onclick="openNewProjectFromList()" style="padding:6px 14px;font-size:0.82rem;">+ New Project</button>
+      <button class="save-btn" onclick="togglePinnedOnly()"
+              title="${plPinnedOnly ? 'Showing pinned projects only — click to show every project' : 'Show only the projects you pinned'}"
+              style="padding:6px 11px;font-size:0.82rem;${plPinnedOnly ? '' : 'background:var(--surface0);color:var(--subtext0);border:1px solid var(--surface1);'}">📌 Pinned only</button>
       <button class="save-btn" onclick="printProjectList()" title="Print the project list as shown (filters respected) — or Save as PDF from the print dialog"
               style="padding:6px 11px;font-size:0.82rem;background:var(--surface0);color:var(--subtext0);border:1px solid var(--surface1);">🖨 Print</button>
     </div>
@@ -4374,17 +4475,57 @@ function renderProjectsList() {
           <th>${filterInput('tasks', '#', true)}</th>
           <th>${filterInput('open', '#', true)}</th>
           <th>${filterInput('done', '#', true)}</th>
-          <th>${filterInput('created', 'Search date…')}</th>
+          <th>${filterInput('created', 'Date…')}</th>
           <th style="text-align:right;">${plistHasFilters()
             ? `<button class="plist-filter-clear" onclick="clearPlistFilters()" title="Clear all column filters">✕ Clear</button>`
             : ''}</th>
         </tr>
       </thead>
       <tbody>
-        ${rows || `<tr><td colspan="11" style="padding:18px 12px;text-align:center;color:var(--overlay0);">No projects match these filters</td></tr>`}
+        ${rows || `<tr><td colspan="11" style="padding:18px 12px;text-align:center;color:var(--overlay0);">${
+          plPinnedOnly && !plistHasFilters()
+            ? 'No pinned projects — click 📌 on a row to pin one.'
+            : 'No projects match these filters'}</td></tr>`}
       </tbody>
     </table>
     ${plBulkBarHtml()}`;
+
+  // Split: the project table on top, the selected project's tasks below
+  el.innerHTML = `<div id="pl-top">${topHtml}</div>` + (plSplitProj ? `
+    <div id="pl-divider" onmousedown="plSplitDragStart(event)" title="Drag to resize"></div>
+    <div id="pl-split" style="flex:0 0 ${plSplitH}%;">
+      <div id="pl-split-head">
+        <span class="pl-sh-name">${esc(plSplitProj)}</span>
+        <span style="color:var(--overlay0);font-size:0.74rem;">tasks</span>
+        <span style="flex:1;"></span>
+        <button class="pl-sh-btn" onclick="openAddModalForProject('${esc(plSplitProj)}')" title="Add a task to this project">+ Task</button>
+        <button class="pl-sh-btn" onclick="openProjectTasks('${esc(plSplitProj)}')" title="Open this project full screen">⛶</button>
+        <button class="pl-sh-btn" onclick="plCloseSplit()" title="Close this pane">✕</button>
+      </div>
+      <div id="pl-split-body"></div>
+    </div>` : '');
+
+  if (plSplitProj) {
+    const body = document.getElementById('pl-split-body');
+    // Same renderer the List view is on, so sort, column filters and showDone carry over
+    const paneTasks = getFiltered().filter(t => t.project === plSplitProj);
+    // The pane *is* one project, so Company and Project repeat on every row. Borrow
+    // the same "inside a project" state the drill-down uses, then hand it straight back.
+    const _fp = filterProject, _hid = new Set(nlColHidden);
+    filterProject = plSplitProj;
+    nlColHidden.add('company'); nlColHidden.add('project');
+    try {
+      if (listMode === 'table') renderListTable(paneTasks, body, { pane: true });
+      else renderNiceList(paneTasks, body, { pane: true });
+    } finally {
+      filterProject = _fp;
+      nlColHidden.clear(); _hid.forEach(k => nlColHidden.add(k));
+    }
+    // Inline "+ Add task" has no project context down here — the header button does
+    body.querySelectorAll('.nl-add').forEach(el => el.remove());
+    body.scrollTop = _paneScroll;
+  }
+  document.getElementById('pl-top').scrollTop = _topScroll;
 
   // keep typing uninterrupted: restore focus/caret into the column just edited
   if (plistFocusKey) {
@@ -4396,6 +4537,34 @@ function renderProjectsList() {
   }
 
   initPlistDrag(el);
+}
+
+// Drag the divider: percentage of the view's height, floored so neither pane
+// collapses to nothing on a short window or a phone
+function plSplitDragStart(e) {
+  e.preventDefault();
+  const wrap = document.getElementById('projects-list-view');
+  const div  = document.getElementById('pl-divider');
+  const pane = document.getElementById('pl-split');
+  div.classList.add('dragging');
+  const move = ev => {
+    const r = wrap.getBoundingClientRect();
+    if (r.height < 260) return;                       // too short to split meaningfully
+    const minPct = 120 / r.height * 100;
+    let h = (r.bottom - ev.clientY) / r.height * 100;
+    h = Math.min(80, Math.max(20, h));
+    h = Math.min(100 - minPct, Math.max(minPct, h));
+    plSplitH = h;
+    pane.style.flex = `0 0 ${h}%`;
+  };
+  const up = () => {
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    div.classList.remove('dragging');
+    localStorage.setItem('todo_pl_split_h', String(plSplitH));
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
 }
 
 // ── Project selection: same idea as task rows — checkbox, Shift-range, bulk bar
@@ -4425,6 +4594,8 @@ function plBulkBarHtml() {
     <div class="nl-bulkbar">
       <span class="nl-bulk-count">${plSel.size} project${plSel.size === 1 ? '' : 's'} selected</span>
       ${btn('Status ▾', 'plBulkStatus(event)')}
+      ${btn('📌 Pin', 'plBulkPin(true)')}
+      ${btn('Unpin', 'plBulkPin(false)')}
       ${btn('🗑 Delete', 'plBulkDelete()', 'style="color:var(--red,#f38ba8);"')}
       <span style="flex:1;"></span>
       ${btn('Select all', 'plSelectAll()')}
@@ -4446,6 +4617,11 @@ function plBulkSetStatus(stId) {
   });
   saveProjectMeta();
   renderAll();
+}
+function plBulkPin(on) {
+  plSel.forEach(p => setPinned(p, on));   // your pins only — other people's are untouched
+  saveProjectMeta();
+  renderProjectsList();
 }
 function plBulkDelete() {
   const names = [...plSel];
@@ -4473,6 +4649,8 @@ function initPlistDrag(el) {
     const h = e.target.closest && e.target.closest('.pl-drag');
     if (!h) { if (e.target.classList?.contains('plist-name-inp')) e.preventDefault(); return; }
     const row = h.closest('tr[data-proj]');
+    // Dropping into a group sets the project's status; "Pinned" has none to set
+    if (row.dataset.pinnedrow) { e.preventDefault(); return; }
     _plDragProj = row.dataset.proj;
     row.classList.add('is-dragging-pl');
     e.dataTransfer.effectAllowed = 'move';
@@ -4487,7 +4665,7 @@ function initPlistDrag(el) {
   el.addEventListener('dragover', e => {
     if (!_plDragProj) return;
     const tr = e.target.closest && e.target.closest('tr[data-stgroup]');
-    if (!tr) return;
+    if (!tr || tr.dataset.stgroup === '__pinned__') return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     el.querySelectorAll('.plist-drop-over').forEach(r => r.classList.remove('plist-drop-over'));
@@ -4498,7 +4676,7 @@ function initPlistDrag(el) {
     if (e.target.classList?.contains('plist-name-inp')) { e.preventDefault(); return; }
     if (!_plDragProj) return;
     const tr = e.target.closest && e.target.closest('tr[data-stgroup]');
-    if (!tr) return;
+    if (!tr || tr.dataset.stgroup === '__pinned__') return;
     e.preventDefault();
     const newSt = tr.dataset.stgroup || null;
     const p = _plDragProj;
@@ -4632,38 +4810,35 @@ function startProjCompanyEdit(projName) {
   sel.addEventListener('keydown', e => { if (e.key === 'Escape') renderProjectsList(); });
 }
 
-function startProjDueEdit(projName) {
-  const row = document.querySelector(`tr[data-proj="${escAttr(projName)}"]`);
-  const cell = row.querySelector('.plist-due-cell');
+// Project due date — the same picker the task list uses (nlDueMenu)
+let _plDueProj = null;
+function plistDueMenu(e, projName) {
+  _plDueProj = projName;
+  const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   const cur = projectMeta[projName]?.due || '';
-  const inp = document.createElement('input');
-  inp.type = 'date';
-  inp.className = 'plist-edit-select';
-  inp.value = cur;
-  cell.innerHTML = '';
-  cell.appendChild(inp);
-  inp.focus();
-  let closed = false;
-  function commit() {
-    if (closed) return;
-    closed = true;
-    let v = inp.value || null;
-    // A year still being typed reads as e.g. 0002-02-01 — treat as not-a-date
-    if (v && v < '2000-01-01') v = cur || null;
-    if (v !== (cur || null)) {
-      if (!projectMeta[projName]) projectMeta[projName] = {};
-      projectMeta[projName].due = v;
-      saveProjectMeta();
-    }
-    renderProjectsList();
-  }
-  // Commit on blur/Enter only — the date input fires 'change' mid-typing,
-  // which used to save half-typed years like 0002 and close the editor.
-  inp.addEventListener('blur', commit);
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    else if (e.key === 'Escape') { closed = true; renderProjectsList(); }
-  });
+  const rows = `<div style="padding:6px 10px;" onclick="event.stopPropagation()">
+      <input type="date" value="${esc(cur)}" onchange="plistSetProjDue(this.value)"
+             style="background:var(--surface0);border:1px solid var(--surface1);color:var(--text);border-radius:6px;padding:5px 7px;font-size:0.78rem;font-family:inherit;width:100%;">
+    </div>`
+    + nlPickRow('Today', `plistSetProjDue('${day(0)}')`, cur === day(0))
+    + nlPickRow('Tomorrow', `plistSetProjDue('${day(1)}')`, cur === day(1))
+    + nlPickRow('Next week', `plistSetProjDue('${day(7)}')`, cur === day(7))
+    + (cur ? nlPickRow('<span style="color:var(--overlay0);">Clear date</span>', `plistSetProjDue('')`) : '');
+  nlPickMenu(e, rows, 'Due date', 220);
+}
+function plistSetProjDue(value) {
+  const projName = _plDueProj;
+  closeOvMenu();
+  if (!projName) return;
+  const cur = projectMeta[projName]?.due || null;
+  // A year still being typed reads as e.g. 0002-02-01 — treat as not-a-date
+  let v = value || null;
+  if (v && v < '2000-01-01') return;
+  if (v === cur) return;
+  if (!projectMeta[projName]) projectMeta[projName] = {};
+  projectMeta[projName].due = v;
+  saveProjectMeta();
+  renderProjectsList();
 }
 
 function startProjStatusEdit(projName) {
@@ -7526,6 +7701,9 @@ function toolbarCrumbs() {
 }
 
 function renderTasks() {
+  // In the split Project List the task rows live in the bottom pane, so a row
+  // action must re-render that pane, not the hidden List view behind it.
+  if (currentView === 'projects-list') { renderProjectsList(); return; }
   const _scroll = nlCaptureScroll();
   try {
     _renderTasksBody();
@@ -7960,7 +8138,7 @@ function nlHeadUp() {
   renderTasks();
 }
 
-function renderNiceList(filtered, el) {
+function renderNiceList(filtered, el, opts) {
   // Per-column filter row (same idea as the Project List's) narrows first
   filtered = filtered.filter(nlColFilterMatch);
   // Every level in the group bar nests inside the one before it.
@@ -8273,7 +8451,7 @@ function renderNiceList(filtered, el) {
     + (fields.length && field === 'taskstatus' ? `
     <div class="nl-add" style="padding-left:8px;" onclick="nlNewStatus()">＋ New status</div>` : '')
     + `</div>` + nlSelectionBar();
-  updateLineCount(el.querySelectorAll('.nl-row').length);
+  if (!opts?.pane) updateLineCount(el.querySelectorAll('.nl-row').length);
 }
 
 // Row hover buttons: quick subtask, rename in place, and a small task menu
@@ -10699,7 +10877,7 @@ function listSortValue(t, col) {
   }
 }
 
-function renderListTable(filtered, el) {
+function renderListTable(filtered, el, opts) {
   const rows = applyColFilters([...filtered]);
   if (listSortDue) {
     rows.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
@@ -10724,7 +10902,7 @@ function renderListTable(filtered, el) {
     (withAdd ? `<option value="__add__">➕ Add status…</option>` : '');
 
   // Inside a single project the Company and Project columns are redundant — hide them
-  const hideProjCols = filterProject !== 'All';
+  const hideProjCols = opts?.pane || filterProject !== 'All';
   const visibleCols = hideProjCols ? LIST_COLS.filter(c => c.key !== 'company' && c.key !== 'project') : LIST_COLS;
   const nCols = visibleCols.length + 2;  // + checkbox + actions columns
 
@@ -10871,7 +11049,7 @@ function renderListTable(filtered, el) {
   refreshPartnerDatalist();
   const add = document.getElementById('list-add-title');
   if (add && _listAddFocus) { add.focus(); _listAddFocus = false; }
-  updateLineCount(rows.length);
+  if (!opts?.pane) updateLineCount(rows.length);
 }
 
 // ── Excel-style fill down ────────────────────────────────────────────────
