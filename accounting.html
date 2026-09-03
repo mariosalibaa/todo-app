@@ -110,6 +110,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 const esc = Admin.esc;
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
@@ -369,13 +370,43 @@ async function acceptAll() {
 }
 
 // ── Upload ──
+// The PDF is read here in the browser with pdf.js and only its text goes to
+// the server (a 25-page statement is 5 MB as PDF, ~60 KB as text — the host
+// rejects bodies over ~4.5 MB). Lines are rebuilt the way pdf-parse does it
+// server-side: items on the same baseline are glued, a new baseline = new line.
+async function pdfText(buf) {
+  if (!window.pdfjsLib) throw new Error('pdf.js did not load');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  let out = '';
+  for (let p = 1; p <= doc.numPages; p++) {
+    const tc = await (await doc.getPage(p)).getTextContent();
+    let lastY = null;
+    for (const it of tc.items) {
+      if (!('str' in it)) continue;
+      const y = Math.round(it.transform[5] * 10);
+      if (lastY !== null && y !== lastY) out += '\n';
+      out += it.str;
+      lastY = y;
+    }
+    out += '\n\n';
+  }
+  return out;
+}
 function upload(file) {
   if (!file) return;
   say('Reading ' + file.name + '…');
   const rd = new FileReader();
   rd.onload = async () => {
     try {
-      const r = await Admin.api('POST', '/api/accounting/whish/upload', { filename: file.name, pdfBase64: rd.result.split(',')[1] });
+      let payload;
+      try { payload = { filename: file.name, text: await pdfText(rd.result) }; }
+      catch (e) {
+        console.warn('pdf.js extraction failed, sending the file instead:', e);
+        if (file.size > 4 * 1024 * 1024) throw new Error('could not read the PDF in the browser and it is too large to send (' + (file.size / 1048576).toFixed(1) + ' MB)');
+        payload = { filename: file.name, pdfBase64: btoa(String.fromCharCode(...new Uint8Array(rd.result))) };
+      }
+      const r = await Admin.api('POST', '/api/accounting/whish/upload', payload);
       say(`${file.name}: ${r.head.from} → ${r.head.till}, ${r.lines} lines (${r.added} new, ${r.updated} already known)` + (r.warnings.length ? ' · ' + r.warnings.length + ' warning(s), see console' : ''));
       if (r.warnings.length) console.warn(r.warnings);
       await loadAccounts();
@@ -383,7 +414,7 @@ function upload(file) {
     } catch (e) { say('Upload failed: ' + e.message, 'err'); }
     document.getElementById('file').value = '';
   };
-  rd.readAsDataURL(file);
+  rd.readAsArrayBuffer(file);
 }
 
 // ── Google contacts → phone/name map ──

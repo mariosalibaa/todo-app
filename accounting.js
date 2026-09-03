@@ -13,10 +13,13 @@ const pdfParse = require('pdf-parse');
 // split and keeping the one that agrees with the running balance.
 const SERVICES = [
   'WHISH PHYSICAL CARD', 'WHISH TO WHISH', 'LTN CASH OUT', 'PAY BY CARD', 'SCAN TO PAY',
-  'CREDIT CARD', 'WHISH MONEY', 'CASH OUT', 'TOPUP', 'W2W', 'ATM', 'REFUND', 'FEES', 'FEE'
+  'CREDIT CARD', 'WHISH MONEY', 'REVERSED W2W', 'QR COLLECT', 'COLLECTION', 'E-SIM', 'CASH OUT', 'TOPUP', 'W2W', 'ATM', 'REFUND', 'FEES', 'FEE'
 ];
 const AMT = '(?:0|[1-9]\\d{0,2}(?:,\\d{3})+|[1-9]\\d*)\\.\\d{2}';
 const TAIL = new RegExp('^(' + AMT + ')(' + AMT + ')$');
+const TAIL_END = new RegExp('(' + AMT + ')\\s*(' + AMT + ')$');
+// browser pdf.js keeps the spaces between columns: "body 65.00 2,786.66" is unambiguous
+const SPACED = new RegExp('^(.*?)\\s*(' + AMT + ')\\s+(' + AMT + ')$');
 const num = s => parseFloat(String(s).replace(/,/g, ''));
 const isoDate = d => { const m = d.match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : d; };
 
@@ -40,6 +43,11 @@ function counterparty(desc) {
 
 // Split "body+amount+balance" so that prev ± amount == balance
 function splitAmounts(rest, prev) {
+  const sp = rest.match(SPACED);
+  if (sp) {
+    const c = { body: sp[1], amount: num(sp[2]), balance: num(sp[3]) };
+    if (prev == null || Math.abs(prev - c.amount - c.balance) < 0.011 || Math.abs(prev + c.amount - c.balance) < 0.011) return c;
+  }
   const candidates = [];
   for (let i = 0; i < rest.length; i++) {
     const m = rest.slice(i).match(TAIL);
@@ -54,39 +62,58 @@ function splitAmounts(rest, prev) {
 }
 
 function parseStatement(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(l => l && !/^DATE ?REFERENCE/.test(l));
   const head = {};
-  for (const l of lines) {
+  const dated = /^(\d{2}\/\d{2}\/\d{4})(.*)$/;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
     let m;
-    if ((m = l.match(/^Full Name:(.+)$/))) head.name = m[1].trim();
-    else if ((m = l.match(/^Phone Number:\+?(\d+)/))) head.phone = m[1];
-    else if ((m = l.match(/^Account No:(\d+)/))) head.account = m[1];
-    else if ((m = l.match(/^Currency:(\w+)/))) head.currency = m[1];
+    if ((m = l.match(/^Full Name:\s*(.+)$/))) head.name = m[1].trim();
+    else if ((m = l.match(/^Phone Number:\s*\+?(\d+)/))) head.phone = m[1];
+    else if ((m = l.match(/^Account No:\s*(\d+)/))) head.account = m[1];
+    else if ((m = l.match(/^Currency:\s*(\w+)/))) head.currency = m[1];
     else if ((m = l.match(/^From (\d{2}\/\d{2}\/\d{4}) Till (\d{2}\/\d{2}\/\d{4})/))) { head.from = isoDate(m[1]); head.till = isoDate(m[2]); }
-    else if ((m = l.match(new RegExp('^OPENING BALANCE(' + AMT + ')$')))) head.opening = num(m[1]);
-    else if ((m = l.match(new RegExp('^TOTAL AMOUNT \\/ CLOSING BALANCE(' + AMT + ')(' + AMT + ')(' + AMT + ')$')))) {
+    else if ((m = l.match(new RegExp('^OPENING BALANCE\\s*(' + AMT + ')$')))) head.opening = num(m[1]);
+    else if ((m = l.match(new RegExp('^TOTAL AMOUNT \\/ CLOSING BALANCE\\s*(' + AMT + ')\\s*(' + AMT + ')\\s*(' + AMT + ')$')))) {
       head.totalDebit = num(m[1]); head.totalCredit = num(m[2]); head.closing = num(m[3]);
+    }
+    // 2026 layout: "dd/mm/yyyyOpening Balance" with the figure on the same or the next line
+    else if ((m = l.match(/^\d{2}\/\d{2}\/\d{4}\s*(Opening|Closing) Balance\s*(.*)$/))) {
+      const v = (m[2] || lines[i + 1] || '').match(new RegExp('^(' + AMT + ')$'));
+      if (v) head[m[1] === 'Opening' ? 'opening' : 'closing'] = num(v[1]);
     }
   }
   const tx = [], warnings = [];
   let prev = head.opening ?? null;
-  for (const l of lines) {
-    const m = l.match(/^(\d{2}\/\d{2}\/\d{4})tr:(\d+)(.*)$/);
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(\d{2}\/\d{2}\/\d{4})\s*tr:(\d+)\s*(.*)$/);
     if (!m) continue;
-    const sp = splitAmounts(m[3], prev);
-    if (!sp) { warnings.push('unparsed: ' + l); continue; }
-    let service = '', desc = sp.body;
-    for (const s of SERVICES) if (sp.body.startsWith(s)) { service = s; desc = sp.body.slice(s.length); break; }
+    // Old layout: the whole row is one line. New layout: description may wrap
+    // over several lines and the amounts sit on their own line — keep pulling
+    // lines until the text ends in "amount balance".
+    let rest = m[3];
+    let j = i;
+    while (!TAIL_END.test(rest) && j + 1 < lines.length && !dated.test(lines[j + 1])) {
+      j++;
+      rest += (rest ? ' ' : '') + lines[j];
+    }
+    i = j;
+    const sp = splitAmounts(rest, prev);
+    if (!sp) { warnings.push('unparsed: ' + lines[i]); continue; }
+    let body = sp.body.trim(), service = '', desc = body;
+    for (const s of SERVICES) if (body.startsWith(s)) { service = s; desc = body.slice(s.length); break; }
     let debit = 0, credit = 0;
     if (prev != null && Math.abs(prev - sp.amount - sp.balance) < 0.011) debit = sp.amount;
     else if (prev != null && Math.abs(prev + sp.amount - sp.balance) < 0.011) credit = sp.amount;
-    else { if (/TOPUP|CASHIN|REFUND/.test(sp.body)) credit = sp.amount; else debit = sp.amount; warnings.push('direction guessed: tr:' + m[2]); }
+    else { if (/TOPUP|CASHIN|REFUND/.test(body)) credit = sp.amount; else debit = sp.amount; warnings.push('direction guessed: tr:' + m[2]); }
     prev = sp.balance;
     tx.push({
-      id: m[2], ref: m[2], date: isoDate(m[1]), service, description: desc.trim(),
-      ...counterparty(desc), debit, credit, balance: sp.balance
+      id: m[2], ref: m[2], date: isoDate(m[1]), service, description: desc.trim().replace(/\s+/g, ' '),
+      ...counterparty(desc.replace(/\s+/g, ' ')), debit, credit, balance: sp.balance
     });
   }
+  if (head.closing != null && tx.length && Math.abs(tx[tx.length - 1].balance - head.closing) > 0.011)
+    warnings.push(`closing balance ${head.closing} != last line ${tx[tx.length - 1].balance}`);
   return { head, tx, warnings };
 }
 
@@ -176,8 +203,11 @@ async function handle(req, res, url, user, ctx) {
 
   if (url === '/api/accounting/whish/upload' && req.method === 'POST') {
     const body = await readBody(req);
-    if (!body.pdfBase64) return json(res, 400, { error: 'pdfBase64 required' });
-    const text = (await pdfParse(Buffer.from(body.pdfBase64, 'base64'))).text;
+    // The page extracts the text itself with pdf.js (a 25-page statement is 5 MB
+    // as PDF but ~60 KB as text, and the host caps request bodies at ~4.5 MB);
+    // pdfBase64 stays as a fallback for small files.
+    if (!body.text && !body.pdfBase64) return json(res, 400, { error: 'text or pdfBase64 required' });
+    const text = body.text || (await pdfParse(Buffer.from(body.pdfBase64, 'base64'))).text;
     const { head, tx, warnings } = parseStatement(text);
     if (!head.account || !tx.length) return json(res, 400, { error: 'Not a Whish statement (no account / no lines)', warnings });
     const accRef = ws.collection('whishAccounts').doc(head.account);
