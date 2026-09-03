@@ -1,9 +1,24 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
-    "todo-app": { "root": ".", "runtime": "node", "entrypoint": "server.js" }
+    "todo-app": {
+      "root": ".",
+      "runtime": "node",
+      "entrypoint": "server.js"
+    }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": { "service": "todo-app" } }
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "todo-app"
+      }
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/digest",
+      "schedule": "0 5 * * *"
+    }
   ]
 }

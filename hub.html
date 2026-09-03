@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Shift Admin</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--red:#f38ba8;--green:#a6e3a1;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;}
+  .who a:hover{color:var(--text);}
+  main{max-width:960px;margin:0 auto;padding:32px 20px 60px;}
+  h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 14px;font-weight:600;}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:44px;}
+  .tile{display:block;background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:22px 20px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
+  .tile:hover{border-color:var(--amber);transform:translateY(-2px);}
+  .tile .ico{font-size:1.7rem;margin-bottom:10px;}
+  .tile .name{font-weight:600;font-size:1.02rem;}
+  .tile .desc{font-size:.78rem;color:var(--sub);margin-top:4px;line-height:1.4;}
+  .tile.off{opacity:.35;pointer-events:none;}
+  table{width:100%;border-collapse:collapse;font-size:.84rem;background:var(--mantle);border-radius:12px;overflow:hidden;}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--surface0);}
+  th{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);font-weight:600;}
+  td.c,th.c{text-align:center;width:110px;}
+  input[type=checkbox]{width:16px;height:16px;accent-color:var(--amber);cursor:pointer;}
+  input[type=email]{background:var(--base);border:1px solid var(--surface1);color:var(--text);border-radius:8px;padding:8px 10px;font-size:.86rem;width:100%;}
+  button{background:var(--amber);color:var(--base);border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;font-size:.84rem;}
+  button.ghost{background:transparent;color:var(--overlay0);padding:4px 8px;font-size:1rem;}
+  button.ghost:hover{color:var(--red);}
+  .addrow{display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap;}
+  .addrow label{font-size:.8rem;color:var(--sub);display:flex;align-items:center;gap:5px;}
+  .admin-badge{font-size:.62rem;background:var(--surface0);color:var(--amber);padding:2px 6px;border-radius:5px;margin-left:6px;letter-spacing:.08em;}
+  .note{font-size:.74rem;color:var(--overlay0);margin-top:10px;line-height:1.5;}
+  @media (max-width:600px){header{padding:14px 16px;}main{padding:22px 14px;}td.c,th.c{width:70px;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>ADMIN</small></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h2>Apps</h2>
+  <div class="tiles" id="tiles"></div>
+  <section id="members" style="display:none;">
+    <h2>Members &amp; access</h2>
+    <table>
+      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th style="width:40px"></th></tr></thead>
+      <tbody id="member-rows"></tbody>
+    </table>
+    <div class="addrow">
+      <input type="email" id="new-email" placeholder="name@gmail.com" style="max-width:280px" onkeydown="if(event.key==='Enter')addMember()">
+      <label><input type="checkbox" id="new-todo" checked> To-Do</label>
+      <label><input type="checkbox" id="new-acc"> Accounting</label>
+      <button onclick="addMember()">Add</button>
+    </div>
+    <div class="note">Each app has its own list: a member sees only the tiles ticked here, and the server refuses the others. Changes apply within a minute. Admins (Mario) always have every app.</div>
+  </section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const APPS = [
+  { id: 'todo', ico: '✓', name: 'To-Do', desc: 'Team tasks, projects and follow-ups', href: '/todo' },
+  { id: 'accounting', ico: '⌁', name: 'Accounting', desc: 'Whish statements → contacts, notes, projects, Odoo', href: '/accounting' },
+];
+const esc = Admin.esc;
+
+Admin.require(null, me => {
+  document.getElementById('who').innerHTML =
+    `<span>${esc(me.name || me.email)}${me.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</span>` +
+    (me.local ? '<span style="color:var(--overlay0)">local</span>' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  document.getElementById('tiles').innerHTML = APPS.map(a => `
+    <a class="tile ${me.apps.includes(a.id) ? '' : 'off'}" href="${a.href}">
+      <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
+    </a>`).join('');
+  if (me.admin) { document.getElementById('members').style.display = ''; loadMembers(); }
+});
+
+async function loadMembers() {
+  const rows = document.getElementById('member-rows');
+  try {
+    const list = await Admin.api('GET', '/api/allowlist');
+    list.sort((a, b) => a.email.localeCompare(b.email));
+    rows.innerHTML = list.map(m => {
+      const apps = m.admin ? APPS.map(a => a.id) : (Array.isArray(m.apps) ? m.apps : ['todo']);
+      return `<tr data-email="${esc(m.email)}">
+        <td>${esc(m.email)}${m.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</td>
+        <td class="c"><input type="checkbox" data-app="todo" ${apps.includes('todo') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
+        <td class="c"><input type="checkbox" data-app="accounting" ${apps.includes('accounting') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
+        <td>${m.admin ? '' : `<button class="ghost" title="Remove" onclick="removeMember('${esc(m.email)}')">✕</button>`}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" style="color:var(--overlay0)">Nobody yet</td></tr>';
+  } catch (e) { rows.innerHTML = `<tr><td colspan="4" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
+}
+async function toggleApp(cb) {
+  const tr = cb.closest('tr');
+  const apps = [...tr.querySelectorAll('input[data-app]')].filter(i => i.checked).map(i => i.dataset.app);
+  try { await Admin.api('POST', '/api/allowlist', { email: tr.dataset.email, apps }); }
+  catch (e) { alert('Could not save: ' + e.message); cb.checked = !cb.checked; }
+}
+async function addMember() {
+  const inp = document.getElementById('new-email');
+  const email = inp.value.trim().toLowerCase();
+  if (!email) return;
+  const apps = [];
+  if (document.getElementById('new-todo').checked) apps.push('todo');
+  if (document.getElementById('new-acc').checked) apps.push('accounting');
+  try { await Admin.api('POST', '/api/allowlist', { email, apps }); inp.value = ''; document.getElementById('new-acc').checked = false; loadMembers(); }
+  catch (e) { alert('Could not add: ' + e.message); }
+}
+async function removeMember(email) {
+  if (!confirm(`Remove ${email}? They lose access to every app on their next request.`)) return;
+  try { await Admin.api('DELETE', '/api/allowlist', { email }); loadMembers(); }
+  catch (e) { alert('Could not remove: ' + e.message); }
+}
+</script>
+</body>
+</html>

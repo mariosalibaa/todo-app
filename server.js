@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const admin = require('firebase-admin');
+const accounting = require('./accounting');   // /api/accounting/* (Whish statements)
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -74,6 +75,9 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'icons/icon-192.png'));
   fs.readFileSync(path.join(__dirname, 'icons/icon-512.png'));
   fs.readFileSync(path.join(__dirname, 'icons/apple-touch-icon.png'));
+  fs.readFileSync(path.join(__dirname, 'hub.html'));
+  fs.readFileSync(path.join(__dirname, 'accounting.html'));
+  fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
@@ -341,15 +345,36 @@ async function executeSyncPlan(direction, odoo, app) {
 // ── Email allowlist ────────────────────────────────────────────────────────
 // The board is one shared team workspace on a public URL: only approved
 // Google accounts may join. Docs in workspaces/team/allowlist keyed by email.
-let _allowCache = { set: null, at: 0 };
-async function isAllowedEmail(email) {
-  if (!email) return false;
-  if (!_allowCache.set || Date.now() - _allowCache.at > 60000) {
+// Each approved email carries the list of apps it may open (`apps`, default
+// ['todo']); the admin hub shows only those tiles and the API refuses the rest.
+// Admins always have every app and are the only ones who may edit the list.
+const APPS = ['todo', 'accounting'];
+const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
+  .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
+let _allowCache = { map: null, at: 0 };
+async function allowlistMap() {
+  if (!_allowCache.map || Date.now() - _allowCache.at > 60000) {
     const snap = await db.collection('workspaces').doc(TEAM_ID).collection('allowlist').get();
-    _allowCache = { set: new Set(snap.docs.map(d => (d.data().email || d.id).toLowerCase())), at: Date.now() };
+    const map = new Map();
+    for (const d of snap.docs) {
+      const x = d.data();
+      const email = (x.email || d.id).toLowerCase();
+      map.set(email, { email, apps: Array.isArray(x.apps) ? x.apps.filter(a => APPS.includes(a)) : ['todo'] });
+    }
+    _allowCache = { map, at: Date.now() };
   }
-  return _allowCache.set.has(email.toLowerCase());
+  return _allowCache.map;
 }
+// null = not approved; otherwise { email, apps, admin }
+async function accessFor(email) {
+  if (!email) return null;
+  const e = email.toLowerCase();
+  const isAdmin = ADMIN_EMAILS.has(e);
+  const entry = (await allowlistMap()).get(e);
+  if (!entry && !isAdmin) return null;
+  return { email: e, apps: isAdmin ? APPS.slice() : entry.apps, admin: isAdmin };
+}
+async function isAllowedEmail(email) { return !!(await accessFor(email)); }
 
 async function ensureTeamMember(user) {
   const wsRef = db.collection('workspaces').doc(TEAM_ID);
@@ -382,6 +407,65 @@ async function ensureTeamMember(user) {
 // runs on Render (RENDER env var is set there), or when REQUIRE_AUTH=1 is set.
 // Sign-in is enforced on any cloud host (Render, Vercel) and can be forced locally
 const AUTH_DISABLED = !process.env.RENDER && !process.env.VERCEL && process.env.REQUIRE_AUTH !== '1';
+
+// ── Daily due-date digest ──────────────────────────────────────────────────
+// Telegram ping each morning listing what is due today plus anything overdue.
+// The app has no other time-based reminder: the 🔔 follow-up log records a
+// touch that already happened, it never fires at a time.
+
+// "Today" must be Beirut-local, because task `due` values are plain YYYY-MM-DD
+// dates typed in local time — comparing them against UTC slips a day each night.
+function beirutToday() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Beirut', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+}
+
+async function sendDueDigest(dry) {
+  const today = beirutToday();
+  const snap = await db.collection('workspaces').doc(TEAM_ID).collection('tasks').get();
+  const open = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(t => !t.done && !t.deleted && t.due);
+
+  const dueToday = open.filter(t => t.due === today);
+  const overdue = open.filter(t => t.due < today).sort((a, b) => a.due.localeCompare(b.due));
+
+  if (!dueToday.length && !overdue.length) {
+    return { sent: false, reason: 'nothing due', today };
+  }
+
+  const line = t => '• ' + t.title + (t.project ? '  (' + t.project + ')' : '');
+  const parts = ['📋 To-Do — ' + today];
+  if (dueToday.length) {
+    parts.push('', 'Due today (' + dueToday.length + ')', ...dueToday.map(line));
+  }
+  if (overdue.length) {
+    const show = overdue.slice(0, 15);
+    parts.push('', 'Overdue (' + overdue.length + ')',
+      ...show.map(t => line(t) + '  — ' + t.due));
+    if (overdue.length > show.length) {
+      parts.push('…and ' + (overdue.length - show.length) + ' more');
+    }
+  }
+  parts.push('', 'https://todo.shift-group.co');
+  const text = parts.join('\n');
+
+  const result = { today, dueToday: dueToday.length, overdue: overdue.length };
+  if (dry) return { ...result, sent: false, dry: true, text };
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chat = process.env.TELEGRAM_CHAT_ID || process.env.ACCOUNTING_CHAT_ID;
+  if (!token || !chat) return { ...result, sent: false, reason: 'telegram not configured' };
+
+  const tg = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chat, text: text.slice(0, 4000), disable_web_page_preview: true
+    })
+  });
+  if (!tg.ok) console.error('digest telegram failed:', tg.status, await tg.text());
+  return { ...result, sent: tg.ok };
+}
 
 // Auth middleware: verify Firebase ID token
 // ── App session tokens ─────────────────────────────────────────────────────
@@ -474,9 +558,14 @@ const handler = async (req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // Public endpoints (no auth required)
-  if (url === '/') {
-    const html = fs.readFileSync(path.join(__dirname, 'todo.html'), 'utf8');
+  // ── Pages ──
+  // admin.shift-group.co → hub; todo.shift-group.co (and localhost) → To-Do.
+  // Every page is also reachable by path, whatever the host.
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
+  const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/accounting': 'accounting.html', '/accounting/whish': 'accounting.html' };
+  const page = PAGES[url] || (url === '/' ? (host.startsWith('admin.') ? 'hub.html' : 'todo.html') : null);
+  if (page) {
+    const html = fs.readFileSync(path.join(__dirname, page), 'utf8');
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store'
@@ -485,10 +574,13 @@ const handler = async (req, res) => {
     return;
   }
 
-  // Static files
+  // Static files — an explicit whitelist: the folder also holds the Firebase
+  // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const filePath = path.join(__dirname, url);
-    if (fs.existsSync(filePath)) {
+    const STATIC_OK = new Set(['/manifest.json', '/sw.js', '/admin-shared.js']);
+    const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url));
+    const filePath = ok ? path.join(__dirname, url) : null;
+    if (filePath && fs.existsSync(filePath)) {
       const ext = path.extname(filePath);
       const contentType = MIME[ext] || 'application/octet-stream';
       res.writeHead(200, { 'Content-Type': contentType });
@@ -507,6 +599,32 @@ const handler = async (req, res) => {
     return;
   }
 
+  // ── Daily due-date digest, called by Vercel Cron ──
+  // Deliberately ahead of the user auth gate: cron has no signed-in user.
+  // Vercel sends "Authorization: Bearer $CRON_SECRET" automatically; ?key= is
+  // the same secret, for testing by hand. No secret set = endpoint stays shut.
+  if (url === '/api/cron/digest') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const secret = process.env.CRON_SECRET;
+    const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || q.get('key') || '';
+    if (!secret || given !== secret) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'unauthorized' }));
+      return;
+    }
+    try {
+      const out = await sendDueDigest(q.has('dry'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(out));
+    } catch (e) {
+      console.error('digest error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(e && e.message || e) }));
+    }
+    return;
+  }
+
+
   // All API endpoints require auth
   const user = await verifyToken(req);
   if (!user) {
@@ -518,18 +636,55 @@ const handler = async (req, res) => {
   const userId = user.uid;
 
   // Allowlist gate: a valid Google/session token is not enough — the email
-  // must be approved. (Local mode's synthetic user skips this.)
-  if (!AUTH_DISABLED && !(await isAllowedEmail(user.email))) {
+  // must be approved. (Local mode's synthetic user gets everything.)
+  const access = AUTH_DISABLED
+    ? { email: user.email || '', apps: APPS.slice(), admin: true }
+    : await accessFor(user.email);
+  if (!access) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'not_allowed', email: user.email || '' }));
     return;
   }
 
+  // Who am I + which apps may I open (the hub and every app page ask this first)
+  if (url === '/api/me') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ email: access.email, name: user.name || user.displayName || access.email,
+      apps: access.apps, admin: access.admin, local: AUTH_DISABLED }));
+    return;
+  }
+
+  // Per-app gate. /api/session and /api/allowlist belong to no app; the
+  // allowlist is admin-only; everything else is the To-Do API.
+  const noApp = app => {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'no_app', app, email: access.email }));
+  };
+  if (url.startsWith('/api/accounting/')) {
+    if (!access.apps.includes('accounting')) return noApp('accounting');
+    try {
+      const handled = await accounting.handle(req, res, url, user, { db, admin, TEAM_ID, odooCall });
+      if (handled === false) { res.writeHead(404); res.end('not found'); }
+    } catch (e) {
+      console.error('accounting error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(e && e.message || e) }));
+    }
+    return;
+  }
+  if (url === '/api/allowlist' && !access.admin) return noApp('admin');
+  if (url !== '/api/session' && url !== '/api/allowlist' && !access.apps.includes('todo')) return noApp('todo');
+
   // ── Access management: list/add/remove approved emails ──
   if (url === '/api/allowlist' && req.method === 'GET') {
     const snap = await db.collection('workspaces').doc(TEAM_ID).collection('allowlist').get();
+    const list = snap.docs.map(d => {
+      const x = d.data(); const email = (x.email || d.id).toLowerCase();
+      return { ...x, email, apps: Array.isArray(x.apps) ? x.apps : ['todo'], admin: ADMIN_EMAILS.has(email) };
+    });
+    for (const a of ADMIN_EMAILS) if (!list.some(l => l.email === a)) list.push({ email: a, apps: APPS.slice(), admin: true });
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(snap.docs.map(d => d.data())));
+    res.end(JSON.stringify(list));
     return;
   }
   if (url === '/api/allowlist' && req.method === 'POST') {
@@ -537,11 +692,16 @@ const handler = async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const email = (JSON.parse(body).email || '').trim().toLowerCase();
+        const b = JSON.parse(body);
+        const email = (b.email || '').trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { res.writeHead(400); res.end('bad email'); return; }
-        await db.collection('workspaces').doc(TEAM_ID).collection('allowlist')
-          .doc(email).set({ email, addedBy: user.email || user.uid, addedAt: new Date().toISOString() });
-        _allowCache.set = null;
+        // apps omitted (old To-Do access modal) → keep what the doc has, default To-Do only
+        const doc = { email, updatedBy: user.email || user.uid, updatedAt: new Date().toISOString() };
+        if (Array.isArray(b.apps)) doc.apps = b.apps.filter(a => APPS.includes(a));
+        const ref = db.collection('workspaces').doc(TEAM_ID).collection('allowlist').doc(email);
+        if (!(await ref.get()).exists) { doc.addedBy = doc.updatedBy; doc.addedAt = doc.updatedAt; if (!doc.apps) doc.apps = ['todo']; }
+        await ref.set(doc, { merge: true });
+        _allowCache.map = null;
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true }));
       } catch (e) { res.writeHead(500); res.end('server error'); }
     });
@@ -554,7 +714,7 @@ const handler = async (req, res) => {
       try {
         const email = (JSON.parse(body).email || '').trim().toLowerCase();
         await db.collection('workspaces').doc(TEAM_ID).collection('allowlist').doc(email).delete();
-        _allowCache.set = null;
+        _allowCache.map = null;
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true }));
       } catch (e) { res.writeHead(500); res.end('server error'); }
     });

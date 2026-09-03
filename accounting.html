@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#714B67">
+<title>Accounting · Whish</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  /* Odoo-like: purple top bar, white grid, thin borders, few colours */
+  :root{--odoo:#714B67;--odoo2:#875A7B;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--amber:#F2A93B;--green:#28a745;--red:#dc3545;--blue:#017e84;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;}
+  .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;}
+  .top a{color:#fff;text-decoration:none;opacity:.85;}
+  .top .brand{font-weight:600;font-size:14px;}
+  .top .sp{flex:1;}
+  .top .who{font-size:12px;opacity:.85;}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg);}
+  .bar select,.bar input{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13px;background:#fff;height:30px;}
+  .bar .search{min-width:180px;flex:1;max-width:320px;}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 10px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .btn.primary{background:var(--odoo);border-color:var(--odoo);color:#fff;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .wrap{overflow-x:auto;}
+  table{border-collapse:collapse;width:100%;min-width:1180px;}
+  th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:1;}
+  td{padding:3px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:nowrap;}
+  tr:hover td{background:#f5f2f7;}
+  tr.personal td{color:#9aa0a6;}
+  tr.personal td input,tr.personal td select{color:#9aa0a6;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.debit{color:var(--red);} td.credit{color:var(--green);}
+  td input[type=text],td select{width:100%;border:1px solid transparent;background:transparent;padding:4px 5px;font-size:13px;border-radius:3px;font-family:inherit;}
+  td input[type=text]:hover,td select:hover{border-color:var(--line);}
+  td input[type=text]:focus,td select:focus{border-color:var(--odoo2);outline:0;background:#fff;}
+  td input.dirty{background:#fff8e6;}
+  td input.saved{background:#eef9f0;}
+  .c-contact{min-width:150px;} .c-note{min-width:180px;} .c-proj{min-width:180px;} .c-kind{width:92px;}
+  .ref{color:var(--muted);font-size:11px;}
+  .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
+  .odoo-no{color:#adb5bd;}
+  .odoo-multi{color:var(--amber);font-weight:600;}
+  tfoot td{font-weight:600;background:var(--bg);border-top:2px solid var(--line);}
+  .empty{padding:60px 20px;text-align:center;color:var(--muted);}
+  .empty b{display:block;font-size:15px;color:var(--text);margin-bottom:6px;}
+  .msg{padding:6px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);display:none;}
+  .msg.err{color:var(--red);display:block;} .msg.ok{color:var(--green);display:block;}
+  .sug{color:#adb5bd;font-style:italic;}
+  .chip{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;background:#eee;color:#555;margin-left:4px;vertical-align:middle;}
+  @media (max-width:700px){.top{height:42px;} .bar .search{max-width:none;}}
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/admin" title="Admin hub">⌂</a>
+  <span class="brand">Accounting</span>
+  <span style="opacity:.6">›</span>
+  <span>Whish</span>
+  <span class="sp"></span>
+  <span class="who" id="who"></span>
+</div>
+<div class="bar">
+  <select id="acc" onchange="selectAccount(this.value)"></select>
+  <input type="date" id="from" onchange="render()" title="From">
+  <input type="date" id="to" onchange="render()" title="To">
+  <select id="kind" onchange="render()">
+    <option value="">All</option><option value="work">Work</option><option value="personal">Personal</option><option value="unset">Not yet tagged</option>
+  </select>
+  <input class="search" type="search" id="q" placeholder="Search contact, note, number, amount…" oninput="render()">
+  <span class="sp" style="flex:1"></span>
+  <label class="btn primary" for="file">⬆ Upload statement (PDF)</label>
+  <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
+  <button class="btn" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
+  <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the Odoo Whish journals">⇄ Check Odoo</button>
+</div>
+<div class="msg" id="msg"></div>
+<div class="wrap">
+  <table id="grid" style="display:none">
+    <thead><tr>
+      <th>Date</th><th>Service</th><th>Counterparty</th><th class="c-contact">Contact</th><th class="c-note">Note</th>
+      <th class="c-kind">W / P</th><th class="c-proj">Project / analytic</th>
+      <th class="num">Out</th><th class="num">In</th><th class="num">Balance</th><th>Odoo</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+    <tfoot><tr id="totals"></tr></tfoot>
+  </table>
+  <div class="empty" id="empty"><b>No statement yet</b>Export the statement as PDF from the Whish app (up to 6 months) and upload it here.<br>Overlapping periods are fine — lines are keyed by their transaction number.</div>
+</div>
+<datalist id="analytic-list"></datalist>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc;
+const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
+let accounts = [], acc = null, tx = [], contacts = {}, analytic = [];
+const KNOWN = { '9613700985': 'Maya', '9613299799': 'Walid Hibri', '9613165168': 'Mario Saliba' };   // seeds until contacts are imported
+
+function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
+
+Admin.require('accounting', async me => {
+  document.getElementById('who').textContent = me.name || me.email;
+  await Promise.all([loadAccounts(), loadContacts()]);
+  loadAnalytic();
+  if (accounts.length) selectAccount(localStorage.getItem('whish_acc') || accounts[0].account);
+});
+
+async function loadAccounts() {
+  accounts = await Admin.api('GET', '/api/accounting/whish/accounts');
+  const sel = document.getElementById('acc');
+  sel.innerHTML = accounts.map(a => `<option value="${a.account}">Whish · ${esc(a.name)} · ${a.account} (${a.currency})</option>`).join('')
+    || '<option value="">— no account yet —</option>';
+}
+async function loadContacts() {
+  contacts = {};
+  for (const c of await Admin.api('GET', '/api/accounting/whish/contacts')) contacts[c.phone] = c;
+}
+async function loadAnalytic() {
+  try {
+    analytic = await Admin.api('GET', '/api/accounting/analytic');
+    document.getElementById('analytic-list').innerHTML = analytic.map(a => `<option value="${esc(a.name)}">${esc(a.plan)}</option>`).join('');
+  } catch (e) { say('Odoo analytic accounts not available: ' + e.message, 'err'); }
+}
+async function selectAccount(a) {
+  acc = a; localStorage.setItem('whish_acc', a);
+  document.getElementById('acc').value = a;
+  tx = a ? await Admin.api('GET', `/api/accounting/whish/${a}/tx`) : [];
+  render();
+}
+
+function contactName(t) {
+  return (t.phone && contacts[t.phone] && contacts[t.phone].name) || t.name || (t.phone && KNOWN[t.phone]) || '';
+}
+// last project used for the same phone number → suggestion for untagged rows
+function suggestion(t) {
+  if (!t.phone) return '';
+  for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o.analyticName && o.id !== t.id) return o.analyticName; }
+  return '';
+}
+function suggestKind(t) {
+  if (!t.phone) return '';
+  for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o.kind && o.id !== t.id) return o.kind; }
+  return '';
+}
+
+function visible() {
+  const from = document.getElementById('from').value, to = document.getElementById('to').value;
+  const kind = document.getElementById('kind').value, q = document.getElementById('q').value.trim().toLowerCase();
+  return tx.filter(t => {
+    if (from && t.date < from) return false;
+    if (to && t.date > to) return false;
+    if (kind === 'unset' ? t.kind : (kind && t.kind !== kind)) return false;
+    if (q) {
+      const hay = [t.date, t.service, t.description, t.phone, contactName(t), t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function odooCell(t) {
+  if (!t.odoo) return '<span class="odoo-no" title="Not checked yet">·</span>';
+  const m = t.odoo.matches || [];
+  if (!m.length) return '<span class="odoo-no" title="Checked ' + esc(t.odoo.checkedAt.slice(0, 10)) + ': nothing found in the Whish journals">—</span>';
+  const tip = m.map(x => `${x.move} · ${x.date} · ${x.company} · ${x.partner || x.label}`).join('\n');
+  if (m.length === 1) return `<a class="odoo-ok" target="_blank" href="${ODOO}${m[0].moveId}" title="${esc(tip)}">✓ ${esc(m[0].move)}</a>`;
+  return `<span class="odoo-multi" title="${esc(tip)}">${m.length} matches</span>`;
+}
+
+function render() {
+  const rows = visible().slice().reverse();   // newest first, like an Odoo bank statement
+  document.getElementById('grid').style.display = tx.length ? '' : 'none';
+  document.getElementById('empty').style.display = tx.length ? 'none' : '';
+  document.getElementById('rows').innerHTML = rows.map(t => {
+    const name = contactName(t), sug = suggestion(t), sk = suggestKind(t);
+    const cp = t.phone ? `${esc(t.phone.replace(/^961/, '0'))}` : esc(t.description);
+    return `<tr data-id="${t.id}" class="${t.kind === 'personal' ? 'personal' : ''}">
+      <td>${t.date}<div class="ref">tr:${t.ref}</div></td>
+      <td>${esc(t.service || '')}</td>
+      <td title="${esc(t.description)}">${cp}</td>
+      <td class="c-contact">${t.phone
+        ? `<input type="text" value="${esc(name)}" placeholder="who?" data-f="contact" onchange="saveContact('${t.phone}', this)">`
+        : `<span style="color:#adb5bd">—</span>`}</td>
+      <td class="c-note"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
+      <td class="c-kind"><select data-f="kind" onchange="saveField('${t.id}', 'kind', this.value, this)">
+        <option value="" ${!t.kind ? 'selected' : ''}>${sk ? '↳ ' + sk + '?' : '—'}</option>
+        <option value="work" ${t.kind === 'work' ? 'selected' : ''}>Work</option>
+        <option value="personal" ${t.kind === 'personal' ? 'selected' : ''}>Personal</option></select></td>
+      <td class="c-proj"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="${sug ? '↳ ' + esc(sug) + ' (Enter)' : 'project'}" data-sug="${esc(sug)}"
+        onkeydown="if(event.key==='Enter'&&!this.value&&this.dataset.sug){this.value=this.dataset.sug;this.dispatchEvent(new Event('change'));}"
+        onchange="saveAnalytic('${t.id}', this)"></td>
+      <td class="num debit">${fmt(t.debit)}</td>
+      <td class="num credit">${fmt(t.credit)}</td>
+      <td class="num">${fmt(t.balance)}</td>
+      <td>${odooCell(t)}</td>
+    </tr>`;
+  }).join('');
+  const out = rows.reduce((a, t) => a + t.debit, 0), inn = rows.reduce((a, t) => a + t.credit, 0);
+  document.getElementById('totals').innerHTML =
+    `<td colspan="7">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}</td>
+     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td class="num">${rows.length ? fmt(rows[0].balance) : ''}</td><td></td>`;
+}
+
+// ── Saving ──
+function flash(el, ok) { el.classList.remove('dirty'); el.classList.toggle('saved', ok); el.classList.toggle('dirty', !ok); setTimeout(() => el.classList.remove('saved'), 1200); }
+async function saveField(id, field, value, el) {
+  el.classList.add('dirty');
+  const t = tx.find(x => x.id === id); if (t) t[field] = value;
+  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { [field]: value }); flash(el, true); }
+  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+  if (field === 'kind') el.closest('tr').classList.toggle('personal', value === 'personal');
+}
+async function saveAnalytic(id, el) {
+  const name = el.value.trim();
+  const a = analytic.find(x => x.name.toLowerCase() === name.toLowerCase());
+  el.classList.add('dirty');
+  const t = tx.find(x => x.id === id); if (t) { t.analyticName = a ? a.name : name; t.analyticId = a ? a.id : null; }
+  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { analyticName: a ? a.name : name, analyticId: a ? a.id : null, company: a ? a.company : '' }); flash(el, true); }
+  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+async function saveContact(phone, el) {
+  const name = el.value.trim();
+  el.classList.add('dirty');
+  contacts[phone] = { phone, name, source: 'manual' };
+  try {
+    await Admin.api('POST', '/api/accounting/whish/contacts', { items: [{ phone, name, source: 'manual' }] });
+    flash(el, true);
+    // same number elsewhere in the grid takes the name too
+    document.querySelectorAll(`tr input[data-f="contact"]`).forEach(i => { const r = tx.find(x => x.id === i.closest('tr').dataset.id); if (r && r.phone === phone && i !== el) i.value = name; });
+  } catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+
+// ── Upload ──
+function upload(file) {
+  if (!file) return;
+  say('Reading ' + file.name + '…');
+  const rd = new FileReader();
+  rd.onload = async () => {
+    try {
+      const r = await Admin.api('POST', '/api/accounting/whish/upload', { filename: file.name, pdfBase64: rd.result.split(',')[1] });
+      say(`${file.name}: ${r.head.from} → ${r.head.till}, ${r.lines} lines (${r.added} new, ${r.updated} already known)` + (r.warnings.length ? ' · ' + r.warnings.length + ' warning(s), see console' : ''));
+      if (r.warnings.length) console.warn(r.warnings);
+      await loadAccounts();
+      await selectAccount(r.account);
+    } catch (e) { say('Upload failed: ' + e.message, 'err'); }
+    document.getElementById('file').value = '';
+  };
+  rd.readAsDataURL(file);
+}
+
+// ── Google contacts → phone/name map ──
+// Asks Google for the contacts scope in a popup (a fresh token each time),
+// reads the People API directly from the browser and stores only phone+name.
+async function importContacts() {
+  const digits = s => String(s || '').replace(/\D/g, '');
+  say('Opening Google…');
+  let token;
+  try {
+    const r = await Admin.signIn(['https://www.googleapis.com/auth/contacts.readonly', 'https://www.googleapis.com/auth/contacts.other.readonly']);
+    token = r.accessToken;
+  } catch (e) { say('Google sign-in cancelled: ' + e.message, 'err'); return; }
+  if (!token) { say('Google did not return an access token', 'err'); return; }
+  const items = [];
+  const pull = async (base, key) => {
+    let pageToken = '';
+    do {
+      const u = `${base}${base.includes('?') ? '&' : '?'}pageSize=1000&readMask=names,phoneNumbers${pageToken ? '&pageToken=' + pageToken : ''}`;
+      const r = await fetch(u, { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) throw new Error(`People API ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      const j = await r.json();
+      for (const p of (j[key] || [])) {
+        const name = p.names && p.names[0] && p.names[0].displayName;
+        for (const ph of (p.phoneNumbers || [])) { const d = digits(ph.canonicalForm || ph.value); if (name && d) items.push({ phone: d, name, source: 'google' }); }
+      }
+      pageToken = j.nextPageToken || '';
+    } while (pageToken);
+  };
+  try {
+    say('Reading Google contacts…');
+    await pull('https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers', 'connections');
+    await pull('https://people.googleapis.com/v1/otherContacts', 'otherContacts').catch(e => console.warn('otherContacts skipped:', e.message));
+    const r = await Admin.api('POST', '/api/accounting/whish/contacts', { items });
+    await loadContacts(); render();
+    say(`Google contacts: ${items.length} numbers read, ${r.saved} saved (${r.skipped} kept your manual names)`);
+  } catch (e) { say('Contacts import failed: ' + e.message, 'err'); }
+}
+
+// ── Odoo ──
+async function checkOdoo() {
+  const ids = visible().map(t => t.id);
+  if (!ids.length) return;
+  const b = document.getElementById('btn-odoo'); b.disabled = true;
+  say(`Checking ${ids.length} lines against the Odoo Whish journals…`);
+  try {
+    const found = await Admin.api('POST', `/api/accounting/whish/${acc}/odoo-check`, { ids });
+    const at = new Date().toISOString();
+    let hits = 0;
+    for (const t of tx) if (found[t.id]) { t.odoo = { checkedAt: at, matches: found[t.id] }; if (found[t.id].length) hits++; }
+    render();
+    say(`Odoo: ${hits} of ${ids.length} lines found in the Whish journals`);
+  } catch (e) { say('Odoo check failed: ' + e.message, 'err'); }
+  b.disabled = false;
+}
+</script>
+</body>
+</html>
