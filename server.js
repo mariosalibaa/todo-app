@@ -562,7 +562,8 @@ const handler = async (req, res) => {
   // hub.shift-group.co is THE link (hub at /, apps under /todo, /accounting);
   // the old todo.shift-group.co redirects there. localhost serves To-Do at /.
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
-  if (host === 'todo.shift-group.co') {
+  // (HUB_LIVE=1 is set on Vercel once the hub DNS record resolves — until then the old link must keep serving)
+  if (host === 'todo.shift-group.co' && process.env.HUB_LIVE === '1') {
     res.writeHead(301, { Location: 'https://hub.shift-group.co' + (url === '/' ? '/todo' : url) });
     res.end();
     return;
