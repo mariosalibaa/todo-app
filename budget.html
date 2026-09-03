@@ -37,6 +37,11 @@
   .band .add{width:26px;height:26px;border-radius:50%;background:#fff;color:#333;border:0;cursor:pointer;font-size:20px;line-height:24px;padding:0;font-weight:700;}
   .band input[type=search],.band input[type=month],.band select{border:0;border-radius:4px;padding:4px 7px;font-size:12px;height:26px;}
   .band .who{font-size:11px;opacity:.8;}
+  .band .band-btn{background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:4px;height:26px;padding:0 10px;font-size:12px;cursor:pointer;}
+  .band .band-btn:hover{background:rgba(255,255,255,.15);}
+  tbody tr.grp td{cursor:pointer;}
+  tbody tr.grp .chev{display:inline-block;width:12px;color:#666;}
+  tbody tr.grp .cnt{font-weight:400;color:#666;margin-left:6px;font-size:11.5px;}
   .wrap{flex:1;min-height:0;overflow:auto;background:repeating-linear-gradient(#fff 0 22px,var(--stripe) 22px 44px);}
   table{border-collapse:separate;border-spacing:0;width:100%;}
   thead th{position:sticky;top:0;background:#e9e9e9;text-align:left;font-weight:500;padding:0 8px;height:22px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#333;z-index:2;cursor:pointer;user-select:none;}
@@ -103,7 +108,7 @@
 const esc = Admin.esc;
 const API = '/api/accounting/budget/';
 let D = null;                       // everything from /all
-let S = { screen: 'expenses', ym: new Date().toISOString().slice(0, 7), sort: {}, sel: null, ledger: null, q: '', from: '', to: '', repYm: null };
+let S = { screen: 'expenses', ym: new Date().toISOString().slice(0, 7), sort: {}, sel: null, ledger: null, q: '', from: '', to: '', repYm: null, open: {}, groups: [] };
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const SCREENS = [
   { id: 'expenses',   ico: '🟥', lbl: 'Expenses',   pill: 'red' },
@@ -190,12 +195,14 @@ function render() {
   else if (S.screen === 'search') center.innerHTML = `<input type="search" placeholder="Search notes, payee, category, account…" value="${esc(S.q)}" oninput="S.q=this.value;draw()" style="width:300px"> <input type="date" value="${S.from}" onchange="S.from=this.value;draw()"> <input type="date" value="${S.to}" onchange="S.to=this.value;draw()"><div class="title"><span>${sub}</span></div>`;
   else if (S.screen === 'reports') center.innerHTML = `<input type="month" value="${S.repYm || S.ym}" onchange="S.repYm=this.value;draw()"><div class="title"><b>Reports</b><span>${sub}</span></div>`;
   else center.innerHTML = `<div class="title"><b>${SCREENS.find(s => s.id === S.screen).lbl}${S.ledger ? ' › ' + esc(accName(S.ledger)) : ''}</b><span>${sub}</span></div>`;
+  const grouped = S.screen === 'accounts' && !S.ledger && (S.sort.accounts || {}).k === 'type';
+  document.getElementById('band-left').innerHTML = grouped ? `<button class="band-btn" onclick="toggleAllGroups()">${allOpen() ? '⊟ Collapse all' : '⊞ Expand all'}</button>` : '';
   document.getElementById('btn-add').style.visibility = ['reports', 'search'].includes(S.screen) ? 'hidden' : 'visible';
   draw();
 }
 function go(id) { S.screen = id; S.ledger = null; S.sel = null; render(); }
 function shiftMonth(n) { const d = new Date(S.ym + '-15'); d.setMonth(d.getMonth() + n); S.ym = d.toISOString().slice(0, 7); render(); }
-function sortBy(k) { const s = S.sort[S.screen] || {}; S.sort[S.screen] = { k, dir: s.k === k ? -s.dir : 1 }; draw(); }
+function sortBy(k) { const s = S.sort[S.screen] || {}; S.sort[S.screen] = { k, dir: s.k === k ? -s.dir : 1 }; render(); }   // render(): sorting off 'type' also hides the collapse button
 function sorted(list, def) {
   const s = S.sort[S.screen] || def;
   return list.slice().sort((a, b) => { const va = s.v ? s.v(a) : a[s.k], vb = s.v ? s.v(b) : b[s.k]; return (va < vb ? -1 : va > vb ? 1 : 0) * s.dir; });
@@ -232,14 +239,21 @@ function draw() {
   } else if (S.screen === 'accounts') {
     S.sort[S.screen] = S.sort[S.screen].k === 'date' ? { k: 'type', dir: 1 } : S.sort[S.screen];
     const rows = sorted(D.accounts.map(a => ({ ...a, balance: b[a.id], usd: a.currency === D.settings.baseCurrency ? b[a.id] : toBase(b[a.id], a.currency) })), { k: 'type', dir: 1 });
-    let html = '', grp = null, gsum = 0, incl = 0;
     const cols = [{ k: 'name', l: 'Account' }, { k: 'type', l: 'Type' }, { k: 'currency', l: 'Currency' }, { k: 'balance', l: 'Balance', num: 1 }, { k: 'usd', l: 'In USD', num: 1 }, { k: 'include', l: 'Included' }];
-    const groupTotals = {}; for (const a of rows) groupTotals[a.type] = (groupTotals[a.type] || 0) + a.usd;
-    for (const a of rows) {
-      if ((S.sort.accounts.k === 'type') && a.type !== grp) { grp = a.type; html += `<tr class="grp"><td colspan="4">${esc(grp || '(no type)')}</td><td class="num">${money(groupTotals[grp])}</td><td></td></tr>`; }
-      if (a.include) incl += a.usd;
-      html += `<tr class="${S.sel === a.id ? 'on' : ''}" onclick="select('${a.id}')" ondblclick="openLedger('${a.id}')"><td>${esc(a.name)}${a.id === D.settings.whishAccountId ? ' <span class="tag">W</span>' : ''}</td><td>${esc(a.type)}</td><td>${esc(a.currency)}</td><td class="num ${a.balance < 0 ? 'neg' : ''}">${money(a.balance, a.currency)}</td><td class="num ${a.usd < 0 ? 'neg' : ''}">${money(a.usd)}</td><td>${a.include ? '✓' : '<span style="color:#bbb">excluded</span>'}</td></tr>`;
-    }
+    // the total always counts every account, collapsed groups included
+    const incl = rows.filter(a => a.include).reduce((t, a) => t + a.usd, 0);
+    const grouped = S.sort.accounts.k === 'type';
+    const groupTotals = {}, groupCount = {};
+    for (const a of rows) { groupTotals[a.type || ''] = (groupTotals[a.type || ''] || 0) + a.usd; groupCount[a.type || ''] = (groupCount[a.type || ''] || 0) + 1; }
+    S.groups = grouped ? [...new Set(rows.map(a => a.type || ''))] : [];
+    const accRow = a => `<tr class="${S.sel === a.id ? 'on' : ''}" onclick="select('${a.id}')" ondblclick="openLedger('${a.id}')"><td>${esc(a.name)}${a.id === D.settings.whishAccountId ? ' <span class="tag">W</span>' : ''}</td><td>${esc(a.type)}</td><td>${esc(a.currency)}</td><td class="num ${a.balance < 0 ? 'neg' : ''}">${money(a.balance, a.currency)}</td><td class="num ${a.usd < 0 ? 'neg' : ''}">${money(a.usd)}</td><td>${a.include ? '✓' : '<span style="color:#bbb">excluded</span>'}</td></tr>`;
+    let html = '';
+    if (!grouped) html = rows.map(accRow).join('');
+    else S.groups.forEach((g, i) => {
+      const on = !!S.open[g], n = groupCount[g];
+      html += `<tr class="grp" onclick="toggleGroup(${i})"><td colspan="4"><span class="chev">${on ? '▾' : '▸'}</span>${esc(g || '(no type)')}<span class="cnt">${n} account${n > 1 ? 's' : ''}</span></td><td class="num">${money(groupTotals[g])}</td><td></td></tr>`;
+      if (on) html += rows.filter(a => (a.type || '') === g).map(accRow).join('');
+    });
     const s = S.sort[S.screen];
     document.getElementById('wrap').innerHTML = `<table><thead><tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}" onclick="sortBy('${c.k}')">${c.l}${s.k === c.k ? `<span class="arr">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead><tbody>${html}</tbody></table>`;
     document.getElementById('foot-left').innerHTML = rows.length + ' accounts · double-click = ledger · <span class="lnk" onclick="edit(\'accounts\', S.sel)">edit selected</span>';
@@ -266,6 +280,9 @@ function draw() {
   } else if (S.screen === 'reports') drawReports();
   else if (S.screen === 'search') drawSearch();
 }
+function toggleGroup(i) { const g = S.groups[i]; S.open[g] = !S.open[g]; draw(); }
+const allOpen = () => S.groups.length > 0 && S.groups.every(g => S.open[g]);
+function toggleAllGroups() { const close = allOpen(); S.open = {}; if (!close) S.groups.forEach(g => S.open[g] = true); draw(); render(); }
 function select(id) { S.sel = id; document.querySelectorAll('tbody tr').forEach(tr => tr.classList.toggle('on', tr.getAttribute('onclick') === `select('${id}')`)); }
 function openLedger(id) { S.screen = 'accounts'; S.ledger = id; S.sel = null; S.sort.accounts = { k: 'date', dir: 1 }; render(); }
 function drawLedger(id, b) {
