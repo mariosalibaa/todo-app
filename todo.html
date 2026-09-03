@@ -1344,6 +1344,8 @@
     .projects-list-table tr:hover .pl-pin { opacity: .55; }
     .pl-pin:hover { opacity: 1 !important; filter: none; }
     .pl-pin.on { opacity: 1; filter: none; }
+    .projects-list-table tr.plist-row { cursor: pointer; }
+    .plist-name-inp[readonly] { cursor: pointer; background: transparent; }
     .projects-list-table tr.pl-active > td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
     .projects-list-table tr.pl-active > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
     /* Split: project table on top, the selected project's tasks below */
@@ -4210,6 +4212,10 @@ function clearPlistFilters() {
   renderProjectsList();
 }
 
+// The name cell doubles as the rename box, so it only takes focus on a
+// deliberate double-click — a single click belongs to the row.
+function plistNameEdit(inp) { inp.readOnly = false; inp.focus(); inp.select(); }
+
 // ── Project pins ─────────────────────────────────────────────────────────
 // Per user, but carried on the shared project record as a list of short names,
 // so a pin follows you to your phone without a per-user store on the server.
@@ -4243,16 +4249,73 @@ let plSplitH = (() => {
   const v = parseFloat(localStorage.getItem('todo_pl_split_h'));
   return Number.isFinite(v) ? Math.min(80, Math.max(20, v)) : 50;
 })();
+function plMarkActive() {
+  document.querySelectorAll('#pl-top tr[data-proj]').forEach(r =>
+    r.classList.toggle('pl-active', r.dataset.proj === plSplitProj));
+}
 function plSelectProject(p) {
   if (plSplitProj === p) return;
   plSplitProj = p;
   localStorage.setItem('todo_pl_split_proj', p);
-  renderProjectsList();
+  // Swap classes and redraw only the pane — rebuilding the table here would
+  // replace the row mid-gesture and eat the second click of a double-click
+  plMarkActive();
+  renderPlSplit();
 }
 function plCloseSplit() {
   plSplitProj = null;
   localStorage.removeItem('todo_pl_split_proj');
-  renderProjectsList();
+  plMarkActive();
+  renderPlSplit();
+}
+// Add a task to a project without leaving the Project List: show it below,
+// then open the same inline draft row the List view uses.
+function plAddTaskInline(proj) {
+  plSelectProject(proj);
+  nlOpenInlineAdd('', '');
+}
+
+// Builds (or tears down) the bottom pane on its own, without touching the table
+function renderPlSplit(keepScroll) {
+  const el = document.getElementById('projects-list-view');
+  if (!el) return;
+  const prev = document.getElementById('pl-split-body');
+  const scroll = keepScroll != null ? keepScroll : (prev ? prev.scrollTop : 0);
+  document.getElementById('pl-divider')?.remove();
+  document.getElementById('pl-split')?.remove();
+  if (!plSplitProj) return;
+
+  el.insertAdjacentHTML('beforeend', `
+    <div id="pl-divider" onmousedown="plSplitDragStart(event)" title="Drag to resize"></div>
+    <div id="pl-split" style="flex:0 0 ${plSplitH}%;">
+      <div id="pl-split-head">
+        <span class="pl-sh-name">${esc(plSplitProj)}</span>
+        <span style="color:var(--overlay0);font-size:0.74rem;">tasks</span>
+        <span style="flex:1;"></span>
+        <button class="pl-sh-btn" onclick="nlOpenInlineAdd('','')" title="Add a task to this project, right here">+ Task</button>
+        <button class="pl-sh-btn" onclick="openProjectTasks('${esc(plSplitProj)}')" title="Open this project full screen">⛶</button>
+        <button class="pl-sh-btn" onclick="plCloseSplit()" title="Close this pane">✕</button>
+      </div>
+      <div id="pl-split-body"></div>
+    </div>`);
+
+  const body = document.getElementById('pl-split-body');
+  // Same renderer the List view is on, so sort, column filters and showDone carry over
+  const paneTasks = getFiltered().filter(t => t.project === plSplitProj);
+  // The pane *is* one project, so Company and Project repeat on every row. Borrow
+  // the same "inside a project" state the drill-down uses, then hand it straight back.
+  const _fp = filterProject, _hid = new Set(nlColHidden);
+  filterProject = plSplitProj;
+  nlColHidden.add('company'); nlColHidden.add('project');
+  _nlDraftShown = false;   // the List view's wrapper normally resets this
+  try {
+    if (listMode === 'table') renderListTable(paneTasks, body, { pane: true });
+    else renderNiceList(paneTasks, body, { pane: true });
+  } finally {
+    filterProject = _fp;
+    nlColHidden.clear(); _hid.forEach(k => nlColHidden.add(k));
+  }
+  body.scrollTop = scroll;
 }
 
 function renderProjectsList() {
@@ -4370,22 +4433,24 @@ function renderProjectsList() {
             <button class="pl-pin${isPinned(p) ? ' on' : ''}" onclick="togglePin(event,'${esc(p)}')"
                     title="${isPinned(p) ? 'Pinned — click to unpin' : 'Pin to the top of the list'}">📌</button>
             <button class="tt-open-btn" onclick="event.stopPropagation();openProjectTasks('${esc(p)}')" title="Open this project's tasks full screen">⛶</button>
-            <input class="plist-name-inp" type="text" value="${esc(p)}" title="Type to rename · Enter to save · Esc to cancel"
-                   onclick="event.stopPropagation()"
-                   onfocus="this.select()"
+            <input class="plist-name-inp" type="text" value="${esc(p)}" readonly
+                   title="Click to show this project's tasks below · double-click to rename"
+                   onmousedown="event.preventDefault()"
+                   ondblclick="event.stopPropagation();plistNameEdit(this)"
+                   onblur="this.readOnly = true"
                    onchange="commitProjNameEdit(this,'${esc(p)}')"
                    onkeydown="plistNameKey(event,this,'${esc(p)}')">
           </div>
         </td>
-        <td class="plist-company-cell" onclick="event.stopPropagation();startProjCompanyEdit('${esc(p)}')">${esc(companyName)}</td>
-        <td class="plist-client-cell" onclick="event.stopPropagation();startProjClientEdit('${esc(p)}')" title="Click to set the client">${
+        <td class="plist-company-cell" ondblclick="event.stopPropagation();startProjCompanyEdit('${esc(p)}')" title="Double-click to set the company">${esc(companyName)}</td>
+        <td class="plist-client-cell" ondblclick="event.stopPropagation();startProjClientEdit('${esc(p)}')" title="Double-click to set the client">${
           clientName ? esc(clientName) : '<span style="color:var(--overlay0);">—</span>'}</td>
-        <td class="plist-status-cell" onclick="event.stopPropagation();startProjStatusEdit('${esc(p)}')">
+        <td class="plist-status-cell" ondblclick="event.stopPropagation();startProjStatusEdit('${esc(p)}')" title="Double-click to set the status">
           ${status ? `<span style="background:${statusColor(status)}22;color:${statusColor(status)};padding:2px 8px;border-radius:4px;font-weight:500;font-size:0.75rem;">${esc(statusName)}</span>` : statusName}
         </td>
         <td class="plist-due-cell" style="text-align:center;">
-          <span class="nl-c-due ${projDue && projDue < todayStr() ? 'late' : ''}" onclick="event.stopPropagation();plistDueMenu(event,'${esc(p)}')"
-                title="Click to set a due date">${projDue ? '📅 ' + formatDate(projDue) : '<span class="nl-empty">📅</span>'}</span>
+          <span class="nl-c-due ${projDue && projDue < todayStr() ? 'late' : ''}" ondblclick="event.stopPropagation();plistDueMenu(event,'${esc(p)}')"
+                title="Double-click to set a due date">${projDue ? '📅 ' + formatDate(projDue) : '<span class="nl-empty">📅</span>'}</span>
         </td>
         <td style="text-align:center;cursor:pointer;" onclick="event.stopPropagation();toggleProjBillable('${esc(p)}')"
             title="${projectMeta[p]?.billable ? 'Billable — done tasks auto-forward to accounting (click to turn off)' : 'Click to make this project billable'}">
@@ -4398,7 +4463,7 @@ function renderProjectsList() {
         <td>
           <div class="plist-actions">
             <button class="plist-btn" onclick="event.stopPropagation();deleteProject('${esc(p)}')" title="Delete">🗑</button>
-            <button class="plist-btn" onclick="event.stopPropagation();openAddModalForProject('${esc(p)}')" title="Add task">+ Task</button>
+            <button class="plist-btn" onclick="event.stopPropagation();plAddTaskInline('${esc(p)}')" title="Add a task without leaving this view">+ Task</button>
           </div>
         </td>
       </tr>`;
@@ -4491,40 +4556,8 @@ function renderProjectsList() {
     ${plBulkBarHtml()}`;
 
   // Split: the project table on top, the selected project's tasks below
-  el.innerHTML = `<div id="pl-top">${topHtml}</div>` + (plSplitProj ? `
-    <div id="pl-divider" onmousedown="plSplitDragStart(event)" title="Drag to resize"></div>
-    <div id="pl-split" style="flex:0 0 ${plSplitH}%;">
-      <div id="pl-split-head">
-        <span class="pl-sh-name">${esc(plSplitProj)}</span>
-        <span style="color:var(--overlay0);font-size:0.74rem;">tasks</span>
-        <span style="flex:1;"></span>
-        <button class="pl-sh-btn" onclick="openAddModalForProject('${esc(plSplitProj)}')" title="Add a task to this project">+ Task</button>
-        <button class="pl-sh-btn" onclick="openProjectTasks('${esc(plSplitProj)}')" title="Open this project full screen">⛶</button>
-        <button class="pl-sh-btn" onclick="plCloseSplit()" title="Close this pane">✕</button>
-      </div>
-      <div id="pl-split-body"></div>
-    </div>` : '');
-
-  if (plSplitProj) {
-    const body = document.getElementById('pl-split-body');
-    // Same renderer the List view is on, so sort, column filters and showDone carry over
-    const paneTasks = getFiltered().filter(t => t.project === plSplitProj);
-    // The pane *is* one project, so Company and Project repeat on every row. Borrow
-    // the same "inside a project" state the drill-down uses, then hand it straight back.
-    const _fp = filterProject, _hid = new Set(nlColHidden);
-    filterProject = plSplitProj;
-    nlColHidden.add('company'); nlColHidden.add('project');
-    try {
-      if (listMode === 'table') renderListTable(paneTasks, body, { pane: true });
-      else renderNiceList(paneTasks, body, { pane: true });
-    } finally {
-      filterProject = _fp;
-      nlColHidden.clear(); _hid.forEach(k => nlColHidden.add(k));
-    }
-    // Inline "+ Add task" has no project context down here — the header button does
-    body.querySelectorAll('.nl-add').forEach(el => el.remove());
-    body.scrollTop = _paneScroll;
-  }
+  el.innerHTML = `<div id="pl-top">${topHtml}</div>`;
+  renderPlSplit(_paneScroll);
   document.getElementById('pl-top').scrollTop = _topScroll;
 
   // keep typing uninterrupted: restore focus/caret into the column just edited
@@ -9708,7 +9741,11 @@ function nlCommitDraft() {
   const title = (d.title || '').trim();
   if (!title) return null;
   const ctx = _nlAddCtx || { field: '', key: '' };
-  const proj = ctx.field === 'project' && ctx.key ? ctx.key : (filterProject !== 'All' ? filterProject : '');
+  // In the Project List's split pane there is no filterProject to inherit —
+  // the pane itself says which project a new task belongs to.
+  const proj = ctx.field === 'project' && ctx.key ? ctx.key
+    : filterProject !== 'All' ? filterProject
+    : (currentView === 'projects-list' && plSplitProj) ? plSplitProj : '';
   const t = {
     id: uid(),
     title,
