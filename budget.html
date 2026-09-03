@@ -92,13 +92,70 @@
   .rep .card.wide{grid-column:1/-1;}
   .rep table{width:100%;} .rep td,.rep th{height:22px;}
   @media (max-width:800px){.side{width:200px;} .rep{grid-template-columns:1fr;} .band .title{min-width:120px;}}
+
+  /* ══ Mobile: iOS HomeBudget look (grouped lists, nav bar, bottom toolbar) ══ */
+  #m{display:none;}
+  body.mob{display:block;background:#f2f2f7;}
+  body.mob .side,body.mob .main{display:none;}
+  body.mob #m{display:flex;flex-direction:column;height:100%;font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f2f2f7;}
+  .m-nav{flex:none;background:#f8f8f8;border-bottom:1px solid #c6c6c8;padding:8px 10px calc(8px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;min-height:52px;}
+  .m-nav .side-btn{color:#007aff;font-size:16px;background:none;border:0;padding:4px 2px;cursor:pointer;white-space:nowrap;min-width:52px;}
+  .m-nav .side-btn.r{text-align:right;}
+  .m-nav .ttl{flex:1;text-align:center;line-height:1.15;min-width:0;}
+  .m-nav .ttl b{display:block;font-size:17px;font-weight:600;color:#000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .m-nav .ttl span{font-size:12px;color:#8e8e93;}
+  .m-nav .mo{display:flex;align-items:center;justify-content:center;gap:10px;}
+  .m-nav .arw{width:28px;height:28px;border-radius:50%;border:1.5px solid #007aff;color:#007aff;background:none;font-size:14px;line-height:1;cursor:pointer;flex:none;}
+  .m-nav .plus{font-size:26px;line-height:1;color:#007aff;background:none;border:0;cursor:pointer;padding:0 4px;}
+  .m-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .m-sec{background:#efeff4;color:#6d6d72;font-size:12px;font-weight:600;padding:6px 14px;border-top:1px solid #c6c6c8;border-bottom:1px solid #c6c6c8;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.02em;}
+  .m-sec .amt{margin-left:auto;font-variant-numeric:tabular-nums;}
+  .m-row{background:#fff;display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #e5e5ea;cursor:pointer;}
+  .m-row:active{background:#e5e5ea;}
+  .m-row .ico{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;}
+  .m-row .tx{flex:1;min-width:0;}
+  .m-row .tx b{display:block;font-size:15px;font-weight:400;color:#000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .m-row .tx span{font-size:12px;color:#8e8e93;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
+  .m-row .val{font-size:15px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+  .m-row .val small{display:block;font-size:11px;color:#8e8e93;}
+  .m-row .val.neg{color:#e5323a;} .m-row .val.pos{color:#2eaa4a;}
+  .m-row .dis{color:#c7c7cc;font-size:16px;flex:none;}
+  .m-row .chev{color:#8e8e93;font-size:12px;width:14px;flex:none;}
+  .m-row.grp{background:#fff;font-weight:600;}
+  .m-row.grp .tx b{font-weight:600;}
+  .m-row.w .tx b{color:var(--wh);}
+  .m-badge{margin-left:auto;color:#fff;border-radius:11px;padding:2px 9px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .m-tools{flex:none;background:#f8f8f8;border-top:1px solid #c6c6c8;padding:6px 10px calc(6px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;justify-content:center;min-height:44px;}
+  .m-seg{display:flex;border:1px solid #007aff;border-radius:6px;overflow:hidden;}
+  .m-seg button{background:#fff;color:#007aff;border:0;padding:5px 14px;font-size:13px;cursor:pointer;}
+  .m-seg button.on{background:#007aff;color:#fff;}
+  .m-tools .lnk{color:#007aff;font-size:14px;cursor:pointer;background:none;border:0;}
+  .m-tools .tot{font-size:13px;color:#3c3c43;font-weight:600;}
+  .m-find{width:100%;border:0;background:#e4e4e9;border-radius:9px;padding:8px 11px;font-size:15px;font-family:inherit;}
+  .m-empty{padding:50px 20px;text-align:center;color:#8e8e93;font-size:14px;}
+  .m-note{padding:10px 14px;color:#8e8e93;font-size:12px;}
+  /* dialogs become bottom sheets on a phone */
+  body.mob .ov{align-items:flex-end;}
+  body.mob .dlg{width:100%;max-width:none;border-radius:14px 14px 0 0;max-height:88vh;}
+  body.mob .dlg h3{border-radius:14px 14px 0 0;font-size:16px;padding:12px 16px;}
+  body.mob .dlg .body{grid-template-columns:100px 1fr;padding:14px 16px;}
+  body.mob .dlg input,body.mob .dlg select,body.mob .dlg textarea{font-size:16px;padding:8px;}
+  body.mob .dlg .acts{padding:12px 16px calc(12px + env(safe-area-inset-bottom));}
+  body.mob .btn{height:38px;}
+  /* desktop-only phone preview */
+  .phone-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:200;}
+  .phone-ov.on{display:flex;}
+  .phone-shell{background:#000;border-radius:46px;padding:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);position:relative;}
+  .phone-shell iframe{width:430px;height:932px;border:0;border-radius:36px;background:#fff;display:block;}
+  .phone-cap{position:absolute;bottom:-28px;left:0;right:0;text-align:center;color:#fff;font-size:12px;}
+  .phone-cap a{color:#8fd0ff;margin-left:10px;}
 </style>
 </head>
 <body>
 <div class="side">
   <div class="head"><a href="/accounting" title="Whish statements">‹</a><div class="t"><b>Budget</b><span id="side-month"></span></div><a href="/admin" title="Hub">⌂</a></div>
   <ul class="nav" id="nav"></ul>
-  <div class="foot"><span id="who"></span><span class="sp"></span><a onclick="openSettings()" title="Currencies & settings">⚙</a></div>
+  <div class="foot"><span id="who"></span><span class="sp"></span><a onclick="openPhone()" title="Preview the phone version (iPhone 15 Pro Max)">📱</a><a onclick="openSettings()" title="Currencies &amp; settings">⚙</a></div>
 </div>
 <div class="main">
   <div class="band">
@@ -109,8 +166,19 @@
   <div class="wrap" id="wrap"></div>
   <div class="foot"><span id="foot-left"></span><span class="tot" id="foot-total"></span><span id="foot-right"></span></div>
 </div>
+<div id="m">
+  <div class="m-nav" id="m-nav"></div>
+  <div class="m-body" id="m-body"></div>
+  <div class="m-tools" id="m-tools"></div>
+</div>
 <div class="msg" id="msg"></div>
 <div class="ov" id="ov" onclick="if(event.target===this)closeDlg()"><div class="dlg" id="dlg"></div></div>
+<div class="phone-ov" id="phone-ov" onclick="if(event.target===this)closePhone()">
+  <div class="phone-shell">
+    <div class="phone-cap">iPhone 15 Pro Max &middot; 430 &times; 932 <a href="/accounting/budget?mobile=1" target="_blank">open in a tab</a> <a href="#" onclick="closePhone();return false;">close</a></div>
+    <iframe id="phone-frame" title="Phone preview"></iframe>
+  </div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -195,7 +263,7 @@ const monthTransfers = ym => D.transfers.filter(e => inMonth(e.date, ym));
 const sum = (list, k = 'amount') => list.reduce((s, x) => s + (Number(x[k]) || 0), 0);
 
 // ── rendering ──
-function render() {
+function renderDesktop() {
   const [y, m] = S.ym.split('-');
   document.getElementById('side-month').textContent = MONTHS[+m - 1] + ' ' + y;
   const bal = balances();
@@ -232,7 +300,7 @@ function table(cols, rows, rowFn, foot) {
 const rowCls = e => (S.sel === e.id ? 'on ' : '') + (e.whish ? 'w' : '');
 const wtag = e => e.whish ? '<span class="tag">W</span>' : '';
 
-function draw() {
+function drawDesktop() {
   S.sort[S.screen] = S.sort[S.screen] || { k: 'date', dir: -1 };
   const b = balances();
   if (S.screen === 'expenses') {
@@ -426,6 +494,236 @@ function drawReports() {
   charts.push(new Chart(document.getElementById('c2'), { type: 'bar', data: { labels: months.map(m => MONTHS[+m.slice(5) - 1].slice(0, 3) + ' ' + m.slice(2, 4)), datasets: [{ label: 'Income', data: mInc, backgroundColor: '#2eaa4a' }, { label: 'Expenses', data: mExp, backgroundColor: '#e5323a' }] }, options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'top' } } } }));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mobile — the iOS HomeBudget / Finances layout: a menu screen with coloured
+// badges, drill-down screens with a nav bar and month arrows, grouped lists.
+// It shares every data function and every add/edit dialog with the desktop
+// view; only the chrome and the list rendering differ.
+// ═══════════════════════════════════════════════════════════════════════════
+const MOBILE = /[?&]mobile=1/.test(location.search) || (!/[?&]desktop=1/.test(location.search) && matchMedia('(max-width: 700px)').matches);
+function render() { document.body.classList.toggle('mob', MOBILE); return MOBILE ? mRender() : renderDesktop(); }
+function draw() { return MOBILE ? mDraw() : drawDesktop(); }
+
+// desktop-only preview of the phone build
+function openPhone() {
+  document.getElementById('phone-frame').src = '/accounting/budget?mobile=1';
+  document.getElementById('phone-ov').className = 'phone-ov on';
+}
+function closePhone() { document.getElementById('phone-ov').className = 'phone-ov'; document.getElementById('phone-frame').src = 'about:blank'; }
+
+const M_MENU = [
+  { id: 'expenses',   ico: '\U0001F7E5', lbl: 'Expenses',   c: '#e5323a' },
+  { id: 'income',     ico: '\U0001F4B5', lbl: 'Income',     c: '#2eaa4a' },
+  { id: 'transfers',  ico: '\U0001F501', lbl: 'Transfers',  c: '#16a085' },
+  { id: 'accounts',   ico: '\U0001F3E6', lbl: 'Accounts',   c: '#2d8fe0' },
+  { id: 'payees',     ico: '\U0001F465', lbl: 'Payees' },
+  { id: 'categories', ico: '\U0001F5C2', lbl: 'Categories' },
+  { id: 'reports',    ico: '\U0001F4C8', lbl: 'Reports' },
+  { id: 'search',     ico: '\U0001F50D', lbl: 'Search' },
+];
+const M_COLORS = ['#e5323a', '#2d8fe0', '#2eaa4a', '#f39c12', '#8e44ad', '#16a085', '#d35400', '#7f8c8d', '#c0392b', '#27ae60', '#2980b9', '#6b5bd6'];
+const mColor = key => M_COLORS[[...String(key || '?')].reduce((h, c) => h + c.charCodeAt(0), 0) % M_COLORS.length];
+const mIcon = (name, key) => `<span class="ico" style="background:${mColor(key || name)}">${esc((name || '?').trim().charAt(0).toUpperCase())}</span>`;
+const mMoney = n => money(n);
+
+function mNav(opts) {
+  const left = opts.back === false ? '<span class="side-btn"></span>'
+    : `<button class="side-btn" onclick="${opts.backFn || 'mHome()'}">\u2039 ${esc(opts.backLbl || 'Menu')}</button>`;
+  const right = opts.add === false ? '<span class="side-btn r"></span>'
+    : `<span class="side-btn r"><button class="plus" onclick="addCurrent()">+</button></span>`;
+  const title = opts.month
+    ? `<div class="ttl mo"><button class="arw" onclick="shiftMonth(-1)">\u2039</button><div><b>${esc(opts.title)}</b><span>${esc(opts.sub || '')}</span></div><button class="arw" onclick="shiftMonth(1)">\u203a</button></div>`
+    : `<div class="ttl"><b>${esc(opts.title)}</b>${opts.sub ? `<span>${esc(opts.sub)}</span>` : ''}</div>`;
+  document.getElementById('m-nav').innerHTML = left + title + right;
+}
+function mHome() { S.screen = 'home'; S.ledger = null; render(); }
+function mGo(id) { S.screen = id; S.ledger = null; render(); }
+
+function mRender() {
+  const [y, mo] = S.ym.split('-');
+  const bal = balances();
+  if (S.screen === 'home' || !S.screen) {
+    const incl = D.accounts.filter(a => a.include).reduce((t, a) => t + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
+    const badge = { expenses: sum(monthExpenses(S.ym)), income: sum(monthIncome(S.ym)), transfers: sum(monthTransfers(S.ym)), accounts: incl };
+    mNav({ back: false, add: false, title: 'Budget', sub: MONTHS[+mo - 1] + ' ' + y });
+    document.getElementById('m-body').innerHTML = M_MENU.map(x =>
+      `<div class="m-row" onclick="mGo('${x.id}')"><span class="ico" style="background:transparent;font-size:19px">${x.ico}</span>
+        <div class="tx"><b>${x.lbl}</b></div>
+        ${x.c ? `<span class="m-badge" style="background:${x.c}">${mMoney(badge[x.id])}</span>` : ''}<span class="dis">\u203a</span></div>`).join('')
+      + `<div class="m-note">Signed in as ${esc((Admin.me || {}).email || '')} \u00b7 <span style="color:#007aff" onclick="openSettings()">Settings</span></div>`;
+    document.getElementById('m-tools').innerHTML = `<span class="tot">Accounts total ${mMoney(incl)}</span>`;
+    return;
+  }
+  const monthly = ['expenses', 'income', 'transfers'].includes(S.screen);
+  const lbl = (M_MENU.find(x => x.id === S.screen) || {}).lbl || 'Budget';
+  if (monthly) {
+    const t = { expenses: sum(monthExpenses(S.ym)), income: sum(monthIncome(S.ym)), transfers: sum(monthTransfers(S.ym)) }[S.screen];
+    mNav({ month: true, title: MONTHS[+mo - 1] + ' ' + y, sub: mMoney(t) });
+  } else if (S.screen === 'accounts' && S.ledger) {
+    const a = accById(S.ledger);
+    mNav({ backLbl: 'Accounts', backFn: "mGo('accounts')", add: false, title: a ? a.name : 'Account', sub: a ? money(bal[a.id], a.currency) : '' });
+  } else if (S.screen === 'accounts') {
+    const incl = D.accounts.filter(x => x.include).reduce((t, x) => t + (x.currency === D.settings.baseCurrency ? bal[x.id] : toBase(bal[x.id], x.currency)), 0);
+    mNav({ title: 'Accounts', sub: mMoney(incl) });
+  } else mNav({ title: lbl, add: !['reports', 'search'].includes(S.screen) });
+  mDraw();
+}
+
+// what to call a row: a Whish line is best known by its merchant / phone owner
+function mTitle(e, inc) {
+  if (e.whish) return payeeName(e.payeeId) || e.payeeLabel || subName(e.subId) || 'Whish';
+  if (inc) return e.name || 'Income';
+  return subName(e.subId) || catName(e.catId) || '(uncategorised)';
+}
+function mSec(label, amount) { return `<div class="m-sec"><span>${esc(label)}</span>${amount != null ? `<span class="amt">${mMoney(amount)}</span>` : ''}</div>`; }
+function mEntry(o) {
+  return `<div class="m-row ${o.w ? 'w' : ''}" onclick="${o.tap}">${o.icon || ''}
+    <div class="tx"><b>${esc(o.title)}</b>${o.sub ? `<span>${esc(o.sub)}</span>` : ''}</div>
+    <div class="val ${o.cls || ''}">${o.value}${o.value2 ? `<small>${esc(o.value2)}</small>` : ''}</div><span class="dis">\u203a</span></div>`;
+}
+const mBody = html => document.getElementById('m-body').innerHTML = html || '<div class="m-empty">Nothing here yet.<br>Tap + to add an entry.</div>';
+const mTools = html => document.getElementById('m-tools').innerHTML = html || '';
+
+function mDraw() {
+  const bal = balances();
+  S.mBy = S.mBy || 'cat';
+  if (S.screen === 'expenses' || S.screen === 'income') {
+    const inc = S.screen === 'income';
+    const list = inc ? monthIncome(S.ym) : monthExpenses(S.ym);
+    const row = e => mEntry({
+      w: e.whish, tap: `edit('${inc ? 'income' : 'expenses'}','${e.id}')`,
+      icon: mIcon(mTitle(e, inc), inc ? 'income' : e.catId),
+      title: mTitle(e, inc),
+      sub: [dmy(e.date), e.whish ? '' : (payeeName(e.payeeId) || ''), e.notes].filter(Boolean).join(' \u00b7 '),
+      value: mMoney(e.amount), value2: e.currency !== 'USD' ? e.currency + ' ' + num(e.currencyAmount) : '', cls: inc ? 'pos' : ''
+    });
+    if (inc || S.mBy === 'date') {
+      mBody(list.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).map(row).join(''));
+    } else {
+      const cats = {};
+      for (const e of list) (cats[e.catId] = cats[e.catId] || []).push(e);
+      const order = Object.keys(cats).sort((a, b) => sum(cats[b]) - sum(cats[a]));
+      mBody(order.map(c => {
+        const open = !!S.open['c' + c];
+        return `<div class="m-row grp" onclick="S.open['c${c}']=!S.open['c${c}'];mDraw()"><span class="chev">${open ? '\u25be' : '\u203a'}</span>
+          <div class="tx"><b>${esc(catName(c) || '(uncategorised)')}</b><span>${cats[c].length} entr${cats[c].length > 1 ? 'ies' : 'y'}</span></div>
+          <div class="val">${mMoney(sum(cats[c]))}</div></div>`
+          + (open ? cats[c].slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map(row).join('') : '');
+      }).join(''));
+    }
+    mTools(inc ? `<span class="tot">Total ${mMoney(sum(list))}</span>`
+      : `<div class="m-seg"><button class="${S.mBy === 'cat' ? 'on' : ''}" onclick="S.mBy='cat';mDraw()">By Category</button><button class="${S.mBy === 'date' ? 'on' : ''}" onclick="S.mBy='date';mDraw()">By Date</button></div><span class="tot">${mMoney(sum(list))}</span>`);
+  } else if (S.screen === 'transfers') {
+    const list = monthTransfers(S.ym).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+    mBody(list.map(t => mEntry({ tap: `edit('transfers','${t.id}')`, icon: mIcon('T', 'transfer'),
+      title: accName(t.fromId) + ' \u2192 ' + accName(t.toId), sub: [dmy(t.date), t.notes].filter(Boolean).join(' \u00b7 '), value: mMoney(t.amount) })).join(''));
+    mTools(`<span class="tot">Total ${mMoney(sum(list))}</span>`);
+  } else if (S.screen === 'accounts' && S.ledger) {
+    mLedger(S.ledger, bal);
+  } else if (S.screen === 'accounts') {
+    const q = (S.accQ || '').trim().toLowerCase();
+    const rows = D.accounts.map(a => ({ ...a, balance: bal[a.id], usd: a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency) }))
+      .filter(a => !q || (a.name + ' ' + (a.type || '')).toLowerCase().includes(q))
+      .sort((a, b) => by('type')(a, b) || by('name')(a, b));
+    const groups = [...new Set(rows.map(a => a.type || ''))];
+    S.mGroups = groups;
+    let html = `<div style="padding:8px 12px;background:#fff;border-bottom:1px solid #e5e5ea"><input class="m-find" type="search" placeholder="Find an account" value="${esc(S.accQ || '')}" oninput="S.accQ=this.value;mDraw()"></div>`;
+    for (const g of groups) {
+      const mine = rows.filter(a => (a.type || '') === g);
+      const open = !!S.open[g] || !!q;
+      html += `<div class="m-row grp" onclick="mToggleGroup(${groups.indexOf(g)})"><span class="chev">${open ? '\u25be' : '\u203a'}</span>
+        <div class="tx"><b>${esc(g || '(no type)')}</b><span>${mine.length} account${mine.length > 1 ? 's' : ''}</span></div>
+        <div class="val">${mMoney(mine.reduce((t, a) => t + a.usd, 0))}</div></div>`;
+      if (open) html += mine.map(a => mEntry({ tap: `mOpenLedger('${a.id}')`, icon: mIcon(a.name, a.type),
+        title: a.name, sub: (a.include ? '' : 'excluded from total') + (a.id === D.settings.whishAccountId ? (a.include ? 'Whish statement' : ' \u00b7 Whish statement') : ''),
+        value: money(a.balance, a.currency), value2: a.currency !== 'USD' ? mMoney(a.usd) : '', cls: a.balance < 0 ? 'neg' : '' })).join('');
+    }
+    mBody(html);
+    const incl = rows.filter(a => a.include).reduce((t, a) => t + a.usd, 0);
+    mTools(`<button class="lnk" onclick="mToggleAll()">${groups.every(g => S.open[g]) ? 'Collapse all' : 'Expand all'}</button><span class="tot">${q ? rows.length + ' shown \u00b7 ' : ''}${mMoney(incl)}</span>`);
+  } else if (S.screen === 'payees') {
+    const stats = {};
+    for (const e of D.expenses) if (e.payeeId) { stats[e.payeeId] = stats[e.payeeId] || { n: 0, t: 0 }; stats[e.payeeId].n++; stats[e.payeeId].t += e.amount; }
+    mBody(D.payees.slice().sort(by('name')).map(x => mEntry({ tap: `edit('payees','${x.id}')`, icon: mIcon(x.name, x.id),
+      title: x.name, sub: [x.phone, (stats[x.id] || {}).n ? stats[x.id].n + ' expenses' : ''].filter(Boolean).join(' \u00b7 '),
+      value: mMoney((stats[x.id] || {}).t || 0) })).join(''));
+    mTools(`<span class="tot">${D.payees.length} payees</span>`);
+  } else if (S.screen === 'categories') {
+    const stats = {};
+    for (const e of [...D.expenses, ...wExpenses()]) { stats[e.catId] = (stats[e.catId] || 0) + e.amount; stats['s' + e.subId] = (stats['s' + e.subId] || 0) + e.amount; }
+    let html = '';
+    for (const c of D.categories.slice().sort((a, b) => (a.seq - b.seq) || by('name')(a, b))) {
+      const subs = D.subCategories.filter(x => x.catId === c.id).sort((a, b) => (a.seq - b.seq) || by('name')(a, b));
+      const open = !!S.open['k' + c.id];
+      html += `<div class="m-row grp" onclick="S.open['k${c.id}']=!S.open['k${c.id}'];mDraw()"><span class="chev">${subs.length ? (open ? '\u25be' : '\u203a') : ''}</span>
+        ${mIcon(c.name, c.id)}<div class="tx"><b>${esc(c.name)}</b><span>${subs.length} subcategor${subs.length === 1 ? 'y' : 'ies'}</span></div>
+        <div class="val">${mMoney(stats[c.id])}</div></div>`;
+      if (open) html += subs.map(x => mEntry({ tap: `edit('subCategories','${x.id}')`, title: '\u2003' + x.name, value: mMoney(stats['s' + x.id]) })).join('');
+    }
+    mBody(html);
+    mTools(`<button class="lnk" onclick="edit('categories',null)">+ Category</button>`);
+  } else if (S.screen === 'search') {
+    const q = (S.q || '').trim().toLowerCase();
+    let rows = [];
+    for (const e of [...D.expenses, ...wExpenses()]) rows.push({ id: e.id, kind: 'expenses', date: e.date, what: mTitle(e, false), who: e.whish ? catName(e.catId) : (payeeName(e.payeeId) || ''), notes: e.notes, amount: -e.amount, whish: e.whish });
+    for (const e of [...D.income, ...wIncome()]) rows.push({ id: e.id, kind: 'income', date: e.date, what: e.name || 'Income', who: '', notes: e.notes, amount: e.amount, whish: e.whish });
+    for (const t of D.transfers) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: accName(t.fromId) + ' \u2192 ' + accName(t.toId), who: '', notes: t.notes, amount: t.amount });
+    rows = q ? rows.filter(r => [r.what, r.who, r.notes, String(r.amount)].join(' ').toLowerCase().includes(q)) : [];
+    const head = `<div style="padding:8px 12px;background:#fff;border-bottom:1px solid #e5e5ea"><input class="m-find" type="search" placeholder="Search everything" value="${esc(S.q || '')}" oninput="S.q=this.value;mDraw()"></div>`;
+    mBody(head + (q
+      ? (rows.length ? rows.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 300).map(r => mEntry({
+          w: r.whish, tap: `edit('${r.kind}','${r.id}')`, icon: mIcon(r.what, r.kind), title: r.what,
+          sub: [dmy(r.date), r.who, r.notes].filter(Boolean).join(' \u00b7 '), value: mMoney(r.amount), cls: r.amount < 0 ? 'neg' : 'pos'
+        })).join('') : '<div class="m-empty">No match.</div>')
+      : '<div class="m-empty">Type to search expenses, income and transfers.</div>'));
+    mTools(q ? `<span class="tot">${rows.length} match${rows.length === 1 ? '' : 'es'}</span>` : '');
+  } else if (S.screen === 'reports') {
+    const ym = S.ym, exp = monthExpenses(ym), inc = monthIncome(ym), tot = sum(exp);
+    const cats = Object.entries(exp.reduce((o, e) => { o[e.catId] = (o[e.catId] || 0) + e.amount; return o; }, {}))
+      .map(([id, v]) => ({ name: catName(id) || '(none)', v, id })).sort((a, b) => b.v - a.v);
+    mBody(mSec(MONTHS[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4))
+      + mEntry({ tap: "mGo('income')", icon: mIcon('I', 'income'), title: 'Income', value: mMoney(sum(inc)), cls: 'pos' })
+      + mEntry({ tap: "mGo('expenses')", icon: mIcon('E', 'expenses'), title: 'Expenses', value: mMoney(tot), cls: 'neg' })
+      + mEntry({ tap: "mGo('expenses')", icon: mIcon('N', 'net'), title: 'Net', value: mMoney(sum(inc) - tot), cls: sum(inc) - tot < 0 ? 'neg' : 'pos' })
+      + mSec('By category', tot)
+      + cats.map(c => `<div class="m-row"><div class="tx"><b>${esc(c.name)}</b>
+          <span style="display:block;height:4px;margin-top:4px;border-radius:2px;background:${mColor(c.id)};width:${tot ? Math.max(2, Math.round(c.v / tot * 100)) : 0}%"></span></div>
+          <div class="val">${mMoney(c.v)}<small>${tot ? Math.round(c.v / tot * 100) : 0}%</small></div></div>`).join(''));
+    mTools(`<button class="lnk" onclick="shiftMonth(-1)">\u2039 Previous</button><span class="tot">${MONTHS[+ym.slice(5) - 1]}</span><button class="lnk" onclick="shiftMonth(1)">Next \u203a</button>`);
+  }
+}
+function mToggleGroup(i) { const g = (S.mGroups || [])[i]; S.open[g] = !S.open[g]; mDraw(); }
+function mToggleAll() {
+  const groups = [...new Set(D.accounts.map(a => a.type || ''))];
+  const close = groups.every(g => S.open[g]);
+  groups.forEach(g => S.open[g] = !close);
+  mDraw();
+}
+function mOpenLedger(id) { S.ledger = id; render(); }
+function mLedger(id, bal) {
+  const a = accById(id); if (!a) return;
+  const eff = e => e.accAmount != null ? e.accAmount : e.amount;
+  let rows = [];
+  for (const e of D.expenses) if (e.accountId === id) rows.push({ id: e.id, kind: 'expenses', date: e.date, what: subName(e.subId) || catName(e.catId), who: payeeName(e.payeeId), delta: -eff(e) });
+  for (const e of D.income) if (e.accountId === id) rows.push({ id: e.id, kind: 'income', date: e.date, what: e.name || 'Income', who: '', delta: eff(e) });
+  for (const t of D.transfers) {
+    if (t.fromId === id) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer to ' + accName(t.toId), delta: -(t.fromAmount != null ? t.fromAmount : t.amount) });
+    if (t.toId === id) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: 'Transfer from ' + accName(t.fromId), delta: t.toAmount != null ? t.toAmount : t.amount });
+  }
+  for (const w of whishRows()) if (w.accountId === id) rows.push({ id: w.id, whish: true, kind: w.kind === 'expense' ? 'expenses' : 'income', date: w.date, what: w.payeeLabel || w.service, who: w.notes, delta: w.kind === 'expense' ? -w.amount : w.amount, sbal: w.balance });
+  rows.sort((x, y) => by('date')(x, y) || by('id')(x, y));
+  let run = a.opening || 0;
+  for (const r of rows) { run += r.delta; r.run = r.sbal != null ? r.sbal : run; }
+  rows.reverse();
+  mBody(mSec(a.type || 'account', bal[id]) + rows.map(r => mEntry({
+    w: r.whish, tap: `edit('${r.kind}','${r.id}')`, icon: mIcon(r.what, r.kind), title: r.what,
+    sub: [dmy(r.date), r.who].filter(Boolean).join(' \u00b7 '),
+    value: num(r.delta), value2: 'bal ' + num(r.run), cls: r.delta < 0 ? 'neg' : 'pos'
+  })).join(''));
+  mTools(`<span class="tot">${rows.length} movements \u00b7 ${money(bal[id], a.currency)}</span><button class="lnk" onclick="edit('accounts','${id}')">Edit</button>`);
+}
+
 // ── modals ──
 function closeDlg() { document.getElementById('ov').className = 'ov'; }
 function dlg(title, fields, acts) {
@@ -571,14 +869,21 @@ function openSettings() {
     await post('settings', data); Object.assign(D.settings, data); say('Saved'); render();
   };
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDlg(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDlg(); closePhone(); } });
 
 // ── boot ──
 Admin.require('accounting', async () => {
+  if (MOBILE) { document.body.classList.add('mob'); document.getElementById('m-body').innerHTML = '<div class="m-empty">Loading…</div>'; }
   document.getElementById('wrap').innerHTML = '<div class="empty">Loading…</div>';
   try { D = await Admin.api('GET', API + 'all'); }
-  catch (e) { document.getElementById('wrap').innerHTML = `<div class="empty">Could not load: ${esc(e.message)}</div>`; return; }
+  catch (e) {
+    const msg = `Could not load: ${esc(e.message)}`;
+    document.getElementById('wrap').innerHTML = `<div class="empty">${msg}</div>`;
+    document.getElementById('m-body').innerHTML = `<div class="m-empty">${msg}</div>`;
+    return;
+  }
   D.whishMap = D.whishMap || []; D.whish = D.whish || [];
+  if (MOBILE) S.screen = 'home';
   render();
 });
 </script>

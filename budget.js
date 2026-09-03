@@ -52,12 +52,14 @@ async function whishLines(ws) {
     for (const d of tx.docs) {
       const t = d.data();
       const contact = t.phone ? (contacts[t.phone] || '') : '';
+      // a number nobody has named yet reads better as a local Lebanese number
+      const local = t.phone ? '0' + String(t.phone).replace(/^961/, '') : '';
       out.push({
         id: d.id, whishAccount: a.id, date: t.date || '', ref: t.ref || '', service: t.service || '',
         phone: t.phone || '', contact,
         // payee = owner of the phone number, else the merchant name on the statement
-        payeeLabel: contact || t.name || t.description || (t.phone ? '0' + String(t.phone).replace(/^961/, '') : ''),
-        who: contact || t.name || t.description || (t.phone ? '0' + String(t.phone).replace(/^961/, '') : ''),
+        payeeLabel: contact || t.name || local || t.description || '',
+        who: contact || t.name || local || t.description || '',
         debit: t.debit || 0, credit: t.credit || 0, balance: t.balance ?? null,
         note: t.note || '', kind: t.kind || '', analyticName: t.analyticName || ''
       });
