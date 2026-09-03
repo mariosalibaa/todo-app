@@ -52,6 +52,7 @@
   /* where a value came from */
   td.src-auto input,td.src-auto select,td.src-auto{color:var(--auto);font-style:italic;}
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
+  td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:#8ab0e6;}
   .c-contact{min-width:150px;} .c-note{min-width:180px;} .c-proj{min-width:180px;} .c-kind{width:96px;}
   .ref{color:var(--muted);font-size:11px;}
@@ -90,6 +91,7 @@
 <div class="legend">
   <span><i style="background:#fff"></i>From the Whish statement</span>
   <span style="color:var(--auto);font-style:italic"><i style="background:#fff;border-color:var(--auto)"></i>Filled automatically (Google contact / suggestion) — not confirmed</span>
+  <span style="color:var(--odoo);font-weight:600"><i style="background:#fff;border-color:var(--odoo)"></i>From Odoo — partner of the matched payment / analytic account of its reconciled invoice</span>
   <span><i style="background:var(--manual-bg)"></i>Filled by you</span>
   <span class="clr" id="clr" onclick="clearFilters()">✕ Clear column filters</span>
 </div>
@@ -174,6 +176,7 @@ function contactName(t) {
   if (c && c.name) return { name: c.name, src: c.source === 'manual' ? 'manual' : 'auto' };
   if (t.name) return { name: t.name, src: 'whish' };
   if (t.phone && KNOWN[t.phone]) return { name: KNOWN[t.phone], src: 'auto' };
+  if (t.odooPartner) return { name: t.odooPartner, src: 'odoo' };
   return { name: '', src: '' };
 }
 // last value used for the same phone number → suggestion for untagged rows
@@ -182,7 +185,8 @@ function lastFor(t, field) {
   for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o[field] && o.id !== t.id) return o[field]; }
   return '';
 }
-const srcClass = s => s === 'manual' ? 'src-manual' : (s === 'suggest' || s === 'auto' || s === 'google') ? 'src-auto' : '';
+const srcClass = s => s === 'manual' ? 'src-manual' : s === 'odoo' ? 'src-odoo'
+  : (s === 'suggest' || s === 'auto' || s === 'google') ? 'src-auto' : '';
 
 // ── Header + column filters ──
 function buildHeader() {
@@ -257,13 +261,21 @@ function visible() {
   return list;
 }
 
+const matchTip = x => [x.move, x.date, x.company, x.partner || x.label,
+  (x.docs || []).length ? '↳ ' + x.docs.join(', ') : '',
+  (x.analytics || []).length ? '↳ project ' + x.analytics.map(a => a.name).join(', ') : '',
+  (x.why || []).length ? '(' + x.why.join(', ') + ')' : ''].filter(Boolean).join(' · ');
 function odooCell(t) {
   if (!t.odoo) return '<span class="odoo-no" title="Not checked yet">·</span>';
   const m = t.odoo.matches || [];
   if (!m.length) return '<span class="odoo-no" title="Checked ' + esc(t.odoo.checkedAt.slice(0, 10)) + ': nothing found in the Whish journals">—</span>';
-  const tip = m.map(x => `${x.move} · ${x.date} · ${x.company} · ${x.partner || x.label}`).join('\n');
-  if (m.length === 1) return `<a class="odoo-ok" target="_blank" href="${ODOO}${m[0].moveId}" title="${esc(tip)}">✓ ${esc(m[0].move)}</a>`;
-  return `<span class="odoo-multi" title="${esc(tip)}">${m.length} matches</span>`;
+  const win = m.find(x => x.chosen);
+  if (win) {
+    const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
+    return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`;
+  }
+  const tip = m.map(matchTip).join('\n');
+  return `<span class="odoo-multi" title="${esc(tip)}">${m.length} possible — pick one</span>`;
 }
 
 function render() {
@@ -293,7 +305,7 @@ function render() {
         <option value="" ${!t.kind ? 'selected' : ''}>${sk ? '↳ ' + sk + '?' : '—'}</option>
         <option value="work" ${t.kind === 'work' ? 'selected' : ''}>Work</option>
         <option value="personal" ${t.kind === 'personal' ? 'selected' : ''}>Personal</option></select></td>
-      <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="${sug ? '↳ ' + esc(sug) + ' (Enter)' : 'project'}" data-sug="${esc(sug)}"
+      <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'reconciled document')) : ''}"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="${sug ? '↳ ' + esc(sug) + ' (Enter)' : 'project'}" data-sug="${esc(sug)}"
         onkeydown="if(event.key==='Enter'&&!this.value&&this.dataset.sug){this.value=this.dataset.sug;this.dataset.accepted='1';this.dispatchEvent(new Event('change'));}"
         onchange="saveAnalytic('${t.id}', this)"></td>
       <td class="num debit">${fmt(t.debit)}</td>
@@ -462,11 +474,11 @@ async function checkOdoo() {
   say(`Checking ${ids.length} lines against the Odoo Whish journals…`);
   try {
     const found = await Admin.api('POST', `/api/accounting/whish/${acc}/odoo-check`, { ids });
-    const at = new Date().toISOString();
-    let hits = 0;
-    for (const t of tx) if (found[t.id]) { t.odoo = { checkedAt: at, matches: found[t.id] }; if (found[t.id].length) hits++; }
+    const hits = Object.values(found).filter(m => m.length).length;
+    const withProject = Object.values(found).filter(m => ((m.find(x => x.chosen) || {}).analytics || []).length).length;
+    tx = await Admin.api('GET', `/api/accounting/whish/${acc}/tx`);   // the check may have filled projects
     render();
-    say(`Odoo: ${hits} of ${ids.length} lines found in the Whish journals`);
+    say(`Odoo: ${hits} of ${ids.length} lines found` + (withProject ? `, ${withProject} project${withProject > 1 ? 's' : ''} taken from the reconciled invoice` : ''));
   } catch (e) { say('Odoo check failed: ' + e.message, 'err'); }
   b.disabled = false;
 }

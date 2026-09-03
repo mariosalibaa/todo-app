@@ -212,36 +212,154 @@ async function whishJournals(odooCall) {
   return _whishJournals;
 }
 
-// Find journal items on the Whish cash accounts with the same amount within
-// ±3 days of each statement line.
+// ── Name similarity ────────────────────────────────────────────────────────
+// "ELIE ABOU RJEILI" (Whish) vs "Elie Abou Rjayle EAR" (Odoo): shared words
+// plus a bigram score, so spelling drift in transliterated names still scores.
+const norm = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const bigrams = s => { const g = new Set(); const t = s.replace(/ /g, ''); for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2)); return g; };
+function similarity(a, b) {
+  a = norm(a); b = norm(b);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const wa = a.split(' ').filter(w => w.length > 2), wb = b.split(' ').filter(w => w.length > 2);
+  const shared = wa.filter(w => wb.includes(w)).length;
+  const words = wa.length && wb.length ? shared / Math.min(wa.length, wb.length) : 0;
+  const ga = bigrams(a), gb = bigrams(b);
+  let inter = 0; for (const g of ga) if (gb.has(g)) inter++;
+  const dice = (ga.size + gb.size) ? (2 * inter) / (ga.size + gb.size) : 0;
+  return Math.max(words, dice);
+}
+
+// Analytic accounts reachable from a payment: never on the payment itself
+// (it hits receivable/payable), always on the invoice/bill it is reconciled
+// with — payment line → partial reconcile → counterpart doc → product lines.
+async function analyticOfMoves(odooCall, moveIds, ctx) {
+  const out = {};
+  if (!moveIds.length) return out;
+  const L = await odooCall('account.move.line', 'search_read', [[['move_id', 'in', moveIds]]],
+    { fields: ['id', 'move_id', 'analytic_distribution', 'matched_debit_ids', 'matched_credit_ids'], context: ctx, limit: 5000 });
+  const partialIds = [...new Set(L.flatMap(l => [...(l.matched_debit_ids || []), ...(l.matched_credit_ids || [])]))];
+  const P = partialIds.length ? await odooCall('account.partial.reconcile', 'search_read', [[['id', 'in', partialIds]]],
+    { fields: ['id', 'debit_move_id', 'credit_move_id'], context: ctx, limit: 5000 }) : [];
+  const own = new Set(L.map(l => l.id));
+  const cpIds = [...new Set(P.flatMap(p => [p.debit_move_id[0], p.credit_move_id[0]]))].filter(id => !own.has(id));
+  const CP = cpIds.length ? await odooCall('account.move.line', 'search_read', [[['id', 'in', cpIds]]],
+    { fields: ['id', 'move_id'], context: ctx, limit: 5000 }) : [];
+  const docIds = [...new Set(CP.map(l => l.move_id[0]))];
+  const DL = docIds.length ? await odooCall('account.move.line', 'search_read', [[['move_id', 'in', docIds], ['display_type', '=', 'product']]],
+    { fields: ['move_id', 'analytic_distribution'], context: ctx, limit: 5000 }) : [];
+  const anIds = [...new Set([...L, ...DL].flatMap(l => Object.keys(l.analytic_distribution || {})).flatMap(k => k.split(',')))].map(Number).filter(Boolean);
+  const AN = anIds.length ? await odooCall('account.analytic.account', 'search_read', [[['id', 'in', anIds]]],
+    { fields: ['id', 'name', 'company_id'], context: ctx }) : [];
+  const byId = Object.fromEntries(AN.map(a => [a.id, a]));
+  const docOfLine = Object.fromEntries(CP.map(l => [l.id, l.move_id]));
+  const anOfDoc = {};
+  for (const l of DL) for (const k of Object.keys(l.analytic_distribution || {})) for (const p of k.split(','))
+    (anOfDoc[l.move_id[0]] = anOfDoc[l.move_id[0]] || new Set()).add(+p);
+
+  for (const l of L) {
+    const mv = l.move_id[0];
+    const rec = out[mv] = out[mv] || { analytics: [], docs: [] };
+    // analytic straight on the payment (rare, but honour it)
+    for (const k of Object.keys(l.analytic_distribution || {})) for (const p of k.split(',')) {
+      const a = byId[+p]; if (a && !rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: 'payment' });
+    }
+    for (const pid of [...(l.matched_debit_ids || []), ...(l.matched_credit_ids || [])]) {
+      const pr = P.find(x => x.id === pid); if (!pr) continue;
+      for (const li of [pr.debit_move_id[0], pr.credit_move_id[0]]) {
+        const doc = docOfLine[li]; if (!doc) continue;
+        if (!rec.docs.includes(doc[1])) rec.docs.push(doc[1]);
+        for (const p of (anOfDoc[doc[0]] || [])) {
+          const a = byId[p]; if (a && !rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: doc[1] });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// Match statement lines against the Odoo Whish journals.
+// Same amount within ±3 days is only a candidate: several real payments often
+// share both. Candidates are scored (exact date, partner-name similarity, the
+// phone in the label) and assigned ONE-TO-ONE — a payment already claimed by a
+// better-fitting statement line cannot be reused — so a row is called
+// ambiguous only when two candidates genuinely tie.
 async function odooCheck(odooCall, txs) {
   const { rows: journals, ctx } = await whishJournals(odooCall);
   if (!journals.length) return {};
   const accIds = journals.map(j => j.default_account_id && j.default_account_id[0]).filter(Boolean);
   const dates = txs.map(t => t.date).sort();
   const shift = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const days = (a, b) => Math.round(Math.abs(new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000);
   const lines = await odooCall('account.move.line', 'search_read', [[
     ['account_id', 'in', accIds], ['date', '>=', shift(dates[0], -3)], ['date', '<=', shift(dates[dates.length - 1], 3)]
   ]], { fields: ['id', 'move_id', 'date', 'debit', 'credit', 'amount_currency', 'partner_id', 'name', 'ref', 'company_id', 'journal_id', 'parent_state'],
         context: ctx, limit: 5000 });
-  const out = {};
+
+  const anByMove = await analyticOfMoves(odooCall, [...new Set(lines.map(l => l.move_id[0]))], ctx);
+  const asMatch = (l, score, why) => {
+    const rec = anByMove[l.move_id[0]] || { analytics: [], docs: [] };
+    return {
+      lineId: l.id, moveId: l.move_id[0], move: l.move_id[1], date: l.date,
+      amount: l.debit || l.credit, partner: l.partner_id ? l.partner_id[1] : '', label: l.name || l.ref || '',
+      company: l.company_id ? l.company_id[1] : '', journal: l.journal_id ? l.journal_id[1] : '', state: l.parent_state,
+      docs: rec.docs, analytics: rec.analytics, score: Math.round(score * 10) / 10, why
+    };
+  };
+
+  // 1. candidates per row
+  const cand = new Map();
   for (const t of txs) {
-    // statement debit (money out) = credit on the Odoo cash account, and vice versa
     const want = t.debit || t.credit;
     const lo = shift(t.date, -3), hi = shift(t.date, 3);
-    out[t.id] = lines.filter(l => l.date >= lo && l.date <= hi && (
-      Math.abs((t.debit ? l.credit : l.debit) - want) < 0.011 || Math.abs(Math.abs(l.amount_currency) - want) < 0.011
-    )).map(l => ({
-      lineId: l.id, moveId: l.move_id && l.move_id[0], move: l.move_id && l.move_id[1], date: l.date,
-      amount: l.debit || l.credit, partner: l.partner_id ? l.partner_id[1] : '', label: l.name || l.ref || '',
-      company: l.company_id ? l.company_id[1] : '', journal: l.journal_id ? l.journal_id[1] : '', state: l.parent_state
-    }));
+    const who = [t.name, t.contactName].filter(Boolean);
+    const tail = (t.phone || '').slice(-6);
+    const list = [];
+    for (const l of lines) {
+      if (l.date < lo || l.date > hi) continue;
+      // statement debit (money out) = credit on the Odoo cash account, and vice versa
+      const sameAmount = Math.abs((t.debit ? l.credit : l.debit) - want) < 0.011
+        || (l.amount_currency && Math.abs(Math.abs(l.amount_currency) - want) < 0.011);
+      if (!sameAmount) continue;
+      const why = [];
+      let score = 4 - days(t.date, l.date);                       // exact date 4 → 3 days away 1
+      if (!days(t.date, l.date)) why.push('same date');
+      const text = [l.partner_id ? l.partner_id[1] : '', l.name || '', l.ref || ''].join(' ');
+      const sim = who.length ? Math.max(...who.map(n => similarity(n, l.partner_id ? l.partner_id[1] : ''))) : 0;
+      if (sim > 0.45) { score += 5 * sim; why.push('name ' + Math.round(sim * 100) + '%'); }
+      if (tail && text.replace(/\D/g, '').includes(tail)) { score += 3; why.push('phone in label'); }
+      list.push({ l, score, why });
+    }
+    cand.set(t.id, list);
+  }
+
+  // 2. one-to-one assignment, best score first
+  const pairs = [];
+  for (const [id, list] of cand) for (const c of list) pairs.push({ id, ...c });
+  pairs.sort((a, b) => b.score - a.score);
+  const takenLine = new Set(), takenRow = new Set(), chosen = new Map();
+  for (const p of pairs) {
+    if (takenRow.has(p.id) || takenLine.has(p.l.id)) continue;
+    takenRow.add(p.id); takenLine.add(p.l.id); chosen.set(p.id, p);
+  }
+
+  // 3. result: the chosen match first, rivals kept for reference
+  const out = {};
+  for (const t of txs) {
+    const list = cand.get(t.id) || [];
+    if (!list.length) { out[t.id] = []; continue; }
+    const win = chosen.get(t.id);
+    const rest = list.filter(c => c.l.id !== (win && win.l.id)).sort((a, b) => b.score - a.score);
+    const ordered = win ? [win, ...rest] : rest;
+    // ambiguous only when the runner-up is just as good AND is still free
+    const ambiguous = ordered.length > 1 && ordered[1].score >= ordered[0].score - 0.01 && !takenLine.has(ordered[1].l.id);
+    out[t.id] = ordered.map((c, i) => ({ ...asMatch(c.l, c.score, c.why), chosen: i === 0 && !ambiguous }));
   }
   return out;
 }
 
 // Editable annotation fields; *Src = who filled it ('manual' | 'suggest' | 'google')
-const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'noteSrc', 'kindSrc', 'analyticSrc'];
+const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom'];
 
 // ── Router ─────────────────────────────────────────────────────────────────
 // Returns true when the request was handled.
@@ -348,9 +466,28 @@ async function handle(req, res, url, user, ctx) {
     if (Array.isArray(body.ids) && body.ids.length) { const s = new Set(body.ids.map(String)); txs = txs.filter(t => s.has(t.id)); }
     if (!txs.length) return json(res, 200, {});
     try {
-      const found = await odooCheck(odooCall, txs);
+      // the scorer compares the Odoo partner with what we know the number is called
+      const cs = await ws.collection('whishContacts').get();
+      const names = Object.fromEntries(cs.docs.map(d => [d.id, (d.data().name || '')]));
+      const found = await odooCheck(odooCall, txs.map(t => ({ ...t, contactName: names[t.phone] || '' })));
       const at = now();
-      await batchSet(db, txs.map(t => ({ ref: col.doc(t.id), data: { odoo: { checkedAt: at, matches: found[t.id] || [] } } })));
+      const writes = txs.map(t => {
+        const matches = found[t.id] || [];
+        const data = { odoo: { checkedAt: at, matches } };
+        const win = matches.find(m => m.chosen);
+        if (win) {
+          if (win.partner) data.odooPartner = win.partner;
+          // Project from the analytic account of the invoice/bill this payment
+          // is reconciled with. Anything you typed yourself (src 'manual') wins.
+          const an = (win.analytics || [])[0];
+          if (an && t.analyticSrc !== 'manual') {
+            data.analyticId = an.id; data.analyticName = an.name;
+            data.analyticSrc = 'odoo'; data.analyticFrom = an.from;
+          }
+        }
+        return { ref: col.doc(t.id), data };
+      });
+      await batchSet(db, writes);
       return json(res, 200, found);
     } catch (e) { return json(res, 502, { error: String(e.message || e) }); }
   }
