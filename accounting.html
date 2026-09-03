@@ -11,7 +11,9 @@
   /* Odoo-like: purple top bar, white grid, thin borders, few colours */
   :root{--odoo:#714B67;--odoo2:#875A7B;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--amber:#F2A93B;--green:#28a745;--red:#dc3545;--blue:#017e84;}
   *{box-sizing:border-box;}
-  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;}
+  html,body{height:100%;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
+  .top,.bar,.msg{flex:none;}
   .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;}
   .top a{color:#fff;text-decoration:none;opacity:.85;}
   .top .brand{font-weight:600;font-size:14px;}
@@ -23,7 +25,7 @@
   .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 10px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
   .btn.primary{background:var(--odoo);border-color:var(--odoo);color:#fff;}
   .btn:disabled{opacity:.5;cursor:default;}
-  .wrap{overflow-x:auto;}
+  .wrap{flex:1;min-height:0;overflow:auto;}   /* grid scrolls; top bar, toolbar and header stay */
   table{border-collapse:collapse;width:100%;min-width:1180px;}
   th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:1;}
   td{padding:3px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:nowrap;}
