@@ -559,11 +559,11 @@ const handler = async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   // ── Pages ──
-  // admin.shift-group.co → hub; todo.shift-group.co (and localhost) → To-Do.
+  // hub.shift-group.co → hub; todo.shift-group.co (and localhost) → To-Do.
   // Every page is also reachable by path, whatever the host.
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/accounting': 'accounting.html', '/accounting/whish': 'accounting.html' };
-  const page = PAGES[url] || (url === '/' ? (host.startsWith('admin.') ? 'hub.html' : 'todo.html') : null);
+  const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(path.join(__dirname, page), 'utf8');
     res.writeHead(200, {
@@ -625,8 +625,15 @@ const handler = async (req, res) => {
   }
 
 
+  // Machine access for the Whish folder watcher (D:scodewhish-watcher):
+  // "Authorization: Bearer $ACCOUNTING_API_KEY" opens the accounting API only.
+  // No key configured = nothing opens.
+  const machineKey = process.env.ACCOUNTING_API_KEY;
+  const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const machine = !!machineKey && bearer.length >= 32 && bearer === machineKey && url.startsWith('/api/accounting/');
+
   // All API endpoints require auth
-  const user = await verifyToken(req);
+  const user = machine ? { uid: 'whish-watcher', email: 'whish-watcher@shift-group.co' } : await verifyToken(req);
   if (!user) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -637,9 +644,11 @@ const handler = async (req, res) => {
 
   // Allowlist gate: a valid Google/session token is not enough — the email
   // must be approved. (Local mode's synthetic user gets everything.)
-  const access = AUTH_DISABLED
-    ? { email: user.email || '', apps: APPS.slice(), admin: true }
-    : await accessFor(user.email);
+  const access = machine
+    ? { email: user.email, apps: ['accounting'], admin: false }
+    : AUTH_DISABLED
+      ? { email: user.email || '', apps: APPS.slice(), admin: true }
+      : await accessFor(user.email);
   if (!access) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'not_allowed', email: user.email || '' }));

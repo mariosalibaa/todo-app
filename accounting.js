@@ -117,6 +117,62 @@ function parseStatement(text) {
   return { head, tx, warnings };
 }
 
+
+// ── CSV statement (Whish app "Export CSV", 2026) ───────────────────────────
+// Two blocks: a header row (statement_id,period_from,…,closing_balance) and the
+// lines (statement_id,line_no,date,reference,service,description,debit,credit,balance).
+// Dates arrive Excel-quoted as ="dd/mm/yyyy" / ="yyyy-mm-dd".
+function csvSplit(line) {
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) { if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out.map(s => s.replace(/^="?|"?$/g, '').trim());
+}
+const csvDate = s => {
+  let m;
+  if ((m = s.match(/(\d{4})-(\d{2})-(\d{2})/))) return m[0];
+  if ((m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/))) return m[3] + '-' + m[2] + '-' + m[1];
+  return s;
+};
+function isCsvStatement(text) { return /^statement_id,period_from,period_to/m.test(text) && /^statement_id,line_no,date,reference/m.test(text); }
+function parseCsvStatement(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const head = {}, tx = [], warnings = [];
+  let mode = '';
+  for (const l of lines) {
+    if (/^statement_id,period_from/.test(l)) { mode = 'head'; continue; }
+    if (/^statement_id,line_no/.test(l)) { mode = 'tx'; continue; }
+    const c = csvSplit(l);
+    if (mode === 'head' && c.length >= 14) {
+      head.from = csvDate(c[1]); head.till = csvDate(c[2]); head.name = c[4]; head.phone = c[5].replace(/\D/g, '');
+      head.account = c[6]; head.currency = c[9] || 'USD'; head.opening = num(c[10]);
+      head.totalDebit = num(c[11]); head.totalCredit = num(c[12]); head.closing = num(c[13]);
+      mode = '';
+    } else if (mode === 'tx' && c.length >= 9) {
+      const ref = (c[3].match(/(\d+)/) || [])[1];
+      if (!ref) { warnings.push('no reference: ' + l); continue; }
+      const desc = c[5].replace(/\s+/g, ' ').trim();
+      tx.push({ id: ref, ref, date: csvDate(c[2]), service: c[4].trim(), description: desc, ...counterparty(desc),
+        debit: num(c[6]) || 0, credit: num(c[7]) || 0, balance: num(c[8]) });
+    }
+  }
+  // running-balance check, same tolerance as the PDF parser
+  let prev = head.opening ?? null;
+  for (const t of tx) {
+    if (prev != null && Math.abs(prev - t.debit + t.credit - t.balance) > 0.011) warnings.push('balance break at tr:' + t.ref);
+    prev = t.balance;
+  }
+  if (head.closing != null && tx.length && Math.abs(tx[tx.length - 1].balance - head.closing) > 0.011)
+    warnings.push('closing balance ' + head.closing + ' != last line ' + tx[tx.length - 1].balance);
+  return { head, tx, warnings };
+}
+
 // ── HTTP helpers ───────────────────────────────────────────────────────────
 const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 const readBody = req => new Promise((resolve, reject) => {
@@ -206,9 +262,16 @@ async function handle(req, res, url, user, ctx) {
     // The page extracts the text itself with pdf.js (a 25-page statement is 5 MB
     // as PDF but ~60 KB as text, and the host caps request bodies at ~4.5 MB);
     // pdfBase64 stays as a fallback for small files.
-    if (!body.text && !body.pdfBase64) return json(res, 400, { error: 'text or pdfBase64 required' });
-    const text = body.text || (await pdfParse(Buffer.from(body.pdfBase64, 'base64'))).text;
-    const { head, tx, warnings } = parseStatement(text);
+    if (!body.text && !body.pdfBase64 && !body.csv) return json(res, 400, { error: 'text, csv or pdfBase64 required' });
+    let parsed;
+    if (body.csv) {
+      if (!isCsvStatement(body.csv)) return json(res, 400, { error: 'Not a Whish CSV statement' });
+      parsed = parseCsvStatement(body.csv);
+    } else {
+      const text = body.text || (await pdfParse(Buffer.from(body.pdfBase64, 'base64'))).text;
+      parsed = parseStatement(text);
+    }
+    const { head, tx, warnings } = parsed;
     if (!head.account || !tx.length) return json(res, 400, { error: 'Not a Whish statement (no account / no lines)', warnings });
     const accRef = ws.collection('whishAccounts').doc(head.account);
     const existing = new Set((await accRef.collection('tx').select().get()).docs.map(d => d.id));
@@ -222,8 +285,8 @@ async function handle(req, res, url, user, ctx) {
         opening: head.opening ?? null, closing: head.closing ?? null, uploadedAt: now(), by: who
       })
     }, { merge: true });
-    const added = tx.filter(t => !existing.has(t.id)).length;
-    return json(res, 200, { account: head.account, head, lines: tx.length, added, updated: tx.length - added, warnings });
+    const addedIds = tx.filter(t => !existing.has(t.id)).map(t => t.id);
+    return json(res, 200, { account: head.account, head, lines: tx.length, added: addedIds.length, updated: tx.length - addedIds.length, addedIds, warnings });
   }
 
   if (url === '/api/accounting/whish/contacts' && req.method === 'GET') {
@@ -292,7 +355,24 @@ async function handle(req, res, url, user, ctx) {
     } catch (e) { return json(res, 502, { error: String(e.message || e) }); }
   }
 
+  // Telegram relay for the folder watcher: api.telegram.org is unreachable from
+  // Mario's laptop, so the watcher posts here and the hub forwards it.
+  // { text, chatId?, parseMode? } — chat defaults to TELEGRAM_CHAT_ID.
+  if (url === '/api/accounting/notify' && req.method === 'POST') {
+    const body = await readBody(req);
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chat = body.chatId || process.env.TELEGRAM_CHAT_ID || process.env.ACCOUNTING_CHAT_ID;
+    if (!token || !chat) return json(res, 503, { error: 'telegram not configured' });
+    if (!body.text) return json(res, 400, { error: 'text required' });
+    const tg = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text: String(body.text).slice(0, 4000), parse_mode: body.parseMode || undefined, disable_web_page_preview: true })
+    });
+    const out = await tg.json().catch(() => ({}));
+    return json(res, tg.ok ? 200 : 502, { sent: tg.ok, error: out.description });
+  }
+
   return false;
 }
 
-module.exports = { handle, parseStatement, normalizePhone };
+module.exports = { handle, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone };
