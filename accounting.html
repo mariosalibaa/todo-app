@@ -9,11 +9,11 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <style>
   /* Odoo-like: purple top bar, white grid, thin borders, few colours */
-  :root{--odoo:#714B67;--odoo2:#875A7B;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--amber:#F2A93B;--green:#28a745;--red:#dc3545;--blue:#017e84;}
+  :root{--odoo:#714B67;--odoo2:#875A7B;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--amber:#F2A93B;--green:#28a745;--red:#dc3545;--blue:#1a73e8;--auto:#1a73e8;--manual-bg:#eaf6ec;}
   *{box-sizing:border-box;}
   html,body{height:100%;}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
-  .top,.bar,.msg{flex:none;}
+  .top,.bar,.msg,.legend{flex:none;}
   .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;}
   .top a{color:#fff;text-decoration:none;opacity:.85;}
   .top .brand{font-weight:600;font-size:14px;}
@@ -25,21 +25,35 @@
   .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 10px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
   .btn.primary{background:var(--odoo);border-color:var(--odoo);color:#fff;}
   .btn:disabled{opacity:.5;cursor:default;}
+  .legend{display:flex;gap:16px;align-items:center;padding:4px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;border:1px solid var(--line);}
+  .legend .clr{margin-left:auto;color:var(--odoo);cursor:pointer;display:none;}
+  .legend .clr.on{display:inline;}
   .wrap{flex:1;min-height:0;overflow:auto;}   /* grid scrolls; top bar, toolbar and header stay */
-  table{border-collapse:collapse;width:100%;min-width:1180px;}
-  th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:1;}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:1220px;}
+  thead th{position:sticky;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:2;}
+  thead tr.hdr th{top:0;height:30px;cursor:pointer;user-select:none;}
+  thead tr.hdr th:hover{color:var(--odoo);}
+  thead tr.hdr th .arr{color:var(--odoo);font-size:10px;margin-left:3px;}
+  thead tr.flt th{top:30px;height:30px;padding:0 4px;border-bottom:2px solid var(--line);}
+  thead tr.flt input,thead tr.flt select{width:100%;height:22px;border:1px solid var(--line);border-radius:3px;font-size:11px;padding:0 5px;background:#fff;font-family:inherit;}
+  thead tr.flt input.on,thead tr.flt select.on{border-color:var(--odoo);background:#f5f2f7;}
   td{padding:3px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:nowrap;}
   tr:hover td{background:#f5f2f7;}
   tr.personal td{color:#9aa0a6;}
   tr.personal td input,tr.personal td select{color:#9aa0a6;}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
   td.debit{color:var(--red);} td.credit{color:var(--green);}
-  td input[type=text],td select{width:100%;border:1px solid transparent;background:transparent;padding:4px 5px;font-size:13px;border-radius:3px;font-family:inherit;}
+  td input[type=text],td select{width:100%;border:1px solid transparent;background:transparent;padding:4px 5px;font-size:13px;border-radius:3px;font-family:inherit;color:inherit;}
   td input[type=text]:hover,td select:hover{border-color:var(--line);}
   td input[type=text]:focus,td select:focus{border-color:var(--odoo2);outline:0;background:#fff;}
   td input.dirty{background:#fff8e6;}
   td input.saved{background:#eef9f0;}
-  .c-contact{min-width:150px;} .c-note{min-width:180px;} .c-proj{min-width:180px;} .c-kind{width:92px;}
+  /* where a value came from */
+  td.src-auto input,td.src-auto select,td.src-auto{color:var(--auto);font-style:italic;}
+  td.src-manual input,td.src-manual select{background:var(--manual-bg);}
+  tr.personal td.src-auto input,tr.personal td.src-auto select{color:#8ab0e6;}
+  .c-contact{min-width:150px;} .c-note{min-width:180px;} .c-proj{min-width:180px;} .c-kind{width:96px;}
   .ref{color:var(--muted);font-size:11px;}
   .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
   .odoo-no{color:#adb5bd;}
@@ -49,8 +63,6 @@
   .empty b{display:block;font-size:15px;color:var(--text);margin-bottom:6px;}
   .msg{padding:6px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);display:none;}
   .msg.err{color:var(--red);display:block;} .msg.ok{color:var(--green);display:block;}
-  .sug{color:#adb5bd;font-style:italic;}
-  .chip{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;background:#eee;color:#555;margin-left:4px;vertical-align:middle;}
   @media (max-width:700px){.top{height:42px;} .bar .search{max-width:none;}}
 </style>
 </head>
@@ -67,24 +79,27 @@
   <select id="acc" onchange="selectAccount(this.value)"></select>
   <input type="date" id="from" onchange="render()" title="From">
   <input type="date" id="to" onchange="render()" title="To">
-  <select id="kind" onchange="render()">
-    <option value="">All</option><option value="work">Work</option><option value="personal">Personal</option><option value="unset">Not yet tagged</option>
-  </select>
-  <input class="search" type="search" id="q" placeholder="Search contact, note, number, amount…" oninput="render()">
+  <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
   <span class="sp" style="flex:1"></span>
+  <button class="btn" id="btn-accept" onclick="acceptAll()" title="Fill every blank Project and W/P with its blue suggestion">✓ Accept suggestions</button>
   <label class="btn primary" for="file">⬆ Upload statement (PDF)</label>
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
   <button class="btn" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the Odoo Whish journals">⇄ Check Odoo</button>
 </div>
+<div class="legend">
+  <span><i style="background:#fff"></i>From the Whish statement</span>
+  <span style="color:var(--auto);font-style:italic"><i style="background:#fff;border-color:var(--auto)"></i>Filled automatically (Google contact / suggestion) — not confirmed</span>
+  <span><i style="background:var(--manual-bg)"></i>Filled by you</span>
+  <span class="clr" id="clr" onclick="clearFilters()">✕ Clear column filters</span>
+</div>
 <div class="msg" id="msg"></div>
 <div class="wrap">
   <table id="grid" style="display:none">
-    <thead><tr>
-      <th>Date</th><th>Service</th><th>Counterparty</th><th class="c-contact">Contact</th><th class="c-note">Note</th>
-      <th class="c-kind">W / P</th><th class="c-proj">Project / analytic</th>
-      <th class="num">Out</th><th class="num">In</th><th class="num">Balance</th><th>Odoo</th>
-    </tr></thead>
+    <thead>
+      <tr class="hdr" id="hdr"></tr>
+      <tr class="flt" id="flt"></tr>
+    </thead>
     <tbody id="rows"></tbody>
     <tfoot><tr id="totals"></tr></tfoot>
   </table>
@@ -102,10 +117,28 @@ const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id='
 let accounts = [], acc = null, tx = [], contacts = {}, analytic = [];
 const KNOWN = { '9613700985': 'Maya', '9613299799': 'Walid Hibri', '9613165168': 'Mario Saliba' };   // seeds until contacts are imported
 
+// ── Columns: key, label, class, filter type, sort/filter value ──
+const COLS = [
+  { k: 'date',    l: 'Date',               f: 'text',   v: t => t.date + ' tr:' + t.ref },
+  { k: 'service', l: 'Service',            f: 'select', v: t => t.service || '' },
+  { k: 'cp',      l: 'Counterparty',       f: 'text',   v: t => t.phone ? t.phone.replace(/^961/, '0') : t.description },
+  { k: 'contact', l: 'Contact',            f: 'text',   v: t => contactName(t).name, c: 'c-contact' },
+  { k: 'note',    l: 'Note',               f: 'text',   v: t => t.note || '', c: 'c-note' },
+  { k: 'kind',    l: 'W / P',              f: 'kind',   v: t => t.kind || '', c: 'c-kind' },
+  { k: 'proj',    l: 'Project / analytic', f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
+  { k: 'out',     l: 'Out',                f: 'amount', v: t => t.debit || 0, num: true },
+  { k: 'in',      l: 'In',                 f: 'amount', v: t => t.credit || 0, num: true },
+  { k: 'bal',     l: 'Balance',            f: 'amount', v: t => t.balance, num: true },
+  { k: 'odoo',    l: 'Odoo',               f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length },
+];
+let sort = { k: 'date', dir: -1 };            // newest first, like an Odoo bank statement
+let colF = {};                                // column filters, key → string
+
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
 Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.name || me.email;
+  buildHeader();
   await Promise.all([loadAccounts(), loadContacts()]);
   loadAnalytic();
   if (accounts.length) selectAccount(localStorage.getItem('whish_acc') || accounts[0].account);
@@ -134,34 +167,93 @@ async function selectAccount(a) {
   render();
 }
 
+// name + where it came from: 'manual' (typed here) | 'google' | 'whish' (printed on the statement) | 'seed' | ''
 function contactName(t) {
-  return (t.phone && contacts[t.phone] && contacts[t.phone].name) || t.name || (t.phone && KNOWN[t.phone]) || '';
+  const c = t.phone && contacts[t.phone];
+  if (c && c.name) return { name: c.name, src: c.source === 'manual' ? 'manual' : 'auto' };
+  if (t.name) return { name: t.name, src: 'whish' };
+  if (t.phone && KNOWN[t.phone]) return { name: KNOWN[t.phone], src: 'auto' };
+  return { name: '', src: '' };
 }
-// last project used for the same phone number → suggestion for untagged rows
-function suggestion(t) {
+// last value used for the same phone number → suggestion for untagged rows
+function lastFor(t, field) {
   if (!t.phone) return '';
-  for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o.analyticName && o.id !== t.id) return o.analyticName; }
+  for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o[field] && o.id !== t.id) return o[field]; }
   return '';
 }
-function suggestKind(t) {
-  if (!t.phone) return '';
-  for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o.kind && o.id !== t.id) return o.kind; }
-  return '';
-}
+const srcClass = s => s === 'manual' ? 'src-manual' : (s === 'suggest' || s === 'auto' || s === 'google') ? 'src-auto' : '';
 
+// ── Header + column filters ──
+function buildHeader() {
+  document.getElementById('hdr').innerHTML = COLS.map(c =>
+    `<th class="${c.num ? 'num ' : ''}${c.c || ''}" onclick="setSort('${c.k}')">${c.l}<span class="arr" id="arr-${c.k}"></span></th>`).join('');
+  document.getElementById('flt').innerHTML = COLS.map(c => {
+    const on = colF[c.k] ? 'on' : '';
+    if (c.f === 'text') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="filter" oninput="setFilter('${c.k}', this.value)"></th>`;
+    if (c.f === 'amount') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="=, >, <, a-b" title="150  ·  >100  ·  <50  ·  100-200" oninput="setFilter('${c.k}', this.value)"></th>`;
+    if (c.f === 'kind') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
+        <option value="">all</option><option value="work" ${colF[c.k] === 'work' ? 'selected' : ''}>Work</option>
+        <option value="personal" ${colF[c.k] === 'personal' ? 'selected' : ''}>Personal</option><option value="unset" ${colF[c.k] === 'unset' ? 'selected' : ''}>not tagged</option></select></th>`;
+    if (c.f === 'odoo') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
+        <option value="">all</option><option value="found" ${colF[c.k] === 'found' ? 'selected' : ''}>found</option>
+        <option value="none" ${colF[c.k] === 'none' ? 'selected' : ''}>not found</option><option value="unchecked" ${colF[c.k] === 'unchecked' ? 'selected' : ''}>unchecked</option></select></th>`;
+    if (c.f === 'select') {
+      const vals = [...new Set(tx.map(c.v))].filter(Boolean).sort();
+      return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)"><option value="">all</option>${vals.map(v => `<option ${colF[c.k] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></th>`;
+    }
+    return '<th></th>';
+  }).join('');
+}
+function setFilter(k, v) {
+  if (v) colF[k] = v; else delete colF[k];
+  const el = document.getElementById('flt').children[COLS.findIndex(c => c.k === k)].firstElementChild;
+  el.classList.toggle('on', !!v);
+  render();
+}
+function clearFilters() { colF = {}; buildHeader(); render(); }
+function setSort(k) { sort = sort.k === k ? { k, dir: -sort.dir } : { k, dir: k === 'date' ? -1 : 1 }; render(); }
+
+function amountMatch(v, f) {
+  f = f.replace(/,/g, '').trim();
+  let m;
+  if ((m = f.match(/^([\d.]+)\s*-\s*([\d.]+)$/))) return v >= +m[1] && v <= +m[2];
+  if ((m = f.match(/^>=?\s*([\d.]+)$/))) return v >= +m[1];
+  if ((m = f.match(/^<=?\s*([\d.]+)$/))) return v <= +m[1];
+  if ((m = f.match(/^=?\s*([\d.]+)$/))) return Math.abs(v - +m[1]) < 0.005;
+  return String(v).includes(f);
+}
+function passes(t) {
+  for (const c of COLS) {
+    const f = colF[c.k]; if (!f) continue;
+    const v = c.v(t);
+    if (c.f === 'text') { if (!String(v).toLowerCase().includes(f.toLowerCase())) return false; }
+    else if (c.f === 'select') { if (v !== f) return false; }
+    else if (c.f === 'kind') { if (f === 'unset' ? !!v : v !== f) return false; }
+    else if (c.f === 'odoo') { if (f === 'found' ? v <= 0 : f === 'none' ? v !== 0 : v !== -1) return false; }
+    else if (c.f === 'amount') { if (!amountMatch(v, f)) return false; }
+  }
+  return true;
+}
 function visible() {
   const from = document.getElementById('from').value, to = document.getElementById('to').value;
-  const kind = document.getElementById('kind').value, q = document.getElementById('q').value.trim().toLowerCase();
-  return tx.filter(t => {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const list = tx.filter(t => {
     if (from && t.date < from) return false;
     if (to && t.date > to) return false;
-    if (kind === 'unset' ? t.kind : (kind && t.kind !== kind)) return false;
     if (q) {
-      const hay = [t.date, t.service, t.description, t.phone, contactName(t), t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
+      const hay = [t.date, t.service, t.description, t.phone, contactName(t).name, t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    return true;
+    return passes(t);
   });
+  const col = COLS.find(c => c.k === sort.k) || COLS[0];
+  list.sort((a, b) => {
+    let x = col.v(a), y = col.v(b);
+    if (typeof x === 'string') { x = x.toLowerCase(); y = y.toLowerCase(); }
+    const r = x < y ? -1 : x > y ? 1 : 0;
+    return r ? r * sort.dir : (a.date < b.date ? -1 : a.date > b.date ? 1 : (+a.ref) - (+b.ref)) * (sort.k === 'date' ? sort.dir : -1);
+  });
+  return list;
 }
 
 function odooCell(t) {
@@ -174,26 +266,34 @@ function odooCell(t) {
 }
 
 function render() {
-  const rows = visible().slice().reverse();   // newest first, like an Odoo bank statement
+  const rows = visible();
   document.getElementById('grid').style.display = tx.length ? '' : 'none';
   document.getElementById('empty').style.display = tx.length ? 'none' : '';
+  for (const c of COLS) document.getElementById('arr-' + c.k).textContent = sort.k === c.k ? (sort.dir > 0 ? '▲' : '▼') : '';
+  document.getElementById('clr').classList.toggle('on', Object.keys(colF).length > 0);
+  // keep the Service dropdown in step with the loaded lines
+  const svcSel = document.getElementById('flt').children[1].firstElementChild;
+  if (svcSel && svcSel.options.length - 1 !== new Set(tx.map(t => t.service).filter(Boolean)).size) buildHeader();
+
+  let pending = 0;
   document.getElementById('rows').innerHTML = rows.map(t => {
-    const name = contactName(t), sug = suggestion(t), sk = suggestKind(t);
-    const cp = t.phone ? `${esc(t.phone.replace(/^961/, '0'))}` : esc(t.description);
+    const cn = contactName(t), sug = lastFor(t, 'analyticName'), sk = lastFor(t, 'kind');
+    if ((!t.analyticName && sug) || (!t.kind && sk)) pending++;
+    const cp = t.phone ? esc(t.phone.replace(/^961/, '0')) : esc(t.description);
     return `<tr data-id="${t.id}" class="${t.kind === 'personal' ? 'personal' : ''}">
       <td>${t.date}<div class="ref">tr:${t.ref}</div></td>
       <td>${esc(t.service || '')}</td>
       <td title="${esc(t.description)}">${cp}</td>
-      <td class="c-contact">${t.phone
-        ? `<input type="text" value="${esc(name)}" placeholder="who?" data-f="contact" onchange="saveContact('${t.phone}', this)">`
-        : `<span style="color:#adb5bd">—</span>`}</td>
-      <td class="c-note"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
-      <td class="c-kind"><select data-f="kind" onchange="saveField('${t.id}', 'kind', this.value, this)">
+      <td class="c-contact ${srcClass(cn.src)}">${t.phone
+        ? `<input type="text" value="${esc(cn.name)}" placeholder="who?" data-f="contact" onchange="saveContact('${t.phone}', this)">`
+        : '<span style="color:#adb5bd">—</span>'}</td>
+      <td class="c-note ${srcClass(t.note ? (t.noteSrc || 'manual') : '')}"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
+      <td class="c-kind ${srcClass(t.kind ? (t.kindSrc || 'manual') : '')}"><select data-f="kind" onchange="saveField('${t.id}', 'kind', this.value, this)">
         <option value="" ${!t.kind ? 'selected' : ''}>${sk ? '↳ ' + sk + '?' : '—'}</option>
         <option value="work" ${t.kind === 'work' ? 'selected' : ''}>Work</option>
         <option value="personal" ${t.kind === 'personal' ? 'selected' : ''}>Personal</option></select></td>
-      <td class="c-proj"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="${sug ? '↳ ' + esc(sug) + ' (Enter)' : 'project'}" data-sug="${esc(sug)}"
-        onkeydown="if(event.key==='Enter'&&!this.value&&this.dataset.sug){this.value=this.dataset.sug;this.dispatchEvent(new Event('change'));}"
+      <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="${sug ? '↳ ' + esc(sug) + ' (Enter)' : 'project'}" data-sug="${esc(sug)}"
+        onkeydown="if(event.key==='Enter'&&!this.value&&this.dataset.sug){this.value=this.dataset.sug;this.dataset.accepted='1';this.dispatchEvent(new Event('change'));}"
         onchange="saveAnalytic('${t.id}', this)"></td>
       <td class="num debit">${fmt(t.debit)}</td>
       <td class="num credit">${fmt(t.credit)}</td>
@@ -204,36 +304,68 @@ function render() {
   const out = rows.reduce((a, t) => a + t.debit, 0), inn = rows.reduce((a, t) => a + t.credit, 0);
   document.getElementById('totals').innerHTML =
     `<td colspan="7">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}</td>
-     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td class="num">${rows.length ? fmt(rows[0].balance) : ''}</td><td></td>`;
+     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td></td><td></td>`;
+  const b = document.getElementById('btn-accept');
+  b.disabled = !pending; b.textContent = pending ? `✓ Accept ${pending} suggestion${pending > 1 ? 's' : ''}` : '✓ Accept suggestions';
 }
 
 // ── Saving ──
 function flash(el, ok) { el.classList.remove('dirty'); el.classList.toggle('saved', ok); el.classList.toggle('dirty', !ok); setTimeout(() => el.classList.remove('saved'), 1200); }
+function mark(el, src) { const td = el.closest('td'); td.classList.remove('src-auto', 'src-manual'); if (src) td.classList.add(srcClass(src)); }
 async function saveField(id, field, value, el) {
   el.classList.add('dirty');
-  const t = tx.find(x => x.id === id); if (t) t[field] = value;
-  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { [field]: value }); flash(el, true); }
+  const t = tx.find(x => x.id === id); if (t) { t[field] = value; t[field + 'Src'] = value ? 'manual' : ''; }
+  mark(el, value ? 'manual' : '');
+  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { [field]: value, [field + 'Src']: value ? 'manual' : '' }); flash(el, true); }
   catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
   if (field === 'kind') el.closest('tr').classList.toggle('personal', value === 'personal');
 }
 async function saveAnalytic(id, el) {
   const name = el.value.trim();
   const a = analytic.find(x => x.name.toLowerCase() === name.toLowerCase());
+  const src = !name ? '' : el.dataset.accepted ? 'suggest' : 'manual';
+  delete el.dataset.accepted;
   el.classList.add('dirty');
-  const t = tx.find(x => x.id === id); if (t) { t.analyticName = a ? a.name : name; t.analyticId = a ? a.id : null; }
-  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { analyticName: a ? a.name : name, analyticId: a ? a.id : null, company: a ? a.company : '' }); flash(el, true); }
+  const t = tx.find(x => x.id === id); if (t) { t.analyticName = a ? a.name : name; t.analyticId = a ? a.id : null; t.analyticSrc = src; }
+  mark(el, src);
+  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { analyticName: a ? a.name : name, analyticId: a ? a.id : null, company: a ? a.company : '', analyticSrc: src }); flash(el, true); }
   catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
 }
 async function saveContact(phone, el) {
   const name = el.value.trim();
   el.classList.add('dirty');
   contacts[phone] = { phone, name, source: 'manual' };
+  mark(el, name ? 'manual' : '');
   try {
     await Admin.api('POST', '/api/accounting/whish/contacts', { items: [{ phone, name, source: 'manual' }] });
     flash(el, true);
     // same number elsewhere in the grid takes the name too
-    document.querySelectorAll(`tr input[data-f="contact"]`).forEach(i => { const r = tx.find(x => x.id === i.closest('tr').dataset.id); if (r && r.phone === phone && i !== el) i.value = name; });
+    document.querySelectorAll('tr input[data-f="contact"]').forEach(i => {
+      const r = tx.find(x => x.id === i.closest('tr').dataset.id);
+      if (r && r.phone === phone && i !== el) { i.value = name; mark(i, name ? 'manual' : ''); }
+    });
   } catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+// Fill every blank Project / W-P (visible rows) with its suggestion, marked as "suggest"
+async function acceptAll() {
+  const items = [];
+  for (const t of visible()) {
+    const it = { id: t.id };
+    const sug = !t.analyticName && lastFor(t, 'analyticName');
+    const sk = !t.kind && lastFor(t, 'kind');
+    if (sug) { const a = analytic.find(x => x.name.toLowerCase() === sug.toLowerCase()); Object.assign(it, { analyticName: a ? a.name : sug, analyticId: a ? a.id : null, company: a ? a.company : '', analyticSrc: 'suggest' }); }
+    if (sk) Object.assign(it, { kind: sk, kindSrc: 'suggest' });
+    if (sug || sk) items.push(it);
+  }
+  if (!items.length) return;
+  if (!confirm(`Fill ${items.length} line${items.length > 1 ? 's' : ''} with their suggestions? (shown in blue until you confirm them)`)) return;
+  try {
+    // suggestions chain: do it in rounds so a row filled now can feed the next
+    await Admin.api('POST', `/api/accounting/whish/${acc}/tx-bulk`, { items });
+    for (const it of items) Object.assign(tx.find(x => x.id === it.id), it);
+    render();
+    say(`${items.length} lines filled from suggestions`);
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 
 // ── Upload ──

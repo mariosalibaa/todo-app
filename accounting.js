@@ -157,6 +157,9 @@ async function odooCheck(odooCall, txs) {
   return out;
 }
 
+// Editable annotation fields; *Src = who filled it ('manual' | 'suggest' | 'google')
+const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'noteSrc', 'kindSrc', 'analyticSrc'];
+
 // ── Router ─────────────────────────────────────────────────────────────────
 // Returns true when the request was handled.
 async function handle(req, res, url, user, ctx) {
@@ -222,13 +225,27 @@ async function handle(req, res, url, user, ctx) {
 
   if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/tx\/(\d+)$/)) && req.method === 'PATCH') {
     const body = await readBody(req);
-    const allowed = ['note', 'kind', 'analyticId', 'analyticName', 'company'];
+    const allowed = ANNOT;
     const data = {};
     for (const k of allowed) if (k in body) data[k] = body[k];
     if (!Object.keys(data).length) return json(res, 400, { error: 'nothing to update' });
     data.updatedAt = now(); data.updatedBy = who;
     await ws.collection('whishAccounts').doc(m[1]).collection('tx').doc(m[2]).set(data, { merge: true });
     return json(res, 200, { ok: true });
+  }
+
+  // Bulk annotate: { items: [{ id, ...fields }] } — used by "accept all suggestions"
+  if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/tx-bulk$/)) && req.method === 'POST') {
+    const body = await readBody(req);
+    const col = ws.collection('whishAccounts').doc(m[1]).collection('tx');
+    const at = now();
+    const writes = (body.items || []).filter(i => i && /^\d+$/.test(String(i.id))).map(i => {
+      const data = { updatedAt: at, updatedBy: who };
+      for (const k of ANNOT) if (k in i) data[k] = i[k];
+      return { ref: col.doc(String(i.id)), data };
+    });
+    await batchSet(db, writes);
+    return json(res, 200, { ok: true, saved: writes.length });
   }
 
   if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/odoo-check$/)) && req.method === 'POST') {
