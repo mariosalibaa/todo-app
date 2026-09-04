@@ -14,3 +14,4 @@ todo-app-f5c0d-firebase-adminsdk*.json
 .env.local
 sandbox-*.log
 srv-*.log
+.wise-profile/

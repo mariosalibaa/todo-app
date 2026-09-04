@@ -1,8 +1,13 @@
 // Wise section of the accounting app — multi-currency balance statements.
 // Mounted by server.js under /api/accounting/wise/*; needs ctx = { db, admin, TEAM_ID }.
 // Firestore layout (all under workspaces/<team>):
-//   wiseAccounts/<currency>            { currency, name, lastUpload, statements[] }
-//   wiseAccounts/<currency>/tx/<id>    one statement line, keyed by Wise's own transaction id
+//   wiseAccounts/<balanceId>           { balanceId, currency, name, lastUpload, statements[] }
+//   wiseAccounts/<balanceId>/tx/<id>   one statement line, keyed by Wise's own transaction id
+//
+// Keyed by BALANCE, not by currency: a Wise profile can hold several balances in the same
+// currency (main USD, two USD stocks jars, an interest jar...), and merging them would be
+// wrong. Wise names each export statement_<balanceId>_<CUR>_<from>_<to>.csv, so the balance
+// id comes off the filename; a file with no id falls back to its currency.
 //
 // The parser is header-driven: it reads the column names Wise writes and maps them by
 // name, so a changed column order, a missing optional column or a localised export
@@ -73,6 +78,12 @@ function isoDate(v) {
   return isFinite(t) ? new Date(t).toISOString().slice(0, 10) : '';
 }
 
+// statement_10012290_USD_2025-01-01_2025-12-31.csv -> { balanceId: '10012290', currency: 'USD' }
+function fromFilename(name) {
+  const m = String(name || '').match(/statement[_-](\d{4,})[_-]([A-Z]{3})/i);
+  return m ? { balanceId: m[1], currency: m[2].toUpperCase() } : {};
+}
+
 function parseStatement(csv) {
   const rows = parseCsv(csv);
   if (rows.length < 2) return { error: 'That file has no rows' };
@@ -120,7 +131,9 @@ function parseStatement(csv) {
       counterparty: get(r, 'merchant') || get(r, 'payee') || get(r, 'payer') || get(r, 'description'),
     });
   }
-  if (!tx.length) return { error: 'No usable rows in that file', warnings, header };
+  // A balance with no movement in the period exports a header and nothing else. That is a
+  // valid statement, not a broken file, so say so plainly.
+  if (!tx.length) return { error: 'That balance had no transactions in this period', empty: true, warnings, header };
   const currencies = [...new Set(tx.map(t => t.currency).filter(Boolean))];
   const dates = tx.map(t => t.date).sort();
   return { tx, currencies, from: dates[0], till: dates[dates.length - 1], warnings, header };
@@ -298,16 +311,17 @@ async function handle(req, res, url, user, ctx) {
     const out = [];
     for (const d of snap.docs) {
       const n = (await d.ref.collection('tx').select().get()).size;
-      out.push({ ...d.data(), currency: d.id, lines: n });
+      const x = d.data();
+      out.push({ ...x, key: d.id, currency: x.currency || d.id, lines: n });
     }
     return json(res, 200, out), true;
   }
 
   if (rest === 'tx' && req.method === 'GET') {
     // server.js hands us the path without its query string, so read it off req.url
-    const cur = (new URL(req.url, 'http://x').searchParams.get('currency') || '').toUpperCase();
-    if (!cur) return json(res, 400, { error: 'currency required' }), true;
-    const snap = await ws.collection('wiseAccounts').doc(cur).collection('tx').get();
+    const key = new URL(req.url, 'http://x').searchParams.get('currency') || '';
+    if (!key) return json(res, 400, { error: 'balance required' }), true;
+    const snap = await ws.collection('wiseAccounts').doc(key).collection('tx').get();
     return json(res, 200, snap.docs.map(d => d.data())), true;
   }
 
@@ -339,17 +353,22 @@ async function handle(req, res, url, user, ctx) {
     if (!b.csv) return json(res, 400, { error: 'csv required' }), true;
     const p = parseStatement(b.csv);
     if (p.error) return json(res, 400, p), true;
+    const meta = fromFilename(b.filename);
+    const keyOf = t => meta.balanceId || t.currency || 'UNKNOWN';
     const perCur = {};
-    for (const t of p.tx) (perCur[t.currency || 'UNKNOWN'] = perCur[t.currency || 'UNKNOWN'] || []).push(t);
+    for (const t of p.tx) (perCur[keyOf(t)] = perCur[keyOf(t)] || []).push(t);
     const result = [];
-    for (const [cur, list] of Object.entries(perCur)) {
-      const accRef = ws.collection('wiseAccounts').doc(cur);
+    for (const [key, list] of Object.entries(perCur)) {
+      const cur = list[0].currency || meta.currency || '';
+      const accRef = ws.collection('wiseAccounts').doc(key);
       const existing = new Set((await accRef.collection('tx').select().get()).docs.map(d => d.id));
       await batchSet(db, list.map(t => ({ ref: accRef.collection('tx').doc(t.id), data: { ...t, importedAt: now() } })));
       const dates = list.map(t => t.date).sort();
       const last = list.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
       await accRef.set({
-        currency: cur, name: 'Wise ' + cur, lastUpload: now(),
+        balanceId: meta.balanceId || '', currency: cur,
+        name: b.accountName || ('Wise ' + cur + (meta.balanceId ? ' \u00b7 ' + meta.balanceId : '')),
+        lastUpload: now(),
         closing: last && last.balance != null ? last.balance : null,
         statements: admin.firestore.FieldValue.arrayUnion({
           from: dates[0], till: dates[dates.length - 1], filename: b.filename || '',
@@ -357,7 +376,7 @@ async function handle(req, res, url, user, ctx) {
         })
       }, { merge: true });
       const added = list.filter(t => !existing.has(t.id)).length;
-      result.push({ currency: cur, lines: list.length, added, updated: list.length - added,
+      result.push({ key, currency: cur, lines: list.length, added, updated: list.length - added,
         from: dates[0], till: dates[dates.length - 1], closing: last && last.balance != null ? last.balance : null });
     }
     return json(res, 200, { ok: true, accounts: result, warnings: p.warnings.slice(0, 20) }), true;

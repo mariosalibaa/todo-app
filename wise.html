@@ -174,7 +174,7 @@ async function doSync() {
 async function loadAccounts() {
   accounts = await Admin.api('GET', API + 'accounts').catch(() => []);
   document.getElementById('acc').innerHTML = accounts.length
-    ? accounts.map(a => `<option value="${esc(a.currency)}">${esc(a.name || a.currency)} · ${a.lines} lines</option>`).join('')
+    ? accounts.map(a => `<option value="${esc(a.key || a.currency)}">${esc(a.name || a.currency)} · ${a.lines} lines</option>`).join('')
     : '<option value="">no statement yet</option>';
 }
 async function loadTx(cur) {
