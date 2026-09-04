@@ -102,7 +102,8 @@
   body.mob .side,body.mob .main{display:none;}
   body.mob #m{display:flex;flex-direction:column;height:100%;font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f2f2f7;}
   .m-nav{flex:none;background:#f8f8f8;border-bottom:1px solid #c6c6c8;padding:8px 10px calc(8px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;min-height:52px;}
-  .m-nav .side-btn{color:#007aff;font-size:16px;background:none;border:0;padding:4px 2px;cursor:pointer;white-space:nowrap;min-width:52px;}
+  .m-nav .side-btn{color:#007aff;font-size:16px;background:none;border:0;padding:4px 2px;cursor:pointer;white-space:nowrap;min-width:52px;text-decoration:none;display:inline-block;}
+  .m-nav a.side-btn.home{font-size:22px;line-height:1;text-align:right;}
   .m-nav .side-btn.r{text-align:right;}
   .m-nav .ttl{flex:1;text-align:center;line-height:1.15;min-width:0;}
   .m-nav .ttl b{display:block;font-size:17px;font-weight:600;color:#000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -148,8 +149,18 @@
   /* desktop-only phone preview */
   .phone-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:200;}
   .phone-ov.on{display:flex;}
-  .phone-shell{background:#000;border-radius:46px;padding:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);position:relative;}
+  .phone-ov{overflow:auto;}
+  .phone-stage{display:flex;align-items:center;gap:28px;}
+  .phone-shell{background:#000;border-radius:46px;padding:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);position:relative;
+    transform:scale(var(--pk,1));transform-origin:top center;}
   .phone-shell iframe{width:430px;height:932px;border:0;border-radius:36px;background:#fff;display:block;}
+  .phone-side{color:#fff;font-size:12px;max-width:230px;line-height:1.5;}
+  .phone-side h4{margin:0 0 6px;font-size:13px;font-weight:600;}
+  .phone-side p{margin:0 0 10px;color:#c9c9c9;}
+  .phone-side input[type=range]{width:100%;}
+  .calib-card{border:2px dashed #8fd0ff;border-radius:calc(var(--ppi,96) * 0.125px);color:#8fd0ff;display:flex;
+    align-items:center;justify-content:center;text-align:center;font-size:11px;
+    width:calc(var(--ppi,96) * 3.370px);height:calc(var(--ppi,96) * 2.125px);}
   .phone-cap{position:absolute;bottom:-28px;left:0;right:0;text-align:center;color:#fff;font-size:12px;}
   .phone-cap a{color:#8fd0ff;margin-left:10px;}
 </style>
@@ -177,9 +188,19 @@
 <div class="msg" id="msg"></div>
 <div class="ov" id="ov" onclick="if(event.target===this)closeDlg()"><div class="dlg" id="dlg"></div></div>
 <div class="phone-ov" id="phone-ov" onclick="if(event.target===this)closePhone()">
-  <div class="phone-shell">
-    <div class="phone-cap">iPhone 15 Pro Max &middot; 430 &times; 932 <a href="/accounting/budget?mobile=1" target="_blank">open in a tab</a> <a href="#" onclick="closePhone();return false;">close</a></div>
-    <iframe id="phone-frame" title="Phone preview"></iframe>
+  <div class="phone-stage">
+    <div class="phone-shell"><iframe id="phone-frame" title="Phone preview"></iframe></div>
+    <div class="phone-side">
+      <h4>iPhone 15 Pro Max</h4>
+      <p>430 &times; 932 pt &middot; screen 2.87 &times; 6.23 in<br><span id="phone-scale"></span></p>
+      <p><b>Life size?</b> A browser cannot read your screen's real size, so set it once: drag until the outline below matches a real bank card.</p>
+      <input type="range" id="phone-ppi" min="55" max="230" step="1" oninput="setPhonePpi(this.value)">
+      <div class="calib-card" id="calib-card">hold a bank card here<br>85.6 &times; 54 mm</div>
+      <p style="margin-top:10px">
+        <a href="#" onclick="setPhonePpi(96);return false;">reset</a> &middot;
+        <a href="/accounting/budget?mobile=1" target="_blank">open in a tab</a> &middot;
+        <a href="#" onclick="closePhone();return false;">close</a></p>
+    </div>
   </div>
 </div>
 
@@ -515,7 +536,21 @@ function render() { document.body.classList.toggle('mob', MOBILE); return MOBILE
 function draw() { return MOBILE ? mDraw() : drawDesktop(); }
 
 // desktop-only preview of the phone build
+// how many CSS pixels make one real inch on this screen (96 is the CSS default)
+function setPhonePpi(ppi) {
+  ppi = Math.max(55, Math.min(230, Number(ppi) || 96));
+  try { localStorage.setItem('budget_phone_ppi', ppi); } catch {}
+  const r = document.documentElement.style;
+  r.setProperty('--ppi', ppi);
+  r.setProperty('--pk', (2.87 * ppi / 430).toFixed(4));   // 2.87in = the real screen width
+  const el = document.getElementById('phone-ppi'); if (el) el.value = ppi;
+  const lab = document.getElementById('phone-scale');
+  if (lab) lab.textContent = ppi === 96 ? 'shown at CSS default (96 px per inch)' : `calibrated to ${ppi} px per inch`;
+}
 function openPhone() {
+  let ppi = 96;
+  try { ppi = Number(localStorage.getItem('budget_phone_ppi')) || 96; } catch {}
+  setPhonePpi(ppi);
   document.getElementById('phone-frame').src = '/accounting/budget?mobile=1';
   document.getElementById('phone-ov').className = 'phone-ov on';
 }
@@ -538,8 +573,10 @@ const mMoney = n => money(n);
 
 function mNav(opts) {
   const left = opts.back === false ? '<span class="side-btn"></span>'
+    : opts.backHref ? `<a class="side-btn" href="${opts.backHref}">\u2039 ${esc(opts.backLbl || 'Back')}</a>`
     : `<button class="side-btn" onclick="${opts.backFn || 'mHome()'}">\u2039 ${esc(opts.backLbl || 'Menu')}</button>`;
-  const right = opts.add === false ? '<span class="side-btn r"></span>'
+  const right = opts.home ? `<a class="side-btn r home" href="/admin" title="Shift Hub">\u2302</a>`
+    : opts.add === false ? '<span class="side-btn r"></span>'
     : `<span class="side-btn r"><button class="plus" onclick="addCurrent()">+</button></span>`;
   const title = opts.month
     ? `<div class="ttl mo"><button class="arw" onclick="shiftMonth(-1)">\u2039</button><div><b>${esc(opts.title)}</b><span>${esc(opts.sub || '')}</span></div><button class="arw" onclick="shiftMonth(1)">\u203a</button></div>`
@@ -555,7 +592,7 @@ function mRender() {
   if (S.screen === 'home' || !S.screen) {
     const incl = D.accounts.filter(counts).reduce((t, a) => t + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
     const badge = { expenses: sum(monthExpenses(S.ym)), income: sum(monthIncome(S.ym)), transfers: sum(monthTransfers(S.ym)), accounts: incl };
-    mNav({ back: false, add: false, title: 'Budget', sub: MONTHS[+mo - 1] + ' ' + y });
+    mNav({ backHref: '/accounting', backLbl: 'Whish', home: true, title: 'Budget', sub: MONTHS[+mo - 1] + ' ' + y });
     document.getElementById('m-body').innerHTML = M_MENU.map(x =>
       `<div class="m-row" onclick="mGo('${x.id}')"><span class="ico" style="background:transparent;font-size:19px">${x.ico}</span>
         <div class="tx"><b>${x.lbl}</b></div>
