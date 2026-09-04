@@ -219,16 +219,19 @@ async function partnersAndCompanies(odooCall) {
   return _partnerCache.data;
 }
 
-let _whishJournals = null;
-async function whishJournals(odooCall) {
-  if (_whishJournals) return _whishJournals;
+// Journals whose name carries a word: 'whish' for the Whish grid, 'wise' for the
+// Wise one. Cached per word, because a journal list barely moves.
+const _journals = {};
+async function journalsNamed(odooCall, word) {
+  if (_journals[word]) return _journals[word];
   const companies = await odooCall('res.company', 'search_read', [[]], { fields: ['id', 'name'] });
   const ctx = { allowed_company_ids: companies.map(c => c.id) };
-  const rows = await odooCall('account.journal', 'search_read', [[['name', 'ilike', 'whish']]],
+  const rows = await odooCall('account.journal', 'search_read', [[['name', 'ilike', word]]],
     { fields: ['id', 'name', 'company_id', 'default_account_id'], context: ctx });
-  _whishJournals = { rows, ctx };
-  return _whishJournals;
+  _journals[word] = { rows, ctx };
+  return _journals[word];
 }
+const whishJournals = odooCall => journalsNamed(odooCall, 'whish');
 
 // ── Name similarity ────────────────────────────────────────────────────────
 // "ELIE ABOU RJEILI" (Whish) vs "Elie Abou Rjayle EAR" (Odoo): shared words
@@ -302,8 +305,8 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
 // phone in the label) and assigned ONE-TO-ONE — a payment already claimed by a
 // better-fitting statement line cannot be reused — so a row is called
 // ambiguous only when two candidates genuinely tie.
-async function odooCheck(odooCall, txs) {
-  const { rows: journals, ctx } = await whishJournals(odooCall);
+async function odooCheck(odooCall, txs, opts = {}) {
+  const { rows: journals, ctx } = await journalsNamed(odooCall, opts.journalWord || 'whish');
   if (!journals.length) return {};
   const accIds = journals.map(j => j.default_account_id && j.default_account_id[0]).filter(Boolean);
   const dates = txs.map(t => t.date).sort();
@@ -541,4 +544,5 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone };
+module.exports = { handle, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone,
+  odooCheck, partnersAndCompanies, journalsNamed, similarity };

@@ -139,6 +139,10 @@ function parseStatement(csv) {
   return { tx, currencies, from: dates[0], till: dates[dates.length - 1], warnings, header };
 }
 
+// What you may edit on a line. *Src records who filled it in ('manual' when you
+// typed it, 'odoo' when the matched payment said so), exactly as on the Whish grid.
+const ANNOT = ['note', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc', 'kind'];
+
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise((resolve, reject) => {
   let s = ''; req.on('data', c => { s += c; if (s.length > 8e6) req.destroy(); });
@@ -171,6 +175,7 @@ async function batchSet(db, writes) {
 // Mario's Wise is a PERSONAL account, so syncFromApi() cannot fetch its statements. The code is
 // kept because it works unchanged for a business profile; until then use the CSV import.
 // ═══════════════════════════════════════════════════════════════════════════
+const accounting = require('./accounting');   // shared Odoo lookups + the payment matcher
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -346,6 +351,55 @@ async function handle(req, res, url, user, ctx) {
       summary: Object.values(byCur),
       sample: p.tx.slice(0, 12),
     }), true;
+  }
+
+  // Save what you typed in the Partner / Company / Note columns.
+  // { key, items: [{ id, partnerName, ... }] } — one line or a whole screenful.
+  if (rest === 'tx-save' && req.method === 'POST') {
+    const b = await readBody(req);
+    if (!b.key) return json(res, 400, { error: 'balance required' }), true;
+    const col = ws.collection('wiseAccounts').doc(String(b.key)).collection('tx');
+    const at = now();
+    const writes = (b.items || []).filter(i => i && i.id).map(i => {
+      const data = { updatedAt: at, updatedBy: who };
+      for (const k of ANNOT) if (k in i) data[k] = i[k];
+      return { ref: col.doc(String(i.id)), data };
+    });
+    if (!writes.length) return json(res, 400, { error: 'nothing to update' }), true;
+    await batchSet(db, writes);
+    return json(res, 200, { ok: true, saved: writes.length }), true;
+  }
+
+  // Look for these lines in the Odoo Wise journals (Bank Wise USD/EUR/GBP - S_LB).
+  // Same scorer as the Whish grid; a line matched one-to-one hands us its partner
+  // and company, which we keep unless you chose something yourself.
+  if (rest === 'odoo-check' && req.method === 'POST') {
+    const b = await readBody(req);
+    if (!b.key) return json(res, 400, { error: 'balance required' }), true;
+    const col = ws.collection('wiseAccounts').doc(String(b.key)).collection('tx');
+    let txs = (await col.get()).docs.map(d => d.data());
+    if (Array.isArray(b.ids) && b.ids.length) { const s = new Set(b.ids.map(String)); txs = txs.filter(t => s.has(String(t.id))); }
+    if (!txs.length) return json(res, 200, { matches: {} }), true;
+    try {
+      const { rows: journals } = await accounting.journalsNamed(ctx.odooCall, 'wise');
+      if (!journals.length) return json(res, 200, { matches: {}, journals: 0 }), true;
+      // the scorer expects a name to compare against the Odoo partner
+      const found = await accounting.odooCheck(ctx.odooCall, txs.map(t => ({ ...t, name: t.counterparty || t.description || '' })), { journalWord: 'wise' });
+      const at = now();
+      const writes = txs.map(t => {
+        const matches = found[t.id] || [];
+        const data = { odoo: { checkedAt: at, matches } };
+        const win = matches.find(m => m.chosen);
+        if (win) {
+          if (win.partner) data.odooPartner = win.partner;
+          if (win.partner && t.partnerSrc !== 'manual') { data.partnerName = win.partner; data.partnerId = win.partnerId || null; data.partnerSrc = 'odoo'; }
+          if (win.company && t.companySrc !== 'manual') { data.company = win.company; data.companySrc = 'odoo'; }
+        }
+        return { ref: col.doc(String(t.id)), data };
+      });
+      await batchSet(db, writes);
+      return json(res, 200, { matches: found, journals: journals.length, checked: txs.length }), true;
+    } catch (e) { return json(res, 502, { error: String(e.message || e) }), true; }
   }
 
   if (rest === 'upload' && req.method === 'POST') {

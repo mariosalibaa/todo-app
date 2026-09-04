@@ -44,6 +44,19 @@
   .msg{padding:8px 14px;font-size:12px;display:none;flex:none;}
   .msg.err{color:var(--red);background:#fdf1f2;display:block;} .msg.ok{color:var(--green);background:#f1faf3;display:block;}
   .warn{color:#8a6d3b;background:#fcf8e3;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:12px;max-height:130px;overflow:auto;}
+  .sub{color:var(--muted);font-size:11px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;}
+  td.c-desc{max-width:420px;white-space:normal;vertical-align:top;padding-top:4px;}
+  td.c-desc .main{font-weight:500;}
+  td.cell{vertical-align:top;padding:2px 4px;}
+  td.cell input,td.cell select{width:100%;border:1px solid transparent;background:transparent;border-radius:3px;height:24px;font:inherit;color:inherit;padding:0 4px;}
+  td.cell input:hover,td.cell select:hover{border-color:var(--line);background:#fff;}
+  td.cell input:focus,td.cell select:focus{border-color:var(--wise);background:#fff;outline:0;}
+  td.cell.src-manual input,td.cell.src-manual select{background:#f1faf3;}
+  td.cell.src-odoo input,td.cell.src-odoo select{color:#714B67;font-weight:600;}
+  .c-partner{min-width:190px;} .c-company{width:160px;} .c-odoo{width:110px;}
+  .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
+  .odoo-no{color:#adb5bd;}
+  .odoo-multi{color:#F2A93B;font-weight:600;}
 </style>
 </head>
 <body>
@@ -60,12 +73,14 @@
   <input type="file" id="file" accept=".csv,text/csv" style="display:none" onchange="pick(this.files[0])">
   <button class="btn" id="btn-import" onclick="doImport()" disabled>Import into Wise</button>
   <button class="btn" id="btn-sync" onclick="doSync()" title="Pull every balance straight from Wise through the API">⟳ Sync from Wise</button>
+  <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these lines in the Odoo Wise journals">⇄ Check Odoo</button>
   <span class="hint" id="sync-status"></span>
   <span class="sp" style="flex:1"></span>
   <select id="acc" onchange="loadTx(this.value)"></select>
 </div>
 <div class="msg" id="msg"></div>
 <div class="wrap" id="wrap"></div>
+<datalist id="partner-list"></datalist>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -75,10 +90,93 @@ const esc = Admin.esc;
 const API = '/api/accounting/wise/';
 let pending = null;          // { csv, filename, preview }
 let accounts = [];
+let currentKey = '';   // the balance the grid is showing
 const num = n => (n == null ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const amt = n => (n ? num(n) : '');   // an empty side of the ledger reads better blank than 0.00
 const dmy = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '';
 function say(t, cls) { const m = document.getElementById('msg'); m.textContent = t || ''; m.className = 'msg ' + (t ? (cls || 'ok') : ''); }
+
+const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
+let partners = [], companies = [];
+
+// One "what was this" column instead of three. Wise repeats itself: the description
+// spells out the counterparty and the amount, both of which have their own column
+// already, so strip what is said elsewhere and keep only what is left.
+const key = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function detail(t, accCur) {
+  const cp = (t.counterparty || '').trim();
+  let d = (t.description || '').trim(), m;
+  const bits = [];
+  if ((m = d.match(/^card transaction of ([\d.,]+) ([A-Za-z]{3}) issued by (.*)$/i))) {
+    // the original currency only earns its place when it is not the one in the Out column
+    bits.push('Card' + (m[2].toUpperCase() !== accCur ? ' ' + m[1] + ' ' + m[2].toUpperCase() : ''));
+    d = m[3];
+  } else if ((m = d.match(/^received money from (.*?)(?:\s+with reference\s*(.*))?$/i))) {
+    bits.push('Received'); d = m[1]; if (m[2]) bits.push('ref ' + m[2]);
+  } else if ((m = d.match(/^sent money to (.*)$/i))) { bits.push('Sent'); d = m[1]; }
+  if (d && key(d) !== key(cp) && !key(cp).includes(key(d))) bits.push(d);
+  const ref = (t.reference || '').trim();
+  if (ref && key(ref) !== key(cp) && !key(bits.join(' ')).includes(key(ref))) bits.push(ref);
+  if (t.cardLast4) bits.push('••' + t.cardLast4);
+  return { main: cp || d || '—', sub: bits.filter(Boolean).join(' · ') };
+}
+const descCell = (t, cur) => { const d = detail(t, cur);
+  return `<div class="main">${esc(d.main)}</div>${d.sub ? `<div class="sub" title="${esc(d.sub)}">${esc(d.sub)}</div>` : ''}`; };
+
+async function loadPartners() {
+  try {
+    const r = await Admin.api('GET', '/api/accounting/partners');
+    partners = r.partners || []; companies = r.companies || [];
+    const dl = document.getElementById('partner-list');
+    if (dl) dl.innerHTML = partners.map(p => `<option value="${esc(p.name)}">`).join('');
+  } catch (e) { say('Odoo partners not available: ' + e.message, 'err'); }
+}
+const companyOf = t => t.company || (t.kind === 'personal' ? 'Personal' : '');
+const srcClass = s => s === 'manual' ? 'src-manual' : s === 'odoo' ? 'src-odoo' : '';
+
+// found / not found / several candidates, and the move it points at
+function odooCell(t) {
+  if (!t.odoo) return '<span class="odoo-no" title="Not checked yet">·</span>';
+  const m = t.odoo.matches || [];
+  if (!m.length) return `<span class="odoo-no" title="Checked ${esc(String(t.odoo.checkedAt).slice(0, 10))}: nothing in the Wise journals">—</span>`;
+  const win = m.find(x => x.chosen);
+  const tip = x => [x.move, x.date, x.company, x.partner || x.label].filter(Boolean).join(' · ');
+  if (win) return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip(win))}">✓ ${esc(win.move)}</a>`;
+  return `<span class="odoo-multi" title="${esc(m.slice(0, 4).map(tip).join(' | '))}">? ${m.length}</span>`;
+}
+
+// Save one edited cell. partnerId comes along when the name is one Odoo knows,
+// so the booking later does not have to guess which "Google" was meant.
+async function editCell(id, field, value) {
+  const t = tx.find(x => String(x.id) === String(id)); if (!t) return;
+  const data = { id };
+  if (field === 'partner') {
+    const p = partners.find(x => x.name === value);
+    Object.assign(data, { partnerName: value, partnerId: p ? p.id : null, partnerSrc: value ? 'manual' : '' });
+  } else if (field === 'company') {
+    Object.assign(data, { company: value === 'Personal' ? '' : value, companySrc: value ? 'manual' : '',
+      kind: value === 'Personal' ? 'personal' : value ? 'work' : '' });
+  } else data[field] = value;
+  Object.assign(t, data);
+  try { await Admin.api('POST', API + 'tx-save', { key: currentKey, items: [data] }); say('Saved', 'ok'); }
+  catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+
+async function checkOdoo() {
+  if (!currentKey) return;
+  const b = document.getElementById('btn-odoo'); b.disabled = true;
+  say('Looking in the Odoo Wise journals…');
+  try {
+    const r = await Admin.api('POST', API + 'odoo-check', { key: currentKey });
+    if (r.journals === 0) say('No journal named "Wise" in Odoo — nothing to match against yet.', 'err');
+    else {
+      const hit = Object.values(r.matches || {}).filter(m => m.some(x => x.chosen)).length;
+      say(`Checked ${r.checked} lines: ${hit} matched an Odoo payment.`, 'ok');
+    }
+    await loadTx(currentKey);
+  } catch (e) { say('Odoo check failed: ' + e.message, 'err'); }
+  b.disabled = false;
+}
 
 const HOWTO = `<div class="pad">
   <h3>Bring your Wise account in</h3>
@@ -116,8 +214,8 @@ function renderPreview(w, p) {
     <div class="hint">Check a few rows below, then press <b>Import into Wise</b> in the toolbar. Nothing has been saved yet.</div>
     ${p.warnings && p.warnings.length ? `<div class="warn"><b>${p.warnings.length} note(s) while reading the file</b><br>${p.warnings.map(esc).join('<br>')}</div>` : ''}
   </div>
-  <table><thead><tr><th>Date</th><th>Counterparty</th><th>Description</th><th>Reference</th><th class="num">Out</th><th class="num">In</th><th class="num">Balance</th><th>Cur</th></tr></thead>
-  <tbody>${p.sample.map(t => `<tr><td>${dmy(t.date)}</td><td>${esc(t.counterparty)}</td><td>${esc(t.description)}</td><td>${esc(t.reference)}</td>
+  <table><thead><tr><th>Date</th><th>Description</th><th class="num">Out</th><th class="num">In</th><th class="num">Balance</th><th>Cur</th></tr></thead>
+  <tbody>${p.sample.map(t => `<tr><td>${dmy(t.date)}</td><td class="c-desc">${descCell(t, t.currency)}</td>
     <td class="num debit">${amt(t.debit)}</td><td class="num credit">${amt(t.credit)}</td><td class="num">${num(t.balance)}</td><td>${esc(t.currency)}</td></tr>`).join('')}</tbody></table>
   <div class="pad hint">Showing the first ${p.sample.length} of ${p.count} lines.</div>`;
 }
@@ -177,24 +275,33 @@ async function loadAccounts() {
     ? accounts.map(a => `<option value="${esc(a.key || a.currency)}">${esc(a.name || a.currency)} · ${a.lines} lines</option>`).join('')
     : '<option value="">no statement yet</option>';
 }
-async function loadTx(cur) {
-  if (!cur) return render();
-  pending = null;
+let tx = [];
+async function loadTx(k) {
+  if (!k) return render();
+  pending = null; currentKey = k;
   document.getElementById('btn-import').disabled = true;
-  const tx = await Admin.api('GET', API + 'tx?currency=' + encodeURIComponent(cur));
+  tx = await Admin.api('GET', API + 'tx?currency=' + encodeURIComponent(k));
   tx.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  const cur = (accounts.find(a => (a.key || a.currency) === k) || {}).currency || (tx[0] || {}).currency || '';
   const inSum = tx.reduce((s, t) => s + (t.credit || 0), 0), outSum = tx.reduce((s, t) => s + (t.debit || 0), 0);
+  const opts = ['', 'Personal', ...companies.map(c => c.name)];
   document.getElementById('wrap').innerHTML = `
-    <table><thead><tr><th>Date</th><th>Counterparty</th><th>Description</th><th>Reference</th><th class="num">Out</th><th class="num">In</th><th class="num">Balance</th></tr></thead>
-    <tbody>${tx.map(t => `<tr><td>${dmy(t.date)}</td><td>${esc(t.counterparty || '')}</td><td>${esc(t.description || '')}</td><td>${esc(t.reference || '')}</td>
-      <td class="num debit">${amt(t.debit)}</td><td class="num credit">${amt(t.credit)}</td><td class="num">${num(t.balance)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="4" style="font-weight:600">${tx.length} lines</td><td class="num debit" style="font-weight:600">${num(outSum)}</td>
-      <td class="num credit" style="font-weight:600">${num(inSum)}</td><td></td></tr></tfoot></table>`;
+    <table><thead><tr><th>Date</th><th>Description</th><th class="num">Out</th><th class="num">In</th><th class="num">Balance</th>
+      <th class="c-partner">Partner (Odoo)</th><th class="c-company">Company</th><th class="c-odoo">Odoo</th></tr></thead>
+    <tbody>${tx.map(t => `<tr><td>${dmy(t.date)}</td><td class="c-desc">${descCell(t, cur)}</td>
+      <td class="num debit">${amt(t.debit)}</td><td class="num credit">${amt(t.credit)}</td><td class="num">${num(t.balance)}</td>
+      <td class="cell c-partner ${srcClass(t.partnerSrc)}"><input list="partner-list" value="${esc(t.partnerName || '')}"
+        onchange="editCell('${esc(String(t.id))}','partner',this.value)" placeholder="—"></td>
+      <td class="cell c-company ${srcClass(t.companySrc)}"><select onchange="editCell('${esc(String(t.id))}','company',this.value)">
+        ${opts.map(o => `<option value="${esc(o)}"${companyOf(t) === o ? ' selected' : ''}>${esc(o || '—')}</option>`).join('')}</select></td>
+      <td class="c-odoo">${odooCell(t)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="2" style="font-weight:600">${tx.length} lines</td><td class="num debit" style="font-weight:600">${num(outSum)}</td>
+      <td class="num credit" style="font-weight:600">${num(inSum)}</td><td colspan="4"></td></tr></tfoot></table>`;
 }
 
 Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.email;
-  await Promise.all([loadAccounts(), loadStatus()]);
+  await Promise.all([loadAccounts(), loadStatus(), loadPartners()]);
   if (accounts.length) loadTx(document.getElementById('acc').value); else render();
 });
 </script>
