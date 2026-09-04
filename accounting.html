@@ -186,6 +186,7 @@ async function loadPartners() {
     const r = await Admin.api('GET', '/api/accounting/partners');
     partners = r.partners || []; companies = r.companies || [];
     matchMemo.clear();
+    if (acc) await adoptOdooFacts();   // now the partner ids can be filled in too
     buildHeader(); render();
   } catch (e) { say('Odoo partners not available: ' + e.message, 'err'); }
 }
@@ -193,7 +194,30 @@ async function selectAccount(a) {
   acc = a; localStorage.setItem('whish_acc', a);
   document.getElementById('acc').value = a;
   tx = a ? await Admin.api('GET', `/api/accounting/whish/${a}/tx`) : [];
+  await adoptOdooFacts();
   render();
+}
+// A line matched to an Odoo payment already knows its partner and its company:
+// they are facts from the ledger, not suggestions. Write them onto the line (purple)
+// unless you chose something yourself, so nothing asks you what Odoo already said.
+async function adoptOdooFacts() {
+  const items = [];
+  for (const t of tx) {
+    const win = t.odoo && (t.odoo.matches || []).find(m => m.chosen); if (!win) continue;
+    const it = { id: t.id };
+    if (win.partner && t.partnerSrc !== 'manual' && (t.partnerName !== win.partner || t.partnerSrc !== 'odoo')) {
+      const p = partners.find(x => x.id === win.partnerId) || partners.find(x => x.name === win.partner);
+      Object.assign(it, { partnerName: win.partner, partnerId: win.partnerId || (p ? p.id : null), partnerSrc: 'odoo' });
+    }
+    if (win.company && t.companySrc !== 'manual' && (companyOf(t) !== win.company || t.companySrc !== 'odoo'))
+      Object.assign(it, { company: win.company, companySrc: 'odoo', kind: 'work', kindSrc: 'odoo' });
+    if (Object.keys(it).length > 1) items.push(it);
+  }
+  if (!items.length || !acc) return;
+  try {
+    await Admin.api('POST', `/api/accounting/whish/${acc}/tx-bulk`, { items });
+    for (const it of items) Object.assign(tx.find(x => x.id === it.id), it);
+  } catch (e) { say('Could not record the Odoo partners: ' + e.message, 'err'); }
 }
 
 // ── Who is behind a line ──
