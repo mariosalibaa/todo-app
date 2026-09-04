@@ -152,15 +152,19 @@
   body.mob .btn{height:38px;}
   /* desktop-only phone preview */
   .phone-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:200;overflow:auto;padding:24px;}
-  .phone-ov.on{display:flex;}
-  /* margin:auto centres the stage and still lets it scroll when it is taller than the window */
+  /* the phone is scaled to fit the window (see fitPhone) so it lands dead centre; "safe" keeps the
+     top reachable instead of clipped if anything (the stacked notes) still overflows */
+  .phone-ov.on{display:flex;align-items:safe center;justify-content:safe center;}
   /* the notes float beside the phone instead of sharing the row, so the phone itself lands dead centre */
-  .phone-stage{position:relative;margin:auto;}
+  .phone-stage{position:relative;}
   /* the holder is the *scaled* size, so centring works; the shell is painted inside it */
   .phone-holder{position:relative;flex:none;width:calc(454px * var(--pk,1));height:calc(956px * var(--pk,1));}
   .phone-shell{background:#000;border-radius:46px;padding:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);
     position:absolute;top:0;left:0;transform:scale(var(--pk,1));transform-origin:top left;}
   .phone-shell iframe{width:430px;height:932px;border:0;border-radius:36px;background:#fff;display:block;}
+  /* landscape: the frame is rotated for real, so the mobile page relayouts at 932 x 430 */
+  .phone-ov.land .phone-holder{width:calc(956px * var(--pk,1));height:calc(454px * var(--pk,1));}
+  .phone-ov.land .phone-shell iframe{width:932px;height:430px;}
   .phone-side{position:absolute;top:0;left:100%;margin-left:28px;width:230px;color:#fff;font-size:12px;line-height:1.5;}
   @media (max-width: 1100px){ .phone-side{position:static;margin:18px auto 0;} }
   .phone-side h4{margin:0 0 6px;font-size:13px;font-weight:600;}
@@ -200,7 +204,8 @@
     <div class="phone-holder"><div class="phone-shell"><iframe id="phone-frame" title="Phone preview"></iframe></div></div>
     <div class="phone-side">
       <h4>iPhone 15 Pro Max</h4>
-      <p>430 &times; 932 pt &middot; screen 2.87 &times; 6.23 in<br><span id="phone-scale"></span></p>
+      <p><span id="phone-dims">430 &times; 932 pt &middot; screen 2.87 &times; 6.23 in</span><br><span id="phone-scale"></span></p>
+      <p><a href="#" onclick="togglePhoneLand();return false;"><span id="phone-rot">rotate to landscape</span></a></p>
       <p><b>Life size?</b> A browser cannot read your screen's real size, so set it once: drag until the outline below matches a real bank card.</p>
       <input type="range" id="phone-ppi" min="55" max="230" step="1" oninput="setPhonePpi(this.value)">
       <div class="calib-card" id="calib-card">hold a bank card here<br>85.6 &times; 54 mm</div>
@@ -565,16 +570,49 @@ function draw() { return MOBILE ? mDraw() : drawDesktop(); }
 
 // desktop-only preview of the phone build
 // how many CSS pixels make one real inch on this screen (96 is the CSS default)
+let phonePpi = 96;
+let phoneLand = false;
 function setPhonePpi(ppi) {
   ppi = Math.max(55, Math.min(230, Number(ppi) || 96));
   try { localStorage.setItem('budget_phone_ppi', ppi); } catch {}
+  const el = document.getElementById('phone-ppi'); if (el) el.value = ppi;
+  phonePpi = ppi;
+  fitPhone();
+}
+// the calibrated (life-size) scale, shrunk so the whole phone fits the window:
+// the bookmarks bar / small screens otherwise cut the top off, which cannot be scrolled back.
+function fitPhone() {
+  const ppi = phonePpi;
+  const cal = 2.87 * ppi / 430;                     // 2.87in = the real screen width
+  const pad = 48;                                   // .phone-ov padding, both sides
+  const side = window.innerWidth > 1100 ? 258 : 0;  // notes column + its gap
+  const boxW = phoneLand ? 956 : 454, boxH = phoneLand ? 454 : 956;
+  // the notes are counted on both sides so the phone stays centred with room for them
+  const fit = Math.min(1,
+    (window.innerHeight - pad) / (boxH * cal),
+    (window.innerWidth - pad - 2 * side) / (boxW * cal));
   const r = document.documentElement.style;
   r.setProperty('--ppi', ppi);
-  r.setProperty('--pk', (2.87 * ppi / 430).toFixed(4));   // 2.87in = the real screen width
-  const el = document.getElementById('phone-ppi'); if (el) el.value = ppi;
+  r.setProperty('--pk', (cal * fit).toFixed(4));
+  const dim = document.getElementById('phone-dims');
+  if (dim) dim.innerHTML = phoneLand
+    ? '932 &times; 430 pt &middot; screen 6.23 &times; 2.87 in'
+    : '430 &times; 932 pt &middot; screen 2.87 &times; 6.23 in';
+  const rot = document.getElementById('phone-rot');
+  if (rot) rot.textContent = phoneLand ? 'rotate to portrait' : 'rotate to landscape';
   const lab = document.getElementById('phone-scale');
-  if (lab) lab.textContent = ppi === 96 ? 'shown at CSS default (96 px per inch)' : `calibrated to ${ppi} px per inch`;
+  if (lab) lab.textContent = fit < 0.995
+    ? `calibrated to ${ppi} px per inch · shown at ${Math.round(fit * 100)}% to fit the window`
+    : (ppi === 96 ? 'shown at CSS default (96 px per inch)' : `calibrated to ${ppi} px per inch`);
 }
+function togglePhoneLand() {
+  phoneLand = !phoneLand;
+  document.getElementById('phone-ov').classList.toggle('land', phoneLand);
+  fitPhone();
+}
+window.addEventListener('resize', () => {
+  if (document.getElementById('phone-ov').classList.contains('on')) fitPhone();
+});
 function openPhone() {
   let ppi = 96;
   try { ppi = Number(localStorage.getItem('budget_phone_ppi')) || 96; } catch {}
