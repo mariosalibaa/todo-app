@@ -82,10 +82,7 @@ function say(t, cls) { const m = document.getElementById('msg'); m.textContent =
 
 const HOWTO = `<div class="pad">
   <h3>Bring your Wise account in</h3>
-  <p class="hint"><b>Automatic (recommended):</b> connect the Wise API once and every balance is pulled nightly and on the Sync button. Two one-time steps on wise.com:
-  <b>Settings → API tokens → Add token</b> (read only), and <b>Settings → API tokens → Manage public keys → Add</b> using the file <i>wise-public-key.pem</i> on the Desktop.
-  Then give the token to Mario's session (or set WISE_API_TOKEN on Vercel).</p>
-  <p class="hint"><b>Manual:</b></p>
+  <p class="hint"><b>Why there is no API sync:</b> Wise switched off request signing on <b>personal</b> accounts under PSD2, and says plainly that account statements can no longer be retrieved that way. The API code is built and tested, but it needs a Wise <b>business</b> profile. Until then, import the CSV below — it takes about a minute per balance.</p>
   <ol>
     <li>Open <a href="https://wise.com/balances" target="_blank" rel="noopener">wise.com</a> on a computer and sign in.</li>
     <li>Pick the balance you want, for example USD or EUR. Wise keeps one statement per currency, so repeat this for each balance you use.</li>

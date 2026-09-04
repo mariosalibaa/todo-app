@@ -150,6 +150,13 @@ async function batchSet(db, writes) {
 // Statement endpoints are behind Strong Customer Authentication: Wise answers 403 with a
 // one-time token in x-2fa-approval; we sign it with the private key and retry. That is the
 // whole "2FA" — no phone, no code, so it can run from a cron.
+//
+// !! BUSINESS ACCOUNTS ONLY (checked on wise.com 2026-09-04). Wise's "Manage your public keys"
+// page states: "As part of our ongoing improvements in compliance with ... (PSD2), we no longer
+// support signing API requests to complete strong customer authentication on personal Wise
+// accounts. You can no longer retrieve account statements or fund payments using this method."
+// Mario's Wise is a PERSONAL account, so syncFromApi() cannot fetch its statements. The code is
+// kept because it works unchanged for a business profile; until then use the CSV import.
 // ═══════════════════════════════════════════════════════════════════════════
 const crypto = require('crypto');
 const fs = require('fs');
