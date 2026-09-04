@@ -61,6 +61,8 @@
   .c-desc .who.src-manual{color:var(--green);font-style:normal;} .c-desc .who.src-auto{color:var(--auto);font-style:italic;}
   td.c-desc,td.c-partner,td.c-company{vertical-align:top;padding-top:4px;}
   .odoo-warn{color:#b26a00;font-size:11px;margin-top:2px;}
+  .odoo-doc{color:var(--muted);font-size:11px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;}
+  td:last-child{max-width:230px;}
   /* partner picker */
   .pick{position:relative;}
   .pick input{width:100%;}
@@ -73,6 +75,9 @@
   .sug-act button{border:1px solid var(--line);background:#fff;border-radius:3px;width:22px;height:20px;line-height:1;cursor:pointer;font-size:12px;padding:0;}
   .sug-act button.yes{color:var(--green);border-color:#bfe3c8;} .sug-act button.yes:hover{background:#eef9f0;}
   .sug-act button.no{color:var(--muted);} .sug-act button.no:hover{background:#f1f3f5;}
+  .sug-act button.many{width:auto;padding:0 5px;color:var(--odoo);border-color:#d9c9d4;font-size:10.5px;font-weight:600;}
+  .sug-act button.many:hover{background:#f5f2f7;}
+  .sug-act button.many.over{color:var(--muted);border-color:var(--line);cursor:not-allowed;}
   .sug-act{margin-top:3px;} .sug-act .what{font-size:10.5px;color:var(--auto);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:96px;}
   .sug-skip{color:#adb5bd;font-size:11px;margin-top:3px;} .sug-skip a{color:var(--odoo);cursor:pointer;}
   .ref{color:var(--muted);font-size:11px;}
@@ -107,7 +112,6 @@
   <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
-  <button class="btn" id="btn-accept" onclick="acceptAll()" title="Fill every blank Partner and Company on the lines shown with their blue suggestion">✓ Accept all shown</button>
   <label class="btn primary" for="file">⬆ Upload statement (PDF)</label>
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
   <button class="btn" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
@@ -142,6 +146,7 @@
 const esc = Admin.esc;
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
+const SAME_CAP = 60;   // one number's repeats may go together; a crowd may not
 let accounts = [], acc = null, tx = [], contacts = {}, partners = [], companies = [];
 const KNOWN = { '9613700985': 'Maya', '9613299799': 'Walid Hibri', '9613165168': 'Mario Saliba' };   // seeds until contacts are imported
 
@@ -383,7 +388,9 @@ function odooCell(t) {
   if (win) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
     const differs = t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
+    const docs = (win.docs || []).filter(d => d && d !== win.move);
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
+      + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${esc(docs.join(', '))}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
   const tip = m.map(matchTip).join('\n');
@@ -398,6 +405,11 @@ function render() {
   document.getElementById('clr').classList.toggle('on', Object.keys(colF).length > 0 || !!sugFilter);
 
   let pending = 0;
+  // Lines sharing a number AND the same suggested answer are one decision repeated, so
+  // those may be taken together. A mixed batch never is.
+  const sameKey = t => { const g = sugFor(t); return g.any ? [t.phone || '', g.partner ? g.partner.name : '', g.company || ''].join('|') : ''; };
+  const groups = {};
+  for (const o of tx) { if (sugState(o) !== 'pending' || !o.phone) continue; const k = sameKey(o); if (k) (groups[k] = groups[k] || []).push(o.id); }
   document.getElementById('rows').innerHTML = rows.map(t => {
     const cn = contactName(t), sg = sugFor(t), co = companyOf(t);
     if (sg.any && !t.suggestSkip) pending++;
@@ -424,7 +436,10 @@ function render() {
         ${co && co !== 'Personal' && !companies.some(x => x.name === co) ? `<option selected>${esc(co)}</option>` : ''}</select>
         ${sg.any ? (t.suggestSkip
           ? `<div class="sug-skip">skipped · <a onclick="skipRow('${t.id}', false)">undo</a></div>`
-          : `<div class="sug-act"><button class="yes" title="Apply: ${esc(sugTxt)}" onclick="acceptRow('${t.id}')">✓</button><button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button><span class="what">${esc(sugTxt)}</span></div>`) : ''}
+          : (() => { const k = sameKey(t), n = (groups[k] || []).length;
+              return `<div class="sug-act"><button class="yes" title="Apply to this line only: ${esc(sugTxt)}" onclick="acceptRow('${t.id}')">✓</button><button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button>${n > 1 ? (n > SAME_CAP
+                ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
+                : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what">${esc(sugTxt)}</span></div>`; })()) : ''}
       </td>
       <td class="c-note ${srcClass(t.note ? (t.noteSrc || 'manual') : '')}"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
       <td>${odooCell(t)}</td>
@@ -434,8 +449,6 @@ function render() {
   document.getElementById('totals').innerHTML =
     `<td colspan="2">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}</td>
      <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td></td><td colspan="4"></td>`;
-  const b = document.getElementById('btn-accept');
-  b.disabled = !pending; b.textContent = pending ? `✓ Accept ${pending} shown` : '✓ Accept all shown';
   const rv = document.getElementById('btn-review');
   const waiting = tx.filter(t => sugState(t) === 'pending').length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
@@ -559,15 +572,27 @@ function reviewSuggestions() {
   say(sugFilter ? 'Showing only the lines with a suggestion waiting — ✓ to apply, ✕ to skip' : '');
 }
 function showSkipped() { sugFilter = sugFilter === 'skipped' ? '' : 'skipped'; render(); }
-async function acceptAll() {
-  const items = visible().filter(t => !t.suggestSkip).map(itemFor).filter(Boolean);
-  if (!items.length) return;
-  if (!confirm(`Fill ${items.length} line${items.length > 1 ? 's' : ''} with their suggested partner / company? (shown in blue until you confirm them)`)) return;
+// The only bulk action left: pending lines from the SAME number carrying the SAME
+// suggested partner and company. That is one decision applied to its own repeats, never a
+// mixed batch — accepting 161 different guesses on one click was too easy to get wrong.
+
+async function acceptSame(id) {
+  const t = tx.find(x => x.id === id); if (!t || !t.phone) return;
+  const g = sugFor(t); if (!g.any) return;
+  const key = [t.phone, g.partner ? g.partner.name : '', g.company || ''].join('|');
+  const mates = tx.filter(o => o.phone === t.phone && sugState(o) === 'pending'
+    && [o.phone, (sugFor(o).partner || {}).name || '', sugFor(o).company || ''].join('|') === key);
+  if (!mates.length) return;
+  if (mates.length > SAME_CAP) return say(`That is ${mates.length} lines — too many at once. Narrow the view with the date or amount filter first.`, 'err');
+  const what = [g.partner && g.partner.name, g.company].filter(Boolean).join(' / ');
+  const who = '0' + t.phone.replace(/^961/, '');
+  if (!confirm(`Apply "${what}" to all ${mates.length} pending lines from ${who}?\n\nThey all carry the same suggestion. Anything you already filled in is untouched.`)) return;
+  const items = mates.map(itemFor).filter(Boolean);
   try {
     await Admin.api('POST', `/api/accounting/whish/${acc}/tx-bulk`, { items });
     for (const it of items) Object.assign(tx.find(x => x.id === it.id), it);
     render();
-    say(`${items.length} lines filled from suggestions`);
+    say(`${items.length} lines from ${who} set to ${what}`);
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 
