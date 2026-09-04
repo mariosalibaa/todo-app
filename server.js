@@ -4,6 +4,7 @@ const path = require('path');
 const admin = require('firebase-admin');
 const accounting = require('./accounting');   // /api/accounting/* (Whish statements)
 const budget = require('./budget');           // /api/accounting/budget/* (HomeBudget replica)
+const wise = require('./wise');               // /api/accounting/wise/* (Wise statements)
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -79,6 +80,8 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'hub.html'));
   fs.readFileSync(path.join(__dirname, 'accounting.html'));
   fs.readFileSync(path.join(__dirname, 'budget.html'));
+  fs.readFileSync(path.join(__dirname, 'wise.html'));
+  fs.readFileSync(path.join(__dirname, 'accounting-home.html'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
 }
 
@@ -570,7 +573,10 @@ const handler = async (req, res) => {
     res.end();
     return;
   }
-  const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/accounting': 'accounting.html', '/accounting/whish': 'accounting.html', '/accounting/budget': 'budget.html' };
+  const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
+    // /accounting is a chooser now; the Whish grid lives at /accounting/whish
+    '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html',
+    '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(path.join(__dirname, page), 'utf8');
@@ -681,7 +687,9 @@ const handler = async (req, res) => {
     if (!access.apps.includes('accounting')) return noApp('accounting');
     try {
       const ctx = { db, admin, TEAM_ID, odooCall };
-      const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx) : await accounting.handle(req, res, url, user, ctx);
+      const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)
+        : url.startsWith('/api/accounting/wise/') ? await wise.handle(req, res, url, user, ctx)
+        : await accounting.handle(req, res, url, user, ctx);
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {
       console.error('accounting error:', e);

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#163300">
+<title>Accounting · Wise</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--wise:#163300;--lime:#9fe870;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--green:#28a745;--red:#dc3545;--blue:#1a73e8;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
+  .top{background:var(--wise);color:#fff;display:flex;align-items:center;gap:12px;padding:0 14px;height:46px;flex:none;}
+  .top a{color:var(--lime);text-decoration:none;}
+  .top .brand{font-weight:600;font-size:14px;}
+  .top .sp{flex:1;}
+  .top .who{font-size:12px;opacity:.8;}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg);flex:none;}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 12px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .btn.primary{background:var(--wise);border-color:var(--wise);color:var(--lime);font-weight:600;}
+  .btn:disabled{opacity:.45;cursor:default;}
+  select{border:1px solid var(--line);border-radius:4px;height:30px;padding:0 7px;font-size:13px;background:#fff;}
+  .wrap{flex:1;min-height:0;overflow:auto;}
+  .pad{padding:18px 20px;max-width:860px;}
+  h3{margin:0 0 10px;font-size:15px;}
+  ol{margin:0 0 16px;padding-left:20px;line-height:1.8;}
+  ol b{background:#f1f3f5;border-radius:3px;padding:1px 5px;font-weight:600;}
+  .hint{color:var(--muted);font-size:12px;line-height:1.6;}
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--muted);background:var(--bg);margin:14px 0;}
+  .drop.on{border-color:var(--wise);background:#f2f8ee;color:var(--wise);}
+  .drop b{display:block;color:var(--text);font-size:14px;margin-bottom:4px;}
+  table{border-collapse:separate;border-spacing:0;width:100%;}
+  thead th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;height:30px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:2;}
+  td{padding:3px 8px;border-bottom:1px solid #eef0f2;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis;}
+  tr:hover td{background:#f2f8ee;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.debit{color:var(--red);} td.credit{color:var(--green);}
+  .cards{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0;}
+  .card{border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:170px;}
+  .card b{display:block;font-size:17px;}
+  .card span{color:var(--muted);font-size:12px;}
+  .msg{padding:8px 14px;font-size:12px;display:none;flex:none;}
+  .msg.err{color:var(--red);background:#fdf1f2;display:block;} .msg.ok{color:var(--green);background:#f1faf3;display:block;}
+  .warn{color:#8a6d3b;background:#fcf8e3;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:12px;max-height:130px;overflow:auto;}
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/accounting" title="Accounting">&lsaquo;</a>
+  <span class="brand">Accounting</span>
+  <span style="opacity:.5">›</span><span>Wise</span>
+  <span class="sp"></span>
+  <a href="/accounting/whish">Whish</a><a href="/accounting/budget">Budget</a>
+  <span class="who" id="who"></span>
+</div>
+<div class="bar">
+  <label class="btn primary" for="file">⬆ Choose a Wise statement (CSV)</label>
+  <input type="file" id="file" accept=".csv,text/csv" style="display:none" onchange="pick(this.files[0])">
+  <button class="btn" id="btn-import" onclick="doImport()" disabled>Import into Wise</button>
+  <span class="sp" style="flex:1"></span>
+  <select id="acc" onchange="loadTx(this.value)"></select>
+</div>
+<div class="msg" id="msg"></div>
+<div class="wrap" id="wrap"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc;
+const API = '/api/accounting/wise/';
+let pending = null;          // { csv, filename, preview }
+let accounts = [];
+const num = n => (n == null ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const amt = n => (n ? num(n) : '');   // an empty side of the ledger reads better blank than 0.00
+const dmy = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '';
+function say(t, cls) { const m = document.getElementById('msg'); m.textContent = t || ''; m.className = 'msg ' + (t ? (cls || 'ok') : ''); }
+
+const HOWTO = `<div class="pad">
+  <h3>Bring your Wise account in</h3>
+  <ol>
+    <li>Open <a href="https://wise.com/balances" target="_blank" rel="noopener">wise.com</a> on a computer and sign in.</li>
+    <li>Pick the balance you want, for example USD or EUR. Wise keeps one statement per currency, so repeat this for each balance you use.</li>
+    <li>Click <b>Statements</b>, or <b>⋯ &rarr; Get statement</b>.</li>
+    <li>Choose <b>Statement (CSV)</b>, not PDF. Set the date range you want, whole years are fine.</li>
+    <li>Download it, then drop the file below.</li>
+  </ol>
+  <div class="hint">Nothing is saved until you press Import. Dropping a file only shows you what it found, so you can check it first.
+  Re-importing an overlapping period is safe: lines are keyed by the Wise transaction id, so they update instead of doubling.</div>
+  <div class="drop" id="drop" ondragover="event.preventDefault();this.className='drop on'" ondragleave="this.className='drop'"
+       ondrop="event.preventDefault();this.className='drop';pick(event.dataTransfer.files[0])"
+       onclick="document.getElementById('file').click()">
+    <b>Drop the CSV here</b>or click to choose a file
+  </div>
+</div>`;
+
+function render() {
+  const w = document.getElementById('wrap');
+  if (pending && pending.preview) return renderPreview(w, pending.preview);
+  if (!accounts.length) { w.innerHTML = HOWTO; return; }
+  w.innerHTML = HOWTO;
+}
+function renderPreview(w, p) {
+  w.innerHTML = `<div class="pad">
+    <h3>Found ${p.count} lines &middot; ${dmy(p.from)} to ${dmy(p.till)}</h3>
+    <div class="cards">${p.summary.map(s => `<div class="card">
+      <b>${esc(s.currency)}</b><span>${s.lines} lines</span>
+      <div style="margin-top:6px"><span style="color:var(--green)">in ${num(s.in)}</span> &middot; <span style="color:var(--red)">out ${num(s.out)}</span></div>
+      ${s.closing != null ? `<div style="margin-top:4px"><span>closing ${num(s.closing)}</span></div>` : ''}
+    </div>`).join('')}</div>
+    <div class="hint">Check a few rows below, then press <b>Import into Wise</b> in the toolbar. Nothing has been saved yet.</div>
+    ${p.warnings && p.warnings.length ? `<div class="warn"><b>${p.warnings.length} note(s) while reading the file</b><br>${p.warnings.map(esc).join('<br>')}</div>` : ''}
+  </div>
+  <table><thead><tr><th>Date</th><th>Counterparty</th><th>Description</th><th>Reference</th><th class="num">Out</th><th class="num">In</th><th class="num">Balance</th><th>Cur</th></tr></thead>
+  <tbody>${p.sample.map(t => `<tr><td>${dmy(t.date)}</td><td>${esc(t.counterparty)}</td><td>${esc(t.description)}</td><td>${esc(t.reference)}</td>
+    <td class="num debit">${amt(t.debit)}</td><td class="num credit">${amt(t.credit)}</td><td class="num">${num(t.balance)}</td><td>${esc(t.currency)}</td></tr>`).join('')}</tbody></table>
+  <div class="pad hint">Showing the first ${p.sample.length} of ${p.count} lines.</div>`;
+}
+
+async function pick(file) {
+  if (!file) return;
+  say('Reading ' + file.name + '…');
+  const csv = await file.text();
+  try {
+    const preview = await Admin.api('POST', API + 'preview', { csv });
+    pending = { csv, filename: file.name, preview };
+    document.getElementById('btn-import').disabled = false;
+    say(`${file.name}: ${preview.count} lines in ${preview.currencies.join(', ') || 'one balance'}. Nothing saved yet.`, 'ok');
+    render();
+  } catch (e) {
+    pending = null;
+    document.getElementById('btn-import').disabled = true;
+    say('Could not read that file: ' + e.message + (e.data && e.data.header ? ' — columns found: ' + e.data.header.join(', ') : ''), 'err');
+  }
+}
+async function doImport() {
+  if (!pending) return;
+  const b = document.getElementById('btn-import'); b.disabled = true;
+  say('Importing…');
+  try {
+    const r = await Admin.api('POST', API + 'upload', { csv: pending.csv, filename: pending.filename });
+    say('Imported ' + r.accounts.map(a => `${a.currency}: ${a.added} new, ${a.updated} updated`).join(' · '), 'ok');
+    pending = null;
+    await loadAccounts();
+    if (accounts.length) loadTx(document.getElementById('acc').value);
+  } catch (e) { say('Import failed: ' + e.message, 'err'); b.disabled = false; }
+}
+async function loadAccounts() {
+  accounts = await Admin.api('GET', API + 'accounts').catch(() => []);
+  document.getElementById('acc').innerHTML = accounts.length
+    ? accounts.map(a => `<option value="${esc(a.currency)}">${esc(a.name || a.currency)} · ${a.lines} lines</option>`).join('')
+    : '<option value="">no statement yet</option>';
+}
+async function loadTx(cur) {
+  if (!cur) return render();
+  pending = null;
+  document.getElementById('btn-import').disabled = true;
+  const tx = await Admin.api('GET', API + 'tx?currency=' + encodeURIComponent(cur));
+  tx.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  const inSum = tx.reduce((s, t) => s + (t.credit || 0), 0), outSum = tx.reduce((s, t) => s + (t.debit || 0), 0);
+  document.getElementById('wrap').innerHTML = `
+    <table><thead><tr><th>Date</th><th>Counterparty</th><th>Description</th><th>Reference</th><th class="num">Out</th><th class="num">In</th><th class="num">Balance</th></tr></thead>
+    <tbody>${tx.map(t => `<tr><td>${dmy(t.date)}</td><td>${esc(t.counterparty || '')}</td><td>${esc(t.description || '')}</td><td>${esc(t.reference || '')}</td>
+      <td class="num debit">${amt(t.debit)}</td><td class="num credit">${amt(t.credit)}</td><td class="num">${num(t.balance)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="4" style="font-weight:600">${tx.length} lines</td><td class="num debit" style="font-weight:600">${num(outSum)}</td>
+      <td class="num credit" style="font-weight:600">${num(inSum)}</td><td></td></tr></tfoot></table>`;
+}
+
+Admin.require('accounting', async me => {
+  document.getElementById('who').textContent = me.email;
+  await loadAccounts();
+  if (accounts.length) loadTx(document.getElementById('acc').value); else render();
+});
+</script>
+</body>
+</html>

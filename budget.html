@@ -167,7 +167,7 @@
 </head>
 <body>
 <div class="side">
-  <div class="head"><a href="/accounting" title="Whish statements">‹</a><div class="t"><b>Budget</b><span id="side-month"></span></div><a href="/admin" title="Hub">⌂</a></div>
+  <div class="head"><a href="/accounting" title="Accounting">‹</a><div class="t"><b>Budget</b><span id="side-month"></span></div><a href="/admin" title="Hub">⌂</a></div>
   <ul class="nav" id="nav"></ul>
   <div class="foot"><span id="who"></span><span class="sp"></span><a onclick="openPhone()" title="Preview the phone version (iPhone 15 Pro Max)">📱</a><a onclick="openSettings()" title="Currencies &amp; settings">⚙</a></div>
 </div>
@@ -592,7 +592,7 @@ function mRender() {
   if (S.screen === 'home' || !S.screen) {
     const incl = D.accounts.filter(counts).reduce((t, a) => t + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
     const badge = { expenses: sum(monthExpenses(S.ym)), income: sum(monthIncome(S.ym)), transfers: sum(monthTransfers(S.ym)), accounts: incl };
-    mNav({ backHref: '/accounting', backLbl: 'Whish', home: true, title: 'Budget', sub: MONTHS[+mo - 1] + ' ' + y });
+    mNav({ backHref: '/accounting', backLbl: 'Accounting', home: true, title: 'Budget', sub: MONTHS[+mo - 1] + ' ' + y });
     document.getElementById('m-body').innerHTML = M_MENU.map(x =>
       `<div class="m-row" onclick="mGo('${x.id}')"><span class="ico" style="background:transparent;font-size:19px">${x.ico}</span>
         <div class="tx"><b>${x.lbl}</b></div>

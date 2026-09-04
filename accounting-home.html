@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Accounting · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:960px;margin:0 auto;padding:32px 20px 60px;}
+  h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 14px;font-weight:600;}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;}
+  .tile{display:block;background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:22px 20px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
+  .tile:hover{border-color:var(--amber);transform:translateY(-2px);}
+  .tile .ico{font-size:1.7rem;margin-bottom:10px;}
+  .tile .name{font-weight:600;font-size:1.02rem;}
+  .tile .desc{font-size:.78rem;color:var(--sub);margin-top:4px;line-height:1.45;}
+  .tile .tag{display:inline-block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--base);background:var(--amber);border-radius:4px;padding:2px 6px;margin-top:10px;}
+  .back{font-size:.78rem;color:var(--overlay0);text-decoration:none;display:inline-block;margin-bottom:18px;}
+  .back:hover{color:var(--text);}
+  @media (max-width:600px){header{padding:14px 16px;}main{padding:22px 14px;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>ACCOUNTING</small></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <a class="back" href="/admin">&lsaquo; Shift Hub</a>
+  <h2>Accounting</h2>
+  <div class="tiles" id="tiles"></div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc;
+const SECTIONS = [
+  { ico: '🧾', name: 'Whish', href: '/accounting/whish',
+    desc: 'Import Whish statements, name the counterparties, tag work or personal, and check each line against Odoo.' },
+  { ico: '🌍', name: 'Wise', href: '/accounting/wise',
+    desc: 'Multi-currency Wise balances. Import a statement so the transactions land in Budget.', tag: 'set up' },
+  { ico: '📊', name: 'Budget', href: '/accounting/budget',
+    desc: 'Accounts, expenses, income, transfers and reports. The HomeBudget replacement.' },
+];
+Admin.require('accounting', me => {
+  document.getElementById('who').innerHTML =
+    `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  document.getElementById('tiles').innerHTML = SECTIONS.map(s => `
+    <a class="tile" href="${s.href}">
+      <div class="ico">${s.ico}</div>
+      <div class="name">${esc(s.name)}</div>
+      <div class="desc">${esc(s.desc)}</div>
+      ${s.tag ? `<div class="tag">${esc(s.tag)}</div>` : ''}
+    </a>`).join('');
+});
+</script>
+</body>
+</html>
