@@ -57,6 +57,15 @@
   .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
   .odoo-no{color:#adb5bd;}
   .odoo-multi{color:#F2A93B;font-weight:600;}
+  .c-proj{min-width:150px;}
+  td.cell.src-suggest input,td.cell.src-suggest select{color:#1a73e8;}
+  .sug{margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+  .sug .what{flex-basis:100%;font-size:10.5px;color:#1a73e8;font-style:italic;white-space:normal;line-height:1.25;}
+  .sug button{border:1px solid var(--line);background:#fff;border-radius:3px;height:19px;min-width:20px;line-height:1;cursor:pointer;font-size:11px;padding:0 3px;}
+  .sug button.yes{color:var(--green);border-color:#bfe3c8;} .sug button.yes:hover{background:#eef9f0;}
+  .sug button.many{color:var(--wise);border-color:#cfe3bf;font-weight:600;} .sug button.many:hover{background:#f2f8ee;}
+  .sug button.no{color:var(--muted);} .sug button.no:hover{background:#f1f3f5;}
+  .sug-skip{color:#adb5bd;font-size:11px;margin-top:3px;} .sug-skip a{color:var(--wise);cursor:pointer;text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -74,6 +83,7 @@
   <button class="btn" id="btn-import" onclick="doImport()" disabled>Import into Wise</button>
   <button class="btn" id="btn-sync" onclick="doSync()" title="Pull every balance straight from Wise through the API">⟳ Sync from Wise</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these lines in the Odoo Wise journals">⇄ Check Odoo</button>
+  <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner, company or project suggestion waiting">⚡ Review suggestions</button>
   <span class="hint" id="sync-status"></span>
   <span class="sp" style="flex:1"></span>
   <select id="acc" onchange="loadTx(this.value)"></select>
@@ -81,6 +91,7 @@
 <div class="msg" id="msg"></div>
 <div class="wrap" id="wrap"></div>
 <datalist id="partner-list"></datalist>
+<datalist id="analytic-list"></datalist>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -97,7 +108,8 @@ const dmy = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) 
 function say(t, cls) { const m = document.getElementById('msg'); m.textContent = t || ''; m.className = 'msg ' + (t ? (cls || 'ok') : ''); }
 
 const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
-let partners = [], companies = [];
+let partners = [], companies = [], analytic = [];
+let sugFilter = '';   // '' | 'pending' — the Review button
 
 // One "what was this" column instead of three. Wise repeats itself: the description
 // spells out the counterparty and the amount, both of which have their own column
@@ -130,9 +142,137 @@ async function loadPartners() {
     const dl = document.getElementById('partner-list');
     if (dl) dl.innerHTML = partners.map(p => `<option value="${esc(p.name)}">`).join('');
   } catch (e) { say('Odoo partners not available: ' + e.message, 'err'); }
+  try {
+    analytic = await Admin.api('GET', '/api/accounting/analytic');
+    document.getElementById('analytic-list').innerHTML =
+      analytic.map(a => `<option value="${esc(a.name)}">${esc([a.plan, a.company].filter(Boolean).join(' \u00b7 '))}</option>`).join('');
+  } catch { analytic = []; }
+}
+
+// ── Suggestions ────────────────────────────────────────────────────────────
+// Wise has no phone number to group by, so the merchant is the key: the first
+// three word-ish tokens of the counterparty, anything with a digit dropped.
+// "Facebk *Uhjgv4ea74 Dublin" carries a different token on every charge and
+// "Apple.com/bill 08055…" a different invoice number, yet both are the same
+// merchant every month.
+const norm = v => String(v || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const bigrams = v => { const g = new Set(); const t = v.replace(/ /g, ''); for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2)); return g; };
+function dice(a, b) {
+  a = norm(a); b = norm(b);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const ga = bigrams(a), gb = bigrams(b);
+  let inter = 0; for (const g of ga) if (gb.has(g)) inter++;
+  return (ga.size + gb.size) ? (2 * inter) / (ga.size + gb.size) : 0;
+}
+const mkey = t => norm(t.counterparty || t.description || '').split(' ').filter(w => w && !/\d/.test(w)).slice(0, 3).join(' ');
+
+// A card merchant is a name followed by noise — "Odoo Middle East", "Openai
+// *Chatgpt Subscr" — so the Odoo partner has to OPEN the string. A partner name
+// that merely appears somewhere inside it is a coincidence: "Shift" sits inside
+// "Google Gsuite shift" and means nothing. Anything else has to look alike as a
+// whole, which is what the bigram score measures.
+const matchMemo = new Map();
+function partnerMatch(name) {
+  if (!name || !partners.length) return null;
+  const k = norm(name); if (!k) return null;
+  if (matchMemo.has(k)) return matchMemo.get(k);
+  let best = null, bs = 0;
+  for (const p of partners) {
+    const pn = norm(p.name);
+    if (pn.length < 4) continue;
+    const sc = (k === pn || k.startsWith(pn + ' ')) ? 0.95 : dice(k, pn);
+    if (sc > bs) { bs = sc; best = p; }
+  }
+  const out = bs >= 0.62 ? { id: best.id, name: best.name, score: bs } : null;
+  matchMemo.set(k, out);
+  return out;
+}
+// the most recent other line of the same merchant that carries this field
+function lastFor(t, field) {
+  const k = mkey(t); if (!k) return null;
+  for (const o of tx) if (o.id !== t.id && o[field] && mkey(o) === k) return o;
+  return null;
+}
+// What is waiting on this row: a partner (used before for this merchant, an Odoo
+// partner whose name looks like the merchant, or the partner on the matched
+// payment), a company and a project — each only while the cell is still empty.
+function sugFor(t) {
+  const out = { partner: null, company: '', analytic: null, why: '', any: false };
+  const win = t.odoo && (t.odoo.matches || []).find(m => m.chosen);
+  if (!t.partnerName) {
+    const prev = lastFor(t, 'partnerName');
+    if (prev) { out.partner = { id: prev.partnerId || null, name: prev.partnerName }; out.why = 'used before for this merchant'; }
+    else {
+      const p = partnerMatch(t.counterparty || '');
+      if (p) { out.partner = { id: p.id, name: p.name }; out.why = 'looks like ' + p.name; }
+      else if (t.odooPartner) {
+        const q = partners.find(x => x.name === t.odooPartner);
+        out.partner = { id: q ? q.id : null, name: t.odooPartner }; out.why = 'partner on the matched Odoo payment';
+      }
+    }
+  }
+  if (!companyOf(t)) {
+    const prev = lastFor(t, 'company');
+    if (prev) { out.company = prev.company; out.why = out.why || 'used before for this merchant'; }
+    else if (win && win.company) { out.company = win.company; out.why = out.why || 'from the matched Odoo payment'; }
+  }
+  if (!t.analyticName) {
+    const prev = lastFor(t, 'analyticName');
+    if (prev && prev.analyticId) { out.analytic = { id: prev.analyticId, name: prev.analyticName }; out.why = out.why || 'used before for this merchant'; }
+  }
+  out.any = !!(out.partner || out.company || out.analytic);
+  return out;
+}
+const sugState = t => !sugFor(t).any ? '' : (t.suggestSkip ? 'skipped' : 'pending');
+const sugText = g => [g.partner && g.partner.name, g.company, g.analytic && g.analytic.name].filter(Boolean).join(' / ');
+function itemFor(t) {
+  const g = sugFor(t); if (!g.any) return null;
+  const it = { id: t.id };
+  if (g.partner) Object.assign(it, { partnerId: g.partner.id || null, partnerName: g.partner.name, partnerSrc: 'suggest' });
+  if (g.company) Object.assign(it, { company: g.company === 'Personal' ? '' : g.company, companySrc: 'suggest',
+    kind: g.company === 'Personal' ? 'personal' : 'work' });
+  if (g.analytic) Object.assign(it, { analyticId: g.analytic.id, analyticName: g.analytic.name, analyticSrc: 'suggest', analyticFrom: '' });
+  return it;
+}
+async function saveItems(items, msg) {
+  if (!items.length) return;
+  try {
+    await Admin.api('POST', API + 'tx-save', { key: currentKey, items });
+    for (const it of items) { const t = rowOf(it.id); if (t) Object.assign(t, it); }
+    renderGrid(); say(msg, 'ok');
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+const rowOf = id => tx.find(x => String(x.id) === String(id));
+async function acceptRow(id) {
+  const t = rowOf(id); const it = t && itemFor(t); if (!it) return;
+  await saveItems([it], 'Applied: ' + sugText(sugFor(t)));
+}
+async function skipRow(id, on) {
+  await saveItems([{ id, suggestSkip: !!on }], on ? 'Suggestion skipped for this line' : 'Suggestion back');
+}
+// The one bulk action: pending lines of the SAME merchant carrying the SAME
+// answer. One decision applied to its own repeats, never a mixed batch.
+const SAME_CAP = 60;
+const sameKey = t => { const g = sugFor(t); return g.any ? mkey(t) + '|' + sugText(g) : ''; };
+async function acceptSame(id) {
+  const t = rowOf(id); if (!t) return;
+  const k = sameKey(t); if (!k) return;
+  const mates = tx.filter(o => sugState(o) === 'pending' && sameKey(o) === k);
+  if (!mates.length) return;
+  if (mates.length > SAME_CAP) return say(`That is ${mates.length} lines — too many at once. Narrow the view first.`, 'err');
+  const what = sugText(sugFor(t));
+  if (!confirm(`Apply "${what}" to all ${mates.length} pending lines of ${mkey(t)}?\n\nThey all carry the same suggestion. Anything already filled in is untouched.`)) return;
+  await saveItems(mates.map(itemFor).filter(Boolean), `${mates.length} lines set to ${what}`);
+}
+function reviewSuggestions() {
+  sugFilter = sugFilter === 'pending' ? '' : 'pending';
+  renderGrid();
+  say(sugFilter ? 'Showing only the lines with a suggestion waiting — ✓ to apply, ✕ to skip' : '');
 }
 const companyOf = t => t.company || (t.kind === 'personal' ? 'Personal' : '');
-const srcClass = s => s === 'manual' ? 'src-manual' : s === 'odoo' ? 'src-odoo' : '';
+const srcClass = s => s === 'manual' ? 'src-manual' : s === 'odoo' ? 'src-odoo' : s === 'suggest' ? 'src-suggest' : '';
 
 // found / not found / several candidates, and the move it points at
 function odooCell(t) {
@@ -158,7 +298,7 @@ async function editCell(id, field, value) {
       kind: value === 'Personal' ? 'personal' : value ? 'work' : '' });
   } else data[field] = value;
   Object.assign(t, data);
-  try { await Admin.api('POST', API + 'tx-save', { key: currentKey, items: [data] }); say('Saved', 'ok'); }
+  try { await Admin.api('POST', API + 'tx-save', { key: currentKey, items: [data] }); renderGrid(); say('Saved', 'ok'); }
   catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 
@@ -282,21 +422,61 @@ async function loadTx(k) {
   document.getElementById('btn-import').disabled = true;
   tx = await Admin.api('GET', API + 'tx?currency=' + encodeURIComponent(k));
   tx.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-  const cur = (accounts.find(a => (a.key || a.currency) === k) || {}).currency || (tx[0] || {}).currency || '';
-  const inSum = tx.reduce((s, t) => s + (t.credit || 0), 0), outSum = tx.reduce((s, t) => s + (t.debit || 0), 0);
+  renderGrid();
+}
+
+function renderGrid() {
+  const cur = (accounts.find(a => (a.key || a.currency) === currentKey) || {}).currency || (tx[0] || {}).currency || '';
+  const rows = sugFilter ? tx.filter(t => sugState(t) === sugFilter) : tx;
+  const inSum = rows.reduce((s, t) => s + (t.credit || 0), 0), outSum = rows.reduce((s, t) => s + (t.debit || 0), 0);
   const opts = ['', 'Personal', ...companies.map(c => c.name)];
+  // lines of one merchant carrying the very same answer may be taken together
+  const groups = {};
+  for (const o of tx) { if (sugState(o) !== 'pending') continue; const k = sameKey(o); if (k) (groups[k] = groups[k] || []).push(o.id); }
+
   document.getElementById('wrap').innerHTML = `
     <table><thead><tr><th>Date</th><th>Description</th><th class="num">Out</th><th class="num">In</th><th class="num">Balance</th>
-      <th class="c-partner">Partner (Odoo)</th><th class="c-company">Company</th><th class="c-odoo">Odoo</th></tr></thead>
-    <tbody>${tx.map(t => `<tr><td>${dmy(t.date)}</td><td class="c-desc">${descCell(t, cur)}</td>
+      <th class="c-partner">Partner (Odoo)</th><th class="c-company">Company</th><th class="c-proj">Project (analytic)</th><th class="c-odoo">Odoo</th></tr></thead>
+    <tbody>${rows.map(t => {
+      const id = esc(String(t.id)), g = sugFor(t), n = (groups[sameKey(t)] || []).length;
+      const strip = !g.any ? '' : t.suggestSkip
+        ? `<div class="sug-skip">skipped · <a onclick="skipRow('${id}', false)">undo</a></div>`
+        : `<div class="sug"><button class="yes" title="Apply to this line: ${esc(sugText(g))}" onclick="acceptRow('${id}')">✓</button>
+           <button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${id}', true)">✕</button>
+           ${n > 1 ? `<button class="many" title="Apply the same answer to all ${n} pending lines of this merchant" onclick="acceptSame('${id}')">✓${n}</button>` : ''}
+           <span class="what" title="${esc(g.why)}">${esc(sugText(g))}</span></div>`;
+      return `<tr><td>${dmy(t.date)}</td><td class="c-desc">${descCell(t, cur)}</td>
       <td class="num debit">${amt(t.debit)}</td><td class="num credit">${amt(t.credit)}</td><td class="num">${num(t.balance)}</td>
       <td class="cell c-partner ${srcClass(t.partnerSrc)}"><input list="partner-list" value="${esc(t.partnerName || '')}"
-        onchange="editCell('${esc(String(t.id))}','partner',this.value)" placeholder="—"></td>
-      <td class="cell c-company ${srcClass(t.companySrc)}"><select onchange="editCell('${esc(String(t.id))}','company',this.value)">
+        onchange="editCell('${id}','partner',this.value)" placeholder="—">${strip}</td>
+      <td class="cell c-company ${srcClass(t.companySrc)}"><select onchange="editCell('${id}','company',this.value)">
         ${opts.map(o => `<option value="${esc(o)}"${companyOf(t) === o ? ' selected' : ''}>${esc(o || '—')}</option>`).join('')}</select></td>
-      <td class="c-odoo">${odooCell(t)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="2" style="font-weight:600">${tx.length} lines</td><td class="num debit" style="font-weight:600">${num(outSum)}</td>
-      <td class="num credit" style="font-weight:600">${num(inSum)}</td><td colspan="4"></td></tr></tfoot></table>`;
+      <td class="cell c-proj ${srcClass(t.analyticSrc)}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : ''}">
+        <input list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="—" onchange="saveAnalytic('${id}', this)"></td>
+      <td class="c-odoo">${odooCell(t)}</td></tr>`; }).join('')}</tbody>
+    <tfoot><tr><td colspan="2" style="font-weight:600">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}</td>
+      <td class="num debit" style="font-weight:600">${num(outSum)}</td>
+      <td class="num credit" style="font-weight:600">${num(inSum)}</td><td colspan="5"></td></tr></tfoot></table>`;
+
+  const waiting = tx.filter(t => sugState(t) === 'pending').length;
+  const b = document.getElementById('btn-review');
+  b.textContent = sugFilter ? '⚡ Show all lines' : (waiting ? `⚡ Review ${waiting} suggestions` : '⚡ Review suggestions');
+  b.disabled = !waiting && !sugFilter;
+}
+
+// An analytic account has to be one Odoo really has, or the booking cannot use
+// it; anything else snaps back to what the cell held before.
+async function saveAnalytic(id, el) {
+  const t = rowOf(id); if (!t) return;
+  const name = el.value.trim();
+  if (!name) {
+    const data = { id, analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '' };
+    return saveItems([data], 'Project cleared');
+  }
+  const a = analytic.find(x => x.name.toLowerCase() === name.toLowerCase())
+        || analytic.find(x => x.name.toLowerCase().startsWith(name.toLowerCase()));
+  if (!a) { el.value = t.analyticName || ''; return say(`"${name}" is not an Odoo analytic account`, 'err'); }
+  await saveItems([{ id, analyticId: a.id, analyticName: a.name, analyticSrc: 'manual', analyticFrom: '' }], 'Project: ' + a.name);
 }
 
 Admin.require('accounting', async me => {

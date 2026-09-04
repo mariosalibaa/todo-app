@@ -141,7 +141,8 @@ function parseStatement(csv) {
 
 // What you may edit on a line. *Src records who filled it in ('manual' when you
 // typed it, 'odoo' when the matched payment said so), exactly as on the Whish grid.
-const ANNOT = ['note', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc', 'kind'];
+const ANNOT = ['note', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc', 'kind',
+  'analyticId', 'analyticName', 'analyticSrc', 'analyticFrom', 'suggestSkip'];
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise((resolve, reject) => {
@@ -394,6 +395,11 @@ async function handle(req, res, url, user, ctx) {
           if (win.partner) data.odooPartner = win.partner;
           if (win.partner && t.partnerSrc !== 'manual') { data.partnerName = win.partner; data.partnerId = win.partnerId || null; data.partnerSrc = 'odoo'; }
           if (win.company && t.companySrc !== 'manual') { data.company = win.company; data.companySrc = 'odoo'; }
+          // the project comes off the invoice/bill the payment settles, never off the payment itself
+          const an = (win.analytics || [])[0];
+          if (an && t.analyticSrc !== 'manual') {
+            data.analyticId = an.id; data.analyticName = an.name; data.analyticSrc = 'odoo'; data.analyticFrom = an.from;
+          }
         }
         return { ref: col.doc(String(t.id)), data };
       });
