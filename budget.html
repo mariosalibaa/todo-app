@@ -151,14 +151,18 @@
   body.mob .dlg .acts{padding:12px 16px calc(12px + env(safe-area-inset-bottom));}
   body.mob .btn{height:38px;}
   /* desktop-only phone preview */
-  .phone-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:200;}
+  .phone-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:200;overflow:auto;padding:24px;}
   .phone-ov.on{display:flex;}
-  .phone-ov{overflow:auto;}
-  .phone-stage{display:flex;align-items:center;gap:28px;}
-  .phone-shell{background:#000;border-radius:46px;padding:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);position:relative;
-    transform:scale(var(--pk,1));transform-origin:top center;}
+  /* margin:auto centres the stage and still lets it scroll when it is taller than the window */
+  /* the notes float beside the phone instead of sharing the row, so the phone itself lands dead centre */
+  .phone-stage{position:relative;margin:auto;}
+  /* the holder is the *scaled* size, so centring works; the shell is painted inside it */
+  .phone-holder{position:relative;flex:none;width:calc(454px * var(--pk,1));height:calc(956px * var(--pk,1));}
+  .phone-shell{background:#000;border-radius:46px;padding:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);
+    position:absolute;top:0;left:0;transform:scale(var(--pk,1));transform-origin:top left;}
   .phone-shell iframe{width:430px;height:932px;border:0;border-radius:36px;background:#fff;display:block;}
-  .phone-side{color:#fff;font-size:12px;max-width:230px;line-height:1.5;}
+  .phone-side{position:absolute;top:0;left:100%;margin-left:28px;width:230px;color:#fff;font-size:12px;line-height:1.5;}
+  @media (max-width: 1100px){ .phone-side{position:static;margin:18px auto 0;} }
   .phone-side h4{margin:0 0 6px;font-size:13px;font-weight:600;}
   .phone-side p{margin:0 0 10px;color:#c9c9c9;}
   .phone-side input[type=range]{width:100%;}
@@ -193,7 +197,7 @@
 <div class="ov" id="ov" onclick="if(event.target===this)closeDlg()"><div class="dlg" id="dlg"></div></div>
 <div class="phone-ov" id="phone-ov" onclick="if(event.target===this)closePhone()">
   <div class="phone-stage">
-    <div class="phone-shell"><iframe id="phone-frame" title="Phone preview"></iframe></div>
+    <div class="phone-holder"><div class="phone-shell"><iframe id="phone-frame" title="Phone preview"></iframe></div></div>
     <div class="phone-side">
       <h4>iPhone 15 Pro Max</h4>
       <p>430 &times; 932 pt &middot; screen 2.87 &times; 6.23 in<br><span id="phone-scale"></span></p>
@@ -493,7 +497,7 @@ function drawLedger(id, b) {
     ${openingFirst ? openingRow : ''}
     ${rows.map(r => { const f = fval(r); return `<tr class="${r.whish ? 'w' : ''}" ${LCOLS.map(c => `data-${c.k}="${esc(f[c.k].toLowerCase())}"`).join(' ')} ondblclick="edit('${r.kind}','${r.id}')"><td>${f.date}</td><td>${r.whish ? '<span class="tag">W</span>' : ''}${r.kind}</td><td>${esc(r.what)}</td><td>${esc(r.who || '')}</td><td title="${esc(r.notes)}">${esc(r.notes || '')}</td><td class="num ${r.delta < 0 ? 'neg' : 'pos'}">${f.delta}</td><td class="num">${f.run}</td></tr>`; }).join('')}
     ${openingFirst ? '' : openingRow}</tbody></table>`;
-  document.getElementById('foot-left').innerHTML = `<span class="lnk" onclick="S.ledger=null;render()">‹ all accounts</span> · <span id="lf-count">${rows.length} movements</span> · <span class="lnk" onclick="edit('accounts','${id}')">edit account</span> · <span class="lnk" onclick="sortBy('date')">flip order</span>`;
+  document.getElementById('foot-left').innerHTML = `<span class="lnk" onclick="S.ledger=null;render()">‹ all accounts</span> · <span id="lf-count">${rows.length} movements</span> · <span class="lnk" onclick="edit('expenses',null)">+ expense</span> · <span class="lnk" onclick="edit('income',null)">+ income</span> · <span class="lnk" onclick="edit('accounts','${id}')">edit account</span> · <span class="lnk" onclick="sortBy('date')">flip order</span>`;
   ledgerFilter();
   document.getElementById('foot-total').textContent = 'Balance ' + money(b[id], a.currency);
   document.getElementById('foot-right').textContent = a.include ? 'included in total' : 'excluded from total';
@@ -632,7 +636,7 @@ function mRender() {
     mNav({ month: true, title: MONTHS[+mo - 1] + ' ' + y, sub: mMoney(t) });
   } else if (S.screen === 'accounts' && S.ledger) {
     const a = accById(S.ledger);
-    mNav({ backLbl: 'Accounts', backFn: "mGo('accounts')", add: false, title: a ? a.name : 'Account', sub: a ? money(bal[a.id], a.currency) : '' });
+    mNav({ backLbl: 'Accounts', backFn: "mGo('accounts')", title: a ? a.name : 'Account', sub: a ? money(bal[a.id], a.currency) : '' });
   } else if (S.screen === 'accounts') {
     const incl = D.accounts.filter(counts).reduce((t, x) => t + (x.currency === D.settings.baseCurrency ? bal[x.id] : toBase(bal[x.id], x.currency)), 0);
     mNav({ title: 'Accounts', sub: mMoney(incl) });
@@ -654,6 +658,12 @@ function mEntry(o) {
 }
 const mBody = html => document.getElementById('m-body').innerHTML = html || '<div class="m-empty">Nothing here yet.<br>Tap + to add an entry.</div>';
 const mTools = html => document.getElementById('m-tools').innerHTML = html || '';
+// mDraw rewrites the whole body, so a find box loses focus after every letter: put it back, caret at the end
+function mRefocus(id) {
+  const el = document.getElementById(id); if (!el) return;
+  el.focus();
+  try { const n = el.value.length; el.setSelectionRange(n, n); } catch {}
+}
 
 function mDraw() {
   const bal = balances();
@@ -699,7 +709,7 @@ function mDraw() {
       .sort((a, b) => by('type')(a, b) || by('name')(a, b));
     const groups = [...new Set(rows.map(a => a.type || ''))];
     S.mGroups = groups;
-    let html = `<div style="padding:8px 12px;background:#fff;border-bottom:1px solid #e5e5ea"><input class="m-find" type="search" placeholder="Find an account" value="${esc(S.accQ || '')}" oninput="S.accQ=this.value;mDraw()"></div>`;
+    let html = `<div style="padding:8px 12px;background:#fff;border-bottom:1px solid #e5e5ea"><input class="m-find" id="m-acc-q" type="search" placeholder="Find an account" value="${esc(S.accQ || '')}" oninput="S.accQ=this.value;mDraw();mRefocus('m-acc-q')"></div>`;
     for (const g of groups) {
       const mine = rows.filter(a => (a.type || '') === g);
       const open = !!S.open[g] || !!q;
@@ -744,7 +754,7 @@ function mDraw() {
     for (const e of [...D.income, ...wIncome()]) rows.push({ id: e.id, kind: 'income', date: e.date, what: e.name || 'Income', who: '', notes: e.notes, amount: e.amount, whish: e.whish });
     for (const t of D.transfers) rows.push({ id: t.id, kind: 'transfers', date: t.date, what: accName(t.fromId) + ' \u2192 ' + accName(t.toId), who: '', notes: t.notes, amount: t.amount });
     rows = q ? rows.filter(r => [r.what, r.who, r.notes, String(r.amount)].join(' ').toLowerCase().includes(q)) : [];
-    const head = `<div style="padding:8px 12px;background:#fff;border-bottom:1px solid #e5e5ea"><input class="m-find" type="search" placeholder="Search everything" value="${esc(S.q || '')}" oninput="S.q=this.value;mDraw()"></div>`;
+    const head = `<div style="padding:8px 12px;background:#fff;border-bottom:1px solid #e5e5ea"><input class="m-find" id="m-q" type="search" placeholder="Search everything" value="${esc(S.q || '')}" oninput="S.q=this.value;mDraw();mRefocus('m-q')"></div>`;
     mBody(head + (q
       ? (rows.length ? rows.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 300).map(r => mEntry({
           w: r.whish, tap: `edit('${r.kind}','${r.id}')`, icon: mIcon(r.what, r.kind), title: r.what,
@@ -795,7 +805,8 @@ function mLedger(id, bal) {
     sub: [dmy(r.date), r.who].filter(Boolean).join(' \u00b7 '),
     value: num(r.delta), value2: 'bal ' + num(r.run), cls: r.delta < 0 ? 'neg' : 'pos'
   })).join(''));
-  mTools(`<span class="tot">${rows.length} movements \u00b7 ${money(bal[id], a.currency)}</span><button class="lnk" onclick="edit('accounts','${id}')">Edit</button>`);
+  mTools(`<button class="lnk" onclick="edit('expenses',null)">+ Expense</button><button class="lnk" onclick="edit('income',null)">+ Income</button>`
+    + `<span class="tot">${rows.length} movements \u00b7 ${money(bal[id], a.currency)}</span><button class="lnk" onclick="edit('accounts','${id}')">Edit</button>`);
 }
 
 // ── modals ──
@@ -823,7 +834,7 @@ function edit(kind, id, extra) {
   if (id && String(id).startsWith('w:')) return editWhish(id.slice(2));
   const isNew = !id;
   if (kind === 'expenses') {
-    const e = isNew ? { date: today(), currency: 'USD', accountId: (D.expenses.slice().sort(by('ts')).pop() || {}).accountId || S.ledger || '' } : D.expenses.find(x => x.id === id);
+    const e = isNew ? { date: today(), currency: 'USD', accountId: S.ledger || (D.expenses.slice().sort(by('ts')).pop() || {}).accountId || '' } : D.expenses.find(x => x.id === id);
     const catId = e.catId || (D.categories[0] || {}).id;
     dlg(isNew ? 'Add expense' : 'Edit expense', `
       <label>Date</label><input type="date" id="f-date" value="${e.date}">
@@ -844,7 +855,7 @@ function edit(kind, id, extra) {
       const r = await post('expenses', { id: isNew ? undefined : id, ...data }); upsert(D.expenses, r.id, data); say('Saved'); render();
     };
   } else if (kind === 'income') {
-    const e = isNew ? { date: today(), currency: 'USD', accountId: (D.income.slice().sort(by('ts')).pop() || {}).accountId || S.ledger || '' } : D.income.find(x => x.id === id);
+    const e = isNew ? { date: today(), currency: 'USD', accountId: S.ledger || (D.income.slice().sort(by('ts')).pop() || {}).accountId || '' } : D.income.find(x => x.id === id);
     dlg(isNew ? 'Add income' : 'Edit income', `
       <label>Date</label><input type="date" id="f-date" value="${e.date}">
       <label>Name</label><input id="f-name" value="${esc(e.name || '')}" list="income-names"><datalist id="income-names">${[...new Set(D.income.map(i => i.name).filter(Boolean))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
