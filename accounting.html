@@ -632,10 +632,11 @@ async function importContacts() {
   } catch (e) { say('Google sign-in cancelled: ' + e.message, 'err'); return; }
   if (!token) { say('Google did not return an access token', 'err'); return; }
   const items = [];
-  const pull = async (base, key) => {
+  // connections takes personFields, otherContacts takes readMask — same fields, different name
+  const pull = async (base, key, fieldsParam) => {
     let pageToken = '';
     do {
-      const u = `${base}${base.includes('?') ? '&' : '?'}pageSize=1000&readMask=names,phoneNumbers${pageToken ? '&pageToken=' + pageToken : ''}`;
+      const u = `${base}?pageSize=1000&${fieldsParam}=names,phoneNumbers${pageToken ? '&pageToken=' + pageToken : ''}`;
       const r = await fetch(u, { headers: { Authorization: 'Bearer ' + token } });
       if (!r.ok) throw new Error(`People API ${r.status}: ${(await r.text()).slice(0, 200)}`);
       const j = await r.json();
@@ -648,8 +649,8 @@ async function importContacts() {
   };
   try {
     say('Reading Google contacts…');
-    await pull('https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers', 'connections');
-    await pull('https://people.googleapis.com/v1/otherContacts', 'otherContacts').catch(e => console.warn('otherContacts skipped:', e.message));
+    await pull('https://people.googleapis.com/v1/people/me/connections', 'connections', 'personFields');
+    await pull('https://people.googleapis.com/v1/otherContacts', 'otherContacts', 'readMask').catch(e => console.warn('otherContacts skipped:', e.message));
     const r = await Admin.api('POST', '/api/accounting/whish/contacts', { items });
     await loadContacts(); render();
     say(`Google contacts: ${items.length} numbers read, ${r.saved} saved (${r.skipped} kept your manual names)`);

@@ -118,7 +118,7 @@
   A.signIn = async function (scopes) {
     const p = new firebase.auth.GoogleAuthProvider();
     (scopes || []).forEach(s => p.addScope(s));
-    if (scopes && scopes.length) p.setCustomParameters({ prompt: 'consent' });
+    // no forced re-consent: once the contact scopes are granted, the popup just closes
     const r = await fbAuth.signInWithPopup(p);
     A.user = r.user; idToken = await r.user.getIdToken();
     return { user: r.user, accessToken: r.credential && r.credential.accessToken };
