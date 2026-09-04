@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const accounting = require('./accounting');   // /api/accounting/* (Whish statements)
 const budget = require('./budget');           // /api/accounting/budget/* (HomeBudget replica)
 const wise = require('./wise');               // /api/accounting/wise/* (Wise statements)
+const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -78,6 +79,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'icons/icon-512.png'));
   fs.readFileSync(path.join(__dirname, 'icons/apple-touch-icon.png'));
   fs.readFileSync(path.join(__dirname, 'hub.html'));
+  fs.readFileSync(path.join(__dirname, 'whish-rules.js'));
   fs.readFileSync(path.join(__dirname, 'accounting.html'));
   fs.readFileSync(path.join(__dirname, 'budget.html'));
   fs.readFileSync(path.join(__dirname, 'wise.html'));
@@ -705,7 +707,8 @@ const handler = async (req, res) => {
       const ctx = { db, admin, TEAM_ID, odooCall };
       const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)
         : url.startsWith('/api/accounting/wise/') ? await wise.handle(req, res, url, user, ctx)
-        : await accounting.handle(req, res, url, user, ctx);
+        : await whishRules.handle(req, res, url, user, ctx)     // rules first: it only claims its own routes
+          || await accounting.handle(req, res, url, user, ctx);
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {
       console.error('accounting error:', e);
