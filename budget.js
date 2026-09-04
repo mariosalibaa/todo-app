@@ -1,7 +1,9 @@
 // Budget section of the accounting app — replica of the HomeBudget desktop app.
 // Mounted by server.js under /api/accounting/budget/* (accounting app gate applies).
 // Firestore layout (all under workspaces/<team>):
-//   budgetAccounts/<id>       { name, type, currency, opening, include, seq }
+//   budgetAccounts/<id>       { name, type, currency, opening, include, archived, seq }
+//   `include` = counts towards the grand total. `archived` = retired: hidden from the
+//   lists and the account picker and left out of every total, history kept.
 //   budgetCategories/<id>     { name, icon, seq }
 //   budgetSubCategories/<id>  { catId, name, icon, seq }
 //   budgetPayees/<id>         { name, phone, notes }
@@ -18,7 +20,7 @@ const COLL = {
   expenses: 'budgetExpenses', income: 'budgetIncome', transfers: 'budgetTransfers', whish: 'budgetWhish'
 };
 const FIELDS = {
-  accounts: ['name', 'type', 'currency', 'opening', 'include', 'seq'],
+  accounts: ['name', 'type', 'currency', 'opening', 'include', 'archived', 'seq'],
   categories: ['name', 'icon', 'seq'],
   subCategories: ['catId', 'name', 'icon', 'seq'],
   payees: ['name', 'phone', 'notes'],
@@ -111,7 +113,7 @@ async function handle(req, res, url, user, ctx) {
     const data = {};
     for (const f of FIELDS[kind]) if (b[f] !== undefined) data[f] = b[f];
     for (const f of ['amount', 'currencyAmount', 'accAmount', 'fromAmount', 'toAmount', 'opening', 'seq']) if (data[f] != null) data[f] = Number(data[f]) || 0;
-    if (kind === 'accounts') data.include = !!data.include;
+    if (kind === 'accounts') { if ('include' in data) data.include = !!data.include; if ('archived' in data) data.archived = !!data.archived; }
     data.updatedAt = new Date().toISOString(); data.updatedBy = who;
     const id = b.id ? String(b.id) : 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     await coll.doc(id).set(data, { merge: true });

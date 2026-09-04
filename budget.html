@@ -55,6 +55,9 @@
   .foot{flex:none;height:38px;border-top:1px solid var(--line);background:#fafafa;display:flex;align-items:center;padding:0 14px;gap:16px;font-size:12px;color:var(--muted);}
   .foot .tot{margin-left:auto;margin-right:auto;font-weight:700;color:var(--blue);font-size:13px;}
   .foot .lnk{color:var(--blue);cursor:pointer;}
+  .lnk{color:var(--blue);cursor:pointer;}
+  .dlg .hint .lnk{text-decoration:underline;}
+  tr.arch td{color:#adb5bd;font-style:italic;}
   .empty{padding:60px 20px;text-align:center;color:var(--muted);background:#fff;}
   .msg{position:fixed;left:50%;bottom:50px;transform:translateX(-50%);background:#333;color:#fff;padding:7px 14px;border-radius:6px;font-size:12px;display:none;z-index:50;}
   .msg.on{display:block;}
@@ -213,6 +216,8 @@ const catName = id => (D.categories.find(c => c.id === String(id)) || {}).name |
 const subName = id => (D.subCategories.find(c => c.id === String(id)) || {}).name || '';
 const payeeName = id => (D.payees.find(c => c.id === String(id)) || {}).name || '';
 const accName = id => (accById(id) || {}).name || '';
+// an account counts towards the total only while it is included AND not archived
+const counts = a => !!a.include && !a.archived;
 const rate = code => { if (!code || code === D.settings.baseCurrency) return 1; const c = (D.settings.currencies || []).find(x => x.code === code); return c && c.rate ? c.rate : 1; };
 const toBase = (v, code) => Math.round(v * rate(code) * 100) / 100;
 // amount in the account's own currency (what moves its balance)
@@ -267,7 +272,7 @@ function renderDesktop() {
   const [y, m] = S.ym.split('-');
   document.getElementById('side-month').textContent = MONTHS[+m - 1] + ' ' + y;
   const bal = balances();
-  const incl = D.accounts.filter(a => a.include).reduce((s, a) => s + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
+  const incl = D.accounts.filter(counts).reduce((s, a) => s + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
   const pills = { expenses: money(sum(monthExpenses(S.ym))), income: money(sum(monthIncome(S.ym))), transfers: money(sum(monthTransfers(S.ym))), accounts: money(incl) };
   document.getElementById('nav').innerHTML = SCREENS.map(s => `<li class="${S.screen === s.id ? 'on' : ''}" onclick="go('${s.id}')"><span class="ico">${s.ico}</span><span class="lbl">${s.lbl}</span>${s.pill ? `<span class="pill ${s.pill}">${pills[s.id]}</span>` : ''}</li>`).join('');
   document.getElementById('who').textContent = (Admin.me && Admin.me.email) || '';
@@ -325,14 +330,16 @@ function drawDesktop() {
     const rows = sorted(D.accounts.map(a => ({ ...a, balance: b[a.id], usd: a.currency === D.settings.baseCurrency ? b[a.id] : toBase(b[a.id], a.currency) })), { k: 'type', dir: 1 });
     const cols = [{ k: 'name', l: 'Account' }, { k: 'type', l: 'Type' }, { k: 'currency', l: 'Currency' }, { k: 'balance', l: 'Balance', num: 1 }, { k: 'usd', l: 'In USD', num: 1 }, { k: 'include', l: 'Included' }];
     // the total always counts every account, collapsed groups included
-    const incl = rows.filter(a => a.include).reduce((t, a) => t + a.usd, 0);
+    const incl = rows.filter(counts).reduce((t, a) => t + a.usd, 0);
+    const archived = rows.filter(a => a.archived);
     const q = S.accQ.trim().toLowerCase();
-    const hits = q ? rows.filter(a => (a.name + ' ' + (a.type || '')).toLowerCase().includes(q)) : rows;
+    const visible = rows.filter(a => S.showArch || !a.archived);
+    const hits = q ? visible.filter(a => (a.name + ' ' + (a.type || '')).toLowerCase().includes(q)) : visible;
     const grouped = S.sort.accounts.k === 'type';
     const groupTotals = {}, groupCount = {};
     for (const a of hits) { groupTotals[a.type || ''] = (groupTotals[a.type || ''] || 0) + a.usd; groupCount[a.type || ''] = (groupCount[a.type || ''] || 0) + 1; }
     S.groups = grouped ? [...new Set(hits.map(a => a.type || ''))] : [];
-    const accRow = a => `<tr class="${S.sel === a.id ? 'on' : ''}" onclick="select('${a.id}')" ondblclick="openLedger('${a.id}')"><td>${esc(a.name)}${a.id === D.settings.whishAccountId ? ' <span class="tag">W</span>' : ''}</td><td>${esc(a.type)}</td><td>${esc(a.currency)}</td><td class="num ${a.balance < 0 ? 'neg' : ''}">${money(a.balance, a.currency)}</td><td class="num ${a.usd < 0 ? 'neg' : ''}">${money(a.usd)}</td><td>${a.include ? '✓' : '<span style="color:#bbb">excluded</span>'}</td></tr>`;
+    const accRow = a => `<tr class="${S.sel === a.id ? 'on' : ''} ${a.archived ? 'arch' : ''}" onclick="select('${a.id}')" ondblclick="openLedger('${a.id}')"><td>${esc(a.name)}${a.id === D.settings.whishAccountId ? ' <span class="tag">W</span>' : ''}</td><td>${esc(a.type)}</td><td>${esc(a.currency)}</td><td class="num ${a.balance < 0 ? 'neg' : ''}">${money(a.balance, a.currency)}</td><td class="num ${a.usd < 0 ? 'neg' : ''}">${money(a.usd)}</td><td>${a.archived ? '<span style="color:#bbb">archived</span>' : a.include ? '✓' : '<span style="color:#bbb">excluded</span>'}</td></tr>`;
     let html = '';
     if (!grouped) html = hits.map(accRow).join('');
     else S.groups.forEach((g, i) => {
@@ -342,7 +349,8 @@ function drawDesktop() {
     });
     const s = S.sort[S.screen];
     document.getElementById('wrap').innerHTML = `<table><thead><tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}" onclick="sortBy('${c.k}')">${c.l}${s.k === c.k ? `<span class="arr">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead><tbody>${html}</tbody></table>`;
-    document.getElementById('foot-left').innerHTML = (q ? `<b>${hits.length}</b> of ${rows.length} accounts match “${esc(S.accQ)}” · <span class="lnk" onclick="clearAccSearch()">clear</span>` : rows.length + ' accounts') + ' · double-click = ledger · <span class="lnk" onclick="edit(\'accounts\', S.sel)">edit selected</span>';
+    document.getElementById('foot-left').innerHTML = (q ? `<b>${hits.length}</b> of ${visible.length} accounts match “${esc(S.accQ)}” · <span class="lnk" onclick="clearAccSearch()">clear</span>` : visible.length + ' accounts')
+      + (archived.length ? ` · <span class="lnk" onclick="S.showArch=!S.showArch;draw()">${S.showArch ? 'hide' : 'show'} ${archived.length} archived</span>` : '') + ' · double-click = ledger · <span class="lnk" onclick="edit(\'accounts\', S.sel)">edit selected</span>';
     document.getElementById('foot-total').textContent = 'Total (included) ' + money(incl);
     document.getElementById('foot-right').innerHTML = 'Whish balance comes from the statement';
   } else if (S.screen === 'payees') {
@@ -383,6 +391,7 @@ function pickerHtml(id, selId, allowEmpty) {
 function pickMatches(q) {
   const b = balances(), t = q.trim().toLowerCase();
   return D.accounts
+    .filter(a => !a.archived)
     .filter(a => !t || (a.name + ' ' + (a.type || '')).toLowerCase().includes(t))
     .map(a => ({ ...a, bal: b[a.id] }))
     .sort(by('name'));
@@ -544,7 +553,7 @@ function mRender() {
   const [y, mo] = S.ym.split('-');
   const bal = balances();
   if (S.screen === 'home' || !S.screen) {
-    const incl = D.accounts.filter(a => a.include).reduce((t, a) => t + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
+    const incl = D.accounts.filter(counts).reduce((t, a) => t + (a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency)), 0);
     const badge = { expenses: sum(monthExpenses(S.ym)), income: sum(monthIncome(S.ym)), transfers: sum(monthTransfers(S.ym)), accounts: incl };
     mNav({ back: false, add: false, title: 'Budget', sub: MONTHS[+mo - 1] + ' ' + y });
     document.getElementById('m-body').innerHTML = M_MENU.map(x =>
@@ -564,7 +573,7 @@ function mRender() {
     const a = accById(S.ledger);
     mNav({ backLbl: 'Accounts', backFn: "mGo('accounts')", add: false, title: a ? a.name : 'Account', sub: a ? money(bal[a.id], a.currency) : '' });
   } else if (S.screen === 'accounts') {
-    const incl = D.accounts.filter(x => x.include).reduce((t, x) => t + (x.currency === D.settings.baseCurrency ? bal[x.id] : toBase(bal[x.id], x.currency)), 0);
+    const incl = D.accounts.filter(counts).reduce((t, x) => t + (x.currency === D.settings.baseCurrency ? bal[x.id] : toBase(bal[x.id], x.currency)), 0);
     mNav({ title: 'Accounts', sub: mMoney(incl) });
   } else mNav({ title: lbl, add: !['reports', 'search'].includes(S.screen) });
   mDraw();
@@ -624,6 +633,7 @@ function mDraw() {
   } else if (S.screen === 'accounts') {
     const q = (S.accQ || '').trim().toLowerCase();
     const rows = D.accounts.map(a => ({ ...a, balance: bal[a.id], usd: a.currency === D.settings.baseCurrency ? bal[a.id] : toBase(bal[a.id], a.currency) }))
+      .filter(a => S.showArch || !a.archived)
       .filter(a => !q || (a.name + ' ' + (a.type || '')).toLowerCase().includes(q))
       .sort((a, b) => by('type')(a, b) || by('name')(a, b));
     const groups = [...new Set(rows.map(a => a.type || ''))];
@@ -636,12 +646,15 @@ function mDraw() {
         <div class="tx"><b>${esc(g || '(no type)')}</b><span>${mine.length} account${mine.length > 1 ? 's' : ''}</span></div>
         <div class="val">${mMoney(mine.reduce((t, a) => t + a.usd, 0))}</div></div>`;
       if (open) html += mine.map(a => mEntry({ tap: `mOpenLedger('${a.id}')`, icon: mIcon(a.name, a.type),
-        title: a.name, sub: (a.include ? '' : 'excluded from total') + (a.id === D.settings.whishAccountId ? (a.include ? 'Whish statement' : ' \u00b7 Whish statement') : ''),
+        title: a.name, sub: [a.archived ? 'archived' : (a.include ? '' : 'excluded from total'), a.id === D.settings.whishAccountId ? 'Whish statement' : ''].filter(Boolean).join(' \u00b7 '),
         value: money(a.balance, a.currency), value2: a.currency !== 'USD' ? mMoney(a.usd) : '', cls: a.balance < 0 ? 'neg' : '' })).join('');
     }
     mBody(html);
-    const incl = rows.filter(a => a.include).reduce((t, a) => t + a.usd, 0);
-    mTools(`<button class="lnk" onclick="mToggleAll()">${groups.every(g => S.open[g]) ? 'Collapse all' : 'Expand all'}</button><span class="tot">${q ? rows.length + ' shown \u00b7 ' : ''}${mMoney(incl)}</span>`);
+    const incl = rows.filter(counts).reduce((t, a) => t + a.usd, 0);
+    const nArch = D.accounts.filter(a => a.archived).length;
+    mTools(`<button class="lnk" onclick="mToggleAll()">${groups.every(g => S.open[g]) ? 'Collapse all' : 'Expand all'}</button>`
+      + (nArch ? `<button class="lnk" onclick="S.showArch=!S.showArch;mDraw()">${S.showArch ? 'hide' : 'show'} ${nArch} archived</button>` : '')
+      + `<span class="tot">${q ? rows.length + ' shown \u00b7 ' : ''}${mMoney(incl)}</span>`);
   } else if (S.screen === 'payees') {
     const stats = {};
     for (const e of D.expenses) if (e.payeeId) { stats[e.payeeId] = stats[e.payeeId] || { n: 0, t: 0 }; stats[e.payeeId].n++; stats[e.payeeId].t += e.amount; }
@@ -808,15 +821,20 @@ function edit(kind, id, extra) {
   } else if (kind === 'accounts') {
     if (!isNew && !accById(id)) return;
     const a = isNew ? { currency: 'USD', include: true, opening: 0, type: '' } : accById(id);
+    const accBal = isNew ? 0 : (balances()[id] || 0);
     dlg(isNew ? 'Add account' : 'Edit account', `
       <label>Name</label><input id="f-name" value="${esc(a.name || '')}">
       <label>Type / group</label><input id="f-type" value="${esc(a.type || '')}" list="acc-types"><datalist id="acc-types">${[...new Set(D.accounts.map(x => x.type).filter(Boolean))].sort().map(t => `<option value="${esc(t)}">`).join('')}</datalist>
       <label>Currency</label><select id="f-cur">${curOpts(a.currency)}</select>
       <label>Opening balance</label><input type="number" step="0.01" id="f-open" value="${a.opening || 0}">
       <label>Included in total</label><input type="checkbox" id="f-incl" ${a.include ? 'checked' : ''} style="width:auto">
-      <div class="hint">Types with "Excluded" in the name were excluded in HomeBudget; the checkbox is what counts here.</div>`, acts(isNew ? '' : `delEntry('accounts','${id}')`));
+      <label>Archived</label><input type="checkbox" id="f-arch" ${a.archived ? 'checked' : ''} style="width:auto">
+      <div class="hint">Archived = retired: hidden from the account lists and the account picker, and left out of every total. Its history is kept and nothing is edited.</div>
+      ${!isNew && Math.abs(accBal) > 0.005 ? `<div class="hint">Balance is <b>${money(accBal, a.currency)}</b> &middot;
+        <span class="lnk" onclick="zeroAccount('${id}')">write a correction entry to bring it to zero</span><br>
+        That adds one dated entry you can see and undo. It never edits past entries.</div>` : ''}`, acts(isNew ? '' : `delEntry('accounts','${id}')`));
     onSave = async () => {
-      const data = { name: v('f-name').trim(), type: v('f-type').trim(), currency: v('f-cur'), opening: Number(v('f-open')) || 0, include: v('f-incl'), seq: a.seq || 0 };
+      const data = { name: v('f-name').trim(), type: v('f-type').trim(), currency: v('f-cur'), opening: Number(v('f-open')) || 0, include: v('f-incl'), archived: v('f-arch'), seq: a.seq || 0 };
       if (!data.name) throw new Error('name required');
       const r = await post('accounts', { id: isNew ? undefined : id, ...data }); upsert(D.accounts, r.id, data); say('Saved'); render();
     };
@@ -859,6 +877,35 @@ function editWhish(wid) {
   onSave = async () => { const data = { catId: v('f-cat'), subId: v('f-sub'), payeeId: v('f-payee'), notes: v('f-notes') }; await post('whish', { id: wid, ...data }); upsert(D.whishMap, wid, data); say('Saved'); render(); };
 }
 async function clearWhish(wid) { await del('whish', wid); remove(D.whishMap, wid); closeDlg(); render(); }
+// Zero an account the honest way: one dated, visible entry in the direction the
+// account is short. A negative cash balance means spending was recorded that the
+// funding never was, so the correction is money in; a positive leftover is money out.
+async function zeroAccount(id) {
+  const a = accById(id); if (!a) return;
+  const b = balances()[id] || 0;
+  if (Math.abs(b) < 0.005) return say('That account is already at zero');
+  const amt = Math.round(Math.abs(b) * 100) / 100;
+  const dir = b < 0 ? 'income' : 'expense';
+  if (!confirm(`Add a ${dir} of ${money(amt, a.currency)} dated today to bring "${a.name}" from ${money(b, a.currency)} to zero?\n\nThis records a visible correction entry. Nothing already entered is changed.`)) return;
+  const base = toBase(amt, a.currency);
+  const notes = `Balance correction \u2014 ${a.name} stood at ${money(b, a.currency)}`;
+  const common = { date: today(), currency: a.currency, currencyAmount: amt, amount: base, accAmount: amt, accountId: id, notes, ts: new Date().toISOString() };
+  try {
+    if (b < 0) {
+      const data = { ...common, name: 'Balance correction' };
+      const r = await post('income', data); upsert(D.income, r.id, data);
+    } else {
+      let cat = D.categories.find(c => /balance\s*correction/i.test(c.name || ''));
+      if (!cat) {
+        const made = { name: 'Balance correction', seq: 998, icon: '' };
+        const r = await post('categories', made); upsert(D.categories, r.id, made); cat = { id: r.id, ...made };
+      }
+      const data = { ...common, catId: cat.id, subId: '', payeeId: '' };
+      const r = await post('expenses', data); upsert(D.expenses, r.id, data);
+    }
+    closeDlg(); say(`Correction entry added \u2014 ${a.name} is now at zero`); render();
+  } catch (e) { say('Error: ' + e.message); }
+}
 function openSettings() {
   const cs = D.settings.currencies || [];
   dlg('Settings — currencies', `
