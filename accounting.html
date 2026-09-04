@@ -30,7 +30,7 @@
   .legend .clr{margin-left:auto;color:var(--odoo);cursor:pointer;display:none;}
   .legend .clr.on{display:inline;}
   .wrap{flex:1;min-height:0;overflow:auto;}   /* grid scrolls; top bar, toolbar and header stay */
-  table{border-collapse:separate;border-spacing:0;width:100%;min-width:1350px;}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:1180px;}
   thead th{position:sticky;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:2;}
   thead tr.hdr th{top:0;height:30px;cursor:pointer;user-select:none;}
   thead tr.hdr th:hover{color:var(--odoo);}
@@ -54,13 +54,27 @@
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:#8ab0e6;}
-  .c-contact{min-width:150px;} .c-note{min-width:180px;} .c-proj{min-width:180px;} .c-kind{width:96px;} .c-sug{width:132px;}
+  .c-date{width:96px;} .c-desc{min-width:250px;max-width:360px;white-space:normal;} .c-partner{min-width:190px;} .c-company{width:150px;} .c-note{min-width:150px;}
+  .c-desc .svc{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-right:4px;}
+  .c-desc .who{font-size:11.5px;color:var(--muted);cursor:pointer;margin-top:1px;}
+  .c-desc .who:hover{text-decoration:underline;}
+  .c-desc .who.src-manual{color:var(--green);font-style:normal;} .c-desc .who.src-auto{color:var(--auto);font-style:italic;}
+  td.c-desc,td.c-partner,td.c-company{vertical-align:top;padding-top:4px;}
+  .odoo-warn{color:#b26a00;font-size:11px;margin-top:2px;}
+  /* partner picker */
+  .pick{position:relative;}
+  .pick input{width:100%;}
+  .pick-list{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--line);border-radius:0 0 4px 4px;max-height:210px;overflow:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.18);min-width:240px;}
+  .pick-list.on{display:block;} .pick-list.empty{pointer-events:none;}
+  .pick-list div{padding:5px 8px;cursor:pointer;display:flex;align-items:baseline;gap:8px;font-size:12.5px;font-style:normal;color:var(--text);}
+  .pick-list div .g{margin-left:auto;color:var(--muted);font-size:11px;}
+  .pick-list div.hi{background:#dbeafc;} .pick-list div.none{color:var(--muted);cursor:default;}
   .sug-act{display:flex;gap:4px;align-items:center;}
   .sug-act button{border:1px solid var(--line);background:#fff;border-radius:3px;width:22px;height:20px;line-height:1;cursor:pointer;font-size:12px;padding:0;}
   .sug-act button.yes{color:var(--green);border-color:#bfe3c8;} .sug-act button.yes:hover{background:#eef9f0;}
   .sug-act button.no{color:var(--muted);} .sug-act button.no:hover{background:#f1f3f5;}
-  .sug-act .what{font-size:10.5px;color:var(--auto);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:78px;}
-  .sug-skip{color:#adb5bd;font-size:11px;} .sug-skip a{color:var(--odoo);cursor:pointer;}
+  .sug-act{margin-top:3px;} .sug-act .what{font-size:10.5px;color:var(--auto);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:96px;}
+  .sug-skip{color:#adb5bd;font-size:11px;margin-top:3px;} .sug-skip a{color:var(--odoo);cursor:pointer;}
   .ref{color:var(--muted);font-size:11px;}
   .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
   .odoo-no{color:#adb5bd;}
@@ -92,18 +106,19 @@
   <input type="date" id="to" onchange="render()" title="To">
   <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
   <span class="sp" style="flex:1"></span>
-  <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a suggestion waiting, one by one">⚡ Review suggestions</button>
-  <button class="btn" id="btn-accept" onclick="acceptAll()" title="Fill every blank Project and W/P with its blue suggestion">✓ Accept all shown</button>
+  <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
+  <button class="btn" id="btn-accept" onclick="acceptAll()" title="Fill every blank Partner and Company on the lines shown with their blue suggestion">✓ Accept all shown</button>
   <label class="btn primary" for="file">⬆ Upload statement (PDF)</label>
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
   <button class="btn" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the Odoo Whish journals">⇄ Check Odoo</button>
 </div>
 <div class="legend">
-  <span><i style="background:#fff"></i>From the Whish statement</span>
-  <span style="color:var(--auto);font-style:italic"><i style="background:#fff;border-color:var(--auto)"></i>Filled automatically (Google contact / suggestion) — not confirmed</span>
-  <span style="color:var(--odoo);font-weight:600"><i style="background:#fff;border-color:var(--odoo)"></i>From Odoo — partner of the matched payment / analytic account of its reconciled invoice</span>
-  <span><i style="background:var(--manual-bg)"></i>Filled by you</span>
+  <span><i style="background:#fff"></i>Date, service, description, amounts: the Whish statement as printed</span>
+  <span style="color:var(--auto);font-style:italic"><i style="background:#fff;border-color:var(--auto)"></i>Suggested (contact name, used before for this number) — not confirmed</span>
+  <span style="color:var(--odoo);font-weight:600"><i style="background:#fff;border-color:var(--odoo)"></i>From the matched Odoo payment</span>
+  <span><i style="background:var(--manual-bg)"></i>Chosen by you</span>
+  <span class="clr on" style="margin-left:0;display:inline" onclick="showSkipped()" title="Lines whose suggestion you waved away">skipped</span>
   <span class="clr" id="clr" onclick="clearFilters()">✕ Clear column filters</span>
 </div>
 <div class="msg" id="msg"></div>
@@ -118,7 +133,6 @@
   </table>
   <div class="empty" id="empty"><b>No statement yet</b>Export the statement as PDF from the Whish app (up to 6 months) and upload it here.<br>Overlapping periods are fine — lines are keyed by their transaction number.</div>
 </div>
-<datalist id="analytic-list"></datalist>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -128,26 +142,24 @@
 const esc = Admin.esc;
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
-let accounts = [], acc = null, tx = [], contacts = {}, analytic = [];
+let accounts = [], acc = null, tx = [], contacts = {}, partners = [], companies = [];
 const KNOWN = { '9613700985': 'Maya', '9613299799': 'Walid Hibri', '9613165168': 'Mario Saliba' };   // seeds until contacts are imported
 
-// ── Columns: key, label, class, filter type, sort/filter value ──
+// ── Columns: the first five are the Whish PDF, untouched; then what we add ──
 const COLS = [
-  { k: 'date',    l: 'Date',               f: 'text',   v: t => t.date + ' tr:' + t.ref },
-  { k: 'service', l: 'Service',            f: 'select', v: t => t.service || '' },
-  { k: 'cp',      l: 'Counterparty',       f: 'text',   v: t => t.phone ? t.phone.replace(/^961/, '0') : t.description },
-  { k: 'contact', l: 'Contact',            f: 'text',   v: t => contactName(t).name, c: 'c-contact' },
-  { k: 'note',    l: 'Note',               f: 'text',   v: t => t.note || '', c: 'c-note' },
-  { k: 'kind',    l: 'W / P',              f: 'kind',   v: t => t.kind || '', c: 'c-kind' },
-  { k: 'proj',    l: 'Project / analytic', f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
-  { k: 'sug',     l: 'Suggest',            f: 'sug',    v: t => sugState(t), c: 'c-sug' },
-  { k: 'out',     l: 'Out',                f: 'amount', v: t => t.debit || 0, num: true },
-  { k: 'in',      l: 'In',                 f: 'amount', v: t => t.credit || 0, num: true },
-  { k: 'bal',     l: 'Balance',            f: 'amount', v: t => t.balance, num: true },
-  { k: 'odoo',    l: 'Odoo',               f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length },
+  { k: 'date',    l: 'Date / ref',            f: 'text',   v: t => t.date + ' tr:' + t.ref, c: 'c-date' },
+  { k: 'desc',    l: 'Service / description', f: 'text',   v: t => [t.service, t.description, contactName(t).name].filter(Boolean).join(' '), c: 'c-desc' },
+  { k: 'out',     l: 'Debit',                 f: 'amount', v: t => t.debit || 0, num: true },
+  { k: 'in',      l: 'Credit',                f: 'amount', v: t => t.credit || 0, num: true },
+  { k: 'bal',     l: 'Balance',               f: 'amount', v: t => t.balance, num: true },
+  { k: 'partner', l: 'Partner (Odoo)',        f: 'text',   v: t => t.partnerName || '', c: 'c-partner' },
+  { k: 'company', l: 'Company',               f: 'select', v: t => companyOf(t), c: 'c-company' },
+  { k: 'note',    l: 'Note',                  f: 'text',   v: t => t.note || '', c: 'c-note' },
+  { k: 'odoo',    l: 'Odoo',                  f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length },
 ];
 let sort = { k: 'date', dir: -1 };            // newest first, like an Odoo bank statement
 let colF = {};                                // column filters, key → string
+let sugFilter = '';                           // '' | 'pending' | 'skipped' — the Review button
 
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
@@ -155,7 +167,7 @@ Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.name || me.email;
   buildHeader();
   await Promise.all([loadAccounts(), loadContacts()]);
-  loadAnalytic();
+  loadPartners();
   if (accounts.length) selectAccount(localStorage.getItem('whish_acc') || accounts[0].account);
 });
 
@@ -169,11 +181,13 @@ async function loadContacts() {
   contacts = {};
   for (const c of await Admin.api('GET', '/api/accounting/whish/contacts')) contacts[c.phone] = c;
 }
-async function loadAnalytic() {
+async function loadPartners() {
   try {
-    analytic = await Admin.api('GET', '/api/accounting/analytic');
-    document.getElementById('analytic-list').innerHTML = analytic.map(a => `<option value="${esc(a.name)}">${esc(a.plan)}</option>`).join('');
-  } catch (e) { say('Odoo analytic accounts not available: ' + e.message, 'err'); }
+    const r = await Admin.api('GET', '/api/accounting/partners');
+    partners = r.partners || []; companies = r.companies || [];
+    matchMemo.clear();
+    buildHeader(); render();
+  } catch (e) { say('Odoo partners not available: ' + e.message, 'err'); }
 }
 async function selectAccount(a) {
   acc = a; localStorage.setItem('whish_acc', a);
@@ -182,14 +196,43 @@ async function selectAccount(a) {
   render();
 }
 
-// name + where it came from: 'manual' (typed here) | 'google' | 'whish' (printed on the statement) | 'seed' | ''
+// ── Who is behind a line ──
+// contact = the phone owner (evidence, from Google contacts / the statement).
+// partner = the Odoo partner the payment belongs to (a decision). They usually agree.
 function contactName(t) {
   const c = t.phone && contacts[t.phone];
   if (c && c.name) return { name: c.name, src: c.source === 'manual' ? 'manual' : 'auto' };
   if (t.name) return { name: t.name, src: 'whish' };
   if (t.phone && KNOWN[t.phone]) return { name: KNOWN[t.phone], src: 'auto' };
-  if (t.odooPartner) return { name: t.odooPartner, src: 'odoo' };
   return { name: '', src: '' };
+}
+const companyOf = t => t.company || (t.kind === 'personal' ? 'Personal' : '');
+
+// name similarity, same recipe as the server: shared words or bigram overlap
+const norm = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const bigrams = s => { const g = new Set(); const t = s.replace(/ /g, ''); for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2)); return g; };
+function similarity(a, b) {
+  a = norm(a); b = norm(b);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const wa = a.split(' ').filter(w => w.length > 2), wb = b.split(' ').filter(w => w.length > 2);
+  const shared = wa.filter(w => wb.includes(w)).length;
+  const words = wa.length && wb.length ? shared / Math.min(wa.length, wb.length) : 0;
+  const ga = bigrams(a), gb = bigrams(b);
+  let inter = 0; for (const g of ga) if (gb.has(g)) inter++;
+  const dice = (ga.size + gb.size) ? (2 * inter) / (ga.size + gb.size) : 0;
+  return Math.max(words, dice);
+}
+const matchMemo = new Map();
+function partnerMatch(name) {
+  if (!name || !partners.length) return null;
+  const key = norm(name); if (!key) return null;
+  if (matchMemo.has(key)) return matchMemo.get(key);
+  let best = null, bs = 0;
+  for (const p of partners) { const s = similarity(key, p.name); if (s > bs) { bs = s; best = p; } }
+  const out = bs >= 0.62 ? { id: best.id, name: best.name, score: bs } : null;
+  matchMemo.set(key, out);
+  return out;
 }
 // last value used for the same phone number → suggestion for untagged rows
 function lastFor(t, field) {
@@ -197,12 +240,34 @@ function lastFor(t, field) {
   for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o[field] && o.id !== t.id) return o[field]; }
   return '';
 }
-// A row is "pending" while a blank Project or W/P has a suggestion behind it and
-// you have not waved it away. That is what the Suggest filter and the counter use.
+function lastRow(t, field) {
+  if (!t.phone) return null;
+  for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o[field] && o.id !== t.id) return o; }
+  return null;
+}
+// What is waiting on this row: a partner (in order: used before for this number,
+// an Odoo partner matching the contact name, the partner on the matched Odoo payment)
+// and a company (used before for this number, else the matched payment's company).
 function sugFor(t) {
-  const project = !t.analyticName ? lastFor(t, 'analyticName') : '';
-  const kind = !t.kind ? lastFor(t, 'kind') : '';
-  return { project, kind, any: !!(project || kind) };
+  const out = { partner: null, company: '', any: false };
+  if (!t.partnerName) {
+    const prev = lastRow(t, 'partnerName');
+    if (prev) out.partner = { id: prev.partnerId || null, name: prev.partnerName, why: 'used before for this number' };
+    else {
+      const cn = contactName(t).name || (t.phone ? '' : t.description);
+      const p = partnerMatch(cn);
+      if (p) out.partner = { id: p.id, name: p.name, why: 'matches ' + cn };
+      else if (t.odooPartner) { const q = partners.find(x => x.name === t.odooPartner); out.partner = { id: q ? q.id : null, name: t.odooPartner, why: 'partner on the matched Odoo payment' }; }
+    }
+  }
+  if (!companyOf(t)) {
+    const prev = lastFor(t, 'company');
+    if (prev) out.company = prev;
+    else if (t.phone && lastFor(t, 'kind') === 'personal') out.company = 'Personal';
+    else { const win = t.odoo && (t.odoo.matches || []).find(m => m.chosen); if (win && win.company) out.company = win.company; }
+  }
+  out.any = !!(out.partner || out.company);
+  return out;
 }
 function sugState(t) {
   if (!sugFor(t).any) return '';
@@ -219,20 +284,12 @@ function buildHeader() {
     const on = colF[c.k] ? 'on' : '';
     if (c.f === 'text') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="filter" oninput="setFilter('${c.k}', this.value)"></th>`;
     if (c.f === 'amount') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="=, >, <, a-b" title="150  ·  >100  ·  <50  ·  100-200" oninput="setFilter('${c.k}', this.value)"></th>`;
-    if (c.f === 'sug') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
-      <option value="">all</option>
-      <option value="pending" ${colF[c.k] === 'pending' ? 'selected' : ''}>to review</option>
-      <option value="skipped" ${colF[c.k] === 'skipped' ? 'selected' : ''}>skipped</option>
-      <option value="none" ${colF[c.k] === 'none' ? 'selected' : ''}>no suggestion</option></select></th>`;
-    if (c.f === 'kind') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
-        <option value="">all</option><option value="work" ${colF[c.k] === 'work' ? 'selected' : ''}>Work</option>
-        <option value="personal" ${colF[c.k] === 'personal' ? 'selected' : ''}>Personal</option><option value="unset" ${colF[c.k] === 'unset' ? 'selected' : ''}>not tagged</option></select></th>`;
     if (c.f === 'odoo') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
         <option value="">all</option><option value="found" ${colF[c.k] === 'found' ? 'selected' : ''}>found</option>
         <option value="none" ${colF[c.k] === 'none' ? 'selected' : ''}>not found</option><option value="unchecked" ${colF[c.k] === 'unchecked' ? 'selected' : ''}>unchecked</option></select></th>`;
     if (c.f === 'select') {
-      const vals = [...new Set(tx.map(c.v))].filter(Boolean).sort();
-      return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)"><option value="">all</option>${vals.map(v => `<option ${colF[c.k] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></th>`;
+      const vals = c.k === 'company' ? ['Personal', ...companies.map(x => x.name)] : [...new Set(tx.map(c.v))].filter(Boolean).sort();
+      return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)"><option value="">all</option>${vals.map(v => `<option ${colF[c.k] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}<option value="__unset" ${colF[c.k] === '__unset' ? 'selected' : ''}>not set</option></select></th>`;
     }
     return '<th></th>';
   }).join('');
@@ -243,7 +300,7 @@ function setFilter(k, v) {
   el.classList.toggle('on', !!v);
   render();
 }
-function clearFilters() { colF = {}; buildHeader(); render(); }
+function clearFilters() { colF = {}; sugFilter = ''; buildHeader(); render(); }
 function setSort(k) { sort = sort.k === k ? { k, dir: -sort.dir } : { k, dir: k === 'date' ? -1 : 1 }; render(); }
 
 function amountMatch(v, f) {
@@ -256,13 +313,12 @@ function amountMatch(v, f) {
   return String(v).includes(f);
 }
 function passes(t) {
+  if (sugFilter && sugState(t) !== sugFilter) return false;
   for (const c of COLS) {
     const f = colF[c.k]; if (!f) continue;
     const v = c.v(t);
     if (c.f === 'text') { if (!String(v).toLowerCase().includes(f.toLowerCase())) return false; }
-    else if (c.f === 'select') { if (v !== f) return false; }
-    else if (c.f === 'kind') { if (f === 'unset' ? !!v : v !== f) return false; }
-    else if (c.f === 'sug') { if (f === 'none' ? v !== '' : v !== f) return false; }
+    else if (c.f === 'select') { if (f === '__unset' ? !!v : v !== f) return false; }
     else if (c.f === 'odoo') { if (f === 'found' ? v <= 0 : f === 'none' ? v !== 0 : v !== -1) return false; }
     else if (c.f === 'amount') { if (!amountMatch(v, f)) return false; }
   }
@@ -275,7 +331,7 @@ function visible() {
     if (from && t.date < from) return false;
     if (to && t.date > to) return false;
     if (q) {
-      const hay = [t.date, t.service, t.description, t.phone, contactName(t).name, t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
+      const hay = [t.date, t.service, t.description, t.phone, contactName(t).name, t.partnerName, companyOf(t), t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return passes(t);
@@ -294,6 +350,7 @@ const matchTip = x => [x.move, x.date, x.company, x.partner || x.label,
   (x.docs || []).length ? '↳ ' + x.docs.join(', ') : '',
   (x.analytics || []).length ? '↳ project ' + x.analytics.map(a => a.name).join(', ') : '',
   (x.why || []).length ? '(' + x.why.join(', ') + ')' : ''].filter(Boolean).join(' · ');
+// found / not found, and — once you have chosen a partner — whether Odoo agrees
 function odooCell(t) {
   if (!t.odoo) return '<span class="odoo-no" title="Not checked yet">·</span>';
   const m = t.odoo.matches || [];
@@ -301,7 +358,9 @@ function odooCell(t) {
   const win = m.find(x => x.chosen);
   if (win) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
-    return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`;
+    const differs = t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
+    return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
+      + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
   const tip = m.map(matchTip).join('\n');
   return `<span class="odoo-multi" title="${esc(tip)}">${m.length} possible — pick one</span>`;
@@ -312,108 +371,153 @@ function render() {
   document.getElementById('grid').style.display = tx.length ? '' : 'none';
   document.getElementById('empty').style.display = tx.length ? 'none' : '';
   for (const c of COLS) document.getElementById('arr-' + c.k).textContent = sort.k === c.k ? (sort.dir > 0 ? '▲' : '▼') : '';
-  document.getElementById('clr').classList.toggle('on', Object.keys(colF).length > 0);
-  // keep the Service dropdown in step with the loaded lines
-  const svcSel = document.getElementById('flt').children[1].firstElementChild;
-  if (svcSel && svcSel.options.length - 1 !== new Set(tx.map(t => t.service).filter(Boolean)).size) buildHeader();
+  document.getElementById('clr').classList.toggle('on', Object.keys(colF).length > 0 || !!sugFilter);
 
   let pending = 0;
   document.getElementById('rows').innerHTML = rows.map(t => {
-    const cn = contactName(t), sg = sugFor(t), sug = sg.project, sk = sg.kind;
+    const cn = contactName(t), sg = sugFor(t), co = companyOf(t);
     if (sg.any && !t.suggestSkip) pending++;
-    const cp = t.phone ? esc(t.phone.replace(/^961/, '0')) : esc(t.description);
-    return `<tr data-id="${t.id}" class="${t.kind === 'personal' ? 'personal' : ''}">
-      <td>${t.date}<div class="ref">tr:${t.ref}</div></td>
-      <td>${esc(t.service || '')}</td>
-      <td title="${esc(t.description)}">${cp}</td>
-      <td class="c-contact ${srcClass(cn.src)}">${t.phone
-        ? `<input type="text" value="${esc(cn.name)}" placeholder="who?" data-f="contact" onchange="saveContact('${t.phone}', this)">`
-        : '<span style="color:#adb5bd">—</span>'}</td>
-      <td class="c-note ${srcClass(t.note ? (t.noteSrc || 'manual') : '')}"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
-      <td class="c-kind ${srcClass(t.kind ? (t.kindSrc || 'manual') : '')}"><select data-f="kind" onchange="saveField('${t.id}', 'kind', this.value, this)">
-        <option value="" ${!t.kind ? 'selected' : ''}>${sk ? '↳ ' + sk + '?' : '—'}</option>
-        <option value="work" ${t.kind === 'work' ? 'selected' : ''}>Work</option>
-        <option value="personal" ${t.kind === 'personal' ? 'selected' : ''}>Personal</option></select></td>
-      <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'reconciled document')) : ''}"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="${sug ? '↳ ' + esc(sug) + ' (Enter)' : 'project'}" data-sug="${esc(sug)}"
-        onkeydown="if(event.key==='Enter'&&!this.value&&this.dataset.sug){this.value=this.dataset.sug;this.dataset.accepted='1';this.dispatchEvent(new Event('change'));}"
-        onchange="saveAnalytic('${t.id}', this)"></td>
-      <td class="c-sug">${sg.any ? (t.suggestSkip
-        ? `<span class="sug-skip">skipped &middot; <a onclick="skipRow('${t.id}', false)">undo</a></span>`
-        : `<span class="sug-act"><button class="yes" title="Apply: ${esc([sug, sk].filter(Boolean).join(' / '))}" onclick="acceptRow('${t.id}')">✓</button>
-             <button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button>
-             <span class="what" title="${esc([sug, sk].filter(Boolean).join(' / '))}">${esc(sug || sk)}</span></span>`)
-        : '<span style="color:#dee2e6">—</span>'}</td>
+    const cp = t.phone ? esc(t.phone.replace(/^961/, '0')) : '';
+    const sugTxt = [sg.partner && sg.partner.name, sg.company].filter(Boolean).join(' / ');
+    return `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}">
+      <td class="c-date">${t.date}<div class="ref">tr:${t.ref}</div></td>
+      <td class="c-desc" title="${esc(t.description)}">
+        <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
+        ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
+      </td>
       <td class="num debit">${fmt(t.debit)}</td>
       <td class="num credit">${fmt(t.credit)}</td>
       <td class="num">${fmt(t.balance)}</td>
+      <td class="c-partner ${srcClass(t.partnerName ? (t.partnerSrc || 'manual') : '')}" title="${t.partnerSrc === 'odoo' ? 'From the matched Odoo payment' : sg.partner ? esc('Suggested: ' + sg.partner.name + ' — ' + sg.partner.why) : ''}">
+        <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : 'partner'}"
+          oninput="pickFilter('pp-${t.id}')" onkeydown="pickKey(event,'pp-${t.id}')" onblur="pickBlur('pp-${t.id}')">
+          <input type="hidden" id="pp-${t.id}" value="${esc(t.partnerId || '')}" data-row="${t.id}"><div class="pick-list" id="pp-${t.id}-list"></div></div>
+      </td>
+      <td class="c-company ${srcClass(co ? (t.companySrc || (t.kind ? t.kindSrc : '') || 'manual') : '')}"><select onchange="saveCompany('${t.id}', this.value, this)">
+        <option value="" ${!co ? 'selected' : ''}>${sg.company && !t.suggestSkip ? '↳ ' + esc(sg.company) + '?' : '—'}</option>
+        <option ${co === 'Personal' ? 'selected' : ''}>Personal</option>
+        ${companies.map(x => `<option ${co === x.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
+        ${co && co !== 'Personal' && !companies.some(x => x.name === co) ? `<option selected>${esc(co)}</option>` : ''}</select>
+        ${sg.any ? (t.suggestSkip
+          ? `<div class="sug-skip">skipped · <a onclick="skipRow('${t.id}', false)">undo</a></div>`
+          : `<div class="sug-act"><button class="yes" title="Apply: ${esc(sugTxt)}" onclick="acceptRow('${t.id}')">✓</button><button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button><span class="what">${esc(sugTxt)}</span></div>`) : ''}
+      </td>
+      <td class="c-note ${srcClass(t.note ? (t.noteSrc || 'manual') : '')}"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
       <td>${odooCell(t)}</td>
     </tr>`;
   }).join('');
   const out = rows.reduce((a, t) => a + t.debit, 0), inn = rows.reduce((a, t) => a + t.credit, 0);
   document.getElementById('totals').innerHTML =
-    `<td colspan="7">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}</td>
-     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td></td><td></td>`;
+    `<td colspan="2">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}</td>
+     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td></td><td colspan="4"></td>`;
   const b = document.getElementById('btn-accept');
   b.disabled = !pending; b.textContent = pending ? `✓ Accept ${pending} shown` : '✓ Accept all shown';
   const rv = document.getElementById('btn-review');
   const waiting = tx.filter(t => sugState(t) === 'pending').length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
-  rv.disabled = !waiting && colF.sug !== 'pending';
+  rv.classList.toggle('primary', sugFilter === 'pending');
+  rv.disabled = !waiting && sugFilter !== 'pending';
+}
+
+// ── Partner picker: type to filter the Odoo partners, ↑↓, Enter or click ──
+const P = {};
+function pickFilter(id) {
+  const txt = document.getElementById(id + '-txt'), box = document.getElementById(id + '-list');
+  if (!txt || !box) return;
+  const q = norm(txt.value);
+  const list = (q ? partners.filter(p => norm(p.name).includes(q)) : partners.slice(0, 40)).slice(0, 40);
+  P[id] = { list, hi: 0 };
+  box.innerHTML = list.length
+    ? list.map((p, i) => `<div class="${i === 0 ? 'hi' : ''}" onmousedown="event.preventDefault();pickChoose('${id}',${p.id})"><span>${esc(p.name)}</span><span class="g">${p.vendor && p.customer ? 'vendor · customer' : p.vendor ? 'vendor' : p.customer ? 'customer' : ''}</span></div>`).join('')
+    : '<div class="none">no Odoo partner matches — type the exact name to check spelling</div>';
+  box.className = 'pick-list on' + (list.length ? '' : ' empty');
+}
+function pickKey(e, id) {
+  const box = document.getElementById(id + '-list');
+  if (e.key === 'Escape') { if (box.className.includes('on')) e.stopPropagation(); box.className = 'pick-list'; return; }
+  if (e.key === 'ArrowDown' && !box.className.includes('on')) { e.preventDefault(); pickFilter(id); return; }
+  const st = P[id]; if (!st || !st.list.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    st.hi = Math.min(st.list.length - 1, Math.max(0, st.hi + (e.key === 'ArrowDown' ? 1 : -1)));
+    [...box.children].forEach((c, i) => c.className = i === st.hi ? 'hi' : '');
+    const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') { e.preventDefault(); if (box.className.includes('on')) pickChoose(id, st.list[st.hi].id); }
+}
+function pickChoose(id, partnerId) {
+  const p = partners.find(x => x.id === partnerId); if (!p) return;
+  const hidden = document.getElementById(id), txt = document.getElementById(id + '-txt');
+  hidden.value = p.id; txt.value = p.name; P[id] = null;
+  document.getElementById(id + '-list').className = 'pick-list';
+  savePartner(hidden.dataset.row, p, 'manual', txt);
+}
+function pickBlur(id) {
+  setTimeout(() => {
+    const txt = document.getElementById(id + '-txt'), hidden = document.getElementById(id); if (!txt || !hidden) return;
+    document.getElementById(id + '-list').className = 'pick-list';
+    const row = tx.find(x => x.id === hidden.dataset.row); if (!row) return;
+    if (!txt.value.trim()) { if (row.partnerName) savePartner(row.id, null, '', txt); return; }
+    const exact = partners.find(p => norm(p.name) === norm(txt.value));
+    if (exact) { if (exact.id !== row.partnerId) { hidden.value = exact.id; txt.value = exact.name; savePartner(row.id, exact, 'manual', txt); } return; }
+    txt.value = row.partnerName || '';   // no such partner: snap back
+  }, 160);
 }
 
 // ── Saving ──
 function flash(el, ok) { el.classList.remove('dirty'); el.classList.toggle('saved', ok); el.classList.toggle('dirty', !ok); setTimeout(() => el.classList.remove('saved'), 1200); }
-function mark(el, src) { const td = el.closest('td'); td.classList.remove('src-auto', 'src-manual'); if (src) td.classList.add(srcClass(src)); }
+function mark(el, src) { const td = el.closest('td'); td.classList.remove('src-auto', 'src-manual', 'src-odoo'); if (src) td.classList.add(srcClass(src)); }
+async function patch(id, data) { return Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, data); }
 async function saveField(id, field, value, el) {
   el.classList.add('dirty');
   const t = tx.find(x => x.id === id); if (t) { t[field] = value; t[field + 'Src'] = value ? 'manual' : ''; }
   mark(el, value ? 'manual' : '');
-  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { [field]: value, [field + 'Src']: value ? 'manual' : '' }); flash(el, true); }
-  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
-  if (field === 'kind') el.closest('tr').classList.toggle('personal', value === 'personal');
-}
-async function saveAnalytic(id, el) {
-  const name = el.value.trim();
-  const a = analytic.find(x => x.name.toLowerCase() === name.toLowerCase());
-  const src = !name ? '' : el.dataset.accepted ? 'suggest' : 'manual';
-  delete el.dataset.accepted;
-  el.classList.add('dirty');
-  const t = tx.find(x => x.id === id); if (t) { t.analyticName = a ? a.name : name; t.analyticId = a ? a.id : null; t.analyticSrc = src; }
-  mark(el, src);
-  try { await Admin.api('PATCH', `/api/accounting/whish/${acc}/tx/${id}`, { analyticName: a ? a.name : name, analyticId: a ? a.id : null, company: a ? a.company : '', analyticSrc: src }); flash(el, true); }
+  try { await patch(id, { [field]: value, [field + 'Src']: value ? 'manual' : '' }); flash(el, true); }
   catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
 }
-async function saveContact(phone, el) {
-  const name = el.value.trim();
-  el.classList.add('dirty');
-  contacts[phone] = { phone, name, source: 'manual' };
-  mark(el, name ? 'manual' : '');
+async function savePartner(id, p, src, el) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const data = p ? { partnerId: p.id, partnerName: p.name, partnerSrc: src } : { partnerId: null, partnerName: '', partnerSrc: '' };
+  Object.assign(t, data);
+  if (el) { el.classList.add('dirty'); mark(el, p ? src : ''); }
+  try { await patch(id, data); if (el) flash(el, true); say(p ? `Partner: ${p.name}` : 'Partner cleared'); render(); }
+  catch (e) { if (el) flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+// company decides work/personal for Budget as well
+const kindOf = co => co === 'Personal' ? 'personal' : co ? 'work' : '';
+async function saveCompany(id, value, el) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const data = { company: value, companySrc: value ? 'manual' : '', kind: kindOf(value), kindSrc: value ? 'manual' : '' };
+  Object.assign(t, data);
+  el.classList.add('dirty'); mark(el, value ? 'manual' : '');
+  el.closest('tr').classList.toggle('personal', value === 'Personal');
+  try { await patch(id, data); flash(el, true); }
+  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+async function renameContact(phone) {
+  const cur = (contacts[phone] || {}).name || '';
+  const name = prompt('Who owns 0' + phone.replace(/^961/, '') + '?', cur);
+  if (name === null) return;
+  contacts[phone] = { phone, name: name.trim(), source: 'manual' };
   try {
-    await Admin.api('POST', '/api/accounting/whish/contacts', { items: [{ phone, name, source: 'manual' }] });
-    flash(el, true);
-    // same number elsewhere in the grid takes the name too
-    document.querySelectorAll('tr input[data-f="contact"]').forEach(i => {
-      const r = tx.find(x => x.id === i.closest('tr').dataset.id);
-      if (r && r.phone === phone && i !== el) { i.value = name; mark(i, name ? 'manual' : ''); }
-    });
-  } catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+    await Admin.api('POST', '/api/accounting/whish/contacts', { items: [{ phone, name: name.trim(), source: 'manual' }] });
+    matchMemo.clear(); render(); say(name.trim() ? `0${phone.replace(/^961/, '')} is ${name.trim()}` : 'Name removed');
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
-// Fill every blank Project / W-P (visible rows) with its suggestion, marked as "suggest"
+function itemFor(t) {
+  const sg = sugFor(t); if (!sg.any) return null;
+  const it = { id: t.id };
+  if (sg.partner) Object.assign(it, { partnerId: sg.partner.id || null, partnerName: sg.partner.name, partnerSrc: 'suggest' });
+  if (sg.company) Object.assign(it, { company: sg.company, companySrc: 'suggest', kind: kindOf(sg.company), kindSrc: 'suggest' });
+  return it;
+}
 // one row at a time: apply what is suggested for this line only
 async function acceptRow(id) {
   const t = tx.find(x => x.id === id); if (!t) return;
-  const sg = sugFor(t);
-  if (!sg.any) return;
-  const it = { id };
-  if (sg.project) {
-    const a = analytic.find(x => x.name.toLowerCase() === sg.project.toLowerCase());
-    Object.assign(it, { analyticName: a ? a.name : sg.project, analyticId: a ? a.id : null, company: a ? a.company : '', analyticSrc: 'suggest' });
-  }
-  if (sg.kind) Object.assign(it, { kind: sg.kind, kindSrc: 'suggest' });
+  const it = itemFor(t); if (!it) return;
   try {
     await Admin.api('POST', `/api/accounting/whish/${acc}/tx-bulk`, { items: [it] });
     Object.assign(t, it); render();
-    say(`Applied: ${[sg.project, sg.kind].filter(Boolean).join(' / ')}`);
+    say(`Applied: ${[it.partnerName, it.company].filter(Boolean).join(' / ')}`);
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 // not this one: hide the suggestion without filling anything
@@ -426,25 +530,16 @@ async function skipRow(id, on) {
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 function reviewSuggestions() {
-  colF.sug = colF.sug === 'pending' ? '' : 'pending';
-  buildHeader(); render();
-  say(colF.sug ? 'Showing only the lines with a suggestion waiting — ✓ to apply, ✕ to skip' : '');
+  sugFilter = sugFilter === 'pending' ? '' : 'pending';
+  render();
+  say(sugFilter ? 'Showing only the lines with a suggestion waiting — ✓ to apply, ✕ to skip' : '');
 }
+function showSkipped() { sugFilter = sugFilter === 'skipped' ? '' : 'skipped'; render(); }
 async function acceptAll() {
-  const items = [];
-  for (const t of visible()) {
-    if (t.suggestSkip) continue;          // you already said no to this one
-    const it = { id: t.id };
-    const sug = !t.analyticName && lastFor(t, 'analyticName');
-    const sk = !t.kind && lastFor(t, 'kind');
-    if (sug) { const a = analytic.find(x => x.name.toLowerCase() === sug.toLowerCase()); Object.assign(it, { analyticName: a ? a.name : sug, analyticId: a ? a.id : null, company: a ? a.company : '', analyticSrc: 'suggest' }); }
-    if (sk) Object.assign(it, { kind: sk, kindSrc: 'suggest' });
-    if (sug || sk) items.push(it);
-  }
+  const items = visible().filter(t => !t.suggestSkip).map(itemFor).filter(Boolean);
   if (!items.length) return;
-  if (!confirm(`Fill ${items.length} line${items.length > 1 ? 's' : ''} with their suggestions? (shown in blue until you confirm them)`)) return;
+  if (!confirm(`Fill ${items.length} line${items.length > 1 ? 's' : ''} with their suggested partner / company? (shown in blue until you confirm them)`)) return;
   try {
-    // suggestions chain: do it in rounds so a row filled now can feed the next
     await Admin.api('POST', `/api/accounting/whish/${acc}/tx-bulk`, { items });
     for (const it of items) Object.assign(tx.find(x => x.id === it.id), it);
     render();
@@ -546,10 +641,10 @@ async function checkOdoo() {
   try {
     const found = await Admin.api('POST', `/api/accounting/whish/${acc}/odoo-check`, { ids });
     const hits = Object.values(found).filter(m => m.length).length;
-    const withProject = Object.values(found).filter(m => ((m.find(x => x.chosen) || {}).analytics || []).length).length;
-    tx = await Admin.api('GET', `/api/accounting/whish/${acc}/tx`);   // the check may have filled projects
+    const withPartner = Object.values(found).filter(m => (m.find(x => x.chosen) || {}).partner).length;
+    tx = await Admin.api('GET', `/api/accounting/whish/${acc}/tx`);   // the check may have filled partner and company
     render();
-    say(`Odoo: ${hits} of ${ids.length} lines found` + (withProject ? `, ${withProject} project${withProject > 1 ? 's' : ''} taken from the reconciled invoice` : ''));
+    say(`Odoo: ${hits} of ${ids.length} lines found` + (withPartner ? `, ${withPartner} partner${withPartner > 1 ? 's' : ''} and compan${withPartner > 1 ? 'ies' : 'y'} taken from the matched payments` : ''));
   } catch (e) { say('Odoo check failed: ' + e.message, 'err'); }
   b.disabled = false;
 }

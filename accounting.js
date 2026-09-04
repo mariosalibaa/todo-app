@@ -201,6 +201,24 @@ async function analyticAccounts(odooCall) {
   return _analyticCache.list;
 }
 
+// Every partner (vendor or customer — Odoo books both against res.partner) and every company.
+let _partnerCache = { at: 0, data: null };
+async function partnersAndCompanies(odooCall) {
+  if (_partnerCache.data && Date.now() - _partnerCache.at < 10 * 60 * 1000) return _partnerCache.data;
+  const companies = await odooCall('res.company', 'search_read', [[]], { fields: ['id', 'name'] });
+  const ctx = { allowed_company_ids: companies.map(c => c.id) };
+  const rows = await odooCall('res.partner', 'search_read', [[['active', '=', true]]],
+    { fields: ['id', 'name', 'is_company', 'company_id', 'customer_rank', 'supplier_rank', 'phone'], context: ctx, limit: 20000 });   // Odoo 18: no separate mobile field
+  const partners = rows.map(r => ({
+    id: r.id, name: r.name, isCompany: !!r.is_company,
+    company: r.company_id ? r.company_id[1] : '',
+    customer: (r.customer_rank || 0) > 0, vendor: (r.supplier_rank || 0) > 0,
+    phone: normalizePhone(r.phone || ''),
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  _partnerCache = { at: Date.now(), data: { partners, companies: companies.map(c => ({ id: c.id, name: c.name })) } };
+  return _partnerCache.data;
+}
+
 let _whishJournals = null;
 async function whishJournals(odooCall) {
   if (_whishJournals) return _whishJournals;
@@ -301,7 +319,7 @@ async function odooCheck(odooCall, txs) {
     const rec = anByMove[l.move_id[0]] || { analytics: [], docs: [] };
     return {
       lineId: l.id, moveId: l.move_id[0], move: l.move_id[1], date: l.date,
-      amount: l.debit || l.credit, partner: l.partner_id ? l.partner_id[1] : '', label: l.name || l.ref || '',
+      amount: l.debit || l.credit, partner: l.partner_id ? l.partner_id[1] : '', partnerId: l.partner_id ? l.partner_id[0] : null, label: l.name || l.ref || '',
       company: l.company_id ? l.company_id[1] : '', journal: l.journal_id ? l.journal_id[1] : '', state: l.parent_state,
       docs: rec.docs, analytics: rec.analytics, score: Math.round(score * 10) / 10, why
     };
@@ -359,7 +377,10 @@ async function odooCheck(odooCall, txs) {
 }
 
 // Editable annotation fields; *Src = who filled it ('manual' | 'suggest' | 'google')
-const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip'];
+// partner = the Odoo res.partner the payment is booked against (a decision);
+// company = 'Personal' or an Odoo company name; kind is kept in step (personal/work) for Budget.
+const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip'];
 
 // ── Router ─────────────────────────────────────────────────────────────────
 // Returns true when the request was handled.
@@ -423,6 +444,11 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, { ok: true, saved: writes.length, skipped: items.length - writes.length });
   }
 
+  if (url === '/api/accounting/partners' && req.method === 'GET') {
+    try { return json(res, 200, await partnersAndCompanies(odooCall)); }
+    catch (e) { return json(res, 502, { error: String(e.message || e) }); }
+  }
+
   if (url === '/api/accounting/analytic' && req.method === 'GET') {
     try { return json(res, 200, await analyticAccounts(odooCall)); }
     catch (e) { return json(res, 502, { error: String(e.message || e) }); }
@@ -477,6 +503,9 @@ async function handle(req, res, url, user, ctx) {
         const win = matches.find(m => m.chosen);
         if (win) {
           if (win.partner) data.odooPartner = win.partner;
+          // partner and company from Odoo, unless you chose them yourself
+          if (win.partner && t.partnerSrc !== 'manual') { data.partnerName = win.partner; data.partnerId = win.partnerId || null; data.partnerSrc = 'odoo'; }
+          if (win.company && t.companySrc !== 'manual') { data.company = win.company; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
           // Project from the analytic account of the invoice/bill this payment
           // is reconciled with. Anything you typed yourself (src 'manual') wins.
           const an = (win.analytics || [])[0];

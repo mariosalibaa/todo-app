@@ -60,8 +60,9 @@ async function whishLines(ws) {
         id: d.id, whishAccount: a.id, date: t.date || '', ref: t.ref || '', service: t.service || '',
         phone: t.phone || '', contact,
         // payee = owner of the phone number, else the merchant name on the statement
-        payeeLabel: contact || t.name || local || t.description || '',
-        who: contact || t.name || local || t.description || '',
+        partner: t.partnerName || '',
+        payeeLabel: t.partnerName || contact || t.name || local || t.description || '',
+        who: t.partnerName || contact || t.name || local || t.description || '',
         debit: t.debit || 0, credit: t.credit || 0, balance: t.balance ?? null,
         note: t.note || '', kind: t.kind || '', analyticName: t.analyticName || ''
       });
