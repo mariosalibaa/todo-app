@@ -761,7 +761,9 @@ function edit(kind, id, extra) {
       <label>Notes</label><textarea id="f-notes">${esc(e.notes || '')}</textarea>
       <div class="hint">Foreign amounts are converted to USD with the rates in ⚙ settings. Leave the account box empty for none.</div>`, acts(isNew ? '' : `delEntry('expenses','${id}')`));
     onSave = async () => {
-      const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
+      const cur = v('f-cur'), raw = String(v('f-amt')).trim(), ca = Number(raw);
+      // 0 is a real amount (and a refund is a negative one) — only a blank or non-number is an error
+      if (raw === '' || !isFinite(ca)) throw new Error('enter an amount');
       const accountId = v('f-acc');
       const data = { date: v('f-date'), catId: v('f-cat'), subId: v('f-sub'), currency: cur, currencyAmount: ca, amount: toBase(ca, cur), payeeId: v('f-payee'), accountId, notes: v('f-notes'), ts: e.ts || new Date().toISOString() };
       data.accAmount = accountId ? inAccCurrency(data.amount, cur, ca, accountId) : null;
@@ -776,7 +778,9 @@ function edit(kind, id, extra) {
       <label>Account</label>${pickerHtml('f-acc', e.accountId, true)}
       <label>Notes</label><textarea id="f-notes">${esc(e.notes || '')}</textarea>`, acts(isNew ? '' : `delEntry('income','${id}')`));
     onSave = async () => {
-      const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
+      const cur = v('f-cur'), raw = String(v('f-amt')).trim(), ca = Number(raw);
+      // 0 is a real amount (and a refund is a negative one) — only a blank or non-number is an error
+      if (raw === '' || !isFinite(ca)) throw new Error('enter an amount');
       const accountId = v('f-acc');
       const data = { date: v('f-date'), name: v('f-name'), currency: cur, currencyAmount: ca, amount: toBase(ca, cur), accountId, notes: v('f-notes'), ts: e.ts || new Date().toISOString() };
       data.accAmount = accountId ? inAccCurrency(data.amount, cur, ca, accountId) : null;
@@ -792,7 +796,9 @@ function edit(kind, id, extra) {
       <label>Notes</label><textarea id="f-notes">${esc(t.notes || '')}</textarea>
       <div class="hint">Between currencies: the amount is converted with the settings rates on each side.</div>`, acts(isNew ? '' : `delEntry('transfers','${id}')`));
     onSave = async () => {
-      const cur = v('f-cur'), ca = Number(v('f-amt')); if (!ca) throw new Error('amount required');
+      const cur = v('f-cur'), raw = String(v('f-amt')).trim(), ca = Number(raw);
+      // 0 is a real amount (and a refund is a negative one) — only a blank or non-number is an error
+      if (raw === '' || !isFinite(ca)) throw new Error('enter an amount');
       if (!v('f-from') || !v('f-to')) throw new Error('pick both a from and a to account');
       if (v('f-from') === v('f-to')) throw new Error('from and to are the same account');
       const amount = toBase(ca, cur);
