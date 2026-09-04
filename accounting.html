@@ -74,6 +74,7 @@
   .bill.done{background:#f6fbf7;border-color:#cfe8d6;}
   .rule{display:flex;align-items:center;gap:10px;padding:6px 8px;border:1px solid var(--line);border-radius:5px;margin-bottom:6px;font-size:12px;}
   .rule.off{opacity:.55;}
+  .btn.book{padding:1px 7px;height:22px;font-size:11.5px;color:var(--odoo);border-color:#d9c9d4;} .btn.book:hover{background:#f5f2f7;}
   .odoo-doc{color:var(--muted);font-size:11px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;}
   td:last-child{max-width:230px;}
   /* partner picker */
@@ -91,7 +92,7 @@
   .sug-act button.many{width:auto;padding:0 5px;color:var(--odoo);border-color:#d9c9d4;font-size:10.5px;font-weight:600;}
   .sug-act button.many:hover{background:#f5f2f7;}
   .sug-act button.many.over{color:var(--muted);border-color:var(--line);cursor:not-allowed;}
-  .sug-act{margin-top:3px;} .sug-act .what{font-size:10.5px;color:var(--auto);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:96px;}
+  .sug-act{margin-top:3px;flex-wrap:wrap;} .sug-act .what{flex-basis:100%;font-size:10.5px;color:var(--auto);font-style:italic;white-space:normal;line-height:1.25;}
   .sug-skip{color:#adb5bd;font-size:11px;margin-top:3px;} .sug-skip a{color:var(--odoo);cursor:pointer;}
   .ref{color:var(--muted);font-size:11px;}
   .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
@@ -170,7 +171,7 @@ const esc = Admin.esc;
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
 const SAME_CAP = 60;   // one number's repeats may go together; a crowd may not
-let accounts = [], acc = null, tx = [], contacts = {}, partners = [], companies = [], analytic = [];
+let accounts = [], acc = null, tx = [], contacts = {}, partners = [], companies = [], analytic = [], rules = [];
 const KNOWN = { '9613700985': 'Maya', '9613299799': 'Walid Hibri', '9613165168': 'Mario Saliba' };   // seeds until contacts are imported
 
 // ── Columns: the first five are the Whish PDF, untouched; then what we add ──
@@ -215,6 +216,7 @@ async function loadPartners() {
     const r = await Admin.api('GET', '/api/accounting/partners');
     partners = r.partners || []; companies = r.companies || [];
     analytic = await Admin.api('GET', '/api/accounting/analytic').catch(() => []);
+    rules = await Admin.api('GET', '/api/accounting/whish/rules').catch(() => []);
     document.getElementById('analytic-list').innerHTML =
       analytic.map(a => `<option value="${esc(a.name)}">${esc([a.plan, a.company].filter(Boolean).join(' · '))}</option>`).join('');
     matchMemo.clear();
@@ -407,10 +409,28 @@ const matchTip = x => [x.move, x.date, x.company, x.partner || x.label,
   (x.analytics || []).length ? '↳ project ' + x.analytics.map(a => a.name).join(', ') : '',
   (x.why || []).length ? '(' + x.why.join(', ') + ')' : ''].filter(Boolean).join(' · ');
 // found / not found, and — once you have chosen a partner — whether Odoo agrees
+// Same test as the server's, so the button only shows where Book would work.
+const cents = n => Math.round(Number(n || 0) * 100) / 100;
+function ruleFor(t) {
+  return rules.find(r => r.active !== false
+    && (!r.phone || String(t.phone || '') === String(r.phone))
+    && (!r.contains || String(t.description || '').toLowerCase().includes(String(r.contains).toLowerCase()))
+    && ((r.direction || 'out') === 'out' ? cents(t.debit) > 0 : cents(t.credit) > 0)
+    && (r.amount == null || r.amount === '' || cents(r.amount) === ((r.direction || 'out') === 'out' ? cents(t.debit) : cents(t.credit))));
+}
+function bookButton(t) {
+  const bk = t.booked;
+  if (bk && bk.paymentState === 'paid') return `<a class="odoo-ok" target="_blank" href="${ODOO}${bk.moveId}" title="${esc('Booked from this page: ' + bk.move + (bk.payment ? ', paid by ' + bk.payment.name : ''))}">✓ ${esc(bk.move)}</a>`;
+  const r = ruleFor(t);
+  if (!r) return '';
+  const what = [r.partnerName, r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · ');
+  return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('Create the bill, post it and pay it from ' + (r.paymentJournalName || 'the cash journal') + ':\n' + what)}">${bk ? '📗 Post & pay' : '📗 Book'}</button>`;
+}
 function odooCell(t) {
-  if (!t.odoo) return '<span class="odoo-no" title="Not checked yet">·</span>';
+  const btn = bookButton(t);
+  if (!t.odoo) return btn || '<span class="odoo-no" title="Not checked yet">·</span>';
   const m = t.odoo.matches || [];
-  if (!m.length) return '<span class="odoo-no" title="Checked ' + esc(t.odoo.checkedAt.slice(0, 10)) + ': nothing found in the Whish journals">—</span>';
+  if (!m.length) return btn || '<span class="odoo-no" title="Checked ' + esc(t.odoo.checkedAt.slice(0, 10)) + ': nothing found in the Whish journals">—</span>';
   const win = m.find(x => x.chosen);
   if (win) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
@@ -466,7 +486,7 @@ function render() {
           : (() => { const k = sameKey(t), n = (groups[k] || []).length;
               return `<div class="sug-act"><button class="yes" title="Apply to this line only: ${esc(sugTxt)}" onclick="acceptRow('${t.id}')">✓</button><button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button>${n > 1 ? (n > SAME_CAP
                 ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
-                : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what">${esc(sugTxt)}</span></div>`; })()) : ''}
+                : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : ''}
       </td>
       <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : ''}"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="analytic" onchange="saveAnalytic('${t.id}', this)"></td>
       <td class="c-note ${srcClass(t.note ? (t.noteSrc || 'manual') : '')}"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
@@ -749,20 +769,22 @@ async function openBills() {
 }
 function drawBills() {
   const { prev, rules } = billsData;
-  const waiting = prev.candidates.filter(c => !c.booked);
-  const done = prev.candidates.filter(c => c.booked);
+  const waiting = prev.candidates.filter(c => !c.booked || c.booked.payment_state !== 'paid');
+  const done = prev.candidates.filter(c => c.booked && c.booked.payment_state === 'paid');
   const line = c => `<div class="bill${c.booked ? ' done' : ''}">
     <span style="width:82px">${esc(c.date)}</span>
     <span class="amt" style="width:74px;text-align:right">${fmt(c.amount)}</span>
     <span class="grow"><b>${esc(c.rule.partnerName || c.rule.label || '')}</b>
       <div class="what">${esc([c.rule.accountCode, c.rule.analyticName, c.rule.companyName].filter(Boolean).join(' · '))} — ${esc(c.description || '')}</div></span>
-    ${c.booked
-      ? `<a class="odoo-ok" target="_blank" href="${ODOO}${c.booked.id}" title="${esc(c.booked.state)}">✓ ${esc(c.booked.name)}</a>`
-      : `<button class="btn" onclick="bookOne('${c.id}', this)">Create draft</button>`}</div>`;
+    ${c.booked && c.booked.payment_state === 'paid'
+      ? `<a class="odoo-ok" target="_blank" href="${ODOO}${c.booked.id}">✓ ${esc(c.booked.name)}</a>`
+      : c.booked
+      ? `<a class="odoo-ok" target="_blank" href="${ODOO}${c.booked.id}" style="color:var(--muted)">${esc(c.booked.name || 'draft')}</a> <button class="btn" onclick="bookOne('${c.id}', this)">Post & pay</button>`
+      : `<button class="btn" onclick="bookOne('${c.id}', this)">Book in Odoo</button>`}</div>`;
   document.getElementById('bills-body').innerHTML =
     (waiting.length ? `<h4>${waiting.length} payment${waiting.length > 1 ? 's' : ''} waiting for a bill</h4>` + waiting.map(line).join('')
                     : '<h4>Nothing waiting</h4><p class="hint">Every payment a rule covers already has its draft, or is already booked in Odoo.</p>')
-    + (done.length ? `<h4>${done.length} already drafted</h4>` + done.map(line).join('') : '')
+    + (done.length ? `<h4>${done.length} booked</h4>` + done.map(line).join('') : '')
     + '<h4>Rules</h4>'
     + (rules.length ? rules.map(r => `<div class="rule${r.active === false ? ' off' : ''}">
         <span class="grow"><b>${esc(r.label || r.partnerName || '')}</b>
@@ -770,15 +792,34 @@ function drawBills() {
         <button class="btn" onclick="dropRule('${r.id}')" title="Delete this rule">✕</button></div>`).join('')
       : '<p class="hint">No rules yet.</p>');
 }
+// Book one line: create the bill if needed, post it, pay it from the cash journal, then
+// let the matcher see the new payment so the Odoo cell turns green.
+async function bookLine(id) {
+  const r = await Admin.api('POST', `/api/accounting/whish/${acc}/book`, { ids: [id], post: true });
+  const one = (r.results || [])[0] || {};
+  if (one.error) throw new Error(one.error);
+  await Admin.api('POST', `/api/accounting/whish/${acc}/odoo-check`, { ids: [id] }).catch(() => {});
+  tx = await Admin.api('GET', `/api/accounting/whish/${acc}/tx`);
+  render();
+  return one;
+}
 async function bookOne(id, btn) {
-  btn.disabled = true; btn.textContent = 'Creating…';
+  const was = btn.textContent; btn.disabled = true; btn.textContent = 'Booking…';
   try {
-    const r = await Admin.api('POST', `/api/accounting/whish/${acc}/book`, { ids: [id] });
-    const one = (r.results || [])[0] || {};
-    if (one.error) { btn.disabled = false; btn.textContent = 'Create draft'; return say(one.error, 'err'); }
-    say(`Draft ${one.move} created — open it in Odoo to post it`);
+    const one = await bookLine(id);
+    say(`${one.move} posted` + (one.payment ? ` and paid by ${one.payment.name}` : ''));
     await openBills();
-  } catch (e) { btn.disabled = false; btn.textContent = 'Create draft'; say('Could not create: ' + e.message, 'err'); }
+  } catch (e) { btn.disabled = false; btn.textContent = was; say('Could not book: ' + e.message, 'err'); }
+}
+async function bookRow(id, btn) {
+  const t = tx.find(x => x.id === id), r = t && ruleFor(t); if (!r) return;
+  const amt = fmt(t.debit || t.credit);
+  if (!confirm(`Book ${amt} of ${t.date} in Odoo?\n\n${r.partnerName} · ${r.companyName}\n${r.accountCode}${r.analyticName ? '\n' + r.analyticName : ''}\n\nThe bill is created, posted and paid from ${r.paymentJournalName || 'the cash journal'} on that date.`)) return;
+  btn.disabled = true; btn.textContent = 'Booking…';
+  try {
+    const one = await bookLine(id);
+    say(`${one.move} posted` + (one.payment ? ` and paid by ${one.payment.name}` : ''));
+  } catch (e) { btn.disabled = false; btn.textContent = '📗 Book'; say('Could not book: ' + e.message, 'err'); }
 }
 async function dropRule(id) {
   if (!confirm('Delete this rule? Bills already created are untouched.')) return;

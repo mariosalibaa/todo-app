@@ -6,8 +6,8 @@
 // and every later line from that number is offered back as a ready draft.
 //
 // Two rules of the house, both deliberate:
-//   * Bills are created as DRAFTS. Nothing is posted, nothing is reconciled, nothing
-//     touches the ledger until a person opens it in Odoo and posts it.
+//   * Nothing happens by itself. A bill is created, posted and paid only when a person
+//     presses Book on that one line; without `post` it stays a draft.
 //   * A line Odoo already knows (the matcher found its payment) is never offered.
 //     That is what the matcher is for: it means the money is already booked.
 //
@@ -17,7 +17,9 @@
 //   GET  /api/accounting/whish/rules              the rules
 //   POST /api/accounting/whish/rules              save one ({ id? , ... }) or delete ({ id, remove:true })
 //   POST /api/accounting/whish/<acc>/book-preview what the rules would book, nothing written
-//   POST /api/accounting/whish/<acc>/book         { ids: [...] } create those drafts
+//   POST /api/accounting/whish/<acc>/book         { ids: [...], post?: true } create the bills;
+//                                                 with post, also post them and pay them from
+//                                                 the rule's cash journal, dated as the Whish line
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise((resolve, reject) => {
@@ -33,7 +35,7 @@ const money = n => Math.round(Number(n || 0) * 100) / 100;
 // "this number is always Patrick" or as tight as "$60 out, and only $60".
 const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName',
   'companyId', 'companyName', 'journalId', 'accountId', 'accountCode', 'analyticId', 'analyticName',
-  'description', 'active'];
+  'paymentJournalId', 'paymentJournalName', 'description', 'active'];
 
 // Does this line belong to this rule? The amount is compared to the cent, because
 // "about $60" is how a $600 transfer ends up booked as an internet bill.
@@ -101,7 +103,7 @@ async function handle(req, res, url, user, ctx) {
     if (cand.length) {
       try {
         const companies = await odooCall('res.company', 'search_read', [[]], { fields: ['id'] });
-        const found = await odooCall('account.move', 'search_read', [[['ref', 'in', cand.map(c => REF(c.t))]]],
+        const found = await odooCall('account.move', 'search_read', [[['ref', 'in', cand.map(c => REF(c.t))], ['move_type', '=', 'in_invoice']]],
           { fields: ['id', 'name', 'ref', 'state', 'amount_total'], context: { allowed_company_ids: companies.map(c => c.id) } });
         existing = Object.fromEntries(found.map(f => [f.ref, f]));
       } catch { /* Odoo unreachable: still list the candidates, just without the "already there" flag */ }
@@ -148,10 +150,11 @@ async function handle(req, res, url, user, ctx) {
         default_move_type: 'in_invoice', check_move_validity: false,
       };
       try {
-        const dup = await odooCall('account.move', 'search_read', [[['ref', '=', ref]]],
-          { fields: ['id', 'name', 'state'], context: octx, limit: 1 });
-        if (dup.length) { out.push({ id, move: dup[0].name, moveId: dup[0].id, already: true }); continue; }
-
+        // the payment's memo carries the same WHISH ref, so ask for the bill by type
+        const dup = await odooCall('account.move', 'search_read', [[['ref', '=', ref], ['move_type', '=', 'in_invoice']]],
+          { fields: ['id', 'name', 'state', 'payment_state'], context: octx, limit: 1 });
+        let moveId = dup.length ? dup[0].id : null, already = !!moveId;
+        if (!moveId) {
         const line = {
           name: rule.description || rule.label || t.description || 'Whish payment',
           quantity: 1,
@@ -162,7 +165,7 @@ async function handle(req, res, url, user, ctx) {
         // analytic_distribution is keyed by the analytic account id, the value is the % of the line
         if (rule.analyticId) line.analytic_distribution = { [String(rule.analyticId)]: 100 };
 
-        const moveId = await odooCall('account.move', 'create', [{
+        moveId = await odooCall('account.move', 'create', [{
           move_type: 'in_invoice',
           partner_id: rule.partnerId,
           journal_id: rule.journalId,
@@ -173,15 +176,48 @@ async function handle(req, res, url, user, ctx) {
           narration: ('Whish ' + t.date + ' · ref ' + (t.ref || '') + ' · ' + (t.description || '')).trim(),
           invoice_line_ids: [[0, 0, line]],
         }], { context: octx });
+        }
 
-        const [mv] = await odooCall('account.move', 'read', [[moveId], ['name', 'amount_total', 'state']], { context: octx });
-        await col.doc(id).set({ booked: { moveId, move: mv.name, ref, at: now(), by: who, ruleId: rule.id } }, { merge: true });
-        out.push({ id, moveId, move: mv.name, amount: mv.amount_total, state: mv.state });
+        // Book it for real: post, then pay from the rule's cash journal on the Whish date.
+        // The payment memo is the bill's ref, i.e. WHISH-<id>, so a re-run finds it too.
+        let payment = null;
+        if (b.post) {
+          if (!rule.paymentJournalId) { out.push({ id, moveId, error: 'the rule has no cash journal to pay from' }); continue; }
+          let [mv] = await odooCall('account.move', 'read', [[moveId], ['state', 'payment_state', 'amount_residual']], { context: octx });
+          if (mv.state === 'draft') await odooCall('account.move', 'action_post', [[moveId]], { context: octx });
+          [mv] = await odooCall('account.move', 'read', [[moveId], ['state', 'payment_state', 'amount_residual']], { context: octx });
+          if (mv.payment_state !== 'paid' && mv.payment_state !== 'in_payment' && mv.amount_residual > 0) {
+            const [method] = await odooCall('account.payment.method.line', 'search_read',
+              [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', t.debit ? 'outbound' : 'inbound']]],
+              { fields: ['id'], context: octx, limit: 1 });
+            const wctx = { ...octx, active_model: 'account.move', active_ids: [moveId], active_id: moveId };
+            const vals = { journal_id: rule.paymentJournalId, payment_date: t.date, amount: mv.amount_residual };
+            if (method) vals.payment_method_line_id = method.id;
+            const wiz = await odooCall('account.payment.register', 'create', [vals], { context: wctx });
+            const act = await odooCall('account.payment.register', 'action_create_payments', [[wiz]], { context: wctx });
+            const payId = act && act.res_id;
+            if (payId) {
+              const [py] = await odooCall('account.payment', 'read', [[payId], ['name', 'date', 'amount']], { context: octx });
+              payment = { id: payId, name: py.name, date: py.date, amount: py.amount };
+            }
+          }
+        }
+
+        const [mv] = await odooCall('account.move', 'read', [[moveId], ['name', 'amount_total', 'state', 'payment_state']], { context: octx });
+        const booked = { moveId, move: mv.name, ref, state: mv.state, paymentState: mv.payment_state, at: now(), by: who, ruleId: rule.id };
+        if (payment) booked.payment = payment;
+        const data = { booked };
+        // the row inherits the rule's answers, unless you already chose your own
+        if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
+        if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
+        if (t.analyticSrc !== 'manual' && rule.analyticId) { data.analyticId = rule.analyticId; data.analyticName = rule.analyticName; data.analyticSrc = 'odoo'; data.analyticFrom = mv.name; }
+        await col.doc(id).set(data, { merge: true });
+        out.push({ id, moveId, move: mv.name, amount: mv.amount_total, state: mv.state, paymentState: mv.payment_state, payment, already });
       } catch (e) {
         out.push({ id, error: String(e.message || e).slice(0, 300) });
       }
     }
-    json(res, 200, { results: out, created: out.filter(o => o.moveId && !o.already).length });
+    json(res, 200, { results: out, created: out.filter(o => o.moveId && !o.already).length, booked: out.filter(o => o.paymentState === 'paid').length });
     return true;
   }
 
