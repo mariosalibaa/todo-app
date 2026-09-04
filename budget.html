@@ -46,7 +46,11 @@
   table{border-collapse:separate;border-spacing:0;width:100%;}
   thead th{position:sticky;top:0;background:#e9e9e9;text-align:left;font-weight:500;padding:0 8px;height:22px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#333;z-index:2;cursor:pointer;user-select:none;}
   thead th .arr{color:var(--blue);font-size:10px;margin-left:3px;}
+  thead tr.flt th{top:22px;cursor:default;padding:2px 4px;background:#f3f3f3;height:20px;}
+  thead tr.flt input{width:100%;box-sizing:border-box;font:inherit;font-size:11px;border:1px solid #ccc;border-radius:3px;padding:1px 5px;height:18px;background:#fff;}
+  thead tr.flt input:focus{outline:none;border-color:var(--blue);}
   td{padding:0 8px;height:22px;border-right:1px solid #ececec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;}
+  tbody tr[hidden]{display:none;}
   tbody tr{cursor:pointer;} tbody tr:hover td{background:#eef5fc;} tbody tr.on td{background:#dbeafc;}
   tbody tr.w td{color:var(--wh);} tbody tr.grp td{background:#dcdcdc;font-weight:600;color:#333;}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
@@ -465,7 +469,7 @@ function pickBlur(id) {
   }, 160);
 }
 function select(id) { S.sel = id; document.querySelectorAll('tbody tr').forEach(tr => tr.classList.toggle('on', tr.getAttribute('onclick') === `select('${id}')`)); }
-function openLedger(id) { S.screen = 'accounts'; S.ledger = id; S.sel = null; S.sort.accounts = { k: 'date', dir: 1 }; render(); }
+function openLedger(id) { S.screen = 'accounts'; S.ledger = id; S.sel = null; S.sort.accounts = { k: 'date', dir: -1 }; S.lf = {}; render(); }
 function drawLedger(id, b) {
   const a = accById(id); if (!a) return;
   const eff = e => e.accAmount != null ? e.accAmount : e.amount;
@@ -476,13 +480,33 @@ function drawLedger(id, b) {
   for (const w of whishRows()) if (w.accountId === id) rows.push({ id: w.id, whish: true, kind: w.kind === 'expense' ? 'expenses' : 'income', date: w.date, what: catName(w.catId) + (w.subId ? ' › ' + subName(w.subId) : ''), who: payeeName(w.payeeId) || w.payeeLabel || w.service, notes: w.notes, delta: w.kind === 'expense' ? -w.amount : w.amount, sbal: w.balance });
   rows.sort((x, y) => by('date')(x, y) || (x.whish && y.whish ? by('id')(x, y) : 0));
   let run = a.opening || 0; for (const r of rows) { run += r.delta; r.run = r.sbal != null ? r.sbal : run; }
-  const s = S.sort.accounts; if (s.dir < 0) rows.reverse();
-  document.getElementById('wrap').innerHTML = `<table><thead><tr><th>Date</th><th>Type</th><th>Detail</th><th>Payee / name</th><th>Notes</th><th class="num">Amount (${esc(a.currency)})</th><th class="num">Balance</th></tr></thead><tbody>
-    <tr class="grp"><td></td><td>Opening</td><td colspan="3">Opening balance</td><td></td><td class="num">${num(a.opening)}</td></tr>
-    ${rows.map(r => `<tr class="${r.whish ? 'w' : ''}" ondblclick="edit('${r.kind}','${r.id}')"><td>${dmy(r.date)}</td><td>${r.whish ? '<span class="tag">W</span>' : ''}${r.kind}</td><td>${esc(r.what)}</td><td>${esc(r.who || '')}</td><td title="${esc(r.notes)}">${esc(r.notes || '')}</td><td class="num ${r.delta < 0 ? 'neg' : 'pos'}">${num(r.delta)}</td><td class="num">${num(r.run)}</td></tr>`).join('')}</tbody></table>`;
-  document.getElementById('foot-left').innerHTML = `<span class="lnk" onclick="S.ledger=null;render()">‹ all accounts</span> · ${rows.length} movements · <span class="lnk" onclick="edit('accounts','${id}')">edit account</span> · <span class="lnk" onclick="sortBy('date')">flip order</span>`;
+  const s = S.sort.accounts || { k: 'date', dir: -1 }; S.lf = S.lf || {};
+  const LCOLS = [{ k: 'date', l: 'Date' }, { k: 'kind', l: 'Type' }, { k: 'what', l: 'Detail' }, { k: 'who', l: 'Payee / name' }, { k: 'notes', l: 'Notes' }, { k: 'delta', l: `Amount (${esc(a.currency)})`, num: 1 }, { k: 'run', l: 'Balance', num: 1 }];
+  // running balance is computed in date order above; the visible order is whatever column is chosen
+  if (s.k === 'date') { if (s.dir < 0) rows.reverse(); }
+  else { const numk = s.k === 'delta' || s.k === 'run'; rows.sort((x, y) => { const u = numk ? (x[s.k] || 0) : String(x[s.k] || '').toLowerCase(), v = numk ? (y[s.k] || 0) : String(y[s.k] || '').toLowerCase(); return (u < v ? -1 : u > v ? 1 : 0) * s.dir || by('date')(x, y); }); }
+  const fval = r => ({ date: dmy(r.date), kind: (r.whish ? 'w ' : '') + r.kind, what: r.what || '', who: r.who || '', notes: r.notes || '', delta: num(r.delta), run: num(r.run) });
+  const openingRow = `<tr class="grp"><td></td><td>Opening</td><td colspan="3">Opening balance</td><td></td><td class="num">${num(a.opening)}</td></tr>`;
+  const openingFirst = s.k === 'date' && s.dir > 0;
+  document.getElementById('wrap').innerHTML = `<table><thead><tr>${LCOLS.map(c => `<th class="${c.num ? 'num' : ''}" onclick="sortBy('${c.k}')">${c.l}${s.k === c.k ? `<span class="arr">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr>
+    <tr class="flt">${LCOLS.map(c => `<th><input type="search" id="lf-${c.k}" placeholder="filter" value="${esc(S.lf[c.k] || '')}" oninput="S.lf['${c.k}']=this.value;ledgerFilter()"></th>`).join('')}</tr></thead><tbody>
+    ${openingFirst ? openingRow : ''}
+    ${rows.map(r => { const f = fval(r); return `<tr class="${r.whish ? 'w' : ''}" ${LCOLS.map(c => `data-${c.k}="${esc(f[c.k].toLowerCase())}"`).join(' ')} ondblclick="edit('${r.kind}','${r.id}')"><td>${f.date}</td><td>${r.whish ? '<span class="tag">W</span>' : ''}${r.kind}</td><td>${esc(r.what)}</td><td>${esc(r.who || '')}</td><td title="${esc(r.notes)}">${esc(r.notes || '')}</td><td class="num ${r.delta < 0 ? 'neg' : 'pos'}">${f.delta}</td><td class="num">${f.run}</td></tr>`; }).join('')}
+    ${openingFirst ? '' : openingRow}</tbody></table>`;
+  document.getElementById('foot-left').innerHTML = `<span class="lnk" onclick="S.ledger=null;render()">‹ all accounts</span> · <span id="lf-count">${rows.length} movements</span> · <span class="lnk" onclick="edit('accounts','${id}')">edit account</span> · <span class="lnk" onclick="sortBy('date')">flip order</span>`;
+  ledgerFilter();
   document.getElementById('foot-total').textContent = 'Balance ' + money(b[id], a.currency);
   document.getElementById('foot-right').textContent = a.include ? 'included in total' : 'excluded from total';
+}
+// per-column ledger filter: substring match on every active column, applied to the DOM so typing keeps focus
+function ledgerFilter() {
+  const act = Object.entries(S.lf || {}).filter(([, v]) => v && v.trim()).map(([k, v]) => [k, v.trim().toLowerCase()]);
+  let n = 0, total = 0;
+  document.querySelectorAll('#wrap tbody tr:not(.grp)').forEach(tr => { total++; const ok = act.every(([k, v]) => (tr.dataset[k] || '').includes(v)); tr.hidden = !ok; if (ok) n++; });
+  const c = document.getElementById('lf-count'); if (c) c.textContent = act.length ? `${n} of ${total} movements` : `${total} movements`;
+  const foot = document.getElementById('foot-left'), clr = foot && foot.querySelector('.lf-clear');
+  if (foot && act.length && !clr) foot.insertAdjacentHTML('beforeend', '<span class="lf-clear"> · <span class="lnk" onclick="S.lf={};render()">clear filters</span></span>');
+  else if (clr && !act.length) clr.remove();
 }
 function drawSearch() {
   const q = S.q.trim().toLowerCase();
