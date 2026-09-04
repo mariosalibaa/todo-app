@@ -140,6 +140,133 @@ async function batchSet(db, writes) {
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Continuous import through the Wise API (no browser, no scraping).
+//   WISE_API_TOKEN        personal API token, read-only is enough (wise.com → Settings → API tokens)
+//   WISE_PRIVATE_KEY      PEM of the RSA key whose PUBLIC half is registered on the Wise account
+//                         (or WISE_PRIVATE_KEY_FILE, default ~/.wise/private.pem on Mario's laptop)
+//   WISE_PROFILE_ID       optional; otherwise the personal profile is used
+// Statement endpoints are behind Strong Customer Authentication: Wise answers 403 with a
+// one-time token in x-2fa-approval; we sign it with the private key and retry. That is the
+// whole "2FA" — no phone, no code, so it can run from a cron.
+// ═══════════════════════════════════════════════════════════════════════════
+const crypto = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const pathMod = require('path');
+const WISE_API = process.env.WISE_API_BASE || 'https://api.transferwise.com';
+
+function wiseConfig() {
+  const token = (process.env.WISE_API_TOKEN || '').trim();
+  let key = (process.env.WISE_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
+  if (!key) {
+    const f = process.env.WISE_PRIVATE_KEY_FILE || pathMod.join(os.homedir(), '.wise', 'private.pem');
+    try { key = fs.readFileSync(f, 'utf8'); } catch {}
+  }
+  return { token, key, profileId: process.env.WISE_PROFILE_ID || '' };
+}
+function signSca(token, key) {
+  return crypto.createSign('RSA-SHA256').update(token).sign(key, 'base64');
+}
+async function wiseFetch(path, cfg, extraHeaders = {}) {
+  const headers = { Authorization: 'Bearer ' + cfg.token, 'Content-Type': 'application/json', ...extraHeaders };
+  const r = await fetch(WISE_API + path, { headers });
+  if (r.status === 403 && r.headers.get('x-2fa-approval-result') === 'REJECTED' && r.headers.get('x-2fa-approval')) {
+    if (!cfg.key) throw new Error('Wise asks for strong customer authentication but no private key is configured (WISE_PRIVATE_KEY)');
+    const ott = r.headers.get('x-2fa-approval');
+    const r2 = await fetch(WISE_API + path, { headers: { ...headers, 'x-2fa-approval': ott, 'X-Signature': signSca(ott, cfg.key) } });
+    if (!r2.ok) throw new Error(`Wise ${r2.status} after SCA on ${path}: ${(await r2.text()).slice(0, 300)}`);
+    return r2.json();
+  }
+  if (!r.ok) throw new Error(`Wise ${r.status} on ${path}: ${(await r.text()).slice(0, 300)}`);
+  return r.json();
+}
+
+// One statement line from the JSON statement → the same shape the CSV importer stores
+function mapApiTx(t, currency) {
+  const d = t.details || {};
+  const value = Number((t.amount || {}).value || 0);
+  const amount = t.type === 'DEBIT' ? -Math.abs(value) : Math.abs(value);
+  const merchant = d.merchant && d.merchant.name ? d.merchant.name : '';
+  const recipient = d.recipient && d.recipient.name ? d.recipient.name : '';
+  const sender = d.senderName || '';
+  const ex = t.exchangeDetails || {};
+  return {
+    id: String(t.referenceNumber || '').trim() || [t.date, amount, d.description].join('|').replace(/[^\w.-]+/g, '_').slice(0, 180),
+    date: String(t.date || '').slice(0, 10),
+    currency: (t.amount && t.amount.currency) || currency,
+    amount,
+    debit: amount < 0 ? Math.abs(amount) : 0,
+    credit: amount > 0 ? amount : 0,
+    balance: t.runningBalance && t.runningBalance.value != null ? Number(t.runningBalance.value) : null,
+    description: d.description || '',
+    reference: d.paymentReference || '',
+    merchant, payer: sender, payee: recipient,
+    payeeAccount: d.recipient && d.recipient.bankAccount ? String(d.recipient.bankAccount) : '',
+    cardLast4: d.cardLastFourDigits || '',
+    note: '',
+    fees: t.totalFees && t.totalFees.value != null ? Number(t.totalFees.value) : 0,
+    exchangeFrom: ex.fromAmount ? ex.fromAmount.currency : '',
+    exchangeTo: ex.toAmount ? ex.toAmount.currency : '',
+    rate: ex.rate != null ? Number(ex.rate) : null,
+    exchangeToAmount: ex.toAmount ? Number(ex.toAmount.value) : null,
+    kind: d.type || t.type || '',
+    counterparty: merchant || recipient || sender || d.description || '',
+    source: 'api',
+  };
+}
+
+// Pull every balance of the profile from the day after the last stored line (minus a
+// 3-day overlap, in case Wise back-dates something) up to now. Idempotent by design.
+async function syncFromApi(ctx, opts = {}) {
+  const { db, admin, TEAM_ID } = ctx;
+  const cfg = wiseConfig();
+  if (!cfg.token) throw new Error('WISE_API_TOKEN is not set');
+  const ws = db.collection('workspaces').doc(TEAM_ID);
+  const now = () => new Date().toISOString();
+
+  let profileId = cfg.profileId;
+  if (!profileId) {
+    const profiles = await wiseFetch('/v2/profiles', cfg);
+    const personal = profiles.find(p => String(p.type).toUpperCase() === 'PERSONAL') || profiles[0];
+    if (!personal) throw new Error('no Wise profile on this token');
+    profileId = personal.id;
+  }
+  const balances = await wiseFetch(`/v4/profiles/${profileId}/balances?types=STANDARD,SAVINGS`, cfg);
+  const result = [];
+  for (const bal of balances) {
+    const cur = String(bal.currency || '').toUpperCase();
+    if (!cur) continue;
+    const label = bal.type === 'SAVINGS' ? `${cur}-${String(bal.name || 'jar').replace(/[^\w-]+/g, '_')}` : cur;
+    const accRef = ws.collection('wiseAccounts').doc(label);
+    const existingSnap = await accRef.collection('tx').select('date').get();
+    const existing = new Set(existingSnap.docs.map(d => d.id));
+    const lastDate = existingSnap.docs.map(d => d.get('date')).filter(Boolean).sort().pop();
+    const start = new Date(opts.since || (lastDate ? Date.parse(lastDate) - 3 * 86400000 : Date.now() - 365 * 86400000));
+    const end = new Date();
+    const q = `currency=${cur}&intervalStart=${start.toISOString()}&intervalEnd=${end.toISOString()}&type=COMPACT`;
+    const st = await wiseFetch(`/v1/profiles/${profileId}/balance-statements/${bal.id}/statement.json?${q}`, cfg);
+    const list = (st.transactions || []).map(t => mapApiTx(t, cur));
+    if (list.length) await batchSet(db, list.map(t => ({ ref: accRef.collection('tx').doc(t.id), data: { ...t, importedAt: now() } })));
+    const closing = st.endOfStatementBalance && st.endOfStatementBalance.value != null ? Number(st.endOfStatementBalance.value)
+      : (bal.amount && bal.amount.value != null ? Number(bal.amount.value) : null);
+    await accRef.set({
+      currency: cur, name: bal.type === 'SAVINGS' ? `Wise ${cur} · ${bal.name || 'jar'}` : 'Wise ' + cur,
+      balanceId: bal.id, balanceType: bal.type || 'STANDARD', profileId,
+      lastUpload: now(), lastSync: now(), closing,
+      statements: admin.firestore.FieldValue.arrayUnion({
+        from: start.toISOString().slice(0, 10), till: end.toISOString().slice(0, 10), filename: 'api',
+        lines: list.length, uploadedAt: now(), by: opts.by || 'wise-api'
+      })
+    }, { merge: true });
+    const added = list.filter(t => !existing.has(t.id)).length;
+    result.push({ currency: cur, account: label, lines: list.length, added, updated: list.length - added, closing, from: start.toISOString().slice(0, 10) });
+  }
+  await ws.collection('wiseMeta').doc('sync').set({ at: now(), profileId, result, by: opts.by || 'wise-api' }, { merge: true });
+  return { profileId, accounts: result };
+}
+
 async function handle(req, res, url, user, ctx) {
   const { db, admin, TEAM_ID } = ctx;
   const ws = db.collection('workspaces').doc(TEAM_ID);
@@ -148,6 +275,16 @@ async function handle(req, res, url, user, ctx) {
   if (!url.startsWith(P)) return false;
   const rest = url.slice(P.length).split('?')[0];
   const now = () => new Date().toISOString();
+
+  if (rest === 'status' && req.method === 'GET') {
+    const cfg = wiseConfig();
+    const meta = await ws.collection('wiseMeta').doc('sync').get();
+    return json(res, 200, { configured: !!cfg.token, hasKey: !!cfg.key, lastSync: meta.exists ? meta.data() : null }), true;
+  }
+  if (rest === 'sync' && req.method === 'POST') {
+    try { return json(res, 200, await syncFromApi(ctx, { by: who })), true; }
+    catch (e) { return json(res, 502, { error: String(e.message || e) }), true; }
+  }
 
   if (rest === 'accounts' && req.method === 'GET') {
     const snap = await ws.collection('wiseAccounts').get();
@@ -222,4 +359,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, parseStatement, parseCsv, isoDate };
+module.exports = { handle, parseStatement, parseCsv, isoDate, syncFromApi, mapApiTx, signSca, wiseConfig };

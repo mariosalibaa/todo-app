@@ -59,6 +59,8 @@
   <label class="btn primary" for="file">⬆ Choose a Wise statement (CSV)</label>
   <input type="file" id="file" accept=".csv,text/csv" style="display:none" onchange="pick(this.files[0])">
   <button class="btn" id="btn-import" onclick="doImport()" disabled>Import into Wise</button>
+  <button class="btn" id="btn-sync" onclick="doSync()" title="Pull every balance straight from Wise through the API">⟳ Sync from Wise</button>
+  <span class="hint" id="sync-status"></span>
   <span class="sp" style="flex:1"></span>
   <select id="acc" onchange="loadTx(this.value)"></select>
 </div>
@@ -80,6 +82,10 @@ function say(t, cls) { const m = document.getElementById('msg'); m.textContent =
 
 const HOWTO = `<div class="pad">
   <h3>Bring your Wise account in</h3>
+  <p class="hint"><b>Automatic (recommended):</b> connect the Wise API once and every balance is pulled nightly and on the Sync button. Two one-time steps on wise.com:
+  <b>Settings → API tokens → Add token</b> (read only), and <b>Settings → API tokens → Manage public keys → Add</b> using the file <i>wise-public-key.pem</i> on the Desktop.
+  Then give the token to Mario's session (or set WISE_API_TOKEN on Vercel).</p>
+  <p class="hint"><b>Manual:</b></p>
   <ol>
     <li>Open <a href="https://wise.com/balances" target="_blank" rel="noopener">wise.com</a> on a computer and sign in.</li>
     <li>Pick the balance you want, for example USD or EUR. Wise keeps one statement per currency, so repeat this for each balance you use.</li>
@@ -147,6 +153,27 @@ async function doImport() {
     if (accounts.length) loadTx(document.getElementById('acc').value);
   } catch (e) { say('Import failed: ' + e.message, 'err'); b.disabled = false; }
 }
+async function loadStatus() {
+  try {
+    const s = await Admin.api('GET', API + 'status');
+    const el = document.getElementById('sync-status'), b = document.getElementById('btn-sync');
+    if (!s.configured) { el.textContent = 'API not connected yet — see the steps below'; b.disabled = true; return; }
+    b.disabled = false;
+    el.textContent = s.lastSync ? 'last sync ' + s.lastSync.at.replace('T', ' ').slice(0, 16) + ' (' + (s.lastSync.result || []).map(r => r.currency + ' +' + r.added).join(', ') + ')' : 'connected · never synced';
+    if (!s.hasKey) el.textContent += ' · no signing key: statements will be refused';
+  } catch {}
+}
+async function doSync() {
+  const b = document.getElementById('btn-sync'); b.disabled = true;
+  say('Asking Wise…');
+  try {
+    const r = await Admin.api('POST', API + 'sync');
+    say('Synced ' + r.accounts.map(a => `${a.account}: ${a.added} new, ${a.updated} updated`).join(' · '), 'ok');
+    await loadAccounts(); await loadStatus();
+    if (accounts.length) loadTx(document.getElementById('acc').value);
+  } catch (e) { say('Sync failed: ' + e.message, 'err'); }
+  b.disabled = false;
+}
 async function loadAccounts() {
   accounts = await Admin.api('GET', API + 'accounts').catch(() => []);
   document.getElementById('acc').innerHTML = accounts.length
@@ -170,7 +197,7 @@ async function loadTx(cur) {
 
 Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.email;
-  await loadAccounts();
+  await Promise.all([loadAccounts(), loadStatus()]);
   if (accounts.length) loadTx(document.getElementById('acc').value); else render();
 });
 </script>

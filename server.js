@@ -617,6 +617,22 @@ const handler = async (req, res) => {
   // Deliberately ahead of the user auth gate: cron has no signed-in user.
   // Vercel sends "Authorization: Bearer $CRON_SECRET" automatically; ?key= is
   // the same secret, for testing by hand. No secret set = endpoint stays shut.
+  // Nightly Wise pull (vercel.json cron). Same guard as the digest.
+  if (url === '/api/cron/wise') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const secret = process.env.CRON_SECRET;
+    const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || q.get('key') || '';
+    if (!secret || given !== secret) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return; }
+    try {
+      const out = await wise.syncFromApi({ db, admin, TEAM_ID }, { by: 'cron' });
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out));
+    } catch (e) {
+      console.error('wise cron:', e);
+      res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) }));
+    }
+    return;
+  }
+
   if (url === '/api/cron/digest') {
     const q = new URL(req.url, 'http://x').searchParams;
     const secret = process.env.CRON_SECRET;
