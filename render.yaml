@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: todo-app
-    env: node
-    plan: free
-    buildCommand: npm install
-    startCommand: npm start
-    healthCheckPath: /
