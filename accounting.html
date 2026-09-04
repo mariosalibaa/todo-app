@@ -30,7 +30,7 @@
   .legend .clr{margin-left:auto;color:var(--odoo);cursor:pointer;display:none;}
   .legend .clr.on{display:inline;}
   .wrap{flex:1;min-height:0;overflow:auto;}   /* grid scrolls; top bar, toolbar and header stay */
-  table{border-collapse:separate;border-spacing:0;width:100%;min-width:1220px;}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:1350px;}
   thead th{position:sticky;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:2;}
   thead tr.hdr th{top:0;height:30px;cursor:pointer;user-select:none;}
   thead tr.hdr th:hover{color:var(--odoo);}
@@ -54,7 +54,13 @@
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:#8ab0e6;}
-  .c-contact{min-width:150px;} .c-note{min-width:180px;} .c-proj{min-width:180px;} .c-kind{width:96px;}
+  .c-contact{min-width:150px;} .c-note{min-width:180px;} .c-proj{min-width:180px;} .c-kind{width:96px;} .c-sug{width:132px;}
+  .sug-act{display:flex;gap:4px;align-items:center;}
+  .sug-act button{border:1px solid var(--line);background:#fff;border-radius:3px;width:22px;height:20px;line-height:1;cursor:pointer;font-size:12px;padding:0;}
+  .sug-act button.yes{color:var(--green);border-color:#bfe3c8;} .sug-act button.yes:hover{background:#eef9f0;}
+  .sug-act button.no{color:var(--muted);} .sug-act button.no:hover{background:#f1f3f5;}
+  .sug-act .what{font-size:10.5px;color:var(--auto);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:78px;}
+  .sug-skip{color:#adb5bd;font-size:11px;} .sug-skip a{color:var(--odoo);cursor:pointer;}
   .ref{color:var(--muted);font-size:11px;}
   .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
   .odoo-no{color:#adb5bd;}
@@ -86,7 +92,8 @@
   <input type="date" id="to" onchange="render()" title="To">
   <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
   <span class="sp" style="flex:1"></span>
-  <button class="btn" id="btn-accept" onclick="acceptAll()" title="Fill every blank Project and W/P with its blue suggestion">✓ Accept suggestions</button>
+  <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a suggestion waiting, one by one">⚡ Review suggestions</button>
+  <button class="btn" id="btn-accept" onclick="acceptAll()" title="Fill every blank Project and W/P with its blue suggestion">✓ Accept all shown</button>
   <label class="btn primary" for="file">⬆ Upload statement (PDF)</label>
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
   <button class="btn" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
@@ -133,6 +140,7 @@ const COLS = [
   { k: 'note',    l: 'Note',               f: 'text',   v: t => t.note || '', c: 'c-note' },
   { k: 'kind',    l: 'W / P',              f: 'kind',   v: t => t.kind || '', c: 'c-kind' },
   { k: 'proj',    l: 'Project / analytic', f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
+  { k: 'sug',     l: 'Suggest',            f: 'sug',    v: t => sugState(t), c: 'c-sug' },
   { k: 'out',     l: 'Out',                f: 'amount', v: t => t.debit || 0, num: true },
   { k: 'in',      l: 'In',                 f: 'amount', v: t => t.credit || 0, num: true },
   { k: 'bal',     l: 'Balance',            f: 'amount', v: t => t.balance, num: true },
@@ -189,6 +197,17 @@ function lastFor(t, field) {
   for (let i = tx.length - 1; i >= 0; i--) { const o = tx[i]; if (o.phone === t.phone && o[field] && o.id !== t.id) return o[field]; }
   return '';
 }
+// A row is "pending" while a blank Project or W/P has a suggestion behind it and
+// you have not waved it away. That is what the Suggest filter and the counter use.
+function sugFor(t) {
+  const project = !t.analyticName ? lastFor(t, 'analyticName') : '';
+  const kind = !t.kind ? lastFor(t, 'kind') : '';
+  return { project, kind, any: !!(project || kind) };
+}
+function sugState(t) {
+  if (!sugFor(t).any) return '';
+  return t.suggestSkip ? 'skipped' : 'pending';
+}
 const srcClass = s => s === 'manual' ? 'src-manual' : s === 'odoo' ? 'src-odoo'
   : (s === 'suggest' || s === 'auto' || s === 'google') ? 'src-auto' : '';
 
@@ -200,6 +219,11 @@ function buildHeader() {
     const on = colF[c.k] ? 'on' : '';
     if (c.f === 'text') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="filter" oninput="setFilter('${c.k}', this.value)"></th>`;
     if (c.f === 'amount') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="=, >, <, a-b" title="150  ·  >100  ·  <50  ·  100-200" oninput="setFilter('${c.k}', this.value)"></th>`;
+    if (c.f === 'sug') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
+      <option value="">all</option>
+      <option value="pending" ${colF[c.k] === 'pending' ? 'selected' : ''}>to review</option>
+      <option value="skipped" ${colF[c.k] === 'skipped' ? 'selected' : ''}>skipped</option>
+      <option value="none" ${colF[c.k] === 'none' ? 'selected' : ''}>no suggestion</option></select></th>`;
     if (c.f === 'kind') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
         <option value="">all</option><option value="work" ${colF[c.k] === 'work' ? 'selected' : ''}>Work</option>
         <option value="personal" ${colF[c.k] === 'personal' ? 'selected' : ''}>Personal</option><option value="unset" ${colF[c.k] === 'unset' ? 'selected' : ''}>not tagged</option></select></th>`;
@@ -238,6 +262,7 @@ function passes(t) {
     if (c.f === 'text') { if (!String(v).toLowerCase().includes(f.toLowerCase())) return false; }
     else if (c.f === 'select') { if (v !== f) return false; }
     else if (c.f === 'kind') { if (f === 'unset' ? !!v : v !== f) return false; }
+    else if (c.f === 'sug') { if (f === 'none' ? v !== '' : v !== f) return false; }
     else if (c.f === 'odoo') { if (f === 'found' ? v <= 0 : f === 'none' ? v !== 0 : v !== -1) return false; }
     else if (c.f === 'amount') { if (!amountMatch(v, f)) return false; }
   }
@@ -294,8 +319,8 @@ function render() {
 
   let pending = 0;
   document.getElementById('rows').innerHTML = rows.map(t => {
-    const cn = contactName(t), sug = lastFor(t, 'analyticName'), sk = lastFor(t, 'kind');
-    if ((!t.analyticName && sug) || (!t.kind && sk)) pending++;
+    const cn = contactName(t), sg = sugFor(t), sug = sg.project, sk = sg.kind;
+    if (sg.any && !t.suggestSkip) pending++;
     const cp = t.phone ? esc(t.phone.replace(/^961/, '0')) : esc(t.description);
     return `<tr data-id="${t.id}" class="${t.kind === 'personal' ? 'personal' : ''}">
       <td>${t.date}<div class="ref">tr:${t.ref}</div></td>
@@ -312,6 +337,12 @@ function render() {
       <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'reconciled document')) : ''}"><input type="text" list="analytic-list" value="${esc(t.analyticName || '')}" placeholder="${sug ? '↳ ' + esc(sug) + ' (Enter)' : 'project'}" data-sug="${esc(sug)}"
         onkeydown="if(event.key==='Enter'&&!this.value&&this.dataset.sug){this.value=this.dataset.sug;this.dataset.accepted='1';this.dispatchEvent(new Event('change'));}"
         onchange="saveAnalytic('${t.id}', this)"></td>
+      <td class="c-sug">${sg.any ? (t.suggestSkip
+        ? `<span class="sug-skip">skipped &middot; <a onclick="skipRow('${t.id}', false)">undo</a></span>`
+        : `<span class="sug-act"><button class="yes" title="Apply: ${esc([sug, sk].filter(Boolean).join(' / '))}" onclick="acceptRow('${t.id}')">✓</button>
+             <button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button>
+             <span class="what" title="${esc([sug, sk].filter(Boolean).join(' / '))}">${esc(sug || sk)}</span></span>`)
+        : '<span style="color:#dee2e6">—</span>'}</td>
       <td class="num debit">${fmt(t.debit)}</td>
       <td class="num credit">${fmt(t.credit)}</td>
       <td class="num">${fmt(t.balance)}</td>
@@ -323,7 +354,11 @@ function render() {
     `<td colspan="7">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}</td>
      <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td></td><td></td>`;
   const b = document.getElementById('btn-accept');
-  b.disabled = !pending; b.textContent = pending ? `✓ Accept ${pending} suggestion${pending > 1 ? 's' : ''}` : '✓ Accept suggestions';
+  b.disabled = !pending; b.textContent = pending ? `✓ Accept ${pending} shown` : '✓ Accept all shown';
+  const rv = document.getElementById('btn-review');
+  const waiting = tx.filter(t => sugState(t) === 'pending').length;
+  rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
+  rv.disabled = !waiting && colF.sug !== 'pending';
 }
 
 // ── Saving ──
@@ -364,9 +399,41 @@ async function saveContact(phone, el) {
   } catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
 }
 // Fill every blank Project / W-P (visible rows) with its suggestion, marked as "suggest"
+// one row at a time: apply what is suggested for this line only
+async function acceptRow(id) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const sg = sugFor(t);
+  if (!sg.any) return;
+  const it = { id };
+  if (sg.project) {
+    const a = analytic.find(x => x.name.toLowerCase() === sg.project.toLowerCase());
+    Object.assign(it, { analyticName: a ? a.name : sg.project, analyticId: a ? a.id : null, company: a ? a.company : '', analyticSrc: 'suggest' });
+  }
+  if (sg.kind) Object.assign(it, { kind: sg.kind, kindSrc: 'suggest' });
+  try {
+    await Admin.api('POST', `/api/accounting/whish/${acc}/tx-bulk`, { items: [it] });
+    Object.assign(t, it); render();
+    say(`Applied: ${[sg.project, sg.kind].filter(Boolean).join(' / ')}`);
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+// not this one: hide the suggestion without filling anything
+async function skipRow(id, on) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  try {
+    await Admin.api('POST', `/api/accounting/whish/${acc}/tx-bulk`, { items: [{ id, suggestSkip: !!on }] });
+    t.suggestSkip = !!on; render();
+    say(on ? 'Suggestion skipped for this line' : 'Suggestion back');
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+function reviewSuggestions() {
+  colF.sug = colF.sug === 'pending' ? '' : 'pending';
+  buildHeader(); render();
+  say(colF.sug ? 'Showing only the lines with a suggestion waiting — ✓ to apply, ✕ to skip' : '');
+}
 async function acceptAll() {
   const items = [];
   for (const t of visible()) {
+    if (t.suggestSkip) continue;          // you already said no to this one
     const it = { id: t.id };
     const sug = !t.analyticName && lastFor(t, 'analyticName');
     const sk = !t.kind && lastFor(t, 'kind');

@@ -359,7 +359,7 @@ async function odooCheck(odooCall, txs) {
 }
 
 // Editable annotation fields; *Src = who filled it ('manual' | 'suggest' | 'google')
-const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom'];
+const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip'];
 
 // ── Router ─────────────────────────────────────────────────────────────────
 // Returns true when the request was handled.
