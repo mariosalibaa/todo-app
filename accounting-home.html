@@ -54,12 +54,14 @@ const SECTIONS = [
     desc: 'Multi-currency Wise balances. Import a statement so the transactions land in Budget.', tag: 'set up' },
   { ico: '📊', name: 'Budget', href: '/accounting/budget',
     desc: 'Accounts, expenses, income, transfers and reports. The HomeBudget replacement.' },
+  { ico: '🟣', name: 'Odoo', href: 'https://shift2.odoo.com', ext: true,
+    desc: 'The books themselves. Bills, payments, journals and reports in Odoo.' },
 ];
 Admin.require('accounting', me => {
   document.getElementById('who').innerHTML =
     `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   document.getElementById('tiles').innerHTML = SECTIONS.map(s => `
-    <a class="tile" href="${s.href}">
+    <a class="tile" href="${s.href}"${s.ext ? ' target="_blank" rel="noopener"' : ''}>
       <div class="ico">${s.ico}</div>
       <div class="name">${esc(s.name)}</div>
       <div class="desc">${esc(s.desc)}</div>
