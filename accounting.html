@@ -293,7 +293,7 @@ async function selectAccount(a) {
   document.getElementById('acc').value = a;
   buildCols(); colF = {}; buildHeader();
   // which buttons make sense here: a statement account is fed by uploads, the others by typing and Odoo
-  const st = isStatement(), hasJ = !!(account && (account.odooJournals || []).length);
+  const st = isStatement(), hasJ = !!(account && ((account.odooJournals || []).length || (account.odooPartner && account.odooPartner.id)));
   document.getElementById('btn-upload').style.display = st ? '' : 'none';
   document.getElementById('btn-contacts').style.display = st ? '' : 'none';
   document.getElementById('btn-line').style.display = st ? 'none' : '';
@@ -1143,13 +1143,15 @@ async function openAccountForm(a) {
   const jl = Object.entries(byCo).map(([co, js]) => `<b>${esc(co)}</b>` + js.map(j =>
     `<label><input type="checkbox" class="jrn" value="${j.id}" ${chosen.has(j.id) ? 'checked' : ''}> ${esc(j.name)} <span class="hint">${esc(j.type)}${j.currency ? ' · ' + esc(j.currency) : ''}</span></label>`).join('')).join('');
   const op = (a && a.opening) || {};
-  const xs = a ? (a.excel || {}) : null, xw = a ? (a.whatsapp || {}) : {};
+  const xs = a ? (a.excel || {}) : null, xw = a ? (a.whatsapp || {}) : {}, opn = (a && a.odooPartner) || {};
   box.innerHTML = `
     <label>Name</label><input id="af-name" value="${esc(a ? a.name : '')}" placeholder="Mario cash, Neo Mario, Cash Abed…">
     <label>Type</label><select id="af-type"><option value="cash" ${!a || a.type === 'cash' ? 'selected' : ''}>Cash (a wallet, a drawer)</option><option value="bank" ${a && a.type === 'bank' ? 'selected' : ''}>Bank (Neo, Wise, BOB…)</option></select>
     <label>Currency</label><select id="af-cur">${['USD', 'EUR', 'LBP', 'AED', 'GBP'].map(c => `<option ${(a ? a.currency : 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <label>Owner</label><select id="af-owner"><option value="">—</option>${PEOPLE.filter(p => p !== 'other').map(p => `<option value="${p}" ${a && a.owner === p ? 'selected' : ''}>${cap(p)}</option>`).join('')}</select>
     <label>Odoo journals</label><div><input id="af-jq" placeholder="filter…" oninput="filterJournals(this.value)" style="margin-bottom:4px"><div class="jlist" id="af-jlist">${jl || '<span class="hint">Odoo not reachable</span>'}</div><div class="hint">Every line of these journals is pulled in with ⇄ Import Odoo and the matcher looks here for typed lines.</div></div>
+    <label>Odoo partner</label><div><input id="af-op" list="odoo-partners" value="${esc(opn.name || '')}" placeholder="Abed Steel Mario…"><datalist id="odoo-partners">${partners.slice(0, 400).map(p => `<option value="${esc(p.name)}">`).join('')}</datalist></div>
+    <label></label><div class="hint">For someone who advances his own money and is settled as a contractor: his Odoo side is this supplier's payable across every company, not a cash journal. Fill this <i>instead of</i> the journals above — when it is set the journals are ignored.</div>
     <label>Opening balance</label><div class="row">${dateInput('af-opdate', op.date)}<input id="af-opamt" type="number" step="0.01" value="${op.amount != null ? op.amount : ''}" placeholder="amount"><input id="af-opnote" value="${esc(op.note || '')}" placeholder="counted in the wallet…"></div>
     <label></label><div class="hint">The balance is pinned to this amount on this date. Lines before it show the implied history; lines after move it.</div>
     ${document.getElementById('af-type') || true ? `<label>HomeBudget history</label><select id="af-hb"><option value="">— none —</option>${budgetAccounts.map(b => `<option value="${esc(b.id)}" ${a && String(a.budgetAccountId) === String(b.id) ? 'selected' : ''}>${esc(b.name)} (${esc(b.currency || '')})</option>`).join('')}</select>` : ''}
@@ -1174,6 +1176,14 @@ async function saveAccount() {
   const opd = document.getElementById('af-opdate').value, opa = document.getElementById('af-opamt').value;
   const body = { name, type: document.getElementById('af-type').value, currency: document.getElementById('af-cur').value, owner: document.getElementById('af-owner').value,
     odooJournals: picked, opening: opd ? { date: opd, amount: +opa || 0, note: document.getElementById('af-opnote').value } : null };
+  const opEl = document.getElementById('af-op');
+  if (opEl) {
+    const nm = opEl.value.trim();
+    const hit = partners.find(p => p.name === nm) || partners.find(p => p.name.toLowerCase() === nm.toLowerCase());
+    if (!nm) body.odooPartner = null;
+    else if (hit) body.odooPartner = { id: hit.id, name: hit.name };
+    else return document.getElementById('accform-msg').textContent = `No Odoo partner called "${nm}" — pick one from the list.`;
+  }
   const xf = document.getElementById('af-xfile');
   if (xf) {
     body.excel = xf.value.trim() ? { file: xf.value.trim(), sheet: document.getElementById('af-xsheet').value.trim(), layout: document.getElementById('af-xlay').value } : null;

@@ -109,9 +109,9 @@ async function odooJournals(odooCall) {
   if (Date.now() - _journalCache.at < 10 * 60000 && _journalCache.list.length) return _journalCache.list;
   const companies = await odooCall('res.company', 'search_read', [[]], { fields: ['id', 'name'] });
   const rows = await odooCall('account.journal', 'search_read', [[['type', 'in', ['bank', 'cash']]]],
-    { fields: ['id', 'name', 'company_id', 'type', 'currency_id', 'default_account_id'], context: { allowed_company_ids: companies.map(c => c.id) }, order: 'company_id, name' });
+    { fields: ['id', 'name', 'company_id', 'type', 'currency_id', 'default_account_id', 'active'], context: { allowed_company_ids: companies.map(c => c.id), active_test: false }, order: 'company_id, name' });
   _journalCache = { at: Date.now(), list: rows.map(r => ({
-    id: r.id, name: r.name, type: r.type, companyId: r.company_id ? r.company_id[0] : null, company: r.company_id ? r.company_id[1] : '',
+    id: r.id, name: r.name + (r.active === false ? ' (archived)' : ''), type: r.type, active: r.active !== false, companyId: r.company_id ? r.company_id[0] : null, company: r.company_id ? r.company_id[1] : '',
     currency: r.currency_id ? r.currency_id[1] : '', accountId: r.default_account_id ? r.default_account_id[0] : null, account: r.default_account_id ? r.default_account_id[1] : ''
   })) };
   return _journalCache.list;
@@ -127,7 +127,11 @@ async function journalsOf(odooCall, account) {
 }
 const shortCompany = s => String(s || '').replace(/SHIFT GROUP SARL \(USD\)/, 'SARL').replace(/SHIFT GROUP SARL \(LBP\)/, 'SARL LBP').replace(/SHIFT DEVELOPMENT/, 'S DEV').replace(/SHIFT GROUP OFFSHORE SAL/, 'OFFSHORE');
 
-// Every line of the account's Odoo journals becomes a line here. The Odoo side is the
+// Where an account's Odoo side lives: either a set of cash/bank journals, or — for a
+// worker who advances his own money and is settled as a contractor — his supplier
+// payable across the companies. Both are read the same way.
+//
+// Every line of the account's Odoo source becomes a line here. The Odoo side is the
 // truth for what it holds — partner, company, the bill it settles, the project on that
 // bill — so those land as 'odoo' facts, never as suggestions. Who physically paid is read
 // from the attachment names ("… paid by abed.pdf") and the memo, and flagged when it is
@@ -140,12 +144,26 @@ async function importOdoo(odooCall, account, who) {
   (await col.where('src', '==', 'odoo').get()).docs.forEach(d => { existing[d.id] = d.data(); });
   const owner = ownerOf(account);
   const writes = [];
+  // one source per journal, or one per company when the account follows a partner's payable
+  const sources = [];
+  const pid = account.odooPartner && +account.odooPartner.id;
   for (const j0 of account.odooJournals || []) {
     const j = all.find(x => x.id === +j0.id);
     if (!j || !j.accountId) { out.journals.push({ id: j0.id, error: 'journal not found' }); continue; }
+    sources.push({ id: j.id, name: j.name, companyId: j.companyId, company: j.company,
+      domain: [['account_id', '=', j.accountId], ['parent_state', '!=', 'cancel']] });
+  }
+  if (pid) {
+    const companies = await odooCall('res.company', 'search_read', [[]], { fields: ['id', 'name'] });
+    for (const c of companies) sources.push({ id: 'p' + c.id, name: (account.odooPartner.name || 'partner') + ' payable', companyId: c.id, company: c.name, isPartner: true,
+      domain: [['partner_id', '=', pid], ['account_id.account_type', '=', 'liability_payable'], ['parent_state', '!=', 'cancel']] });
+  }
+  for (const j of sources) {
     const ctx = { allowed_company_ids: [j.companyId], company_id: j.companyId };
-    const L = await odooCall('account.move.line', 'search_read', [[['account_id', '=', j.accountId], ['parent_state', '!=', 'cancel']]],
-      { fields: ['id', 'date', 'name', 'ref', 'debit', 'credit', 'amount_currency', 'partner_id', 'move_id', 'payment_id', 'journal_id', 'parent_state'], context: ctx, limit: 20000, order: 'date, id' });
+    const L = await odooCall('account.move.line', 'search_read', [j.domain],
+      { fields: ['id', 'date', 'name', 'ref', 'debit', 'credit', 'amount_currency', 'partner_id', 'move_id', 'payment_id', 'journal_id', 'parent_state', 'account_id'], context: ctx, limit: 20000, order: 'date, id' });
+    if (!L.length) { out.journals.push({ id: j.id, name: j.name, company: j.company, lines: 0 }); continue; }
+    const ownAccounts = [...new Set(L.map(l => l.account_id[0]))];
     const moveIds = [...new Set(L.map(l => l.move_id[0]))];
     const M = moveIds.length ? await odooCall('account.move', 'read', [moveIds, ['name', 'ref', 'narration', 'move_type', 'attachment_ids']], { context: ctx }) : [];
     const byMove = Object.fromEntries(M.map(m => [m.id, m]));
@@ -160,7 +178,7 @@ async function importOdoo(odooCall, account, who) {
     const attName = Object.fromEntries(AT.map(a => [a.id, a.name]));
     const anByMove = await acc.analyticOfMoves(odooCall, moveIds, ctx);
     // the other side of a plain entry (no payment): tells what the cash went to
-    const others = moveIds.length ? await odooCall('account.move.line', 'search_read', [[['move_id', 'in', moveIds], ['account_id', '!=', j.accountId], ['display_type', 'not in', ['line_section', 'line_note']]]],
+    const others = moveIds.length ? await odooCall('account.move.line', 'search_read', [[['move_id', 'in', moveIds], ['account_id', 'not in', ownAccounts], ['display_type', 'not in', ['line_section', 'line_note']]]],
       { fields: ['move_id', 'account_id', 'name', 'partner_id'], context: ctx, limit: 20000 }) : [];
     const otherOf = {}; for (const o of others) (otherOf[o.move_id[0]] = otherOf[o.move_id[0]] || []).push(o);
 
@@ -177,21 +195,23 @@ async function importOdoo(odooCall, account, who) {
       const docs = [...new Set([...bills.map(b => b.name), ...rec.docs])].filter(d => d && d !== m.name);
       const an = rec.analytics[0];
       const paidBy = paidByIn([...files, p && p.memo, m.ref, m.narration]);
+      const counterparty = j.isPartner ? (other && other.partner_id ? other.partner_id : null) : l.partner_id;
       const id = 'odoo-' + l.id;
       const prev = existing[id] || {};
       const t = {
         id, src: 'odoo', date: l.date, ref: m.name || '', service: shortCompany(j.company),
-        description, name: l.partner_id ? l.partner_id[1] : '', phone: '',
-        // Odoo debit on the cash account = money came in = statement credit
+        description, name: counterparty ? counterparty[1] : '', phone: '',
+        // Odoo debit on the cash account = money came in = statement credit.
+        // On a payable it reads the same way: a credit is money he advanced, a debit is money he was paid.
         debit: money(l.credit), credit: money(l.debit), amountCurrency: l.amount_currency || 0,
         state: l.parent_state, files, importedAt: now(),
         odoo: { checkedAt: now(), matches: [{
           chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: l.debit || l.credit,
-          partner: l.partner_id ? l.partner_id[1] : '', partnerId: l.partner_id ? l.partner_id[0] : null, label: lineName,
+          partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
           company: j.company, journal: j.name, state: l.parent_state, docs, analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
         }] },
       };
-      if (l.partner_id && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: l.partner_id[0], partnerName: l.partner_id[1], partnerSrc: 'odoo' });
+      if (counterparty && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: counterparty[0], partnerName: counterparty[1], partnerSrc: 'odoo' });
       if (prev.companySrc !== 'manual') Object.assign(t, { company: j.company, companySrc: 'odoo', kind: 'work', kindSrc: 'odoo' });
       if (an && prev.analyticSrc !== 'manual') Object.assign(t, { analyticId: an.id, analyticName: an.name, analyticSrc: 'odoo', analyticFrom: an.from });
       if (paidBy && prev.paidBySrc !== 'manual') Object.assign(t, { paidBy, paidBySrc: 'odoo' });
@@ -300,6 +320,7 @@ async function removeTransferLines(ws, tr, FieldValue) {
 
 const journalsIn = list => (Array.isArray(list) ? list : []).map(j => ({ id: +j.id, name: j.name || '', companyId: j.companyId != null ? +j.companyId : null, company: j.company || '' })).filter(j => j.id);
 const openingIn = o => o && o.date ? { date: String(o.date), amount: money(o.amount), note: String(o.note || '') } : null;
+const odooPartnerIn = x => x && x.id ? { id: +x.id, name: String(x.name || '') } : null;
 const excelIn = x => x && x.file ? { file: String(x.file).trim(), sheet: String(x.sheet || '').trim(), layout: String(x.layout || '').toLowerCase().trim() } : null;
 const whatsappIn = x => x && x.chatId ? { chatId: +x.chatId, since: /^\d{4}-\d{2}-\d{2}$/.test(String(x.since || '')) ? String(x.since) : '', lbpRate: +x.lbpRate || 0 } : null;
 
@@ -347,6 +368,7 @@ async function handle(req, res, url, user, ctx) {
     const journals = journalsIn(b.odooJournals);
     const data = { id, name, type, currency: String(b.currency || 'USD').toUpperCase(), provider: b.provider || (journals.length ? 'odoo' : 'manual'),
       owner: String(b.owner || '').toLowerCase(), odooJournals: journals, opening: openingIn(b.opening), statement: false, createdAt: now(), createdBy: who };
+    if (odooPartnerIn(b.odooPartner)) data.odooPartner = odooPartnerIn(b.odooPartner);
     if (excelIn(b.excel)) data.excel = excelIn(b.excel);
     if (whatsappIn(b.whatsapp)) data.whatsapp = whatsappIn(b.whatsapp);
     await ws.collection('accounts').doc(id).set(data);
@@ -370,6 +392,7 @@ async function handle(req, res, url, user, ctx) {
     if ('owner' in b) data.owner = String(b.owner || '').toLowerCase();
     if ('archived' in b) data.archived = !!b.archived;
     if ('odooJournals' in b) data.odooJournals = journalsIn(b.odooJournals);
+    if ('odooPartner' in b) data.odooPartner = odooPartnerIn(b.odooPartner);
     if ('opening' in b) data.opening = openingIn(b.opening);
     if ('excel' in b) data.excel = excelIn(b.excel) ? { ...(a.excel || {}), ...excelIn(b.excel) } : null;
     if ('whatsapp' in b) data.whatsapp = whatsappIn(b.whatsapp) ? { ...(a.whatsapp || {}), ...whatsappIn(b.whatsapp) } : null;
@@ -491,7 +514,7 @@ async function handle(req, res, url, user, ctx) {
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-odoo$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
-    if (!(a.odooJournals || []).length) return json(res, 400, { error: 'this account has no Odoo journals' });
+    if (!(a.odooJournals || []).length && !(a.odooPartner && a.odooPartner.id)) return json(res, 400, { error: 'this account has no Odoo journals and no Odoo partner' });
     try { return json(res, 200, await importOdoo(odooCall, a, who)); }
     catch (e) { console.error('import-odoo', e); return json(res, 502, { error: String(e.message || e) }); }
   }
