@@ -148,6 +148,7 @@
   <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
+  <button class="btn" id="btn-check" onclick="toggleReviewImported()" title="WhatsApp messages that match nothing in the Excel or in Odoo: not counted until you accept them" style="display:none">❓ To review</button>
   <button class="btn primary" id="btn-line" onclick="openLineForm()" title="Type a line: money in or out of this account">＋ Line</button>
   <label class="btn primary" for="file" id="btn-upload">⬆ Upload statement (PDF)</label>
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
@@ -245,6 +246,7 @@ function buildCols() { COLS = ALL_COLS.filter(c => !c.only || (account && c.only
 let sort = { k: 'date', dir: -1 };            // newest first, like an Odoo bank statement
 let colF = {};                                // column filters, key → string
 let sugFilter = '';                           // '' | 'pending' | 'skipped' — the Review button
+let reviewImported = false;                   // the ❓ button: only WhatsApp lines nobody wrote down elsewhere
 
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
@@ -296,7 +298,7 @@ async function selectAccount(a) {
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
   document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
   document.getElementById('lg-src').innerHTML = st ? '<i style="background:#fff"></i>Date, service, description, amounts: the Whish statement as printed'
-    : '<i style="background:#fff"></i>Lines from Odoo <span class="src">odoo</span>, HomeBudget <span class="src">budget</span>, typed here <span class="src">manual</span> or transfers <span class="src">transfer</span>';
+    : '<i style="background:#fff"></i>Lines from Odoo <span class="src">odoo</span>, HomeBudget <span class="src">budget</span>, the Excel ledger <span class="src">excel</span>, the WhatsApp group <span class="src">whatsapp</span>, typed here <span class="src">manual</span> or transfers <span class="src">transfer</span>';
   document.getElementById('empty-hint').textContent = st ? 'Export the statement as PDF from the Whish app (up to 6 months) and upload it here.'
     : hasJ ? 'Press ⇄ Import Odoo to pull the journal lines, or ＋ Line to type one.' : 'Type a line with ＋ Line, or add Odoo journals to this account with ⚙.';
   tx = a ? await Admin.api('GET', `/api/accounting/accounts/${a}/tx`) : [];
@@ -473,6 +475,7 @@ function visible() {
   const list = tx.filter(t => {
     if (from && t.date < from) return false;
     if (to && t.date > to) return false;
+    if (reviewImported && !t.review) return false;
     if (q) {
       const hay = [t.date, t.service, t.description, t.phone, contactName(t).name, t.partnerName, companyOf(t), t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
@@ -555,18 +558,19 @@ function render() {
     const st = isStatement(), own = account && (account.owner || 'mario');
     const paidFlag = t.paidBy && t.paidBy !== own ? `<div class="flag" title="${esc('Physically paid by ' + cap(t.paidBy) + (t.paidBySrc === 'odoo' ? ' — read from the Odoo attachment / memo' : ''))}">⚑ paid by ${esc(cap(t.paidBy))}</div>` : '';
     const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '');
+    const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
     const acts = st ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>`
-      : (t.excluded ? `<a onclick="toggleExcluded('${t.id}', false)" title="${esc(t.dupOf ? 'Not counted: repeats ' + t.dupOf + '. Click to count it.' : 'Not counted. Click to count it.')}">⊘ count</a>`
+      : (t.excluded ? `<a onclick="toggleExcluded('${t.id}', false)" title="${esc(t.dupOf ? 'Not counted: repeats ' + t.dupOf + '. Click to count it.' : t.review ? 'Not counted: nobody wrote this down in the Excel or in Odoo. Click to accept and count it.' : 'Not counted. Click to count it.')}">${t.review ? '✓ accept' : '⊘ count'}</a>`
         : `<a onclick="toggleExcluded('${t.id}', true)" title="Do not count this line (it repeats another one)">⊘</a>`)
         + (t.kind !== 'transfer' ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>` : '')
         + (t.src === 'manual' || t.src === 'telegram' ? `<a onclick="openLineForm('${t.id}')" title="Edit">✎</a>` : '')
-        + (['manual', 'telegram', 'budget'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '');
+        + (['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '');
     return `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
       <td class="c-date">${t.date}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
-        ${paidFlag}${t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
+        ${paidFlag}${reviewFlag}${t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       <td class="num debit">${fmt(t.debit)}</td>
       <td class="num credit">${fmt(t.credit)}</td>
@@ -610,7 +614,12 @@ function render() {
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
   rv.disabled = !waiting && sugFilter !== 'pending';
+  const ck = document.getElementById('btn-check'), toCheck = tx.filter(t => t.review).length;
+  ck.style.display = toCheck || reviewImported ? '' : 'none';
+  ck.textContent = toCheck ? `❓ ${toCheck} to review` : '❓ Nothing to review';
+  ck.classList.toggle('primary', reviewImported);
 }
+function toggleReviewImported() { reviewImported = !reviewImported; render(); }
 
 // ── Partner picker: type to filter the Odoo partners, ↑↓, Enter or click ──
 const P = {};
@@ -822,7 +831,7 @@ async function toggleExcluded(id, on) {
   const t = tx.find(x => x.id === id); if (!t) return;
   try {
     await patch(id, { excluded: !!on, ...(on ? {} : { dupOf: null }) });
-    t.excluded = !!on; if (!on) t.dupOf = null;
+    t.excluded = !!on; if (!on) { t.dupOf = null; t.review = false; }
     computeBalances(); render();
     say(on ? 'Line no longer counted in the balance' : 'Line counted again');
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
@@ -1097,6 +1106,7 @@ async function openAccountForm(a) {
   const jl = Object.entries(byCo).map(([co, js]) => `<b>${esc(co)}</b>` + js.map(j =>
     `<label><input type="checkbox" class="jrn" value="${j.id}" ${chosen.has(j.id) ? 'checked' : ''}> ${esc(j.name)} <span class="hint">${esc(j.type)}${j.currency ? ' · ' + esc(j.currency) : ''}</span></label>`).join('')).join('');
   const op = (a && a.opening) || {};
+  const xs = a ? (a.excel || {}) : null, xw = a ? (a.whatsapp || {}) : {};
   box.innerHTML = `
     <label>Name</label><input id="af-name" value="${esc(a ? a.name : '')}" placeholder="Mario cash, Neo Mario, Cash Abed…">
     <label>Type</label><select id="af-type"><option value="cash" ${!a || a.type === 'cash' ? 'selected' : ''}>Cash (a wallet, a drawer)</option><option value="bank" ${a && a.type === 'bank' ? 'selected' : ''}>Bank (Neo, Wise, BOB…)</option></select>
@@ -1107,8 +1117,12 @@ async function openAccountForm(a) {
     <label></label><div class="hint">The balance is pinned to this amount on this date. Lines before it show the implied history; lines after move it.</div>
     ${document.getElementById('af-type') || true ? `<label>HomeBudget history</label><select id="af-hb"><option value="">— none —</option>${budgetAccounts.map(b => `<option value="${esc(b.id)}" ${a && String(a.budgetAccountId) === String(b.id) ? 'selected' : ''}>${esc(b.name)} (${esc(b.currency || '')})</option>`).join('')}</select>` : ''}
     <label></label><div class="hint">Rows of that HomeBudget account come in as history. A row that repeats an Odoo line (same amount within 3 days) is linked to it and not counted twice.</div>
-    ${a ? `<label>Imports</label><div class="row"><button class="btn" onclick="importOdooLines()" ${(a.odooJournals || []).length ? '' : 'disabled'}>⇄ Import Odoo now</button><button class="btn" onclick="importBudgetLines()" ${a.budgetAccountId ? '' : 'disabled'}>📊 Import Budget now</button></div>
-       <label></label><div class="hint">${a.lastOdooImport ? 'Odoo imported ' + esc(a.lastOdooImport.slice(0, 16).replace('T', ' ')) : 'Odoo never imported'} · ${a.lastBudgetImport ? 'Budget imported ' + esc(a.lastBudgetImport.slice(0, 16).replace('T', ' ')) : 'Budget never imported'}</div>` : ''}
+    ${xs ? `<label>Excel ledger</label><div class="row"><input id="af-xfile" value="${esc(xs.file || '')}" placeholder="D:\\Dropbox\\…\\workbook.xlsx" style="flex:3"><input id="af-xsheet" value="${esc(xs.sheet || '')}" placeholder="sheet" style="flex:1"><select id="af-xlay">${['', 'abed', 'georges', 'khoder', 'mitri', 'ziad'].map(l => `<option value="${l}" ${(xs.layout || '') === l ? 'selected' : ''}>${l ? 'layout: ' + l : 'layout: from owner'}</option>`).join('')}</select></div>
+    <label></label><div class="hint">The person's cash workbook on this machine. Rows come in as <span class="src">excel</span> lines; a row that repeats an Odoo line is linked and not counted twice.${xs.first ? ' Last read: ' + esc(xs.first) + ' → ' + esc(xs.last) + ' (' + esc(xs.lastFile || '') + ')' : ''}</div>
+    <label>WhatsApp group</label><div class="row"><input id="af-wchat" value="${esc(xw.chatId || '')}" placeholder="chat id" style="flex:1" list="wa-groups"><input id="af-wq" placeholder="find a group…" style="flex:2" oninput="findGroups(this.value)"><input id="af-wsince" type="date" value="${esc(xw.since || '')}" title="read messages from this date"><input id="af-wrate" type="number" value="${xw.lbpRate || ''}" placeholder="LBP/$ 89500" style="width:110px" title="rate for amounts written in Lebanese pounds"></div><datalist id="wa-groups"></datalist>
+    <label></label><div class="hint">Money messages ("100$ from mario", "٨٠٠ الف اجرة طريق") come in as <span class="src">whatsapp</span> lines. One matching an Excel or Odoo line is linked; one found nowhere else waits under ❓ until you accept it.${xw.name ? ' Group: ' + esc(xw.name) + (xw.first ? ' · read ' + esc(xw.first) + ' → ' + esc(xw.last) : '') : ''}</div>` : ''}
+    ${a ? `<label>Imports</label><div class="row"><button class="btn" onclick="importOdooLines()" ${(a.odooJournals || []).length ? '' : 'disabled'}>⇄ Import Odoo now</button><button class="btn" onclick="importBudgetLines()" ${a.budgetAccountId ? '' : 'disabled'}>📊 Import Budget now</button><button class="btn" onclick="importExcelLines()" ${xs.file ? '' : 'disabled'}>📗 Import Excel now</button><button class="btn" onclick="importWhatsappLines()" ${xw.chatId ? '' : 'disabled'}>💬 Import WhatsApp now</button><button class="btn" onclick="linkTransfers()" ${a.owner && a.owner !== 'mario' ? '' : 'disabled'} title="Join every 'from mario' line here with the same amount leaving Mario's cash: one transfer, both sides">⇄ Link transfers with Mario</button></div>
+       <label></label><div class="hint">${a.lastOdooImport ? 'Odoo imported ' + esc(a.lastOdooImport.slice(0, 16).replace('T', ' ')) : 'Odoo never imported'} · ${a.lastBudgetImport ? 'Budget imported ' + esc(a.lastBudgetImport.slice(0, 16).replace('T', ' ')) : 'Budget never imported'} · ${a.lastExcelImport ? 'Excel ' + esc(a.lastExcelImport.slice(0, 16).replace('T', ' ')) : 'Excel never'} · ${a.lastWhatsappImport ? 'WhatsApp ' + esc(a.lastWhatsappImport.slice(0, 16).replace('T', ' ')) : 'WhatsApp never'}</div>` : ''}
     ${a ? `<label>Archive</label><label><input type="checkbox" id="af-arch" ${a.archived ? 'checked' : ''}> hide this account from the list (lines are kept)</label>` : ''}`;
 }
 function filterJournals(q) {
@@ -1123,6 +1137,12 @@ async function saveAccount() {
   const opd = document.getElementById('af-opdate').value, opa = document.getElementById('af-opamt').value;
   const body = { name, type: document.getElementById('af-type').value, currency: document.getElementById('af-cur').value, owner: document.getElementById('af-owner').value,
     odooJournals: picked, opening: opd ? { date: opd, amount: +opa || 0, note: document.getElementById('af-opnote').value } : null };
+  const xf = document.getElementById('af-xfile');
+  if (xf) {
+    body.excel = xf.value.trim() ? { file: xf.value.trim(), sheet: document.getElementById('af-xsheet').value.trim(), layout: document.getElementById('af-xlay').value } : null;
+    const wc = document.getElementById('af-wchat').value.trim();
+    body.whatsapp = wc ? { chatId: +wc, since: document.getElementById('af-wsince').value, lbpRate: +document.getElementById('af-wrate').value || 0 } : null;
+  }
   const hb = (document.getElementById('af-hb') || {}).value || '';
   const btn = document.getElementById('accform-save'); btn.disabled = true;
   try {
@@ -1171,6 +1191,45 @@ async function importBudgetLines() {
     say(`Budget: ${r.rows} rows — ${r.added} new, ${r.updated} known, ${r.linkedToOdoo} linked to Odoo lines and not counted twice`);
     await loadAccounts(); await selectAccount(acc);
   } catch (e) { say('Import failed: ' + e.message, 'err'); }
+}
+
+async function importExcelLines() {
+  if (!account || !(account.excel || {}).file) return;
+  say('Reading the Excel ledger…');
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/import-excel`, {});
+    say(`Excel ${r.file} / ${r.sheet}: ${r.rows} rows (${r.first} → ${r.last}) — ${r.added} new, ${r.updated} known, ${r.removed} gone, ${r.linkedToOdoo} linked to Odoo lines${r.looseLinks ? ' (' + r.looseLinks + ' by a close amount)' : ''}`);
+    await loadAccounts(); await selectAccount(acc);
+  } catch (e) { say('Import failed: ' + e.message, 'err'); }
+}
+async function importWhatsappLines() {
+  if (!account || !(account.whatsapp || {}).chatId) return;
+  say('Reading the WhatsApp group…');
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/import-whatsapp`, {});
+    const sk = Object.entries(r.skipped || {}).map(([k, n]) => n + ' ' + k).join(', ');
+    say(`WhatsApp ${r.group}: ${r.messages} messages → ${r.lines} money lines (${r.first} → ${r.last}) — ${r.linked} match the Excel or Odoo, ${r.review} to review ❓, ${r.accepted} accepted earlier${sk ? '; skipped ' + sk : ''}`);
+    await loadAccounts(); await selectAccount(acc);
+  } catch (e) { say('Import failed: ' + e.message, 'err'); }
+}
+async function linkTransfers() {
+  if (!account) return;
+  say('Looking for the same amounts on Mario\'s cash…');
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/link-transfers`, {});
+    say(`${r.linked} transfer${r.linked === 1 ? '' : 's'} linked with Mario's cash; ${r.unmatched} "from mario" line${r.unmatched === 1 ? '' : 's'} found no match`);
+    await selectAccount(acc);
+  } catch (e) { say('Could not link: ' + e.message, 'err'); }
+}
+let _gq = 0;
+async function findGroups(q) {
+  const my = ++_gq;
+  if (q.trim().length < 2) return;
+  try {
+    const list = await Admin.api('GET', '/api/accounting/whatsapp-groups?q=' + encodeURIComponent(q.trim()));
+    if (my !== _gq) return;
+    document.getElementById('wa-groups').innerHTML = list.map(g => `<option value="${g.id}">${esc(g.name)} · ${g.messages} msgs · last ${g.last}</option>`).join('');
+  } catch (e) { /* not on this machine */ }
 }
 
 // ── A typed line ────────────────────────────────────────────────────────────

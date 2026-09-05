@@ -35,12 +35,17 @@
 //   POST   /api/accounting/accounts/<id>/odoo-check      match lines against the account's Odoo journals
 //   POST   /api/accounting/accounts/<id>/import-odoo     pull every line of the account's Odoo journals
 //   POST   /api/accounting/accounts/<id>/import-budget   { budgetAccountId } pull the HomeBudget history
+//   POST   /api/accounting/accounts/<id>/import-excel    read the account's Excel ledger (local machine only)
+//   POST   /api/accounting/accounts/<id>/import-whatsapp read the account's WhatsApp group (local machine only)
+//   POST   /api/accounting/accounts/<id>/link-transfers  { loose? } join "from mario" lines with Mario's cash as transfers
+//   GET    /api/accounting/whatsapp-groups?q=            the archive's groups, for the ⚙ form
 //   GET    /api/accounting/odoo/journals                 the Odoo bank/cash journals, for the "+" form
 //   GET    /api/accounting/transfers                     list
 //   POST   /api/accounting/transfers                     { date, fromId, toId, amount, note, fromTxId?, toTxId? }
 //   PATCH  /api/accounting/transfers/<id>                { date?, amount?, note? }
 //   DELETE /api/accounting/transfers/<id>
 const acc = require('./accounting');
+const ledgers = require('./ledgers');   // the workers' Excel ledgers, WhatsApp groups, transfer linking
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };   // true = handled
 const readBody = req => new Promise((resolve, reject) => {
@@ -58,7 +63,7 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId'];
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review'];
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 
@@ -289,6 +294,8 @@ async function removeTransferLines(ws, tr, FieldValue) {
 
 const journalsIn = list => (Array.isArray(list) ? list : []).map(j => ({ id: +j.id, name: j.name || '', companyId: j.companyId != null ? +j.companyId : null, company: j.company || '' })).filter(j => j.id);
 const openingIn = o => o && o.date ? { date: String(o.date), amount: money(o.amount), note: String(o.note || '') } : null;
+const excelIn = x => x && x.file ? { file: String(x.file).trim(), sheet: String(x.sheet || '').trim(), layout: String(x.layout || '').toLowerCase().trim() } : null;
+const whatsappIn = x => x && x.chatId ? { chatId: +x.chatId, since: /^\d{4}-\d{2}-\d{2}$/.test(String(x.since || '')) ? String(x.since) : '', lbpRate: +x.lbpRate || 0 } : null;
 
 // ── Router ───────────────────────────────────────────────────────────────────
 async function handle(req, res, url, user, ctx) {
@@ -334,6 +341,8 @@ async function handle(req, res, url, user, ctx) {
     const journals = journalsIn(b.odooJournals);
     const data = { id, name, type, currency: String(b.currency || 'USD').toUpperCase(), provider: b.provider || (journals.length ? 'odoo' : 'manual'),
       owner: String(b.owner || '').toLowerCase(), odooJournals: journals, opening: openingIn(b.opening), statement: false, createdAt: now(), createdBy: who };
+    if (excelIn(b.excel)) data.excel = excelIn(b.excel);
+    if (whatsappIn(b.whatsapp)) data.whatsapp = whatsappIn(b.whatsapp);
     await ws.collection('accounts').doc(id).set(data);
     return json(res, 200, data);
   }
@@ -356,6 +365,8 @@ async function handle(req, res, url, user, ctx) {
     if ('archived' in b) data.archived = !!b.archived;
     if ('odooJournals' in b) data.odooJournals = journalsIn(b.odooJournals);
     if ('opening' in b) data.opening = openingIn(b.opening);
+    if ('excel' in b) data.excel = excelIn(b.excel) ? { ...(a.excel || {}), ...excelIn(b.excel) } : null;
+    if ('whatsapp' in b) data.whatsapp = whatsappIn(b.whatsapp) ? { ...(a.whatsapp || {}), ...whatsappIn(b.whatsapp) } : null;
     await a.ref.set(data, { merge: true });
     return json(res, 200, { ok: true });
   }
@@ -403,6 +414,7 @@ async function handle(req, res, url, user, ctx) {
     // the line itself may be edited only when a person wrote it
     if (cur.src === 'manual' || cur.src === 'telegram') for (const k of LINE) if (k in body) data[k] = k === 'debit' || k === 'credit' ? money(body[k]) : body[k];
     if ('excluded' in body || 'dupOf' in body) data.dupSrc = 'manual';
+    if (body.excluded === false) data.review = false;
     if ('paidBy' in body) data.paidBySrc = body.paidBy ? 'manual' : '';
     if (!Object.keys(data).length) return json(res, 400, { error: 'nothing to update' });
     data.updatedAt = now(); data.updatedBy = who;
@@ -416,7 +428,7 @@ async function handle(req, res, url, user, ctx) {
     const ref = txCol(a).doc(m[2]);
     const cur = (await ref.get()).data();
     if (!cur) return json(res, 404, { error: 'no such line' });
-    if (!['manual', 'telegram', 'budget'].includes(cur.src)) return json(res, 400, { error: 'only typed or Budget lines can be deleted; Odoo and statement lines are facts' });
+    if (!['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(cur.src)) return json(res, 400, { error: 'only typed or imported ledger lines can be deleted; Odoo and statement lines are facts' });
     if (cur.transferId) return json(res, 400, { error: 'this line belongs to a transfer — delete the transfer' });
     await ref.delete();
     return json(res, 200, { ok: true });
@@ -486,6 +498,37 @@ async function handle(req, res, url, user, ctx) {
     if (!bid) return json(res, 400, { error: 'budgetAccountId required' });
     try { return json(res, 200, await importBudget(ws, a, bid, who)); }
     catch (e) { console.error('import-budget', e); return json(res, 502, { error: String(e.message || e) }); }
+  }
+
+  // the workers' ledgers — read on Mario's machine, matched here
+  const ledgerCtx = { acc, txCol, ws, resolve, listAccounts };
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-excel$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    if (excelIn(b.excel)) { a.excel = { ...(a.excel || {}), ...excelIn(b.excel) }; await a.ref.set({ excel: a.excel }, { merge: true }); }
+    try { return json(res, 200, await ledgers.importExcel(ledgerCtx, a, who)); }
+    catch (e) { console.error('import-excel', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-whatsapp$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    if (whatsappIn(b.whatsapp)) { a.whatsapp = { ...(a.whatsapp || {}), ...whatsappIn(b.whatsapp) }; await a.ref.set({ whatsapp: a.whatsapp }, { merge: true }); }
+    try { return json(res, 200, await ledgers.importWhatsapp(ledgerCtx, a, who)); }
+    catch (e) { console.error('import-whatsapp', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/link-transfers$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await ledgers.linkTransfers(ledgerCtx, a, who, { loose: !!b.loose, marioId: b.marioId })); }
+    catch (e) { console.error('link-transfers', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  if (url.startsWith('/api/accounting/whatsapp-groups') && req.method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams.get('q') || '';
+    try { return json(res, 200, ledgers.listGroups(q)); }
+    catch (e) { return json(res, 400, { error: String(e.message || e) }); }
   }
 
   // ── transfers ──

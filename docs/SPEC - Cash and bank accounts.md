@@ -1,6 +1,6 @@
 # SPEC — Cash & bank accounts inside Shift Hub Accounting
 
-Captured 2026-09-05 from Mario's instructions, answers folded in the same day. Status: **phase 1 built 2026-09-05** (accounts page, Mario cash + Neo Mario + Neo Therese from Odoo, HomeBudget history, transfers) — see `Session Notes 2026-09-05 - Cash and bank accounts.pdf`. Phase 2 (per-person cash, Telegram, dashboard) not started.
+Captured 2026-09-05 from Mario's instructions, answers folded in the same day. Status: **phase 1 built 2026-09-05** (accounts page, Mario cash + Neo Mario + Neo Therese from Odoo, HomeBudget history, transfers) — see `Session Notes 2026-09-05 - Cash and bank accounts.pdf`. **Phase 2a built 2026-09-05 (evening)**: Georges / Abed / Khodr / Ziad / Mitri cash accounts from their Excel ledgers + WhatsApp groups + Odoo journals, matched not summed, plus auto-linked transfers — see `ledgers.js` and `Session Notes 2026-09-05 - Worker cash accounts.pdf`. Still open: Telegram capture, cash + gold dashboard, and Mario's reconciliation of the Odoo lines that match no Excel row (listed in the notes).
 
 ## The one-line version
 Turn the Whish page into a generic *account* page. Any account — cash or bank — is created from a **+** button in the app (no code per account), imports statements the way Whish does, carries the same columns and the same Odoo logic, and can be fed from Telegram. Retire the per-person Excels and WhatsApp accounting groups.
