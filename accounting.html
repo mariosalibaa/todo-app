@@ -75,7 +75,7 @@
   .rule{display:flex;align-items:center;gap:10px;padding:6px 8px;border:1px solid var(--line);border-radius:5px;margin-bottom:6px;font-size:12px;}
   .rule.off{opacity:.55;}
   .btn.book{padding:1px 7px;height:22px;font-size:11.5px;color:var(--odoo);border-color:#d9c9d4;} .btn.book:hover{background:#f5f2f7;}
-  .odoo-doc{color:var(--muted);font-size:11px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;}
+  .odoo-doc{color:var(--muted);font-size:11px;margin-top:1px;white-space:normal;word-break:break-word;}
   td:last-child{max-width:230px;}
   /* partner picker */
   .pick{position:relative;}
@@ -113,6 +113,10 @@
   .srctog{cursor:pointer;text-decoration:none;color:inherit;}
   .srctog:hover .src{border-color:var(--odoo);color:var(--odoo);}
   .srctog.off{opacity:.45;text-decoration:line-through;}
+  .odoo-partner{color:#0d6efd;font-size:12px;margin-top:2px;white-space:normal;}
+  .ptag{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-top:2px;text-decoration:none;} a.ptag.cash{color:var(--green);border-color:var(--green);}
+  .nat-transfer{color:var(--green);border-color:var(--green);} .nat-labour{color:var(--odoo);border-color:var(--odoo);} .nat-vendor{color:#b8860b;border-color:#b8860b;} .nat-expense{color:#6c757d;}
+  .months td,.months th{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top;} .months th{text-align:left;font-size:12px;color:#495057;} .months .num{text-align:right;font-variant-numeric:tabular-nums;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
   .c-paid{width:110px;}
@@ -159,6 +163,7 @@
   <button class="btn" id="btn-import" onclick="importOdooLines()" title="Pull every line of this account's Odoo journals (re-running updates, never duplicates)">⇄ Import Odoo</button>
   <button class="btn" id="btn-contacts" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the account's Odoo journals">⇄ Check Odoo</button>
+  <button class="btn" id="btn-months" onclick="openMonths()" title="One draft bill per month from this person, one line per Excel row, each with its project" style="display:none">📅 Book months</button>
   <button class="btn" id="btn-bills" onclick="openBills()" title="Recurring payments with a standing rule — create their draft bills in Odoo">📗 Odoo bills</button>
 </div>
 <div class="legend">
@@ -172,6 +177,14 @@
       <span class="sp" style="flex:1"></span>
       <button class="btn" onclick="closeBills()">✕ Close</button></div>
     <div class="sheet-body" id="bills-body"></div>
+  </div>
+</div>
+<div class="sheet" id="months" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head"><b id="months-title">Book the months</b>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn" onclick="document.getElementById('months').hidden = true">✕ Close</button></div>
+    <div class="sheet-body" id="months-body"></div>
   </div>
 </div>
 <div class="sheet" id="accform" hidden>
@@ -233,7 +246,7 @@ const ALL_COLS = [
   { k: 'out',     l: 'Debit',                 f: 'amount', v: t => t.debit || 0, num: true },
   { k: 'in',      l: 'Credit',                f: 'amount', v: t => t.credit || 0, num: true },
   { k: 'bal',     l: 'Balance',               f: 'amount', v: t => isStatement() ? t.balance : t._bal, num: true },
-  { k: 'partner', l: 'Partner (Odoo)',        f: 'text',   v: t => t.partnerName || '', c: 'c-partner' },
+  { k: 'partner', l: 'Partner / cash',        f: 'text',   v: t => t.partnerName || '', c: 'c-partner' },
   { k: 'company', l: 'Company',               f: 'select', v: t => companyOf(t), c: 'c-company' },
   { k: 'proj',    l: 'Analytic (Odoo)',       f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
   { k: 'note',    l: 'Note',                  f: 'text',   v: t => t.note || '', c: 'c-note' },
@@ -296,6 +309,7 @@ async function selectAccount(a) {
   document.getElementById('btn-contacts').style.display = st ? '' : 'none';
   document.getElementById('btn-line').style.display = st ? 'none' : '';
   document.getElementById('btn-import').style.display = hasJ ? '' : 'none';
+  document.getElementById('btn-months').style.display = isExcelKept() && account.odooPartner && account.odooPartner.id ? '' : 'none';
   document.getElementById('btn-odoo').style.display = (st || hasJ) ? '' : 'none';
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
   document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
@@ -533,7 +547,7 @@ function odooCell(t) {
   if (win) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
     const differs = t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
-    const docs = (win.docs || []).filter(d => d && d !== win.move);
+    const docs = [...new Set((win.docs || []).filter(d => d && d !== win.move))];
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
       + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${esc(docs.join(', '))}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
@@ -562,7 +576,8 @@ function render() {
     const sugTxt = [sg.partner && sg.partner.name, sg.company].filter(Boolean).join(' / ');
     const st = isStatement(), own = account && (account.owner || 'mario');
     const paidFlag = t.paidBy && t.paidBy !== own ? `<div class="flag" title="${esc('Physically paid by ' + cap(t.paidBy) + (t.paidBySrc === 'odoo' ? ' — read from the Odoo attachment / memo' : ''))}">⚑ paid by ${esc(cap(t.paidBy))}</div>` : '';
-    const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '');
+    const natChip = t.nature ? `<span class="src nat-${t.nature}" title="${esc({ transfer: 'Money moved between him and one of our accounts — never a bill', labour: 'His own work — booked in the month\'s bill from him, account Sub Contractor', expense: 'Unofficial spending he fronted — booked in the month\'s bill from him', vendor: 'An official supplier: its own bill, paid through Settlement by him' }[t.nature] || '')}">${esc(t.nature)}</span>` : '';
+    const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '') + (t.src === 'excel' ? natChip : '');
     const onlyFlag = t.src === 'odoo' && t.odooOnly && t.excluded ? `<div class="flag" title="Booked in Odoo on this person's cash journal, but no row of the Excel ledger matches it. Not counted: the Excel is the account.">🟣 not in Excel</div>` : '';
     const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
     const acts = st ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>`
@@ -585,6 +600,8 @@ function render() {
         <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : 'partner'}"
           oninput="pickFilter('pp-${t.id}')" onkeydown="pickKey(event,'pp-${t.id}')" onblur="pickBlur('pp-${t.id}')">
           <input type="hidden" id="pp-${t.id}" value="${esc(t.partnerId || '')}" data-row="${t.id}"><div class="pick-list" id="pp-${t.id}-list"></div></div>
+        ${(() => { const w = t.odoo && (t.odoo.matches || []).find(x => x.chosen); return w && w.partner && t.partnerSrc !== 'odoo' && similarity(w.partner, t.partnerName || '') < 0.95 ? `<div class="odoo-partner" title="The partner on the Odoo entry this row matches">${esc(w.partner)}</div>` : ''; })()}
+        ${t.partnerKind === 'cash' ? `<a class="ptag cash" href="/accounting/accounts?id=${esc(t.cashAccountId || '')}" title="One of our own accounts — this row is a transfer">cash</a>` : t.partnerKind === 'partner' ? '<span class="ptag" title="An Odoo partner">partner</span>' : ''}
       </td>
       <td class="c-company ${srcClass(co ? (t.companySrc || (t.kind ? t.kindSrc : '') || 'manual') : '')}"><select onchange="saveCompany('${t.id}', this.value, this)">
         <option value="" ${!co ? 'selected' : ''}>${sg.company && !t.suggestSkip ? '↳ ' + esc(sg.company) + '?' : '—'}</option>
@@ -1022,6 +1039,52 @@ async function importContacts() {
 // ── Recurring payments ──
 // A rule turns "this number, this amount" into a ready draft bill. Drafts only: the
 // ledger is not touched until somebody opens the bill in Odoo and posts it.
+let monthsData = null;
+async function openMonths() {
+  document.getElementById('months').hidden = false;
+  document.getElementById('months-title').textContent = 'Book the months — ' + (account ? account.name : '');
+  document.getElementById('months-body').innerHTML = '<p class="hint">Reading the months and the projects…</p>';
+  try { monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths(); }
+  catch (e) { document.getElementById('months-body').innerHTML = `<p class="hint">Could not load: ${esc(e.message)}</p>`; }
+}
+function drawMonths() {
+  const { months, projects, analytics } = monthsData;
+  const unmapped = projects.filter(p => !p.analyticId);
+  const mrows = months.map(m => {
+    const bill = m.bill;
+    const state = bill ? (bill.state === 'draft' ? `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">${esc(bill.name)}</a> <span class="hint">draft, ${fmt(bill.amount)}</span>` : `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">✓ ${esc(bill.name)}</a> <span class="hint">${esc(bill.state)}${bill.paymentState && bill.paymentState !== 'not_paid' ? ' · ' + esc(bill.paymentState.replace('_', ' ')) : ''}</span>`) : '<span class="hint">not in Odoo</span>';
+    const can = !bill || bill.state === 'draft';
+    const gap = m.unmapped.length ? `<div class="odoo-warn" title="${esc(m.unmapped.map(u => u.text + ' ×' + u.rows).join(', '))}">${m.unmapped.reduce((s, u) => s + u.rows, 0)} row${m.unmapped.reduce((s, u) => s + u.rows, 0) === 1 ? '' : 's'} without an analytic account</div>` : '';
+    return `<tr><td><b>${esc(m.month)}</b></td><td class="num">${m.rows}</td><td class="hint">${m.labour} labour · ${m.expense} expense</td><td class="num">${fmt(m.amount)}</td><td>${state}${gap}</td>
+      <td><button class="btn sm" ${can ? '' : 'disabled'} onclick="bookMonth('${m.month}', this)">${bill ? (can ? 'Rewrite draft' : 'Posted') : 'Create draft'}</button></td></tr>`;
+  }).join('');
+  const prow = p => `<tr><td>${esc(p.text)}</td><td class="num hint">${p.rows}</td><td><select onchange="mapProject('${esc(p.key)}', this)"><option value="">— not mapped —</option>${analytics.map(a => `<option value="${a.id}" ${a.id === p.analyticId ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select> <span class="hint">${p.src === 'auto' ? 'guessed' : p.src === 'manual' ? 'chosen' : ''}</span></td></tr>`;
+  document.getElementById('months-body').innerHTML = `
+    <p class="hint">One draft bill per month <b>from ${esc(account.odooPartner.name)}</b> in S LB (journal Bills, no tax): one line per Excel row — his days on <i>621100 Sub Contractor A</i>, benzine on <i>626900 Fuel and Gas</i>, the rest on <i>626990 Other Expenses</i> — each line carrying the row's project as its analytic account. Transfers and official-vendor rows are never in it. Rewriting a draft replaces its lines; a posted bill is left alone.</p>
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Month</th><th class="num">Rows</th><th></th><th class="num">Total</th><th>In Odoo</th><th></th></tr></thead><tbody>${mrows || '<tr><td colspan="6" class="hint">No labour or expense rows to book.</td></tr>'}</tbody></table>
+    <h4 style="margin:16px 0 4px">Projects → analytic accounts ${unmapped.length ? `<span class="odoo-warn">${unmapped.length} still to map</span>` : '<span class="hint">all mapped</span>'}</h4>
+    <p class="hint">The sheet's project names, matched to Odoo's analytic accounts. Fix any of them here; the choice holds for every import and every bill after.</p>
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>In the sheet</th><th class="num">Rows</th><th>Analytic account (Odoo)</th></tr></thead><tbody>${[...unmapped, ...projects.filter(p => p.analyticId)].map(prow).join('')}</tbody></table>`;
+}
+async function mapProject(key, sel) {
+  const id = +sel.value || null, name = id ? sel.options[sel.selectedIndex].text : '';
+  sel.disabled = true;
+  try {
+    const r = await Admin.api('POST', '/api/accounting/analytic-map', { key, analyticId: id, analyticName: name, accountId: acc });
+    say(`${id ? name : 'Unmapped'}: ${r.rowsUpdated} row${r.rowsUpdated === 1 ? '' : 's'} updated`);
+    monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths();
+    tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
+  } catch (e) { say('Could not save: ' + e.message, 'err'); sel.disabled = false; }
+}
+async function bookMonth(month, btn) {
+  btn.disabled = true; btn.textContent = 'Working…';
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-month`, { month });
+    say(`${month}: ${r.move} ${r.action} — ${r.rows} lines (${r.labour} labour, ${r.expense} expense), ${fmt(r.total)}${r.unmappedProjects.length ? '; no analytic yet for ' + r.unmappedProjects.join(', ') : ''}`);
+    monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths();
+    tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
+  } catch (e) { say('Could not book: ' + e.message, 'err'); btn.disabled = false; btn.textContent = 'Create draft'; }
+}
 let billsData = null;
 function closeBills() { document.getElementById('bills').hidden = true; }
 async function openBills() {

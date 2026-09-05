@@ -46,6 +46,7 @@
 //   DELETE /api/accounting/transfers/<id>
 const acc = require('./accounting');
 const ledgers = require('./ledgers');   // the workers' Excel ledgers, WhatsApp groups, transfer linking
+const bills = require('./ledger-bills');  // a worker's month → one draft bill; the analytic map
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };   // true = handled
 const readBody = req => new Promise((resolve, reject) => {
@@ -63,7 +64,7 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review'];
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId'];
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 
@@ -530,7 +531,7 @@ async function handle(req, res, url, user, ctx) {
   }
 
   // the workers' ledgers — read on Mario's machine, matched here
-  const ledgerCtx = { acc, txCol, ws, resolve, listAccounts };
+  const ledgerCtx = { acc, txCol, ws, resolve, listAccounts, odooCall };
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-excel$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
@@ -554,6 +555,31 @@ async function handle(req, res, url, user, ctx) {
     try { return json(res, 200, await ledgers.linkTransfers(ledgerCtx, a, who, { loose: !!b.loose, marioId: b.marioId })); }
     catch (e) { console.error('link-transfers', e); return json(res, 400, { error: String(e.message || e) }); }
   }
+  // the worker's months: what is bookable, what is booked, which projects still need an analytic account
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/months$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    try { const map = await bills.analyticMapFor(ledgerCtx, a); return json(res, 200, { months: await bills.months(ledgerCtx, a), ...map }); }   // the map first, so the months know what is mapped
+    catch (e) { console.error('months', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-month$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await bills.bookMonth(ledgerCtx, a, b.month, who)); }
+    catch (e) { console.error('book-month', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // Excel project name → Odoo analytic account, kept for good
+  if (url === '/api/accounting/analytic-map' && req.method === 'POST') {
+    const b = await readBody(req);
+    try {
+      const key = await bills.saveMapEntry(ws, b.key, b.analyticId ? { id: b.analyticId, name: b.analyticName } : null, who);
+      let rows = 0;
+      if (b.accountId) { const a = await resolve(ws, b.accountId); if (a) rows = await bills.applyMap(ledgerCtx, a); }
+      return json(res, 200, { ok: true, key, rowsUpdated: rows });
+    } catch (e) { return json(res, 400, { error: String(e.message || e) }); }
+  }
+
   if (url.startsWith('/api/accounting/whatsapp-groups') && req.method === 'GET') {
     const q = new URL(req.url, 'http://x').searchParams.get('q') || '';
     try { return json(res, 200, ledgers.listGroups(q)); }

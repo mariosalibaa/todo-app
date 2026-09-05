@@ -544,5 +544,5 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone,
+module.exports = { handle, analyticAccounts, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone,
   odooCheck, partnersAndCompanies, journalsNamed, similarity, analyticOfMoves, batchSet };

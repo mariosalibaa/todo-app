@@ -19,6 +19,7 @@
 // lazily and answer with a clear error elsewhere.
 const fs = require('fs');
 const path = require('path');
+const bills = require('./ledger-bills');   // what a row is (transfer / labour / expense / vendor), the analytic map, monthly bills
 
 const money = n => Math.round(Number(n || 0) * 100) / 100;
 const now = () => new Date().toISOString();
@@ -177,6 +178,8 @@ async function importExcel(ctx, account, who) {
   const cfg = account.excel || {};
   if (!cfg.file) throw new Error('no workbook set on this account (⚙ → Excel ledger)');
   const { rows, sheet, file } = await readExcel(cfg.file, cfg.layout || account.owner, cfg.sheet);
+  const lay = LAYOUTS[cfg.layout || account.owner] || {};
+  const amap = ctx.ws ? await bills.loadMapPublic(ctx.ws) : {};
   const col = txCol(account);
   const cur = await col.get();
   const existing = {}; cur.docs.forEach(d => { existing[d.id] = d.data(); });
@@ -194,13 +197,14 @@ async function importExcel(ctx, account, who) {
     // money out = what he spent it on, as the sheet writes it
     const raw = String(r.partner || '').trim().toLowerCase();
     const partnerName = credit ? (CASH_OF[raw] || titled(r.partner) || 'Mario cash') : titled(r.partner);
+    const nat = bills.natureOf({ credit, kind: r.kind, partnerRaw: raw, owner: lay.owner === 'khodr' ? 'khoder' : lay.owner });
     return { id, src: 'excel', date: r.date, ref: '', service: 'Excel', phone: '', description: r.description, debit, credit,
-      project: r.project || '', partnerName, period: r.period || '',
+      project: r.project || '', partnerName, period: r.period || '', ...nat,
       kind: r.kind || '', kindSrc: r.kind ? 'excel' : '', hours: r.hours || 0, excelRow: r.row, importedAt: now() };
   });
 
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
-  const dup = pairUp(lines, odoo, { taken, loose: true });
+  const dup = pairUp(lines.filter(l => !(existing[l.id] || {}).bookedMove), odoo, { taken, loose: true });
   const byId = Object.fromEntries(odoo.map(o => [o.id, o]));
   let added = 0, updated = 0, linked = 0, loose = 0;
   const odooWrites = {};                                              // Odoo line id → its new state
@@ -209,11 +213,17 @@ async function importExcel(ctx, account, who) {
   for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) odooWrites[o.id] = { excluded: true, odooOnly: false };
   const writes = lines.map(t => {
     const prev = existing[t.id] || {};
-    const { partnerName, project, ...rest } = t;
-    const data = { ...rest, excluded: false, dupOf: null };          // the Excel row always counts
+    const { partnerName, project, nature, partnerKind, cashAccountId, ...rest } = t;
+    const data = { ...rest, project, excluded: false, dupOf: null };          // the Excel row always counts
     // what the sheet itself says about the row
     if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerName: partnerName || '', partnerId: null, partnerSrc: partnerName ? 'excel' : '' });
-    if (prev.analyticSrc !== 'manual') Object.assign(data, { analyticName: project || '', analyticId: null, analyticSrc: project ? 'excel' : '' });
+    if (prev.natureSrc !== 'manual') Object.assign(data, { nature: nature || '', partnerKind: partnerKind || '', cashAccountId: cashAccountId || '' });
+    if (prev.analyticSrc !== 'manual') {
+      const e = project ? amap[bills.norm(project)] : null;
+      Object.assign(data, e && e.id ? { analyticName: e.name, analyticId: e.id, analyticSrc: 'excel' } : { analyticName: project || '', analyticId: null, analyticSrc: project ? 'excel' : '' });
+    }
+    // a row already booked into a monthly bill keeps that link whatever else changes
+    if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; }
     // money he was handed is not an expense of any company but the one that holds his account
     if (prev.companySrc !== 'manual') Object.assign(data, { company: t.credit ? 'S LB' : '', companySrc: t.credit ? 'excel' : '' });
     const d = dup.get(t.id);
@@ -224,7 +234,8 @@ async function importExcel(ctx, account, who) {
       const win = (o.odoo && o.odoo.matches || []).find(m => m.chosen) || null;
       data.odoo = { checkedAt: now(), matches: win ? [{ ...win, why: [...(win.why || []), d.loose ? 'close amount, shared word' : 'same amount, same days'] }] : [] };
       data.matchedOdoo = o.id; data.ref = o.ref || ''; data.files = o.files || []; data.service = o.service || 'Excel';
-      if (o.partnerId && prev.partnerSrc !== 'manual') Object.assign(data, { partnerId: o.partnerId, partnerName: o.partnerName, partnerSrc: 'odoo' });
+      // the row keeps the sheet's own word for the partner; the Odoo partner shows on a second line from the match
+      if (o.partnerId && prev.partnerSrc !== 'manual') data.partnerId = o.partnerId;
       if (o.company && prev.companySrc !== 'manual') Object.assign(data, { company: o.company, companySrc: 'odoo', kind: prev.kindSrc === 'manual' ? prev.kind : (t.kind || 'work'), kindSrc: prev.kindSrc === 'manual' ? 'manual' : (t.kind ? 'excel' : 'odoo') });
       if (o.analyticId && prev.analyticSrc !== 'manual') Object.assign(data, { analyticId: o.analyticId, analyticName: o.analyticName, analyticSrc: 'odoo', analyticFrom: o.analyticFrom || '' });
       if (o.paidBy && prev.paidBySrc !== 'manual') Object.assign(data, { paidBy: o.paidBy, paidBySrc: 'odoo' });
