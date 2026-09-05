@@ -152,7 +152,6 @@
   <span id="rowcount" style="font-size:12px;color:var(--muted);white-space:nowrap;cursor:help"></span>
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
-  <button class="btn" id="btn-odoolines" onclick="toggleOdooLines()" title="An account kept in Excel: its Odoo entries are matched onto the Excel rows and hidden here. Show them anyway." style="display:none">🟣 Odoo lines</button>
   <button class="btn" id="btn-check" onclick="toggleReviewImported()" title="WhatsApp messages that match nothing in the Excel or in Odoo: not counted until you accept them" style="display:none">❓ To review</button>
   <button class="btn primary" id="btn-line" onclick="openLineForm()" title="Type a line: money in or out of this account">＋ Line</button>
   <label class="btn primary" for="file" id="btn-upload">⬆ Upload statement (PDF)</label>
@@ -249,8 +248,8 @@ let sugFilter = '';                           // '' | 'pending' | 'skipped' — 
 let reviewImported = false;                   // the ❓ button: only WhatsApp lines nobody wrote down elsewhere
 let srcOff = new Set();                       // sources hidden by clicking their chip in the count
 const isExcelKept = () => !!(account && account.excel && account.excel.file);
-// on an account kept in Excel the Odoo entries start hidden: they are matched onto the rows, not lines of their own
-const resetSources = () => { srcOff = isExcelKept() ? new Set(['odoo']) : new Set(); };
+// every source starts shown — clicking its name in the count is what hides it
+const resetSources = () => { srcOff = new Set(); };
 
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
@@ -622,8 +621,11 @@ function render() {
     const n = bySrc[k], c = countedBy[k] || 0;
     const tail = c === n ? ' counted' : c ? ` (${c} counted)` : '';
     const off = srcOff.has(k);
-    const tip = off ? `${n} ${k} line${n === 1 ? '' : 's'} hidden — click to show them` : `Click to hide the ${n} ${k} line${n === 1 ? '' : 's'}`;
-    return `<a class="srctog${off ? ' off' : ''}" onclick="toggleSrc('${k}')" title="${esc(tip)}">${n} <span class="src">${k}</span>${tail}</a>`;
+    const only = k === 'odoo' && isExcelKept() ? tx.filter(t => t.src === 'odoo' && t.odooOnly).length : 0;
+    const extra = only ? ` (${only} not in Excel)` : '';
+    const tip = (off ? `Hidden. Click to show the ${n} ${k} line${n === 1 ? '' : 's'}.` : `Shown. Click to hide the ${n} ${k} line${n === 1 ? '' : 's'}.`)
+      + (only ? ` ${only} of them match no row of the Excel ledger.` : '');
+    return `<a class="srctog${off ? ' off' : ''}" onclick="toggleSrc('${k}')" title="${esc(tip)}">${n} <span class="src">${k}</span>${tail}${extra}</a>`;
   }).join(' · ');
   rc.innerHTML = tx.length ? chips + (rows.length !== tx.length ? ` · ${rows.length} shown` : '') : '';
   const parts = [['excel', 'Excel rows'], ['whatsapp', 'WhatsApp messages'], ['odoo', 'Odoo entries'], ['budget', 'HomeBudget rows'], ['transfer', 'transfer lines'], ['telegram', 'Telegram lines'], ['manual', 'lines typed here']]
@@ -644,18 +646,12 @@ function render() {
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
   rv.disabled = !waiting && sugFilter !== 'pending';
-  const ol = document.getElementById('btn-odoolines'), nOdoo = isExcelKept() ? tx.filter(t => t.src === 'odoo' && t.excluded).length : 0;
-  ol.style.display = nOdoo ? '' : 'none';
-  const nOnly = tx.filter(t => t.src === 'odoo' && t.excluded && t.odooOnly).length;
-  ol.textContent = `🟣 ${nOdoo} Odoo line${nOdoo === 1 ? '' : 's'}${nOnly ? ' · ' + nOnly + ' not in Excel' : ''}`;
-  ol.classList.toggle('primary', !srcOff.has('odoo'));
   const ck = document.getElementById('btn-check'), toCheck = tx.filter(t => t.review).length;
   ck.style.display = toCheck || reviewImported ? '' : 'none';
   ck.textContent = toCheck ? `❓ ${toCheck} to review` : '❓ Nothing to review';
   ck.classList.toggle('primary', reviewImported);
 }
 function toggleReviewImported() { reviewImported = !reviewImported; render(); }
-function toggleOdooLines() { toggleSrc('odoo'); }
 function toggleSrc(k) { if (srcOff.has(k)) srcOff.delete(k); else srcOff.add(k); render(); }
 
 // ── Partner picker: type to filter the Odoo partners, ↑↓, Enter or click ──
