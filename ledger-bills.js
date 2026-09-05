@@ -48,7 +48,7 @@ async function saveMapEntry(ws, key, entry, who) {
 }
 // Name matching: exact, then one side contains the other, then most shared words — only
 // when a single analytic account wins clearly. Anything doubtful is left for a person.
-function guess(text, analytics) {
+function guess(text, analytics, owner) {
   const t = norm(text); if (!t) return null;
   const words = t.split(' ').filter(w => w.length > 2);
   const scored = analytics.map(a => {
@@ -60,8 +60,9 @@ function guess(text, analytics) {
     return { a, s: shared ? 2 + shared / words.length + shared / nw.length : 0 };
   }).filter(x => x.s >= 2.6).sort((x, y) => y.s - x.s);
   if (!scored.length) return null;
-  if (scored.length > 1 && scored[1].s >= scored[0].s - 0.5 && scored[0].s < 10) return null;   // two candidates as good: ask
-  return scored[0].a;
+  const top = scored.filter(x => x.s >= scored[0].s - 0.5);
+  const mine = owner ? top.filter(x => new RegExp(owner, 'i').test(x.a.name)) : [];   // "BMW 318 (Shift — Abed)" over "BMW 320 (Dad)" on Abed's sheet
+  return (mine.length ? mine : top).sort((x, y) => x.a.name.length - y.a.name.length)[0].a;   // several as good: the shortest name is the parent project
 }
 // The map for one account: every project the sheet uses, mapped or not.
 async function analyticMapFor(ctx, account) {
@@ -74,7 +75,7 @@ async function analyticMapFor(ctx, account) {
   const out = []; let changed = false;
   for (const u of Object.values(used)) {
     let e = map[u.key];
-    if (e === undefined) { const g = guess(u.text, analytics); e = g ? { id: g.id, name: g.name, src: 'auto', at: now() } : null; map[u.key] = e; changed = true; }
+    if (e === undefined || (e && !e.id) || (e === null)) { const g = guess(u.text, analytics, account.owner); const ne = g ? { id: g.id, name: g.name, src: 'auto', at: now() } : null; if (JSON.stringify(ne && ne.id) !== JSON.stringify(e && e.id)) { map[u.key] = ne; changed = true; } e = ne; }
     out.push({ ...u, analyticId: e ? e.id : null, analyticName: e ? e.name : '', src: e ? e.src : '' });
   }
   if (changed) await mapRef(ws).set({ map, updatedAt: now() }, { merge: true });
@@ -107,78 +108,203 @@ async function months(ctx, account) {
   for (const t of tx) {
     if (!bookable(t)) continue;
     const m = t.date.slice(0, 7);
-    const g = by[m] = by[m] || { month: m, rows: 0, amount: 0, labour: 0, expense: 0, booked: 0, unmapped: {}, bill: null };
+    const g = by[m] = by[m] || { month: m, rows: 0, amount: 0, labour: 0, expense: 0, labourAmount: 0, expenseAmount: 0, booked: 0, unmapped: {}, bills: {} };
+    g[t.nature + 'Amount'] = money(g[t.nature + 'Amount'] + t.debit);
     g.rows++; g.amount = money(g.amount + t.debit); g[t.nature]++;
     if (t.bookedMove) g.booked++;
     if (t.project && !(map[norm(t.project)] || {}).id) g.unmapped[t.project] = (g.unmapped[t.project] || 0) + 1;
   }
   // the bills already in Odoo for these months
-  const refs = Object.keys(by).map(m => `${account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '')}-${m}`);
+  const refs = Object.keys(by).flatMap(m => [refOf(account, m, 'labour'), refOf(account, m, 'expenses'), legacyRef(account, m)]);
   if (refs.length) {
     try {
       const found = await odooCall('account.move', 'search_read', [[['ref', 'in', refs], ['move_type', '=', 'in_invoice']]],
         { fields: ['id', 'name', 'ref', 'state', 'amount_total', 'payment_state'], context: { allowed_company_ids: [SLB.companyId] } });
-      for (const f of found) { const m = f.ref.slice(-7); if (by[m]) by[m].bill = { id: f.id, name: f.name && f.name !== '/' ? f.name : 'Draft ' + f.ref, state: f.state, amount: f.amount_total, paymentState: f.payment_state }; }
+      for (const f of found) {
+        const mm = f.ref.match(/(\d{4}-\d{2})(?:-(LABOUR|EXPENSES))?$/); if (!mm || !by[mm[1]]) continue;
+        const part = mm[2] === 'EXPENSES' ? 'expenses' : 'labour';
+        by[mm[1]].bills[part] = { id: f.id, name: f.name && f.name !== '/' ? f.name : 'Draft ' + f.ref, ref: f.ref, state: f.state, amount: f.amount_total, paymentState: f.payment_state };
+      }
     } catch (e) { /* Odoo down: months still list */ }
   }
   return Object.values(by).map(g => ({ ...g, unmapped: Object.entries(g.unmapped).map(([text, rows]) => ({ text, rows })) })).sort((a, b) => b.month.localeCompare(a.month));
 }
 
-// ── one month → one draft bill ─────────────────────────────────────────────
-async function bookMonth(ctx, account, month, who) {
+// ── one month → two draft bills: his work, and what he fronted ─────────────
+// Every line carries an analytic account: the row's project through the map; a row with
+// no project (benzine on the way to a site) takes the project of his work that day, else
+// the previous one; GENERAL is the last resort. Cost is never left untracked.
+const GENERAL = 27;
+const PARTS = { labour: { suffix: 'LABOUR', natures: ['labour'], label: 'his days' }, expenses: { suffix: 'EXPENSES', natures: ['expense'], label: 'what he fronted' } };
+const refOf = (account, month, part) => `${account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '')}-${month}-${PARTS[part].suffix}`;
+const legacyRef = (account, month) => `${account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '')}-${month}`;
+// the analytic of every bookable row of the month, projects inherited where the sheet left them blank
+function analyticsFor(rows, map) {
+  const ordered = rows.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.nature === 'labour' ? -1 : 1));
+  const byDay = {};
+  for (const t of ordered) if (t.project && t.nature === 'labour') byDay[t.date] = byDay[t.date] || t.project;
+  const nextAfter = date => { const d = Object.keys(byDay).sort().find(x => x > date); return d ? byDay[d] : ''; };
+  let last = '';
+  const out = {};
+  for (const t of ordered) {
+    let project = t.project || byDay[t.date] || last || nextAfter(t.date), from = t.project ? 'row' : byDay[t.date] ? 'same day' : last ? 'day before' : nextAfter(t.date) ? 'day after' : '';
+    if (project) last = project;
+    let id = t.analyticSrc === 'manual' && t.analyticId ? t.analyticId : ((map[norm(project)] || {}).id || null);
+    let name = t.analyticSrc === 'manual' && t.analyticId ? t.analyticName : ((map[norm(project)] || {}).name || '');
+    if (!id) { id = GENERAL; name = 'GENERAL'; from = project ? from + ', unmapped → GENERAL' : 'GENERAL'; }
+    out[t.id] = { id, name, project, from };
+  }
+  return out;
+}
+async function bookMonth(ctx, account, month, part, who, opts) {
   const { ws, txCol, odooCall, acc } = ctx;
   if (!/^\d{4}-\d{2}$/.test(String(month || ''))) throw new Error('month as yyyy-mm');
+  if (!PARTS[part]) throw new Error('part must be labour or expenses');
   const partner = account.odooPartner;
   if (!partner || !partner.id) throw new Error('set the account\'s Odoo partner first (⚙): the bill is from him');
   const map = await loadMap(ws);
   const col = txCol(account);
-  const rows = (await col.get()).docs.map(d => d.data()).filter(t => bookable(t) && t.date.startsWith(month)).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.id).localeCompare(String(b.id)));
-  if (!rows.length) throw new Error('nothing to book in ' + month);
-  const ref = `${account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '')}-${month}`;
+  const all = (await col.get()).docs.map(d => d.data()).filter(t => bookable(t) && t.date.startsWith(month));
+  const an = analyticsFor(all, map);
+  const rows = all.filter(t => PARTS[part].natures.includes(t.nature)).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.id).localeCompare(String(b.id)));
+  if (!rows.length) throw new Error(`nothing to book for ${PARTS[part].label} in ${month}`);
+  const ref = refOf(account, month, part);
   const ctxO = { allowed_company_ids: [SLB.companyId], company_id: SLB.companyId };
 
   const lines = rows.map(t => {
-    const analyticId = t.analyticSrc === 'manual' && t.analyticId ? t.analyticId : ((map[norm(t.project || '')] || {}).id || t.analyticId || null);
+    const a = an[t.id];
     const accountId = t.nature === 'labour' ? SLB.accounts.labour : isFuel(t.partnerName + ' ' + t.description) ? SLB.accounts.fuel : SLB.accounts.other;
-    const line = { name: `${t.date} · ${t.description || t.nature}${t.project ? ' · ' + t.project : ''}`, quantity: 1, price_unit: money(t.debit), account_id: accountId, tax_ids: [[6, 0, []]] };
-    if (analyticId) line.analytic_distribution = { [String(analyticId)]: 100 };
-    return { t, line, analyticId, accountId };
+    const line = { name: `${t.date} · ${t.description || t.nature} · ${a.project || a.name}`, quantity: 1, price_unit: money(t.debit), account_id: accountId, tax_ids: [[6, 0, []]], analytic_distribution: { [String(a.id)]: 100 } };
+    return { t, line, a, accountId };
   });
-  const unmapped = lines.filter(l => !l.analyticId && l.t.project).map(l => l.t.project);
 
-  // an existing bill with this ref: rewrite it while it is a draft, refuse once posted
-  const [existing] = await odooCall('account.move', 'search_read', [[['ref', '=', ref], ['move_type', '=', 'in_invoice']]], { fields: ['id', 'name', 'state'], context: ctxO, limit: 1 });
+  // an existing draft with this ref (or, for labour, the old one-bill ref) is rewritten; a posted one is refused
+  const refs = part === 'labour' ? [ref, legacyRef(account, month)] : [ref];
+  const found = await odooCall('account.move', 'search_read', [[['ref', 'in', refs], ['move_type', '=', 'in_invoice']]], { fields: ['id', 'name', 'state', 'ref'], context: ctxO, limit: 2 });
+  const existing = found.find(f => f.ref === ref) || found[0];
   let moveId, moveName, action;
-  if (existing && existing.state !== 'draft') throw new Error(`${existing.name} for ${month} is already ${existing.state} — reset it to draft in Odoo first`);
+  if (existing && existing.state !== 'draft') throw new Error(`${existing.name} (${existing.ref}) is already ${existing.state} — reset it to draft in Odoo first`);
+  const dateOf = rows[rows.length - 1].date;
   if (existing) {
-    await odooCall('account.move', 'write', [[existing.id], { invoice_line_ids: [[5, 0, 0], ...lines.map(l => [0, 0, l.line])], invoice_date: rows[rows.length - 1].date }], { context: ctxO });
+    await odooCall('account.move', 'write', [[existing.id], { ref, invoice_line_ids: [[5, 0, 0], ...lines.map(l => [0, 0, l.line])], invoice_date: dateOf }], { context: ctxO });
     moveId = existing.id; moveName = existing.name && existing.name !== '/' ? existing.name : 'Draft ' + ref; action = 'rewritten';
   } else {
     moveId = await odooCall('account.move', 'create', [{
       move_type: 'in_invoice', company_id: SLB.companyId, journal_id: SLB.journalId, partner_id: +partner.id,
-      invoice_date: rows[rows.length - 1].date, date: rows[rows.length - 1].date, ref,
-      narration: `${account.name} — ${month}: ${rows.length} rows from the Excel ledger (${lines.filter(l => l.t.nature === 'labour').length} labour, ${lines.filter(l => l.t.nature === 'expense').length} expenses). Draft made by Shift Hub.`,
+      invoice_date: dateOf, date: dateOf, ref,
+      narration: `${account.name} — ${month}, ${PARTS[part].label}: ${rows.length} rows from the Excel ledger. Draft made by Shift Hub.`,
       invoice_line_ids: lines.map(l => [0, 0, l.line]),
     }], { context: ctxO });
     const [m] = await odooCall('account.move', 'read', [[moveId], ['name']], { context: ctxO });
     moveName = m.name && m.name !== '/' ? m.name : 'Draft ' + ref; action = 'created';
   }
+  let state = 'draft';
+  if (opts && opts.post) {
+    await odooCall('account.move', 'action_post', [[moveId]], { context: ctxO });
+    const [m2] = await odooCall('account.move', 'read', [[moveId], ['name', 'state']], { context: ctxO });
+    moveName = m2.name; state = m2.state; action += ' and posted';
+  }
   const total = money(rows.reduce((s, t) => s + t.debit, 0));
-  // every row now points at the bill and shows it as its Odoo entry
   const at = now();
   const writes = lines.map(l => ({ ref: col.doc(l.t.id), data: {
-    bookedMove: { id: moveId, name: moveName, ref, month, at },
+    bookedMove: { id: moveId, name: moveName, ref, month, part, at, state },
     ref: moveName, service: SLB.company,
     company: SLB.company, companySrc: 'odoo', kind: l.t.kind || 'work', kindSrc: l.t.kindSrc || 'odoo',
     partnerId: +partner.id,
-    ...(l.analyticId ? { analyticId: l.analyticId, analyticName: (map[norm(l.t.project || '')] || {}).name || l.t.analyticName || '', analyticSrc: l.t.analyticSrc === 'manual' ? 'manual' : 'excel' } : {}),
-    odoo: { checkedAt: at, matches: [{ chosen: true, moveId, move: moveName, date: rows[rows.length - 1].date, amount: total, partner: partner.name, partnerId: +partner.id,
-      label: l.line.name, company: SLB.company, journal: SLB.journal, state: 'draft', docs: [], analytics: l.analyticId ? [{ id: l.analyticId, name: l.line.name, from: 'bill' }] : [],
-      score: 10, why: ['one line of the month\'s bill, made from this row'] }] },
+    analyticId: l.a.id, analyticName: l.a.name, analyticSrc: l.t.analyticSrc === 'manual' ? 'manual' : 'excel', analyticFrom: l.a.from,
+    odoo: { checkedAt: at, matches: [{ chosen: true, moveId, move: moveName, date: dateOf, amount: total, partner: partner.name, partnerId: +partner.id,
+      label: l.line.name, company: SLB.company, journal: SLB.journal, state, docs: [], analytics: [{ id: l.a.id, name: l.a.name, from: 'bill' }],
+      score: 10, why: ['one line of the month\'s ' + PARTS[part].label + ' bill, made from this row'] }] },
   } }));
   await acc.batchSet(ws.firestore, writes);
-  return { month, action, moveId, move: moveName, ref, rows: rows.length, total, labour: lines.filter(l => l.t.nature === 'labour').length, expense: lines.filter(l => l.t.nature === 'expense').length,
-    unmappedProjects: [...new Set(unmapped)], accounts: [...new Set(lines.map(l => SLB.accountNames[l.accountId]))] };
+  const general = lines.filter(l => l.a.id === GENERAL).length, inherited = lines.filter(l => /same day|previous/.test(l.a.from)).length;
+  return { month, part, action, moveId, move: moveName, ref, rows: rows.length, total, inherited, general, accounts: [...new Set(lines.map(l => SLB.accountNames[l.accountId]))] };
 }
 
-module.exports = { natureOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap };
+// ── everything else that must reach Odoo ────────────────────────────────────
+const inOdoo = t => !!(t.odoo && (t.odoo.matches || []).some(x => x.chosen));
+const CASH_JOURNAL = { 'S LB': { id: 87, companyId: 7 }, 'SHIFT GROUP SARL (USD)': { id: 21, companyId: 2 } };
+const VENDOR_IDS = [[/attal/i, 13, 'Ste. ATTAL'], [/tchagh/i, 24, 'Tchaghlassian Steel'], [/solaris/i, 214, 'SOLARIS s.a.l'], [/khc|khoury hardware/i, 233, 'KHC Khoury Hardware Center s.a.r.l'], [/kbm|khoury building/i, 234, 'KBM Khoury Building Materials'], [/njk|nicolas khoury/i, 244, 'NJK Nicolas Khoury'], [/^khoury$/i, 233, 'KHC Khoury Hardware Center s.a.r.l']];
+const RAW_MATERIALS = 5978;   // 611100 Purchasing Raw Materials, S LB
+
+// Money handed to him = a payment to him from that cash, against his supplier account.
+async function postPayments(ctx, account, who, opts) {
+  const { ws, txCol, odooCall, acc } = ctx;
+  const partner = account.odooPartner; if (!partner || !partner.id) throw new Error('set the account\'s Odoo partner first');
+  const col = txCol(account);
+  const rows = (await col.get()).docs.map(d => d.data())
+    .filter(t => t.src === 'excel' && !t.excluded && t.credit > 0 && t.nature === 'transfer' && t.cashAccountId === 'mario-cash' && !inOdoo(t) && !t.bookedMove)
+    .sort((a, b) => a.date < b.date ? -1 : 1);
+  const out = { rows: rows.length, posted: 0, found: 0, skipped: [], total: 0 };
+  if (opts && opts.dry) return { ...out, byYear: rows.reduce((o, t) => (o[t.date.slice(0, 4)] = (o[t.date.slice(0, 4)] || 0) + 1, o), {}) };
+  const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
+  for (const t of rows) {
+    const j = CASH_JOURNAL[t.company] || CASH_JOURNAL['S LB'];
+    const ctxO = { allowed_company_ids: [j.companyId], company_id: j.companyId };
+    const memo = `${prefix}-${t.id}`;
+    try {
+      let [p] = await odooCall('account.payment', 'search_read', [[['memo', '=', memo], ['company_id', '=', j.companyId]]], { fields: ['id', 'state', 'move_id', 'name'], context: ctxO, limit: 1 });
+      if (p) out.found++;
+      else {
+        const id = await odooCall('account.payment', 'create', [{ payment_type: 'outbound', partner_type: 'supplier', partner_id: +partner.id, amount: money(t.credit), date: t.date, journal_id: j.id, memo, company_id: j.companyId }], { context: ctxO });
+        await odooCall('account.payment', 'action_post', [[id]], { context: ctxO });
+        [p] = await odooCall('account.payment', 'read', [[id], ['id', 'state', 'move_id', 'name']], { context: ctxO });
+        out.posted++;
+      }
+      const moveId = p.move_id ? p.move_id[0] : null, name = p.name || (p.move_id ? p.move_id[1] : memo);
+      out.total = money(out.total + t.credit);
+      await col.doc(t.id).set({ bookedMove: { id: moveId, name, ref: memo, kind: 'payment', at: now(), state: p.state }, ref: name, service: t.company || 'S LB',
+        odoo: { checkedAt: now(), matches: [{ chosen: true, moveId, move: name, date: t.date, amount: money(t.credit), partner: partner.name, partnerId: +partner.id, label: 'paid to ' + partner.name + ' from Cash Mario',
+          company: t.company || 'S LB', journal: 'Cash Mario USD', state: p.state, docs: [], analytics: [], score: 10, why: ['payment made from this row'] }] } }, { merge: true });
+    } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount: t.credit, error: String(e.message || e).slice(0, 160) }); if (out.skipped.length > 5) break; }
+  }
+  return out;
+}
+
+// An unofficial supplier ticket he paid: the supplier's bill in S LB (no VAT), paid through Settlement by him.
+async function postVendors(ctx, account, who, opts) {
+  const { ws, txCol, odooCall, acc } = ctx;
+  const partner = account.odooPartner; if (!partner || !partner.id) throw new Error('set the account\'s Odoo partner first');
+  const map = await loadMap(ws);
+  const col = txCol(account);
+  const all = (await col.get()).docs.map(d => d.data());
+  const rows = all.filter(t => t.src === 'excel' && !t.excluded && t.debit > 0 && t.nature === 'vendor' && !inOdoo(t) && !t.bookedMove).sort((a, b) => a.date < b.date ? -1 : 1);
+  const an = analyticsFor(all.filter(t => t.src === 'excel' && !t.excluded && t.debit > 0), map);
+  const out = { rows: rows.length, posted: 0, found: 0, noPartner: [], skipped: [], total: 0 };
+  const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
+  const ctxO = { allowed_company_ids: [SLB.companyId], company_id: SLB.companyId };
+  for (const t of rows) {
+    const v = VENDOR_IDS.find(([rx]) => rx.test(t.partnerName || ''));
+    if (!v) { out.noPartner.push({ id: t.id, date: t.date, amount: t.debit, partner: t.partnerName }); continue; }
+    if (opts && opts.dry) { out.posted++; out.total = money(out.total + t.debit); continue; }
+    const ref = `${prefix}-${t.id}`;
+    try {
+      let [bill] = await odooCall('account.move', 'search_read', [[['ref', '=', ref], ['move_type', '=', 'in_invoice']]], { fields: ['id', 'name', 'state', 'payment_state'], context: ctxO, limit: 1 });
+      const a = an[t.id] || { id: GENERAL, name: 'GENERAL' };
+      if (bill) out.found++;
+      else {
+        const id = await odooCall('account.move', 'create', [{ move_type: 'in_invoice', company_id: SLB.companyId, journal_id: SLB.journalId, partner_id: v[1], invoice_date: t.date, date: t.date, ref,
+          narration: `${account.name}: paid by ${partner.name} on ${t.date} (Excel row, no VAT invoice). Made by Shift Hub.`,
+          invoice_line_ids: [[0, 0, { name: `${t.date} · ${t.description || v[2]}`, quantity: 1, price_unit: money(t.debit), account_id: RAW_MATERIALS, tax_ids: [[6, 0, []]], analytic_distribution: { [String(a.id)]: 100 } }]] }], { context: ctxO });
+        await odooCall('account.move', 'action_post', [[id]], { context: ctxO });
+        [bill] = await odooCall('account.move', 'read', [[id], ['id', 'name', 'state', 'payment_state']], { context: ctxO });
+        out.posted++;
+      }
+      if (bill.payment_state === 'not_paid') {
+        // Settlement journal + Paid by = him: the automation moves the debt onto his account
+        const wctx = { ...ctxO, active_model: 'account.move', active_ids: [bill.id] };
+        const wiz = await odooCall('account.payment.register', 'create', [{ journal_id: 194, payment_date: t.date, x_paid_by: +partner.id }], { context: wctx });
+        await odooCall('account.payment.register', 'action_create_payments', [[wiz]], { context: wctx });
+        [bill] = await odooCall('account.move', 'read', [[bill.id], ['id', 'name', 'state', 'payment_state']], { context: ctxO });
+      }
+      out.total = money(out.total + t.debit);
+      await col.doc(t.id).set({ bookedMove: { id: bill.id, name: bill.name, ref, kind: 'vendor-bill', at: now(), state: bill.state, paymentState: bill.payment_state }, ref: bill.name, service: 'S LB',
+        company: 'S LB', companySrc: 'odoo', partnerId: v[1], analyticId: a.id, analyticName: a.name, analyticSrc: t.analyticSrc === 'manual' ? 'manual' : 'excel',
+        odoo: { checkedAt: now(), matches: [{ chosen: true, moveId: bill.id, move: bill.name, date: t.date, amount: money(t.debit), partner: v[2], partnerId: v[1], label: t.description,
+          company: 'S LB', journal: 'Bills', state: bill.state, docs: [], analytics: [{ id: a.id, name: a.name, from: 'bill' }], score: 10, why: ['bill made from this row, settled by ' + partner.name] }] } }, { merge: true });
+    } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount: t.debit, error: String(e.message || e).slice(0, 200) }); if (out.skipped.length > 5) break; }
+  }
+  return out;
+}
+
+module.exports = { postPayments, postVendors, natureOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };

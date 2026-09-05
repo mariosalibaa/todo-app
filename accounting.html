@@ -549,7 +549,7 @@ function odooCell(t) {
     const differs = t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
     const docs = [...new Set((win.docs || []).filter(d => d && d !== win.move))];
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
-      + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${esc(docs.join(', '))}</div>` : '')
+      + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => win.docIds && win.docIds[d] ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${win.docIds[d]}">${esc(d)}</a>` : esc(d)).join(', ')}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
   const tip = m.map(matchTip).join('\n');
@@ -1050,18 +1050,21 @@ async function openMonths() {
 function drawMonths() {
   const { months, projects, analytics } = monthsData;
   const unmapped = projects.filter(p => !p.analyticId);
-  const mrows = months.map(m => {
-    const bill = m.bill;
-    const state = bill ? (bill.state === 'draft' ? `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">${esc(bill.name)}</a> <span class="hint">draft, ${fmt(bill.amount)}</span>` : `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">✓ ${esc(bill.name)}</a> <span class="hint">${esc(bill.state)}${bill.paymentState && bill.paymentState !== 'not_paid' ? ' · ' + esc(bill.paymentState.replace('_', ' ')) : ''}</span>`) : '<span class="hint">not in Odoo</span>';
+  const cell = (m, part, n, amount) => {
+    const bill = (m.bills || {})[part];
+    if (!n) return '<td class="hint">—</td><td></td>';
+    const state = bill ? (bill.state === 'draft' ? `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">${esc(bill.name)}</a> <span class="hint">draft</span>` : `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">✓ ${esc(bill.name)}</a> <span class="hint">${esc(bill.state)}${bill.paymentState && bill.paymentState !== 'not_paid' ? ' · ' + esc(bill.paymentState.replace('_', ' ')) : ''}</span>`) : '<span class="hint">not in Odoo</span>';
     const can = !bill || bill.state === 'draft';
-    const gap = m.unmapped.length ? `<div class="odoo-warn" title="${esc(m.unmapped.map(u => u.text + ' ×' + u.rows).join(', '))}">${m.unmapped.reduce((s, u) => s + u.rows, 0)} row${m.unmapped.reduce((s, u) => s + u.rows, 0) === 1 ? '' : 's'} without an analytic account</div>` : '';
-    return `<tr><td><b>${esc(m.month)}</b></td><td class="num">${m.rows}</td><td class="hint">${m.labour} labour · ${m.expense} expense</td><td class="num">${fmt(m.amount)}</td><td>${state}${gap}</td>
-      <td><button class="btn sm" ${can ? '' : 'disabled'} onclick="bookMonth('${m.month}', this)">${bill ? (can ? 'Rewrite draft' : 'Posted') : 'Create draft'}</button></td></tr>`;
+    return `<td>${n} line${n === 1 ? '' : 's'} · ${fmt(amount)}<div>${state}</div></td><td><button class="btn sm" ${can ? '' : 'disabled'} onclick="bookMonth('${m.month}', '${part}', this)">${bill ? (can ? 'Rewrite' : 'Posted') : 'Create'}</button></td>`;
+  };
+  const mrows = months.map(m => {
+    const gap = m.unmapped.length ? `<div class="hint" title="${esc(m.unmapped.map(u => u.text + ' ×' + u.rows).join(', '))}">${m.unmapped.reduce((s, u) => s + u.rows, 0)} row${m.unmapped.reduce((s, u) => s + u.rows, 0) === 1 ? '' : 's'} on a project not mapped yet → GENERAL until mapped</div>` : '';
+    return `<tr><td><b>${esc(m.month)}</b>${gap}</td>${cell(m, 'labour', m.labour, m.labourAmount)}${cell(m, 'expenses', m.expense, m.expenseAmount)}</tr>`;
   }).join('');
   const prow = p => `<tr><td>${esc(p.text)}</td><td class="num hint">${p.rows}</td><td><select onchange="mapProject('${esc(p.key)}', this)"><option value="">— not mapped —</option>${analytics.map(a => `<option value="${a.id}" ${a.id === p.analyticId ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select> <span class="hint">${p.src === 'auto' ? 'guessed' : p.src === 'manual' ? 'chosen' : ''}</span></td></tr>`;
   document.getElementById('months-body').innerHTML = `
-    <p class="hint">One draft bill per month <b>from ${esc(account.odooPartner.name)}</b> in S LB (journal Bills, no tax): one line per Excel row — his days on <i>621100 Sub Contractor A</i>, benzine on <i>626900 Fuel and Gas</i>, the rest on <i>626990 Other Expenses</i> — each line carrying the row's project as its analytic account. Transfers and official-vendor rows are never in it. Rewriting a draft replaces its lines; a posted bill is left alone.</p>
-    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Month</th><th class="num">Rows</th><th></th><th class="num">Total</th><th>In Odoo</th><th></th></tr></thead><tbody>${mrows || '<tr><td colspan="6" class="hint">No labour or expense rows to book.</td></tr>'}</tbody></table>
+    <p class="hint">Two draft bills per month <b>from ${esc(account.odooPartner.name)}</b> in S LB (journal Bills, no tax), one line per Excel row: the <b>labour</b> bill carries his days on <i>621100 Sub Contractor A</i>; the <b>expenses</b> bill carries benzine on <i>626900 Fuel and Gas</i> and the rest on <i>626990 Other Expenses</i>. Every line has an analytic account: the row's project, else the project he worked that day, else the previous one, else GENERAL. Transfers and official-vendor rows are never in these bills. Rewriting a draft replaces its lines; a posted bill is left alone.</p>
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Month</th><th>Labour bill — his days</th><th></th><th>Expenses bill — benzine, misc</th><th></th></tr></thead><tbody>${mrows || '<tr><td colspan="5" class="hint">No labour or expense rows to book.</td></tr>'}</tbody></table>
     <h4 style="margin:16px 0 4px">Projects → analytic accounts ${unmapped.length ? `<span class="odoo-warn">${unmapped.length} still to map</span>` : '<span class="hint">all mapped</span>'}</h4>
     <p class="hint">The sheet's project names, matched to Odoo's analytic accounts. Fix any of them here; the choice holds for every import and every bill after.</p>
     <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>In the sheet</th><th class="num">Rows</th><th>Analytic account (Odoo)</th></tr></thead><tbody>${[...unmapped, ...projects.filter(p => p.analyticId)].map(prow).join('')}</tbody></table>`;
@@ -1076,14 +1079,14 @@ async function mapProject(key, sel) {
     tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
   } catch (e) { say('Could not save: ' + e.message, 'err'); sel.disabled = false; }
 }
-async function bookMonth(month, btn) {
+async function bookMonth(month, part, btn) {
   btn.disabled = true; btn.textContent = 'Working…';
   try {
-    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-month`, { month });
-    say(`${month}: ${r.move} ${r.action} — ${r.rows} lines (${r.labour} labour, ${r.expense} expense), ${fmt(r.total)}${r.unmappedProjects.length ? '; no analytic yet for ' + r.unmappedProjects.join(', ') : ''}`);
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-month`, { month, part });
+    say(`${month} ${part}: ${r.move} ${r.action} — ${r.rows} lines, ${fmt(r.total)}${r.inherited ? '; ' + r.inherited + ' took the day\'s project' : ''}${r.general ? '; ' + r.general + ' on GENERAL (map the project, then Rewrite)' : ''}`);
     monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths();
     tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
-  } catch (e) { say('Could not book: ' + e.message, 'err'); btn.disabled = false; btn.textContent = 'Create draft'; }
+  } catch (e) { say('Could not book: ' + e.message, 'err'); btn.disabled = false; btn.textContent = 'Create'; }
 }
 let billsData = null;
 function closeBills() { document.getElementById('bills').hidden = true; }

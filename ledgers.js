@@ -203,6 +203,12 @@ async function importExcel(ctx, account, who) {
       kind: r.kind || '', kindSrc: r.kind ? 'excel' : '', hours: r.hours || 0, excelRow: r.row, importedAt: now() };
   });
 
+  // a spend with no project (benzine) belongs to the site he worked that day, else the last one seen
+  { const byDay = {}; for (const l of lines) if (l.project && l.kind === 'labour') byDay[l.date] = byDay[l.date] || l.project;
+    let last = ''; for (const l of lines.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)) {
+      if (l.project) { last = l.project; continue; }
+      if (l.debit && l.nature === 'expense') { const after = () => { const d = Object.keys(byDay).sort().find(x => x > l.date); return d ? byDay[d] : ''; }; const p = byDay[l.date] || last || after(); if (p) { l.project = p; l.projectFrom = byDay[l.date] ? 'same day' : last ? 'day before' : 'day after'; } }
+    } }
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines.filter(l => !(existing[l.id] || {}).bookedMove), odoo, { taken, loose: true });
   const byId = Object.fromEntries(odoo.map(o => [o.id, o]));
@@ -214,7 +220,7 @@ async function importExcel(ctx, account, who) {
   const writes = lines.map(t => {
     const prev = existing[t.id] || {};
     const { partnerName, project, nature, partnerKind, cashAccountId, ...rest } = t;
-    const data = { ...rest, project, excluded: false, dupOf: null };          // the Excel row always counts
+    const data = { ...rest, project, projectFrom: t.projectFrom || '', excluded: false, dupOf: null };          // the Excel row always counts
     // what the sheet itself says about the row
     if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerName: partnerName || '', partnerId: null, partnerSrc: partnerName ? 'excel' : '' });
     if (prev.natureSrc !== 'manual') Object.assign(data, { nature: nature || '', partnerKind: partnerKind || '', cashAccountId: cashAccountId || '' });
@@ -225,7 +231,9 @@ async function importExcel(ctx, account, who) {
     // a row already booked into a monthly bill keeps that link whatever else changes
     if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; }
     // money he was handed is not an expense of any company but the one that holds his account
-    if (prev.companySrc !== 'manual') Object.assign(data, { company: t.credit ? 'S LB' : '', companySrc: t.credit ? 'excel' : '' });
+    // money handed to him and everything unofficial live in S LB; an official vendor's bill is the SARL's until Odoo says otherwise
+    const co = t.credit || nature === 'labour' || nature === 'expense' ? 'S LB' : nature === 'vendor' ? 'SHIFT GROUP SARL (USD)' : '';
+    if (prev.companySrc !== 'manual') Object.assign(data, { company: co, companySrc: co ? 'excel' : '' });
     const d = dup.get(t.id);
     const o = d ? byId[d.id] : null;
     if (o) {

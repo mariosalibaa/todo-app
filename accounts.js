@@ -209,7 +209,7 @@ async function importOdoo(odooCall, account, who) {
         odoo: { checkedAt: now(), matches: [{
           chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: l.debit || l.credit,
           partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
-          company: j.company, journal: j.name, state: l.parent_state, docs, analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
+          company: j.company, journal: j.name, state: l.parent_state, docs, docIds: Object.fromEntries(bills.map(b => [b.name, b.id])), analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
         }] },
       };
       if (counterparty && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: counterparty[0], partnerName: counterparty[1], partnerSrc: 'odoo' });
@@ -566,8 +566,16 @@ async function handle(req, res, url, user, ctx) {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
     const b = await readBody(req);
-    try { return json(res, 200, await bills.bookMonth(ledgerCtx, a, b.month, who)); }
+    try { return json(res, 200, await bills.bookMonth(ledgerCtx, a, b.month, b.part || 'labour', who, { post: !!b.post })); }
     catch (e) { console.error('book-month', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // the received rows as payments to him; the unofficial vendor tickets as bills settled by him
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/post-(payments|vendors)$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await (m[2] === 'payments' ? bills.postPayments : bills.postVendors)(ledgerCtx, a, who, { dry: !!b.dry })); }
+    catch (e) { console.error('post-' + m[2], e); return json(res, 400, { error: String(e.message || e) }); }
   }
   // Excel project name → Odoo analytic account, kept for good
   if (url === '/api/accounting/analytic-map' && req.method === 'POST') {
