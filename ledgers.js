@@ -62,7 +62,11 @@ const hours = c => { const v = cell(c); return typeof v === 'number' ? money(v) 
 // project, kind}. amount > 0 = the person paid / is owed (debit), < 0 = received (credit) —
 // this is how Abed, Georges, Khodr and Mitri's sheets are written; Ziad's is a wallet view
 // (+ = in), so his layout flips.
+// amount, what the row says, the project it belongs to, its kind, and the counterparty:
+// on a row he was paid, who handed him the money; on a row he spent, what he spent it on.
 const OWNED = (amount, description, project, kind, extra) => ({ amount, description, project: project || '', kind: kind || '', ...(extra || {}) });
+const CASH_OF = { mario: 'Mario cash', ziad: 'Ziad cash', georges: 'Georges cash', abed: 'Abed cash', mitri: 'Mitri cash', khodr: 'Khodr cash', khoder: 'Khodr cash', therese: 'Therese' };
+const titled = x => { const v = String(x || '').trim(); return v ? v[0].toUpperCase() + v.slice(1) : ''; };
 const LAYOUTS = {
   // A status | B date | C amount | D partner | E analytic | F label | G account
   abed: { sheet: 'Abed', date: 2, status: 1, owner: 'abed',
@@ -75,7 +79,8 @@ const LAYOUTS = {
       const dayOf = x => x === 70 ? 'day with son' : x === 50 ? 'day alone' : x === 25 ? 'half day' : x === 35 ? 'half day with son' : 'work';
       const desc = isPay ? ['received', str(r[7]) && str(r[7]) !== own ? 'from ' + str(r[7]) : '', label].filter(Boolean).join(' ') || 'received'
         : self && !label ? 'Abed · ' + dayOf(a) : [partner, label].filter(Boolean).join(' · ') || 'expense';
-      return [OWNED(a, desc, /^payment$/i.test(an) ? '' : an, isPay ? 'transfer' : self ? 'labour' : '', self && !isPay ? { withSon: a === 70 || a === 35 } : null)]; } },
+      return [OWNED(a, desc, /^payment$/i.test(an) ? '' : an, isPay ? 'transfer' : self ? 'labour' : '',
+        { partner: partner || (isPay ? 'mario' : ''), ...(self && !isPay ? { withSon: a === 70 || a === 35 } : {}) })]; } },
   // A status | B date | C amount | D account (person / vendor) | E vendor bill | F project | G note
   georges: { sheet: 'Georges', date: 2, status: 1, owner: 'georges',
     rows: (r, own) => { const a = num(r[3]);
@@ -85,24 +90,25 @@ const LAYOUTS = {
       const isPay = a < 0;
       const desc = isPay ? ['received', who && !self ? 'from ' + who : '', note].filter(Boolean).join(' ') || 'received'
         : [who, bill, note].filter(Boolean).join(' · ') || 'expense';
-      return [OWNED(a, desc, str(r[6]), isPay ? 'transfer' : self && !bill ? 'labour' : '')]; } },
+      return [OWNED(a, desc, str(r[6]), isPay ? 'transfer' : self && !bill ? 'labour' : '', { partner: who || (isPay ? 'mario' : '') })]; } },
   // A ID | B name | C status | D date | E start | F end | G h | H Due1 | I Due2 | J Type | K Km | L T2 | M Project | N Due4 | O Note Exp | P Credit | Q Credit Account | R Note Credit
   khoder: { sheet: 'data', date: 4, status: 3, owner: 'khodr',
     rows: r => { const out = [];
       const h = hours(r[7]), wage = money(num(r[8]) + num(r[9])), exp = num(r[14]), cr = num(r[16]);   // the sheet's own total = Due1 + Due2 + Due4 + Credit
       const project = str(r[13]);
-      if (wage) out.push(OWNED(wage, `${h ? h.toFixed(2) + ' h' : 'labour'}${num(r[9]) ? ' + transport' : ''}`, project, 'labour', { hours: h }));
-      if (exp) { const what = str(r[15]) || 'expense'; out.push(OWNED(exp, what, project, /previous balance/i.test(what) ? 'opening' : '')); }
-      if (cr) { const from = str(r[17]), note = str(r[18]); out.push(OWNED(cr, [cr < 0 ? 'received' : 'given', from ? (cr < 0 ? 'from ' : 'to ') + from : '', note].filter(Boolean).join(' '), '', 'transfer')); }
+      if (wage) out.push(OWNED(wage, `${h ? h.toFixed(2) + ' h' : 'labour'}${num(r[9]) ? ' + transport' : ''}`, project, 'labour', { hours: h, partner: 'khodr' }));
+      if (exp) { const what = str(r[15]) || 'expense'; out.push(OWNED(exp, what, project, /previous balance/i.test(what) ? 'opening' : '', { partner: /previous balance/i.test(what) ? '' : what })); }
+      if (cr) { const from = str(r[17]), note = str(r[18]); out.push(OWNED(cr, [cr < 0 ? 'received' : 'given', from ? (cr < 0 ? 'from ' : 'to ') + from : '', note].filter(Boolean).join(' '), '', 'transfer', { partner: from || 'mario' })); }
       return out; } },
   // A yy-mm | B status | C date | D Hr | E type | F KM | G Due1 | H Due2 | I Due3 | J Received | K Note | L Project
   mitri: { sheet: 'data', date: 3, status: 2, owner: 'mitri',
     rows: r => { const out = [];
       const h = hours(r[4]), wage = num(r[7]) + num(r[8]), exp = num(r[9]), rec = num(r[10]);
       const note = str(r[11]), project = str(r[12]);
-      if (wage) out.push(OWNED(wage, `${h ? h + ' h' : 'labour'}${str(r[5]) ? ' ' + str(r[5]) : ''}${num(r[6]) ? ' ' + num(r[6]) + ' km' : ''}${note && !exp && !rec ? ' · ' + note : ''}`, project, 'labour', { hours: h }));
-      if (exp) out.push(OWNED(exp, note || 'expense', project, ''));
-      if (rec) out.push(OWNED(rec, rec < 0 ? (note || 'received') : (note || 'bonus'), project, rec < 0 ? 'transfer' : ''));
+      const nameIn = t => (String(t || '').match(/from\s+([a-z]+)/i) || [])[1] || '';
+      if (wage) out.push(OWNED(wage, `${h ? h + ' h' : 'labour'}${str(r[5]) ? ' ' + str(r[5]) : ''}${num(r[6]) ? ' ' + num(r[6]) + ' km' : ''}${note && !exp && !rec ? ' · ' + note : ''}`, project, 'labour', { hours: h, partner: 'mitri' }));
+      if (exp) out.push(OWNED(exp, note || 'expense', project, '', { partner: note.replace(/\d+[.,]?\d*\s*\$?/g, '').trim().slice(0, 40) }));
+      if (rec) out.push(OWNED(rec, rec < 0 ? (note || 'received') : (note || 'bonus'), project, rec < 0 ? 'transfer' : '', { partner: rec < 0 ? (nameIn(note) || 'mario') : 'mitri' }));
       return out; } },
   // A status | B date | C amount (+ in, − out) | D label | E project | F type | G account | H account2
   ziad: { sheet: 'accounting', date: 2, status: 1, owner: 'ziad',
@@ -111,8 +117,10 @@ const LAYOUTS = {
       if (!a) return [OWNED(0, label || 'note', '', 'note')];
       const isTr = /transfer/i.test([type, acct, tag].join(' '));
       const isPrev = /previous balance/i.test(label + type);
+      const from = (label.match(/from\s+([a-z]+)/i) || [])[1] || '';
       return [OWNED(-a, [label, acct && !/transfer/i.test(acct) && !new RegExp(acct, 'i').test(label) ? acct : '', /official|invoice/i.test(tag) ? tag.toLowerCase() : ''].filter(Boolean).join(' · '),
-        str(r[5]) === 'general' ? '' : str(r[5]), isPrev ? 'opening' : isTr ? 'transfer' : '', { lbp: num(r[10]) || 0 })]; } },
+        str(r[5]) === 'general' ? '' : str(r[5]), isPrev ? 'opening' : isTr ? 'transfer' : '',
+        { lbp: num(r[10]) || 0, partner: a > 0 ? (from || 'mario') : (acct && !/transfer/i.test(acct) ? acct : '') })]; } },
 };
 
 async function readExcel(file, layoutName, sheetName) {
@@ -182,8 +190,12 @@ async function importExcel(ctx, account, who) {
     const base = `xl-${r.date}-${debit ? 'd' : 'c'}${Math.round((debit || credit) * 100)}-${slugId(r.description) || 'x'}`;
     seen[base] = (seen[base] || 0) + 1;
     const id = seen[base] > 1 ? `${base}-${seen[base]}` : base;
-    const description = [r.description, r.project ? '· ' + r.project : ''].filter(Boolean).join(' ');
-    return { id, src: 'excel', date: r.date, ref: '', service: 'Excel', phone: '', description, debit, credit, project: r.project || '', period: r.period || '',
+    // money in = someone handed it to him, so the counterparty is that person's cash;
+    // money out = what he spent it on, as the sheet writes it
+    const raw = String(r.partner || '').trim().toLowerCase();
+    const partnerName = credit ? (CASH_OF[raw] || titled(r.partner) || 'Mario cash') : titled(r.partner);
+    return { id, src: 'excel', date: r.date, ref: '', service: 'Excel', phone: '', description: r.description, debit, credit,
+      project: r.project || '', partnerName, period: r.period || '',
       kind: r.kind || '', kindSrc: r.kind ? 'excel' : '', hours: r.hours || 0, excelRow: r.row, importedAt: now() };
   });
 
@@ -197,7 +209,13 @@ async function importExcel(ctx, account, who) {
   for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) odooWrites[o.id] = { excluded: true, odooOnly: false };
   const writes = lines.map(t => {
     const prev = existing[t.id] || {};
-    const data = { ...t, excluded: false, dupOf: null };            // the Excel row always counts
+    const { partnerName, project, ...rest } = t;
+    const data = { ...rest, excluded: false, dupOf: null };          // the Excel row always counts
+    // what the sheet itself says about the row
+    if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerName: partnerName || '', partnerId: null, partnerSrc: partnerName ? 'excel' : '' });
+    if (prev.analyticSrc !== 'manual') Object.assign(data, { analyticName: project || '', analyticId: null, analyticSrc: project ? 'excel' : '' });
+    // money he was handed is not an expense of any company but the one that holds his account
+    if (prev.companySrc !== 'manual') Object.assign(data, { company: t.credit ? 'S LB' : '', companySrc: t.credit ? 'excel' : '' });
     const d = dup.get(t.id);
     const o = d ? byId[d.id] : null;
     if (o) {
@@ -212,11 +230,9 @@ async function importExcel(ctx, account, who) {
       if (o.paidBy && prev.paidBySrc !== 'manual') Object.assign(data, { paidBy: o.paidBy, paidBySrc: 'odoo' });
       odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: t.id, dupSrc: 'auto' };
     } else if (prev.matchedOdoo) {
-      // matched last time, not any more: drop the borrowed facts
+      // matched last time, not any more: the sheet's own facts (set above) stand alone again
       data.odoo = null; data.matchedOdoo = null; data.ref = ''; data.files = []; data.service = 'Excel';
-      if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerId: null, partnerName: '', partnerSrc: '' });
-      if (prev.analyticSrc !== 'manual') Object.assign(data, { analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '' });
-      if (prev.companySrc !== 'manual') { data.company = ''; data.companySrc = ''; }
+      data.analyticFrom = '';
       if (prev.paidBySrc === 'odoo') { data.paidBy = ''; data.paidBySrc = ''; }
     }
     if (prev.kindSrc === 'manual') { delete data.kind; delete data.kindSrc; }

@@ -235,7 +235,6 @@ const ALL_COLS = [
   { k: 'bal',     l: 'Balance',               f: 'amount', v: t => isStatement() ? t.balance : t._bal, num: true },
   { k: 'partner', l: 'Partner (Odoo)',        f: 'text',   v: t => t.partnerName || '', c: 'c-partner' },
   { k: 'company', l: 'Company',               f: 'select', v: t => companyOf(t), c: 'c-company' },
-  { k: 'paidby',  l: 'Paid by',               f: 'select', v: t => t.paidBy || '', c: 'c-paid', only: 'cash' },
   { k: 'proj',    l: 'Analytic (Odoo)',       f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
   { k: 'note',    l: 'Note',                  f: 'text',   v: t => t.note || '', c: 'c-note' },
   { k: 'odoo',    l: 'Odoo',                  f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length },
@@ -423,7 +422,7 @@ function sugState(t) {
   if (!sugFor(t).any) return '';
   return t.suggestSkip ? 'skipped' : 'pending';
 }
-const srcClass = s => s === 'manual' ? 'src-manual' : s === 'odoo' ? 'src-odoo'
+const srcClass = s => s === 'manual' ? 'src-manual' : (s === 'odoo' || s === 'excel') ? 'src-odoo'
   : (s === 'suggest' || s === 'auto' || s === 'google') ? 'src-auto' : '';
 
 // ── Header + column filters ──
@@ -599,8 +598,7 @@ function render() {
                 ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
                 : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : ''}
       </td>
-      ${isCash() ? `<td class="c-paid ${srcClass(t.paidBy ? (t.paidBySrc || 'manual') : '')}" title="${t.paidBySrc === 'odoo' ? 'Read from the Odoo attachment name or memo' : 'Who physically paid'}"><select onchange="savePaidBy('${t.id}', this.value, this)"><option value="" ${!t.paidBy ? 'selected' : ''}>—</option>${PEOPLE.map(p => `<option value="${p}" ${t.paidBy === p ? 'selected' : ''}>${cap(p)}</option>`).join('')}</select></td>` : ''}
-      <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : ''}">
+            <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : ''}">
         <div class="pick"><input type="text" id="an-${t.id}-txt" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="analytic"
           oninput="anFilter('an-${t.id}')" onkeydown="anKey(event,'an-${t.id}')" onblur="anBlur('an-${t.id}')">
           <input type="hidden" id="an-${t.id}" value="${esc(t.analyticId || '')}" data-row="${t.id}"><div class="pick-list" id="an-${t.id}-list"></div></div>
@@ -1289,7 +1287,6 @@ function openLineForm(id) {
     <label>Description</label><input id="lf-desc" value="${esc(t ? t.description : '')}" placeholder="what for">
     <label>Partner (Odoo)</label><input id="lf-partner" list="lf-partners" value="${esc(t ? t.partnerName || '' : '')}" placeholder="type to search"><datalist id="lf-partners">${partners.map(p => `<option value="${esc(p.name)}">`).join('')}</datalist>
     <label>Company</label><select id="lf-co"><option value="">—</option><option ${t && companyOf(t) === 'Personal' ? 'selected' : ''}>Personal</option>${companies.map(c => `<option ${t && companyOf(t) === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
-    ${isCash() ? `<label>Paid by</label><select id="lf-paid"><option value="">—</option>${PEOPLE.map(p => `<option value="${p}" ${(t ? t.paidBy : account.owner) === p ? 'selected' : ''}>${cap(p)}</option>`).join('')}</select>` : ''}
     <label>Analytic (Odoo)</label><input id="lf-an" list="lf-ans" value="${esc(t ? t.analyticName || '' : '')}" placeholder="project, vehicle…"><datalist id="lf-ans">${analytic.map(a => `<option value="${esc(a.name)}">`).join('')}</datalist>
     <label>Note</label><input id="lf-note" value="${esc(t ? t.note || '' : '')}">`;
   document.getElementById('lineform').hidden = false;
@@ -1310,7 +1307,6 @@ async function saveLine() {
     company: co, companySrc: co ? 'manual' : '', kind: kindOf(co), kindSrc: co ? 'manual' : '',
     analyticId: a ? a.id : null, analyticName: a ? a.name : '', analyticSrc: a ? 'manual' : '', analyticFrom: '',
     note: document.getElementById('lf-note').value.trim(), noteSrc: document.getElementById('lf-note').value.trim() ? 'manual' : '' };
-  const paid = document.getElementById('lf-paid'); if (paid) body.paidBy = paid.value;
   try {
     if (lineEditing) await Admin.api('PATCH', `/api/accounting/accounts/${acc}/tx/${lineEditing.id}`, body);
     else await Admin.api('POST', `/api/accounting/accounts/${acc}/tx`, body);
