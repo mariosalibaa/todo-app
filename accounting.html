@@ -415,6 +415,7 @@ const matchTip = x => [x.move, x.date, x.company, x.partner || x.label,
 const cents = n => Math.round(Number(n || 0) * 100) / 100;
 function ruleFor(t) {
   return rules.find(r => r.active !== false
+    && (r.phone || r.contains)
     && (!r.phone || String(t.phone || '') === String(r.phone))
     && (!r.contains || String(t.description || '').toLowerCase().includes(String(r.contains).toLowerCase()))
     && ((r.direction || 'out') === 'out' ? cents(t.debit) > 0 : cents(t.credit) > 0)
@@ -426,6 +427,8 @@ function bookButton(t) {
   const r = ruleFor(t);
   if (!r) return '';
   const what = [r.partnerName, r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · ');
+  // classify-only: the answers are filled in, but the bill has to come from the document
+  if (r.book === false) return `<span class="odoo-no" title="${esc((r.description || 'This rule fills the answers in but does not book.') + ' — ' + what)}">needs the bill</span>`;
   return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('Create the bill, post it and pay it from ' + (r.paymentJournalName || 'the cash journal') + ':\n' + what)}">${bk ? '📗 Post & pay' : '📗 Book'}</button>`;
 }
 function odooCell(t) {

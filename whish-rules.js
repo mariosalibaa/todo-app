@@ -33,7 +33,7 @@ const money = n => Math.round(Number(n || 0) * 100) / 100;
 
 // What a rule may say. Everything but the phone is optional, so a rule can be as loose as
 // "this number is always Patrick" or as tight as "$60 out, and only $60".
-const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName',
+const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName', 'book',
   'companyId', 'companyName', 'journalId', 'accountId', 'accountCode', 'analyticId', 'analyticName',
   'paymentJournalId', 'paymentJournalName', 'description', 'active'];
 
@@ -41,6 +41,9 @@ const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId'
 // "about $60" is how a $600 transfer ends up booked as an internet bill.
 function fits(rule, t) {
   if (rule.active === false) return false;
+  // A rule with neither a phone nor a text to look for would claim the whole
+  // statement, so it claims nothing instead.
+  if (!rule.phone && !rule.contains) return false;
   if (rule.phone && String(t.phone || '') !== String(rule.phone)) return false;
   if (rule.contains && !String(t.description || '').toLowerCase().includes(String(rule.contains).toLowerCase())) return false;
   const out = money(t.debit), inn = money(t.credit);
@@ -141,6 +144,9 @@ async function handle(req, res, url, user, ctx) {
       const rule = rules.find(r => fits(r, t));
       if (!rule) { out.push({ id, error: 'no rule matches this line any more' }); continue; }
       if (alreadyInOdoo(t)) { out.push({ id, error: 'Odoo already has this payment' }); continue; }
+      // book:false = the rule only classifies. Astro and Solaris need the official
+      // bill in hand (and attached) before anything is posted.
+      if (rule.book === false) { out.push({ id, error: 'this rule classifies only — book it from the bill itself' }); continue; }
       if (!rule.partnerId || !rule.journalId || !rule.accountId || !rule.companyId) {
         out.push({ id, error: 'the rule is missing the vendor, company, journal or account' }); continue;
       }
