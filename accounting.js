@@ -201,6 +201,18 @@ async function analyticAccounts(odooCall) {
   return _analyticCache.list;
 }
 
+// The analytic plans, hierarchical: 'PROJECTS / Ajaltoun 4193' reads as one name.
+let _planCache = { at: 0, list: [] };
+async function analyticPlans(odooCall) {
+  if (Date.now() - _planCache.at < 10 * 60000 && _planCache.list.length) return _planCache.list;
+  const rows = await odooCall('account.analytic.plan', 'search_read', [[]],
+    { fields: ['id', 'name', 'parent_id'], order: 'complete_name' });
+  const by = Object.fromEntries(rows.map(r => [r.id, r]));
+  const full = r => (r.parent_id && by[r.parent_id[0]] ? full(by[r.parent_id[0]]) + ' / ' : '') + r.name;
+  _planCache = { at: Date.now(), list: rows.map(r => ({ id: r.id, name: r.name, path: full(r) })) };
+  return _planCache.list;
+}
+
 // Every partner (vendor or customer — Odoo books both against res.partner) and every company.
 let _partnerCache = { at: 0, data: null };
 async function partnersAndCompanies(odooCall) {
@@ -455,6 +467,57 @@ async function handle(req, res, url, user, ctx) {
   if (url === '/api/accounting/analytic' && req.method === 'GET') {
     try { return json(res, 200, await analyticAccounts(odooCall)); }
     catch (e) { return json(res, 502, { error: String(e.message || e) }); }
+  }
+
+  // The analytic plans, so a new analytic account can be filed under the right one.
+  if (url === '/api/accounting/analytic/plans' && req.method === 'GET') {
+    try { return json(res, 200, await analyticPlans(odooCall)); }
+    catch (e) { return json(res, 502, { error: String(e.message || e) }); }
+  }
+
+  // Create an Odoo vendor/customer without leaving the statement.
+  // Partners here are SHARED (company_id false) like every existing one - the company
+  // only sets the Odoo context and decides whether it is a vendor or a customer.
+  if (url === '/api/accounting/partners' && req.method === 'POST') {
+    const body = await readBody(req);
+    const name = String(body.name || '').trim();
+    if (!name) return json(res, 400, { error: 'a name is required' });
+    try {
+      const { companies } = await partnersAndCompanies(odooCall);
+      const co = companies.find(c => c.id === +body.companyId || c.name === body.companyId);
+      if (!co) return json(res, 400, { error: 'choose the Odoo company first' });
+      const octx = { allowed_company_ids: [co.id], company_id: co.id };
+      const dup = await odooCall('res.partner', 'search_read', [[['name', '=ilike', name], ['active', '=', true]]],
+        { fields: ['id', 'name'], context: octx, limit: 1 });
+      if (dup.length) return json(res, 200, { id: dup[0].id, name: dup[0].name, existed: true });
+      const vals = { name, company_id: false, is_company: body.isCompany !== false };
+      if (body.kind === 'customer') vals.customer_rank = 1; else vals.supplier_rank = 1;
+      if (body.phone) vals.phone = String(body.phone);
+      const id = await odooCall('res.partner', 'create', [vals], { context: octx });
+      _partnerCache = { at: 0, data: null };
+      return json(res, 200, { id, name, existed: false, kind: body.kind === 'customer' ? 'customer' : 'vendor', by: who });
+    } catch (e) { return json(res, 502, { error: String(e.message || e) }); }
+  }
+
+  // Create an analytic account. Plan is the real choice; the account stays shared
+  // across companies, which is how all 86 existing ones are set up.
+  if (url === '/api/accounting/analytic' && req.method === 'POST') {
+    const body = await readBody(req);
+    const name = String(body.name || '').trim();
+    if (!name) return json(res, 400, { error: 'a name is required' });
+    try {
+      const plans = await analyticPlans(odooCall);
+      const plan = plans.find(p => p.id === +body.planId) || plans.find(p => p.name === body.planId);
+      if (!plan) return json(res, 400, { error: 'choose the plan this account belongs to' });
+      const octx = { allowed_company_ids: (await partnersAndCompanies(odooCall)).companies.map(c => c.id) };
+      const dup = await odooCall('account.analytic.account', 'search_read',
+        [[['name', '=ilike', name], ['active', '=', true]]], { fields: ['id', 'name', 'plan_id'], context: octx, limit: 1 });
+      if (dup.length) return json(res, 200, { id: dup[0].id, name: dup[0].name, plan: dup[0].plan_id ? dup[0].plan_id[1] : '', existed: true });
+      const id = await odooCall('account.analytic.account', 'create',
+        [{ name, plan_id: plan.id, company_id: false }], { context: octx });
+      _analyticCache = { at: 0, list: [] };
+      return json(res, 200, { id, name, plan: plan.name, existed: false, by: who });
+    } catch (e) { return json(res, 502, { error: String(e.message || e) }); }
   }
 
   if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/tx$/)) && req.method === 'GET') {
