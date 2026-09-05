@@ -217,6 +217,9 @@ async function importExcel(ctx, account, who) {
   let added = 0, updated = 0, linked = 0, loose = 0;
   const odooWrites = {};                                              // Odoo line id → its new state
   for (const o of odoo) odooWrites[o.id] = { excluded: true, odooOnly: true, dupOf: null, dupSrc: '' };
+  // an Odoo entry the hub made from a row (a monthly bill, a payment) stays that row's entry
+  const madeFrom = {}; for (const l of lines) { const b = (existing[l.id] || {}).bookedMove; if (b && b.id && !madeFrom[b.id]) madeFrom[b.id] = l.id; }
+  for (const o of odoo) { const mid = o.odoo && o.odoo.matches && o.odoo.matches[0] && o.odoo.matches[0].moveId; if (mid && madeFrom[mid]) odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: madeFrom[mid], dupSrc: 'auto' }; }
   // a person's own link (dupSrc manual) is kept as it is
   for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) odooWrites[o.id] = { excluded: true, odooOnly: false };
   const writes = lines.map(t => {
