@@ -66,8 +66,9 @@ const OWNED = (amount, description, project, kind, extra) => ({ amount, descript
 const LAYOUTS = {
   // A status | B date | C amount | D partner | E analytic | F label | G account
   abed: { sheet: 'Abed', date: 2, status: 1, owner: 'abed',
-    rows: (r, own) => { const a = num(r[3]); if (!a) return [];
+    rows: (r, own) => { const a = num(r[3]);
       const partner = str(r[4]), label = str(r[6]), an = str(r[5]);
+      if (!a) return [OWNED(0, [partner, label].filter(Boolean).join(' · ') || 'note', /^payment$/i.test(an) ? '' : an, 'note')];   // a row without an amount is still a row
       const self = new RegExp('^' + own + '$', 'i').test(partner);
       const isPay = a < 0;
       // Abed's day: 50$ alone, 70$ when his son works with him (Mario, 2026-09-05); 25$ = half a day
@@ -77,8 +78,9 @@ const LAYOUTS = {
       return [OWNED(a, desc, /^payment$/i.test(an) ? '' : an, isPay ? 'transfer' : self ? 'labour' : '', self && !isPay ? { withSon: a === 70 || a === 35 } : null)]; } },
   // A status | B date | C amount | D account (person / vendor) | E vendor bill | F project | G note
   georges: { sheet: 'Georges', date: 2, status: 1, owner: 'georges',
-    rows: (r, own) => { const a = num(r[3]); if (!a) return [];
+    rows: (r, own) => { const a = num(r[3]);
       const who = str(r[4]), bill = str(r[5]), note = str(r[7]);
+      if (!a) return [OWNED(0, [who, bill, note].filter(Boolean).join(' · ') || 'note', str(r[6]), 'note')];
       const self = new RegExp('^' + own, 'i').test(who);
       const isPay = a < 0;
       const desc = isPay ? ['received', who && !self ? 'from ' + who : '', note].filter(Boolean).join(' ') || 'received'
@@ -104,8 +106,9 @@ const LAYOUTS = {
       return out; } },
   // A status | B date | C amount (+ in, − out) | D label | E project | F type | G account | H account2
   ziad: { sheet: 'accounting', date: 2, status: 1, owner: 'ziad',
-    rows: r => { const a = num(r[3]); if (!a) return [];
+    rows: r => { const a = num(r[3]);
       const label = str(r[4]), acct = str(r[7]), tag = str(r[8]), type = str(r[6]);
+      if (!a) return [OWNED(0, label || 'note', '', 'note')];
       const isTr = /transfer/i.test([type, acct, tag].join(' '));
       const isPrev = /previous balance/i.test(label + type);
       return [OWNED(-a, [label, acct && !/transfer/i.test(acct) && !new RegExp(acct, 'i').test(label) ? acct : '', /official|invoice/i.test(tag) ? tag.toLowerCase() : ''].filter(Boolean).join(' · '),
