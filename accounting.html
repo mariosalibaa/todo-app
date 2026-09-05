@@ -146,6 +146,7 @@
   <input type="date" id="from" onchange="render()" title="From">
   <input type="date" id="to" onchange="render()" title="To">
   <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
+  <span id="rowcount" style="font-size:12px;color:var(--muted);white-space:nowrap" title="Rows shown · rows counted in the balance · all lines of this account"></span>
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
   <button class="btn" id="btn-odoolines" onclick="toggleOdooLines()" title="An account kept in Excel: its Odoo entries are matched onto the Excel rows and hidden here. Show them anyway." style="display:none">🟣 Odoo lines</button>
@@ -611,6 +612,8 @@ function render() {
     </tr>`;
   }).join('');
   const counted = rows.filter(t => !t.excluded);
+  const allCounted = tx.filter(t => !t.excluded).length;
+  document.getElementById('rowcount').textContent = tx.length ? `${rows.length} row${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' shown' : ''} · ${allCounted} counted · ${tx.length} lines` : '';
   const out = counted.reduce((a, t) => a + (t.debit || 0), 0), inn = counted.reduce((a, t) => a + (t.credit || 0), 0);
   const op = account && account.opening;
   document.getElementById('totals').innerHTML =
