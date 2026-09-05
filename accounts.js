@@ -566,7 +566,7 @@ async function handle(req, res, url, user, ctx) {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
     const b = await readBody(req);
-    try { return json(res, 200, await bills.bookMonth(ledgerCtx, a, b.month, b.part || 'labour', who, { post: !!b.post })); }
+    try { return json(res, 200, await bills.bookMonth(ledgerCtx, a, b.month, b.part || 'labour', who, { post: !!b.post, redo: !!b.redo })); }
     catch (e) { console.error('book-month', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   // the received rows as payments to him; the unofficial vendor tickets as bills settled by him

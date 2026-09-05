@@ -183,7 +183,10 @@ async function bookMonth(ctx, account, month, part, who, opts) {
   const found = await odooCall('account.move', 'search_read', [[['ref', 'in', refs], ['move_type', '=', 'in_invoice']]], { fields: ['id', 'name', 'state', 'ref'], context: ctxO, limit: 2 });
   const existing = found.find(f => f.ref === ref) || found[0];
   let moveId, moveName, action;
-  if (existing && existing.state !== 'draft') throw new Error(`${existing.name} (${existing.ref}) is already ${existing.state} — reset it to draft in Odoo first`);
+  if (existing && existing.state !== 'draft') {
+    if (!(opts && opts.redo)) throw new Error(`${existing.name} (${existing.ref}) is already ${existing.state} — reset it to draft in Odoo first`);
+    await odooCall('account.move', 'button_draft', [[existing.id]], { context: ctxO });   // asked to redo: back to draft, rewritten below, posted again
+  }
   const dateOf = rows[rows.length - 1].date;
   if (existing) {
     await odooCall('account.move', 'write', [[existing.id], { ref, invoice_line_ids: [[5, 0, 0], ...lines.map(l => [0, 0, l.line])], invoice_date: dateOf }], { context: ctxO });

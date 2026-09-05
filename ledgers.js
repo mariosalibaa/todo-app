@@ -197,7 +197,9 @@ async function importExcel(ctx, account, who) {
     // money out = what he spent it on, as the sheet writes it
     const raw = String(r.partner || '').trim().toLowerCase();
     const partnerName = credit ? (CASH_OF[raw] || titled(r.partner) || 'Mario cash') : titled(r.partner);
-    const nat = bills.natureOf({ credit, kind: r.kind, partnerRaw: raw, owner: lay.owner === 'khodr' ? 'khoder' : lay.owner });
+    const vendorInLabel = raw === (lay.owner === 'khodr' ? 'khoder' : lay.owner) && /attal|tchagh|solaris|khoury|kbm|khc|njk|narinco|medco|electromec|metaleo|epoxy|steel|paint|laser/i.test(r.description || '');
+    const nat = bills.natureOf({ credit, kind: vendorInLabel ? '' : r.kind, partnerRaw: vendorInLabel ? String(r.description).replace(/^abeds*·s*/i, '') : raw, owner: lay.owner === 'khodr' ? 'khoder' : lay.owner });
+    if (vendorInLabel) { r.kind = ''; }
     return { id, src: 'excel', date: r.date, ref: '', service: 'Excel', phone: '', description: r.description, debit, credit,
       project: r.project || '', partnerName, period: r.period || '', ...nat,
       kind: r.kind || '', kindSrc: r.kind ? 'excel' : '', hours: r.hours || 0, excelRow: r.row, importedAt: now() };
