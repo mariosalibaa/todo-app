@@ -148,6 +148,7 @@
   <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
+  <button class="btn" id="btn-odoolines" onclick="toggleOdooLines()" title="An account kept in Excel: its Odoo entries are matched onto the Excel rows and hidden here. Show them anyway." style="display:none">🟣 Odoo lines</button>
   <button class="btn" id="btn-check" onclick="toggleReviewImported()" title="WhatsApp messages that match nothing in the Excel or in Odoo: not counted until you accept them" style="display:none">❓ To review</button>
   <button class="btn primary" id="btn-line" onclick="openLineForm()" title="Type a line: money in or out of this account">＋ Line</button>
   <label class="btn primary" for="file" id="btn-upload">⬆ Upload statement (PDF)</label>
@@ -247,6 +248,9 @@ let sort = { k: 'date', dir: -1 };            // newest first, like an Odoo bank
 let colF = {};                                // column filters, key → string
 let sugFilter = '';                           // '' | 'pending' | 'skipped' — the Review button
 let reviewImported = false;                   // the ❓ button: only WhatsApp lines nobody wrote down elsewhere
+let showOdooLines = false;                    // Excel-kept accounts: the hidden Odoo lines (matched onto rows, or matching nothing)
+const isExcelKept = () => !!(account && account.excel && account.excel.file);
+const odooHidden = t => isExcelKept() && t.src === 'odoo' && t.excluded && !showOdooLines;
 
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
@@ -298,6 +302,7 @@ async function selectAccount(a) {
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
   document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
   document.getElementById('lg-src').innerHTML = st ? '<i style="background:#fff"></i>Date, service, description, amounts: the Whish statement as printed'
+    : isExcelKept() ? '<i style="background:#fff"></i>The Excel ledger <span class="src">excel</span> is the account; Odoo entries are matched onto its rows (✓ in the Odoo column) and never counted on their own. WhatsApp <span class="src">whatsapp</span> adds what the Excel missed once accepted.'
     : '<i style="background:#fff"></i>Lines from Odoo <span class="src">odoo</span>, HomeBudget <span class="src">budget</span>, the Excel ledger <span class="src">excel</span>, the WhatsApp group <span class="src">whatsapp</span>, typed here <span class="src">manual</span> or transfers <span class="src">transfer</span>';
   document.getElementById('empty-hint').textContent = st ? 'Export the statement as PDF from the Whish app (up to 6 months) and upload it here.'
     : hasJ ? 'Press ⇄ Import Odoo to pull the journal lines, or ＋ Line to type one.' : 'Type a line with ＋ Line, or add Odoo journals to this account with ⚙.';
@@ -476,6 +481,7 @@ function visible() {
     if (from && t.date < from) return false;
     if (to && t.date > to) return false;
     if (reviewImported && !t.review) return false;
+    if (odooHidden(t)) return false;
     if (q) {
       const hay = [t.date, t.service, t.description, t.phone, contactName(t).name, t.partnerName, companyOf(t), t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
@@ -558,6 +564,7 @@ function render() {
     const st = isStatement(), own = account && (account.owner || 'mario');
     const paidFlag = t.paidBy && t.paidBy !== own ? `<div class="flag" title="${esc('Physically paid by ' + cap(t.paidBy) + (t.paidBySrc === 'odoo' ? ' — read from the Odoo attachment / memo' : ''))}">⚑ paid by ${esc(cap(t.paidBy))}</div>` : '';
     const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '');
+    const onlyFlag = t.src === 'odoo' && t.odooOnly && t.excluded ? `<div class="flag" title="Booked in Odoo on this person's cash journal, but no row of the Excel ledger matches it. Not counted: the Excel is the account.">🟣 not in Excel</div>` : '';
     const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
     const acts = st ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>`
       : (t.excluded ? `<a onclick="toggleExcluded('${t.id}', false)" title="${esc(t.dupOf ? 'Not counted: repeats ' + t.dupOf + '. Click to count it.' : t.review ? 'Not counted: nobody wrote this down in the Excel or in Odoo. Click to accept and count it.' : 'Not counted. Click to count it.')}">${t.review ? '✓ accept' : '⊘ count'}</a>`
@@ -570,7 +577,7 @@ function render() {
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
-        ${paidFlag}${reviewFlag}${t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
+        ${paidFlag}${reviewFlag}${onlyFlag}${t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       <td class="num debit">${fmt(t.debit)}</td>
       <td class="num credit">${fmt(t.credit)}</td>
@@ -614,12 +621,18 @@ function render() {
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
   rv.disabled = !waiting && sugFilter !== 'pending';
+  const ol = document.getElementById('btn-odoolines'), nOdoo = isExcelKept() ? tx.filter(t => t.src === 'odoo' && t.excluded).length : 0;
+  ol.style.display = nOdoo ? '' : 'none';
+  const nOnly = tx.filter(t => t.src === 'odoo' && t.excluded && t.odooOnly).length;
+  ol.textContent = `🟣 ${nOdoo} Odoo line${nOdoo === 1 ? '' : 's'}${nOnly ? ' · ' + nOnly + ' not in Excel' : ''}`;
+  ol.classList.toggle('primary', showOdooLines);
   const ck = document.getElementById('btn-check'), toCheck = tx.filter(t => t.review).length;
   ck.style.display = toCheck || reviewImported ? '' : 'none';
   ck.textContent = toCheck ? `❓ ${toCheck} to review` : '❓ Nothing to review';
   ck.classList.toggle('primary', reviewImported);
 }
 function toggleReviewImported() { reviewImported = !reviewImported; render(); }
+function toggleOdooLines() { showOdooLines = !showOdooLines; render(); }
 
 // ── Partner picker: type to filter the Odoo partners, ↑↓, Enter or click ──
 const P = {};

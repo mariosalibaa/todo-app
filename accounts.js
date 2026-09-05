@@ -195,7 +195,13 @@ async function importOdoo(odooCall, account, who) {
       if (prev.companySrc !== 'manual') Object.assign(t, { company: j.company, companySrc: 'odoo', kind: 'work', kindSrc: 'odoo' });
       if (an && prev.analyticSrc !== 'manual') Object.assign(t, { analyticId: an.id, analyticName: an.name, analyticSrc: 'odoo', analyticFrom: an.from });
       if (paidBy && prev.paidBySrc !== 'manual') Object.assign(t, { paidBy, paidBySrc: 'odoo' });
-      if (paidBy && owner && paidBy !== owner) out.paidByOthers++;
+      // An account kept in an Excel ledger IS that ledger: Odoo is matched onto its rows,
+      // never counted as lines of its own. The Odoo line stays, hidden, as the evidence.
+      if (account.excel && account.excel.file) {
+        t.excluded = true;
+        if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; }
+        else { t.odooOnly = true; t.dupOf = null; }
+      } else if (paidBy && owner && paidBy !== owner) out.paidByOthers++;
       if (existing[id]) out.updated++; else out.added++;
       writes.push({ ref: col.doc(id), data: t });
     }

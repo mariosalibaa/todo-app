@@ -167,7 +167,8 @@ async function importExcel(ctx, account, who) {
   const col = txCol(account);
   const cur = await col.get();
   const existing = {}; cur.docs.forEach(d => { existing[d.id] = d.data(); });
-  const odoo = cur.docs.map(d => d.data()).filter(t => t.src === 'odoo' && !t.excluded);
+  // the Excel is the account: every Odoo line (hidden or not) is a candidate to fold onto a row
+  const odoo = cur.docs.map(d => d.data()).filter(t => t.src === 'odoo');
 
   // stable ids: date + side + cents + a slug of the text, numbered when a day repeats itself
   const seen = {};
@@ -183,19 +184,41 @@ async function importExcel(ctx, account, who) {
 
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines, odoo, { taken, loose: true });
+  const byId = Object.fromEntries(odoo.map(o => [o.id, o]));
   let added = 0, updated = 0, linked = 0, loose = 0;
+  const odooWrites = {};                                              // Odoo line id → its new state
+  for (const o of odoo) odooWrites[o.id] = { excluded: true, odooOnly: true, dupOf: null, dupSrc: '' };
+  // a person's own link (dupSrc manual) is kept as it is
+  for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) odooWrites[o.id] = { excluded: true, odooOnly: false };
   const writes = lines.map(t => {
     const prev = existing[t.id] || {};
-    const data = { ...t };
-    if (prev.dupSrc !== 'manual') {
-      const d = dup.get(t.id);
-      if (d) { data.dupOf = d.id; data.excluded = true; data.dupSrc = 'auto'; linked++; if (d.loose) loose++; }
-      else if (prev.dupSrc === 'auto') { data.dupOf = null; data.excluded = false; data.dupSrc = ''; }
+    const data = { ...t, excluded: false, dupOf: null };            // the Excel row always counts
+    const d = dup.get(t.id);
+    const o = d ? byId[d.id] : null;
+    if (o) {
+      // fold the Odoo facts onto the row: it now carries the entry it was booked as
+      linked++; if (d.loose) loose++;
+      const win = (o.odoo && o.odoo.matches || []).find(m => m.chosen) || null;
+      data.odoo = { checkedAt: now(), matches: win ? [{ ...win, why: [...(win.why || []), d.loose ? 'close amount, shared word' : 'same amount, same days'] }] : [] };
+      data.matchedOdoo = o.id; data.ref = o.ref || ''; data.files = o.files || []; data.service = o.service || 'Excel';
+      if (o.partnerId && prev.partnerSrc !== 'manual') Object.assign(data, { partnerId: o.partnerId, partnerName: o.partnerName, partnerSrc: 'odoo' });
+      if (o.company && prev.companySrc !== 'manual') Object.assign(data, { company: o.company, companySrc: 'odoo', kind: prev.kindSrc === 'manual' ? prev.kind : (t.kind || 'work'), kindSrc: prev.kindSrc === 'manual' ? 'manual' : (t.kind ? 'excel' : 'odoo') });
+      if (o.analyticId && prev.analyticSrc !== 'manual') Object.assign(data, { analyticId: o.analyticId, analyticName: o.analyticName, analyticSrc: 'odoo', analyticFrom: o.analyticFrom || '' });
+      if (o.paidBy && prev.paidBySrc !== 'manual') Object.assign(data, { paidBy: o.paidBy, paidBySrc: 'odoo' });
+      odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: t.id, dupSrc: 'auto' };
+    } else if (prev.matchedOdoo) {
+      // matched last time, not any more: drop the borrowed facts
+      data.odoo = null; data.matchedOdoo = null; data.ref = ''; data.files = []; data.service = 'Excel';
+      if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerId: null, partnerName: '', partnerSrc: '' });
+      if (prev.analyticSrc !== 'manual') Object.assign(data, { analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '' });
+      if (prev.companySrc !== 'manual') { data.company = ''; data.companySrc = ''; }
+      if (prev.paidBySrc === 'odoo') { data.paidBy = ''; data.paidBySrc = ''; }
     }
     if (prev.kindSrc === 'manual') { delete data.kind; delete data.kindSrc; }
     if (existing[t.id]) updated++; else added++;
     return { ref: col.doc(t.id), data };
   });
+  for (const [id, data] of Object.entries(odooWrites)) writes.push({ ref: col.doc(id), data });
   // rows that left the sheet leave here too (unless a person annotated them)
   const keep = new Set(lines.map(l => l.id));
   const gone = cur.docs.filter(d => d.data().src === 'excel' && !keep.has(d.id) && !d.data().transferId && d.data().dupSrc !== 'manual' && !d.data().note);
