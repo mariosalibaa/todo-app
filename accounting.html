@@ -160,12 +160,7 @@
   <button class="btn" id="btn-bills" onclick="openBills()" title="Recurring payments with a standing rule — create their draft bills in Odoo">📗 Odoo bills</button>
 </div>
 <div class="legend">
-  <span id="lg-src"><i style="background:#fff"></i>Date, service, description, amounts: the statement as printed</span>
-  <span><span class="flag" style="margin:0">⚑ paid by Abed</span> someone else physically paid this line</span>
-  <span style="color:#adb5bd"><i style="background:#fff"></i><s>struck</s> = not counted (a second record of another line)</span>
-  <span style="color:var(--auto);font-style:italic"><i style="background:#fff;border-color:var(--auto)"></i>Suggested (contact name, used before for this number) — not confirmed</span>
-  <span style="color:var(--odoo);font-weight:600"><i style="background:#fff;border-color:var(--odoo)"></i>From the matched Odoo payment</span>
-  <span><i style="background:var(--manual-bg)"></i>Chosen by you</span>
+  <span id="lg-src" hidden></span>
   <span class="clr on" style="margin-left:0;display:inline" onclick="showSkipped()" title="Lines whose suggestion you waved away">skipped</span>
   <span class="clr" id="clr" onclick="clearFilters()">✕ Clear column filters</span>
 </div>
