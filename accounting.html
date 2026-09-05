@@ -609,9 +609,16 @@ function render() {
   const counted = rows.filter(t => !t.excluded);
   const allCounted = tx.filter(t => !t.excluded).length;
   const rc = document.getElementById('rowcount');
-  rc.textContent = tx.length ? `${rows.length} row${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' shown' : ''} · ${allCounted} counted · ${tx.length} lines` : '';
-  // hovering says what the three numbers are made of, in this account's own figures
-  const bySrc = {}; for (const t of tx) bySrc[t.src || 'manual'] = (bySrc[t.src || 'manual'] || 0) + 1;
+  // the count, broken down by where the lines came from, and which of them move the balance
+  const bySrc = {}, countedBy = {};
+  for (const t of tx) { const k = t.src || 'manual'; bySrc[k] = (bySrc[k] || 0) + 1; if (!t.excluded) countedBy[k] = (countedBy[k] || 0) + 1; }
+  const ORDER = ['excel', 'odoo', 'whatsapp', 'budget', 'transfer', 'telegram', 'manual'];
+  const chips = ORDER.filter(k => bySrc[k]).map(k => {
+    const n = bySrc[k], c = countedBy[k] || 0;
+    const tail = c === n ? ' counted' : c ? ` (${c} counted)` : '';
+    return `${n} <span class="src">${k}</span>${tail}`;
+  }).join(' · ');
+  rc.innerHTML = tx.length ? chips + (rows.length !== tx.length ? ` · ${rows.length} shown` : '') : '';
   const parts = [['excel', 'Excel rows'], ['whatsapp', 'WhatsApp messages'], ['odoo', 'Odoo entries'], ['budget', 'HomeBudget rows'], ['transfer', 'transfer lines'], ['telegram', 'Telegram lines'], ['manual', 'lines typed here']]
     .filter(([k]) => bySrc[k]).map(([k, l]) => `${bySrc[k]} ${l}`);
   const hidden = tx.length - rows.length;
