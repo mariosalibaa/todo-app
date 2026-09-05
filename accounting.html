@@ -146,7 +146,7 @@
   <input type="date" id="from" onchange="render()" title="From">
   <input type="date" id="to" onchange="render()" title="To">
   <input class="search" type="search" id="q" placeholder="Search everything…" oninput="render()">
-  <span id="rowcount" style="font-size:12px;color:var(--muted);white-space:nowrap" title="Rows shown · rows counted in the balance · all lines of this account"></span>
+  <span id="rowcount" style="font-size:12px;color:var(--muted);white-space:nowrap;cursor:help"></span>
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
   <button class="btn" id="btn-odoolines" onclick="toggleOdooLines()" title="An account kept in Excel: its Odoo entries are matched onto the Excel rows and hidden here. Show them anyway." style="display:none">🟣 Odoo lines</button>
@@ -608,7 +608,18 @@ function render() {
   }).join('');
   const counted = rows.filter(t => !t.excluded);
   const allCounted = tx.filter(t => !t.excluded).length;
-  document.getElementById('rowcount').textContent = tx.length ? `${rows.length} row${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' shown' : ''} · ${allCounted} counted · ${tx.length} lines` : '';
+  const rc = document.getElementById('rowcount');
+  rc.textContent = tx.length ? `${rows.length} row${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' shown' : ''} · ${allCounted} counted · ${tx.length} lines` : '';
+  // hovering says what the three numbers are made of, in this account's own figures
+  const bySrc = {}; for (const t of tx) bySrc[t.src || 'manual'] = (bySrc[t.src || 'manual'] || 0) + 1;
+  const parts = [['excel', 'Excel rows'], ['whatsapp', 'WhatsApp messages'], ['odoo', 'Odoo entries'], ['budget', 'HomeBudget rows'], ['transfer', 'transfer lines'], ['telegram', 'Telegram lines'], ['manual', 'lines typed here']]
+    .filter(([k]) => bySrc[k]).map(([k, l]) => `${bySrc[k]} ${l}`);
+  const hidden = tx.length - rows.length;
+  rc.title = tx.length ? [
+    `${tx.length} lines is everything stored for this account: ${parts.join(', ')}.`,
+    `${allCounted} counted are the lines that move the balance.` + (isExcelKept() ? ' Only the Excel rows count: WhatsApp lines do not count until you accept them, and Odoo entries never count — they are matched onto the Excel rows instead.' : ' Lines struck out are a second record of another line and are not counted.'),
+    `${rows.length} row${rows.length === 1 ? '' : 's'} is what the grid shows right now` + (hidden ? ` — ${hidden} hidden by the filters or by the 🟣 Odoo-lines toggle.` : '.'),
+  ].join('\n\n') : '';
   const out = counted.reduce((a, t) => a + (t.debit || 0), 0), inn = counted.reduce((a, t) => a + (t.credit || 0), 0);
   const op = account && account.opening;
   document.getElementById('totals').innerHTML =
