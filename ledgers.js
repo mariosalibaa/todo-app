@@ -70,9 +70,11 @@ const LAYOUTS = {
       const partner = str(r[4]), label = str(r[6]), an = str(r[5]);
       const self = new RegExp('^' + own + '$', 'i').test(partner);
       const isPay = a < 0;
+      // Abed's day: 50$ alone, 70$ when his son works with him (Mario, 2026-09-05); 25$ = half a day
+      const dayOf = x => x === 70 ? 'day with son' : x === 50 ? 'day alone' : x === 25 ? 'half day' : x === 35 ? 'half day with son' : 'work';
       const desc = isPay ? ['received', str(r[7]) && str(r[7]) !== own ? 'from ' + str(r[7]) : '', label].filter(Boolean).join(' ') || 'received'
-        : [partner, label].filter(Boolean).join(' · ') || 'expense';
-      return [OWNED(a, desc, /^payment$/i.test(an) ? '' : an, isPay ? 'transfer' : self ? 'labour' : '')]; } },
+        : self && !label ? 'Abed · ' + dayOf(a) : [partner, label].filter(Boolean).join(' · ') || 'expense';
+      return [OWNED(a, desc, /^payment$/i.test(an) ? '' : an, isPay ? 'transfer' : self ? 'labour' : '', self && !isPay ? { withSon: a === 70 || a === 35 } : null)]; } },
   // A status | B date | C amount | D account (person / vendor) | E vendor bill | F project | G note
   georges: { sheet: 'Georges', date: 2, status: 1, owner: 'georges',
     rows: (r, own) => { const a = num(r[3]); if (!a) return [];
