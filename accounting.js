@@ -318,7 +318,8 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
 // better-fitting statement line cannot be reused — so a row is called
 // ambiguous only when two candidates genuinely tie.
 async function odooCheck(odooCall, txs, opts = {}) {
-  const { rows: journals, ctx } = await journalsNamed(odooCall, opts.journalWord || 'whish');
+  // opts.journals = { rows, ctx } of a specific account (accounts.js); default = the Whish journals
+  const { rows: journals, ctx } = opts.journals || await journalsNamed(odooCall, opts.journalWord || 'whish');
   if (!journals.length) return {};
   const accIds = journals.map(j => j.default_account_id && j.default_account_id[0]).filter(Boolean);
   const dates = txs.map(t => t.date).sort();
@@ -520,72 +521,8 @@ async function handle(req, res, url, user, ctx) {
     } catch (e) { return json(res, 502, { error: String(e.message || e) }); }
   }
 
-  if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/tx$/)) && req.method === 'GET') {
-    const snap = await ws.collection('whishAccounts').doc(m[1]).collection('tx').get();
-    const tx = snap.docs.map(d => d.data()).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (+a.ref) - (+b.ref));
-    return json(res, 200, tx);
-  }
-
-  if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/tx\/(\d+)$/)) && req.method === 'PATCH') {
-    const body = await readBody(req);
-    const allowed = ANNOT;
-    const data = {};
-    for (const k of allowed) if (k in body) data[k] = body[k];
-    if (!Object.keys(data).length) return json(res, 400, { error: 'nothing to update' });
-    data.updatedAt = now(); data.updatedBy = who;
-    await ws.collection('whishAccounts').doc(m[1]).collection('tx').doc(m[2]).set(data, { merge: true });
-    return json(res, 200, { ok: true });
-  }
-
-  // Bulk annotate: { items: [{ id, ...fields }] } — used by "accept all suggestions"
-  if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/tx-bulk$/)) && req.method === 'POST') {
-    const body = await readBody(req);
-    const col = ws.collection('whishAccounts').doc(m[1]).collection('tx');
-    const at = now();
-    const writes = (body.items || []).filter(i => i && /^\d+$/.test(String(i.id))).map(i => {
-      const data = { updatedAt: at, updatedBy: who };
-      for (const k of ANNOT) if (k in i) data[k] = i[k];
-      return { ref: col.doc(String(i.id)), data };
-    });
-    await batchSet(db, writes);
-    return json(res, 200, { ok: true, saved: writes.length });
-  }
-
-  if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/odoo-check$/)) && req.method === 'POST') {
-    const body = await readBody(req);
-    const col = ws.collection('whishAccounts').doc(m[1]).collection('tx');
-    let txs = (await col.get()).docs.map(d => d.data());
-    if (Array.isArray(body.ids) && body.ids.length) { const s = new Set(body.ids.map(String)); txs = txs.filter(t => s.has(t.id)); }
-    if (!txs.length) return json(res, 200, {});
-    try {
-      // the scorer compares the Odoo partner with what we know the number is called
-      const cs = await ws.collection('whishContacts').get();
-      const names = Object.fromEntries(cs.docs.map(d => [d.id, (d.data().name || '')]));
-      const found = await odooCheck(odooCall, txs.map(t => ({ ...t, contactName: names[t.phone] || '' })));
-      const at = now();
-      const writes = txs.map(t => {
-        const matches = found[t.id] || [];
-        const data = { odoo: { checkedAt: at, matches } };
-        const win = matches.find(m => m.chosen);
-        if (win) {
-          if (win.partner) data.odooPartner = win.partner;
-          // partner and company from Odoo, unless you chose them yourself
-          if (win.partner && t.partnerSrc !== 'manual') { data.partnerName = win.partner; data.partnerId = win.partnerId || null; data.partnerSrc = 'odoo'; }
-          if (win.company && t.companySrc !== 'manual') { data.company = win.company; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
-          // Project from the analytic account of the invoice/bill this payment
-          // is reconciled with. Anything you typed yourself (src 'manual') wins.
-          const an = (win.analytics || [])[0];
-          if (an && t.analyticSrc !== 'manual') {
-            data.analyticId = an.id; data.analyticName = an.name;
-            data.analyticSrc = 'odoo'; data.analyticFrom = an.from;
-          }
-        }
-        return { ref: col.doc(t.id), data };
-      });
-      await batchSet(db, writes);
-      return json(res, 200, found);
-    } catch (e) { return json(res, 502, { error: String(e.message || e) }); }
-  }
+  // Per-account line routes (GET tx, PATCH tx, tx-bulk, odoo-check) live in accounts.js:
+  // server.js rewrites /api/accounting/whish/<acc>/… to /api/accounting/accounts/<acc>/….
 
   // Telegram relay for the folder watcher: api.telegram.org is unreachable from
   // Mario's laptop, so the watcher posts here and the hub forwards it.
@@ -608,4 +545,4 @@ async function handle(req, res, url, user, ctx) {
 }
 
 module.exports = { handle, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone,
-  odooCheck, partnersAndCompanies, journalsNamed, similarity };
+  odooCheck, partnersAndCompanies, journalsNamed, similarity, analyticOfMoves, batchSet };

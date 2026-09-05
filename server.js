@@ -6,6 +6,7 @@ const accounting = require('./accounting');   // /api/accounting/* (Whish statem
 const budget = require('./budget');           // /api/accounting/budget/* (HomeBudget replica)
 const wise = require('./wise');               // /api/accounting/wise/* (Wise statements)
 const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
+const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -84,6 +85,8 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'budget.html'));
   fs.readFileSync(path.join(__dirname, 'wise.html'));
   fs.readFileSync(path.join(__dirname, 'accounting-home.html'));
+  fs.readFileSync(path.join(__dirname, 'accounts.js'));
+  fs.readFileSync(path.join(__dirname, 'transfers.html'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
 }
 
@@ -577,8 +580,8 @@ const handler = async (req, res) => {
   }
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
-    '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html',
-    '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html' };
+    '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
+    '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(path.join(__dirname, page), 'utf8');
@@ -705,9 +708,12 @@ const handler = async (req, res) => {
     if (!access.apps.includes('accounting')) return noApp('accounting');
     try {
       const ctx = { db, admin, TEAM_ID, odooCall };
+      // the Whish account is one account among others now: its old per-line URLs map onto the generic ones
+      const aurl = url.replace(/^\/api\/accounting\/whish\/(\d+)\/(tx|tx-bulk|odoo-check|book|book-preview)(\/|$)/, '/api/accounting/accounts/$1/$2$3');
       const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)
         : url.startsWith('/api/accounting/wise/') ? await wise.handle(req, res, url, user, ctx)
-        : await whishRules.handle(req, res, url, user, ctx)     // rules first: it only claims its own routes
+        : await whishRules.handle(req, res, aurl, user, ctx)     // rules first: it only claims its own routes
+          || await accounts.handle(req, res, aurl, user, ctx)
           || await accounting.handle(req, res, url, user, ctx);
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {

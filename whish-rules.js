@@ -21,6 +21,8 @@
 //                                                 with post, also post them and pay them from
 //                                                 the rule's cash journal, dated as the Whish line
 
+const accounts = require('./accounts');
+
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise((resolve, reject) => {
   let s = ''; req.on('data', c => { s += c; if (s.length > 4e6) req.destroy(); });
@@ -28,12 +30,13 @@ const readBody = req => new Promise((resolve, reject) => {
   req.on('error', reject);
 });
 
-const REF = t => 'WHISH-' + t.id;
+// idempotency key on the bill: <ACCOUNT>-<line id>; Whish keeps its historical prefix
+const REF = (t, a) => (a && a.provider !== 'whish' ? String(a.id).toUpperCase().replace(/[^A-Z0-9]+/g, '') : 'WHISH') + '-' + t.id;
 const money = n => Math.round(Number(n || 0) * 100) / 100;
 
 // What a rule may say. Everything but the phone is optional, so a rule can be as loose as
 // "this number is always Patrick" or as tight as "$60 out, and only $60".
-const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName', 'book',
+const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName', 'book', 'accountId',
   'companyId', 'companyName', 'journalId', 'accountId', 'accountCode', 'analyticId', 'analyticName',
   'paymentJournalId', 'paymentJournalName', 'description', 'active'];
 
@@ -92,10 +95,12 @@ async function handle(req, res, url, user, ctx) {
   }
 
   // What would be booked, and what already has a draft. Nothing is written here.
-  if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/book-preview$/)) && req.method === 'POST') {
-    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() }));
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-preview$/)) && req.method === 'POST') {
+    const account = await accounts.resolve(ws, m[1]);
+    if (!account) { json(res, 404, { error: 'no such account' }); return true; }
+    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.accountId || r.accountId === account.id);
     if (!rules.length) { json(res, 200, { rules: 0, candidates: [] }); return true; }
-    const txs = (await ws.collection('whishAccounts').doc(m[1]).collection('tx').get()).docs.map(d => d.data());
+    const txs = (await accounts.txCol(account).get()).docs.map(d => d.data());
     const cand = [];
     for (const t of txs) {
       if (alreadyInOdoo(t)) continue;
@@ -106,7 +111,7 @@ async function handle(req, res, url, user, ctx) {
     if (cand.length) {
       try {
         const companies = await odooCall('res.company', 'search_read', [[]], { fields: ['id'] });
-        const found = await odooCall('account.move', 'search_read', [[['ref', 'in', cand.map(c => REF(c.t))], ['move_type', '=', 'in_invoice']]],
+        const found = await odooCall('account.move', 'search_read', [[['ref', 'in', cand.map(c => REF(c.t, account))], ['move_type', '=', 'in_invoice']]],
           { fields: ['id', 'name', 'ref', 'state', 'amount_total'], context: { allowed_company_ids: companies.map(c => c.id) } });
         existing = Object.fromEntries(found.map(f => [f.ref, f]));
       } catch { /* Odoo unreachable: still list the candidates, just without the "already there" flag */ }
@@ -120,7 +125,7 @@ async function handle(req, res, url, user, ctx) {
           id: rule.id, label: rule.label || '', partnerName: rule.partnerName, companyName: rule.companyName,
           accountCode: rule.accountCode, analyticName: rule.analyticName,
         },
-        booked: existing[REF(t)] || null,
+        booked: existing[REF(t, account)] || null,
       })).sort((a, b) => (a.date < b.date ? 1 : -1)),
     });
     return true;
@@ -128,14 +133,16 @@ async function handle(req, res, url, user, ctx) {
 
   // Create the drafts. One line at a time on purpose: a failure on line 4 must not
   // leave lines 1-3 in a state nobody can explain.
-  if ((m = url.match(/^\/api\/accounting\/whish\/(\d+)\/book$/)) && req.method === 'POST') {
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book$/)) && req.method === 'POST') {
+    const account = await accounts.resolve(ws, m[1]);
+    if (!account) { json(res, 404, { error: 'no such account' }); return true; }
     const b = await readBody(req);
     const ids = (b.ids || []).map(String);
     if (!ids.length) { json(res, 400, { error: 'nothing selected' }); return true; }
     if (ids.length > 20) { json(res, 400, { error: 'up to 20 lines at a time' }); return true; }
 
-    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() }));
-    const col = ws.collection('whishAccounts').doc(m[1]).collection('tx');
+    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.accountId || r.accountId === account.id);
+    const col = accounts.txCol(account);
     const out = [];
     for (const id of ids) {
       const snap = await col.doc(id).get();
@@ -150,7 +157,7 @@ async function handle(req, res, url, user, ctx) {
       if (!rule.partnerId || !rule.journalId || !rule.accountId || !rule.companyId) {
         out.push({ id, error: 'the rule is missing the vendor, company, journal or account' }); continue;
       }
-      const ref = REF(t);
+      const ref = REF(t, account);
       const octx = {
         allowed_company_ids: [rule.companyId], company_id: rule.companyId,
         default_move_type: 'in_invoice', check_move_validity: false,
@@ -179,7 +186,7 @@ async function handle(req, res, url, user, ctx) {
           invoice_date: t.date,
           date: t.date,
           ref,                                          // the idempotency key
-          narration: ('Whish ' + t.date + ' · ref ' + (t.ref || '') + ' · ' + (t.description || '')).trim(),
+          narration: ((account.provider === 'whish' ? 'Whish ' : account.name + ' ') + t.date + ' · ref ' + (t.ref || '') + ' · ' + (t.description || '')).trim(),
           invoice_line_ids: [[0, 0, line]],
         }], { context: octx });
         }

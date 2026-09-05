@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#714B67">
+<title>Accounting · Transfers</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--odoo:#714B67;--odoo2:#875A7B;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--green:#28a745;--red:#dc3545;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
+  .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;flex:none;}
+  .top a{color:#fff;text-decoration:none;opacity:.85;} .top .brand{font-weight:600;font-size:14px;} .top .sp{flex:1;} .top .who{font-size:12px;opacity:.85;}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg);flex:none;}
+  .bar select,.bar input{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13px;background:#fff;height:30px;}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 10px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .btn.primary{background:var(--odoo);border-color:var(--odoo);color:#fff;} .btn:disabled{opacity:.5;cursor:default;}
+  .btn.sm{height:22px;padding:0 6px;font-size:11.5px;}
+  .msg{padding:6px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);display:none;flex:none;}
+  .msg.err{color:var(--red);display:block;} .msg.ok{color:var(--green);display:block;}
+  .wrap{flex:1;min-height:0;overflow:auto;}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:760px;}
+  thead th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;height:30px;border-bottom:2px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:2;}
+  td{padding:5px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:nowrap;}
+  tr:hover td{background:#f5f2f7;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.desc{white-space:normal;color:var(--muted);}
+  .acc a{color:var(--odoo);text-decoration:none;} .acc a:hover{text-decoration:underline;}
+  .linked{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;}
+  tfoot td{font-weight:600;background:var(--bg);border-top:2px solid var(--line);}
+  .empty{padding:60px 20px;text-align:center;color:var(--muted);} .empty b{display:block;font-size:15px;color:var(--text);margin-bottom:6px;}
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .sheet[hidden]{display:none;}
+  .sheet-box{background:#fff;border-radius:8px;width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3);}
+  .sheet-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);}
+  .sheet-body{overflow:auto;padding:12px 14px;}
+  .sheet-foot{display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--line);align-items:center;}
+  .form{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;align-items:center;}
+  .form label{color:var(--muted);font-size:12px;} .form input,.form select{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13px;font-family:inherit;width:100%;}
+  .form .row{display:flex;gap:8px;} .form .row > *{flex:1;}
+  .hint{color:var(--muted);font-size:12px;}
+  .arrow{color:var(--muted);padding:0 6px;}
+  @media (max-width:700px){.form{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/accounting" title="Accounting">‹</a>
+  <a href="/admin" title="Shift Hub">⌂</a>
+  <span class="brand">Accounting</span>
+  <span style="opacity:.6">›</span>
+  <span>Transfers</span>
+  <span style="opacity:.6;margin-left:10px">|</span>
+  <a href="/accounting/accounts" style="opacity:.7">Accounts</a>
+  <a href="/accounting/budget" style="opacity:.7">Budget</a>
+  <span class="sp"></span>
+  <span class="who" id="who"></span>
+</div>
+<div class="bar">
+  <select id="f-acc" onchange="render()"><option value="">all accounts</option></select>
+  <input type="date" id="from" onchange="render()" title="From">
+  <input type="date" id="to" onchange="render()" title="To">
+  <input type="search" id="q" placeholder="Search…" oninput="render()" style="min-width:180px">
+  <span style="flex:1"></span>
+  <button class="btn primary" onclick="openForm()">＋ Transfer</button>
+</div>
+<div class="msg" id="msg"></div>
+<div class="wrap">
+  <table id="grid" style="display:none">
+    <thead><tr><th>Date</th><th>From</th><th></th><th>To</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+    <tfoot><tr id="totals"></tr></tfoot>
+  </table>
+  <div class="empty" id="empty"><b>No transfers yet</b>Money moved between two of your accounts — Mario cash → Abed, a Whish top-up from the wallet, cash into Neo. One record, an OUT line on the source and an IN line on the destination, never an expense or an income.</div>
+</div>
+<div class="sheet" id="form" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head"><b id="form-title">New transfer</b><span style="flex:1"></span><button class="btn" onclick="closeForm()">✕ Close</button></div>
+    <div class="sheet-body"><div class="form" id="form-body"></div></div>
+    <div class="sheet-foot"><span class="hint" id="form-msg" style="flex:1"></span><button class="btn primary" id="form-save" onclick="save()">Save</button></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc;
+const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+let accounts = [], list = [], editing = null;
+function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
+
+Admin.require('accounting', async me => {
+  document.getElementById('who').textContent = me.name || me.email;
+  await load();
+  const q = new URLSearchParams(location.search);
+  if (q.get('new')) openForm();
+});
+async function load() {
+  [accounts, list] = await Promise.all([Admin.api('GET', '/api/accounting/accounts'), Admin.api('GET', '/api/accounting/transfers')]);
+  const sel = document.getElementById('f-acc'), cur = sel.value;
+  sel.innerHTML = '<option value="">all accounts</option>' + accounts.map(a => `<option value="${esc(a.id)}" ${a.id === cur ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
+  render();
+}
+const accLink = (id, name) => `<span class="acc"><a href="/accounting/accounts?id=${encodeURIComponent(id)}">${esc(name)}</a></span>`;
+function render() {
+  const fa = document.getElementById('f-acc').value, from = document.getElementById('from').value, to = document.getElementById('to').value;
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const rows = list.filter(t => (!fa || t.fromId === fa || t.toId === fa) && (!from || t.date >= from) && (!to || t.date <= to)
+    && (!q || [t.date, t.fromName, t.toName, t.note, fmt(t.amount), String(t.amount)].join(' ').toLowerCase().includes(q)));
+  document.getElementById('grid').style.display = list.length ? '' : 'none';
+  document.getElementById('empty').style.display = list.length ? 'none' : '';
+  document.getElementById('rows').innerHTML = rows.map(t => `<tr>
+    <td>${esc(t.date)}</td>
+    <td>${accLink(t.fromId, t.fromName)}${t.fromTxId ? '<span class="linked" title="Linked to an existing line on the source account">linked</span>' : ''}</td>
+    <td class="arrow">→</td>
+    <td>${accLink(t.toId, t.toName)}${t.toTxId ? '<span class="linked" title="Linked to an existing line on the destination account">linked</span>' : ''}</td>
+    <td class="num">${fmt(t.amount)} <span class="hint">${esc(t.currency || '')}</span></td>
+    <td class="desc">${esc(t.note || '')}</td>
+    <td><button class="btn sm" onclick="openForm('${esc(t.id)}')">✎</button> <button class="btn sm" onclick="remove('${esc(t.id)}')" title="Delete the transfer and its two lines">🗑</button></td>
+  </tr>`).join('');
+  const sum = rows.reduce((s, t) => s + Number(t.amount || 0), 0);
+  document.getElementById('totals').innerHTML = `<td colspan="4">${rows.length} transfer${rows.length === 1 ? '' : 's'}${rows.length !== list.length ? ' of ' + list.length : ''}</td><td class="num">${fmt(sum)}</td><td colspan="2"></td>`;
+}
+function closeForm() { document.getElementById('form').hidden = true; }
+function openForm(id) {
+  editing = id ? list.find(t => t.id === id) : null;
+  const t = editing || {};
+  document.getElementById('form-title').textContent = editing ? 'Edit transfer' : 'New transfer';
+  document.getElementById('form-msg').textContent = '';
+  const today = new Date().toISOString().slice(0, 10);
+  const opts = sel => accounts.map(a => `<option value="${esc(a.id)}" ${a.id === sel ? 'selected' : ''}>${esc(a.name)} (${esc(a.currency)})</option>`).join('');
+  document.getElementById('form-body').innerHTML = `
+    <label>Date</label><input type="date" id="tf-date" value="${esc(t.date || today)}">
+    <label>From</label><select id="tf-from" ${editing ? 'disabled' : ''}><option value="">—</option>${opts(t.fromId)}</select>
+    <label>To</label><select id="tf-to" ${editing ? 'disabled' : ''}><option value="">—</option>${opts(t.toId)}</select>
+    <label>Amount</label><div class="row"><input type="number" step="0.01" min="0" id="tf-amt" value="${t.amount != null ? t.amount : ''}" placeholder="0.00"><select id="tf-cur" ${editing ? 'disabled' : ''}>${['USD', 'EUR', 'LBP', 'AED', 'GBP'].map(c => `<option ${(t.currency || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+    <label>Note</label><input id="tf-note" value="${esc(t.note || '')}" placeholder="optional">
+    <label></label><div class="hint">${editing ? 'The two account lines follow the new date, amount and note.' : 'An OUT line is written on the source and an IN line on the destination. To link a line that already exists (a Whish top-up, an Odoo entry), use ⇄ on that line in its account instead.'}</div>`;
+  document.getElementById('form').hidden = false;
+  setTimeout(() => document.getElementById(editing ? 'tf-amt' : 'tf-from').focus(), 50);
+}
+async function save() {
+  const body = { date: document.getElementById('tf-date').value, amount: +document.getElementById('tf-amt').value, note: document.getElementById('tf-note').value.trim() };
+  if (!body.date) return document.getElementById('form-msg').textContent = 'A date is needed';
+  if (!(body.amount > 0)) return document.getElementById('form-msg').textContent = 'An amount is needed';
+  if (!editing) {
+    body.fromId = document.getElementById('tf-from').value; body.toId = document.getElementById('tf-to').value; body.currency = document.getElementById('tf-cur').value;
+    if (!body.fromId || !body.toId) return document.getElementById('form-msg').textContent = 'Choose both accounts';
+    if (body.fromId === body.toId) return document.getElementById('form-msg').textContent = 'From and To must differ';
+  }
+  const btn = document.getElementById('form-save'); btn.disabled = true;
+  try {
+    if (editing) await Admin.api('PATCH', `/api/accounting/transfers/${editing.id}`, body);
+    else await Admin.api('POST', '/api/accounting/transfers', body);
+    closeForm(); await load();
+    say(editing ? 'Transfer updated' : `Transfer saved: ${fmt(body.amount)}`);
+  } catch (e) { document.getElementById('form-msg').textContent = 'Could not save: ' + e.message; }
+  btn.disabled = false;
+}
+async function remove(id) {
+  const t = list.find(x => x.id === id); if (!t) return;
+  if (!confirm(`Delete this transfer?\n${t.date} · ${fmt(t.amount)} · ${t.fromName} → ${t.toName}\n\nIts two lines are removed (linked lines are unlinked, not deleted).`)) return;
+  try { await Admin.api('DELETE', `/api/accounting/transfers/${id}`); await load(); say('Transfer deleted'); }
+  catch (e) { say('Could not delete: ' + e.message, 'err'); }
+}
+</script>
+</body>
+</html>
