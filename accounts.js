@@ -143,6 +143,8 @@ async function importOdoo(odooCall, account, who) {
   const col = txCol(account);
   const existing = {};
   (await col.where('src', '==', 'odoo').get()).docs.forEach(d => { existing[d.id] = d.data(); });
+  const madeFrom = {};   // Odoo move id → the Excel row it was booked from (bills, payments made by the hub)
+  (await col.where('src', '==', 'excel').get()).docs.forEach(d => { const b = d.data().bookedMove; if (b && b.id && !madeFrom[b.id]) madeFrom[b.id] = d.id; });
   const owner = ownerOf(account);
   const writes = [];
   // one source per journal, or one per company when the account follows a partner's payable
@@ -220,7 +222,8 @@ async function importOdoo(odooCall, account, who) {
       // never counted as lines of its own. The Odoo line stays, hidden, as the evidence.
       if (account.excel && account.excel.file) {
         t.excluded = true;
-        if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; }
+        if (madeFrom[m.id]) { t.dupOf = madeFrom[m.id]; t.dupSrc = 'auto'; t.odooOnly = false; }
+        else if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; }
         else { t.odooOnly = true; t.dupOf = null; }
       } else if (paidBy && owner && paidBy !== owner) out.paidByOthers++;
       if (existing[id]) out.updated++; else out.added++;

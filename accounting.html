@@ -344,7 +344,7 @@ async function adoptOdooFacts() {
   for (const t of tx) {
     const win = t.odoo && (t.odoo.matches || []).find(m => m.chosen); if (!win) continue;
     const it = { id: t.id };
-    if (win.partner && t.partnerSrc !== 'manual' && (t.partnerName !== win.partner || t.partnerSrc !== 'odoo')) {
+    if (win.partner && t.src !== 'excel' && t.partnerSrc !== 'manual' && (t.partnerName !== win.partner || t.partnerSrc !== 'odoo')) {
       const p = partners.find(x => x.id === win.partnerId) || partners.find(x => x.name === win.partner);
       Object.assign(it, { partnerName: win.partner, partnerId: win.partnerId || (p ? p.id : null), partnerSrc: 'odoo' });
     }
