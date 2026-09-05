@@ -42,22 +42,35 @@ async function whishLines(ws) {
   // every statement line of every Whish account, flattened for the Budget page.
   // The payee of a line is whoever owns the phone number: whishContacts is filled
   // from Google Contacts on the Whish page, so the same names show up here.
-  const [accs, contactDocs] = await Promise.all([
+  const [accs, hubAccs, contactDocs] = await Promise.all([
     ws.collection('whishAccounts').get(),
+    ws.collection('accounts').get(),                       // Mario cash, Neo, the workers' cash — every account of the Accounts page
     ws.collection('whishContacts').get()
   ]);
   const contacts = {};
   for (const d of contactDocs.docs) contacts[d.id] = (d.data() || {}).name || '';
   const out = [];
-  for (const a of accs.docs) {
+  const sources = [...accs.docs.map(d => ({ doc: d, hub: false })), ...hubAccs.docs.filter(d => !(d.data() || {}).archived).map(d => ({ doc: d, hub: true }))];
+  for (const { doc: a, hub } of sources) {
+    const meta = a.data() || {};
     const tx = await a.ref.collection('tx').get();
-    for (const d of tx.docs) {
+    let docs = tx.docs;
+    if (hub) {
+      // no printed balance on these: run one from the opening row, skipping lines that are not counted
+      docs = docs.slice().sort((x, y) => { const p = x.data().date || '', q = y.data().date || ''; return p < q ? -1 : p > q ? 1 : x.id.localeCompare(y.id); });
+      const op = meta.opening, mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
+      let run = op ? op.amount - docs.filter(d => (d.data().date || '') < op.date).reduce((s, d) => s + mv(d.data()), 0) : 0;
+      for (const d of docs) { run = Math.round((run + mv(d.data())) * 100) / 100; d._bal = run; }
+    }
+    for (const d of docs) {
       const t = d.data();
+      if (hub && t.excluded) continue;
+      if (hub) t.balance = d._bal;
       const contact = t.phone ? (contacts[t.phone] || '') : '';
       // a number nobody has named yet reads better as a local Lebanese number
       const local = t.phone ? '0' + String(t.phone).replace(/^961/, '') : '';
       out.push({
-        id: d.id, whishAccount: a.id, date: t.date || '', ref: t.ref || '', service: t.service || '',
+        id: hub ? a.id + ':' + d.id : d.id, whishAccount: a.id, hub, accountName: hub ? meta.name || a.id : '', date: t.date || '', ref: t.ref || '', service: t.service || '',
         phone: t.phone || '', contact,
         // payee = owner of the phone number, else the merchant name on the statement
         partner: t.partnerName || '',
@@ -87,7 +100,8 @@ async function handle(req, res, url, user, ctx) {
       all(ws.collection(COLL.transfers)), all(ws.collection(COLL.whish)), ws.collection('budgetMeta').doc('settings').get(),
       whishLines(ws)
     ]);
-    return json(res, 200, { accounts, categories, subCategories, payees, expenses, income, transfers, whish, whishMap,
+    const hubAccounts = (await ws.collection('accounts').get()).docs.filter(d => !(d.data() || {}).archived).map(d => ({ id: d.id, name: d.data().name || d.id, type: d.data().type || 'cash', owner: d.data().owner || '' }));
+    return json(res, 200, { accounts, categories, subCategories, payees, expenses, income, transfers, whish, whishMap, hubAccounts,
       settings: settingsDoc.exists ? settingsDoc.data() : { baseCurrency: 'USD', currencies: [], cycleStart: 1 } }), true;
   }
 
@@ -97,6 +111,7 @@ async function handle(req, res, url, user, ctx) {
     if (b.baseCurrency) data.baseCurrency = String(b.baseCurrency);
     if (Array.isArray(b.currencies)) data.currencies = b.currencies.map(c => ({ code: String(c.code || ''), name: String(c.name || ''), rate: c.rate == null ? null : Number(c.rate) }));
     if (b.whishAccountId != null) data.whishAccountId = String(b.whishAccountId);
+    if (b.hubAccounts && typeof b.hubAccounts === 'object') data.hubAccounts = Object.fromEntries(Object.entries(b.hubAccounts).filter(([k, v]) => /^[\w-]+$/.test(k)).map(([k, v]) => [k, String(v || '')]));
     if (b.cycleStart) data.cycleStart = Number(b.cycleStart);
     data.updatedAt = new Date().toISOString(); data.updatedBy = who;
     await ws.collection('budgetMeta').doc('settings').set(data, { merge: true });

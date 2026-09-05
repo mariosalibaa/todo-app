@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#714B67">
+<title>Accounting · Dashboard</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--odoo:#714B67;--odoo2:#875A7B;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--green:#28a745;--red:#dc3545;--gold:#b8860b;--silver:#7d8790;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
+  .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;flex:none;}
+  .top a{color:#fff;text-decoration:none;opacity:.85;} .top .brand{font-weight:600;font-size:14px;} .top .sp{flex:1;} .top .who{font-size:12px;opacity:.85;}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg);flex:none;}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 10px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .btn.primary{background:var(--odoo);border-color:var(--odoo);color:#fff;} .btn:disabled{opacity:.5;cursor:default;}
+  .msg{padding:6px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);display:none;flex:none;}
+  .msg.err{color:var(--red);display:block;} .msg.ok{color:var(--green);display:block;}
+  .wrap{flex:1;min-height:0;overflow:auto;padding:14px;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#fff;}
+  .card .l{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .card .v{font-size:22px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;} .card .s{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .card.total{background:var(--odoo);border-color:var(--odoo);color:#fff;} .card.total .l,.card.total .s{color:rgba(255,255,255,.8);}
+  .card.gold .v{color:var(--gold);} .card.silver .v{color:var(--silver);}
+  h2{font-size:13px;margin:16px 0 6px;color:#495057;text-transform:uppercase;letter-spacing:.06em;}
+  table{border-collapse:separate;border-spacing:0;width:100%;}
+  thead th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;height:30px;border-bottom:2px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;}
+  td{padding:5px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:nowrap;}
+  tr:hover td{background:#f5f2f7;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;} .neg{color:var(--red);} .pos{color:var(--green);}
+  td.grp{background:var(--bg);font-weight:600;color:#495057;}
+  tfoot td{font-weight:600;background:var(--bg);border-top:2px solid var(--line);}
+  a.acc{color:var(--odoo);text-decoration:none;} a.acc:hover{text-decoration:underline;}
+  .flag{display:inline-block;font-size:10.5px;color:#8a6d3b;background:#fcf8e3;border:1px solid #f0e2b6;border-radius:3px;padding:0 5px;margin-left:6px;}
+  .muted{color:var(--muted);font-size:11.5px;}
+  input.price{width:90px;border:1px solid var(--line);border-radius:4px;padding:3px 6px;font-size:13px;text-align:right;}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:18px;} @media (max-width:900px){.split{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/accounting" title="Accounting">‹</a>
+  <a href="/admin" title="Shift Hub">⌂</a>
+  <span class="brand">Accounting</span>
+  <span style="opacity:.6">›</span>
+  <span>Dashboard</span>
+  <span style="opacity:.6;margin-left:10px">|</span>
+  <a href="/accounting/accounts" style="opacity:.7">Accounts</a>
+  <a href="/accounting/transfers" style="opacity:.7">Transfers</a>
+  <a href="/accounting/budget" style="opacity:.7">Budget</a>
+  <span class="sp"></span>
+  <span class="who" id="who"></span>
+</div>
+<div class="bar">
+  <span class="muted" id="asof"></span>
+  <span style="flex:1"></span>
+  <button class="btn" onclick="load()" title="Recompute every balance">↻ Refresh</button>
+  <button class="btn" onclick="readWorkbook()" title="Read the gold + silver workbook from this machine (works on Mario's laptop only)">🪙 Read gold workbook</button>
+</div>
+<div class="msg" id="msg"></div>
+<div class="wrap">
+  <div class="cards" id="cards"></div>
+  <div class="split">
+    <div>
+      <h2>Accounts</h2>
+      <table><thead><tr><th>Account</th><th>Owner</th><th class="num">Balance</th><th>Lines</th><th>Up to</th></tr></thead><tbody id="acc-rows"></tbody><tfoot id="acc-foot"></tfoot></table>
+      <p class="muted">Cash balances: negative = the company owes that person (same convention as the Odoo cash journals). An account without an opening row or a statement is summed from its first line.</p>
+    </div>
+    <div>
+      <h2>Gold &amp; silver</h2>
+      <table><thead><tr><th>Metal · owner</th><th class="num">Ounces</th><th class="num">Paid</th><th class="num">Avg $/oz</th><th class="num">Price $/oz</th><th class="num">Value</th><th class="num">Gain</th></tr></thead><tbody id="metal-rows"></tbody><tfoot id="metal-foot"></tfoot></table>
+      <p class="muted" id="metal-note"></p>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc;
+const fmt = n => (n < 0 ? '−' : '') + Math.abs(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt0 = n => (n < 0 ? '−' : '') + Math.abs(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
+const cls = n => n < 0 ? 'neg' : n > 0 ? 'pos' : '';
+function say(text, c) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (c || 'ok'); if (!text) m.className = 'msg'; }
+let balances = [], gold = { holdings: [], prices: {} };
+
+Admin.require('accounting', async me => {
+  document.getElementById('who').textContent = me.name || me.email;
+  await load();
+});
+
+async function load() {
+  say('Adding up every account…');
+  try {
+    [balances, gold] = await Promise.all([Admin.api('GET', '/api/accounting/balances'), Admin.api('GET', '/api/accounting/gold')]);
+    say('');
+  } catch (e) { say('Could not load: ' + e.message, 'err'); }
+  render();
+}
+
+// ── metals: value = ounces × the price typed here (or the workbook's market cell) ──
+function metalRows() {
+  const P = gold.prices || {};
+  const g = {};
+  for (const h of gold.holdings || []) {
+    const k = h.metal + '|' + h.owner;
+    g[k] = g[k] || { metal: h.metal, owner: h.owner, oz: 0, paid: 0, n: 0 };
+    g[k].oz += h.oz || 0; g[k].paid += h.paid || 0; g[k].n++;
+  }
+  return Object.values(g).map(r => { const price = +P[r.metal] || 0; const value = r.oz * price; return { ...r, price, value, avg: r.oz ? r.paid / r.oz : 0, gain: value - r.paid }; })
+    .sort((a, b) => a.metal.localeCompare(b.metal) || a.owner.localeCompare(b.owner));
+}
+
+function render() {
+  const live = balances.filter(b => !b.archived);
+  const cash = live.filter(b => b.type === 'cash'), bank = live.filter(b => b.type === 'bank');
+  const sum = l => l.reduce((s, b) => s + (b.balance || 0), 0);
+  const m = metalRows();
+  const gv = m.filter(r => r.metal === 'gold').reduce((s, r) => s + r.value, 0), sv = m.filter(r => r.metal === 'silver').reduce((s, r) => s + r.value, 0);
+  const review = live.reduce((s, b) => s + (b.review || 0), 0);
+  const P = gold.prices || {};
+  document.getElementById('cards').innerHTML = `
+    <div class="card"><div class="l">Cash</div><div class="v ${cls(sum(cash))}">${fmt(sum(cash))}</div><div class="s">${cash.length} account${cash.length === 1 ? '' : 's'}</div></div>
+    <div class="card"><div class="l">Bank</div><div class="v ${cls(sum(bank))}">${fmt(sum(bank))}</div><div class="s">${bank.length} account${bank.length === 1 ? '' : 's'}</div></div>
+    <div class="card gold"><div class="l">Gold</div><div class="v">${fmt0(gv)}</div><div class="s">${fmt(m.filter(r => r.metal === 'gold').reduce((s, r) => s + r.oz, 0))} oz @ ${fmt0(P.gold)}</div></div>
+    <div class="card silver"><div class="l">Silver</div><div class="v">${fmt0(sv)}</div><div class="s">${fmt(m.filter(r => r.metal === 'silver').reduce((s, r) => s + r.oz, 0))} oz @ ${fmt(P.silver)}</div></div>
+    <div class="card total"><div class="l">Total</div><div class="v">${fmt0(sum(cash) + sum(bank) + gv + sv)}</div><div class="s">cash + bank + metals, USD</div></div>
+    ${review ? `<div class="card"><div class="l">To review</div><div class="v">${review}</div><div class="s">WhatsApp lines found nowhere else</div></div>` : ''}`;
+  document.getElementById('asof').textContent = `Balances as of now · metal prices as of ${P.asOf || '—'}${gold.importedAt ? ' · workbook read ' + gold.importedAt.slice(0, 10) : ''}`;
+
+  const row = b => `<tr><td><a class="acc" href="/accounting/accounts?id=${esc(b.id)}">${esc(b.name)}</a>${b.review ? `<span class="flag" title="WhatsApp lines to review">❓ ${b.review}</span>` : ''}${!b.pinned ? '<span class="flag" title="No opening balance: summed from the first line">no opening</span>' : ''}</td>
+      <td>${esc(cap(b.owner))}</td><td class="num ${cls(b.balance)}">${fmt(b.balance)}</td><td class="muted">${b.counted}${b.lines !== b.counted ? ' <span title="not counted">(' + (b.lines - b.counted) + ')</span>' : ''}</td><td class="muted">${esc(b.last)}</td></tr>`;
+  const grp = (name, list) => list.length ? `<tr><td class="grp" colspan="2">${name}</td><td class="grp num ${cls(sum(list))}">${fmt(sum(list))}</td><td class="grp" colspan="2"></td></tr>` + list.sort((a, b) => a.name.localeCompare(b.name)).map(row).join('') : '';
+  document.getElementById('acc-rows').innerHTML = grp('Cash', cash) + grp('Bank', bank) || '<tr><td colspan="5" class="muted">No accounts yet — create one on the Accounts page.</td></tr>';
+  document.getElementById('acc-foot').innerHTML = `<tr><td colspan="2">Cash + bank</td><td class="num ${cls(sum(live))}">${fmt(sum(live))}</td><td colspan="2"></td></tr>`;
+
+  document.getElementById('metal-rows').innerHTML = m.length ? m.map(r => `<tr><td><b style="color:var(--${r.metal})">${cap(r.metal)}</b> · ${esc(cap(r.owner))} <span class="muted">${r.n} purchase${r.n > 1 ? 's' : ''}</span></td>
+      <td class="num">${fmt(r.oz)}</td><td class="num">${fmt0(r.paid)}</td><td class="num">${fmt0(r.avg)}</td>
+      <td class="num"><input class="price" type="number" step="0.01" value="${r.price || ''}" onchange="savePrice('${r.metal}', this.value)" title="Market price, $ per troy ounce"></td>
+      <td class="num">${fmt0(r.value)}</td><td class="num ${cls(r.gain)}">${fmt0(r.gain)}</td></tr>`).join('')
+    : '<tr><td colspan="7" class="muted">No holdings yet — press "Read gold workbook" on Mario\'s laptop.</td></tr>';
+  document.getElementById('metal-foot').innerHTML = m.length ? `<tr><td>All metals</td><td class="num">${fmt(m.reduce((s, r) => s + r.oz, 0))}</td><td class="num">${fmt0(m.reduce((s, r) => s + r.paid, 0))}</td><td></td><td></td><td class="num">${fmt0(gv + sv)}</td><td class="num ${cls(gv + sv - m.reduce((s, r) => s + r.paid, 0))}">${fmt0(gv + sv - m.reduce((s, r) => s + r.paid, 0))}</td></tr>` : '';
+  document.getElementById('metal-note').textContent = gold.file ? `From ${gold.file}. Kilograms are converted at 32.1507 troy oz/kg. Type a price to revalue; the sheet's market cell is the default.` : '';
+}
+
+async function savePrice(metal, v) {
+  try {
+    await Admin.api('PATCH', '/api/accounting/gold', { prices: { [metal]: +v || 0, asOf: new Date().toISOString().slice(0, 10) } });
+    gold.prices = { ...(gold.prices || {}), [metal]: +v || 0, asOf: new Date().toISOString().slice(0, 10) };
+    say(`${cap(metal)} price saved`); render();
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+async function readWorkbook() {
+  say('Reading the gold + silver workbook…');
+  try {
+    const r = await Admin.api('POST', '/api/accounting/gold/import', {});
+    say(`${r.holdings} purchases read from ${r.file}; gold ${fmt0(r.prices.gold)} $/oz, silver ${fmt(r.prices.silver)} $/oz`);
+    await load();
+  } catch (e) { say('Could not read: ' + e.message, 'err'); }
+}
+</script>
+</body>
+</html>

@@ -531,6 +531,60 @@ async function handle(req, res, url, user, ctx) {
     catch (e) { return json(res, 400, { error: String(e.message || e) }); }
   }
 
+  // ── dashboard: every account's balance, summed here so the page does not download 8,000 lines ──
+  if (url === '/api/accounting/balances' && req.method === 'GET') {
+    const accounts = await listAccounts(ws);
+    const out = [];
+    for (const a of accounts) {
+      const full = await resolve(ws, a.id);
+      const snap = await txCol(full).select('date', 'debit', 'credit', 'excluded', 'balance', 'ref', 'review', 'src').get();
+      const tx = snap.docs.map(d => d.data());
+      let balance = 0;
+      if (a.statement) {
+        const o = tx.filter(t => t.balance != null).sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : (+x.ref || 0) - (+y.ref || 0));
+        balance = o.length ? money(o[o.length - 1].balance) : 0;
+      } else {
+        const mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
+        const op = a.opening;
+        balance = money(op ? op.amount + tx.filter(t => t.date >= op.date).reduce((s, t) => s + mv(t), 0) : tx.reduce((s, t) => s + mv(t), 0));
+      }
+      const dates = tx.map(t => t.date).filter(Boolean).sort();
+      out.push({ id: a.id, name: a.name, type: a.type, owner: a.owner || '', currency: a.currency || 'USD', provider: a.provider || '', archived: !!a.archived,
+        balance, lines: tx.length, counted: tx.filter(t => !t.excluded).length, review: tx.filter(t => t.review).length, first: dates[0] || '', last: dates[dates.length - 1] || '',
+        opening: a.opening || null, pinned: !!a.opening || !!a.statement });
+    }
+    return json(res, 200, out);
+  }
+
+  // ── gold & silver: holdings read from the workbook (laptop), prices editable anywhere ──
+  const goldRef = ws.collection('settings').doc('gold');
+  if (url === '/api/accounting/gold' && req.method === 'GET') {
+    const d = await goldRef.get();
+    return json(res, 200, d.exists ? d.data() : { holdings: [], prices: {} });
+  }
+  if (url === '/api/accounting/gold' && req.method === 'PATCH') {
+    const b = await readBody(req), data = { updatedAt: now(), updatedBy: who };
+    if (b.prices && typeof b.prices === 'object') {
+      const cur = (await goldRef.get()).data() || {};
+      data.prices = { ...(cur.prices || {}) };
+      for (const k of ['gold', 'silver']) if (k in b.prices) data.prices[k] = money(b.prices[k]);
+      data.prices.asOf = String(b.prices.asOf || now().slice(0, 10));
+    }
+    await goldRef.set(data, { merge: true });
+    return json(res, 200, { ok: true });
+  }
+  if (url === '/api/accounting/gold/import' && req.method === 'POST') {
+    const b = await readBody(req);
+    try {
+      const g = await ledgers.readGold(b.file);
+      const cur = (await goldRef.get()).data() || {};
+      const prices = { ...g.prices, ...(cur.prices || {}) };            // a price typed here beats the sheet's
+      if (!prices.asOf) prices.asOf = g.readAt.slice(0, 10);
+      await goldRef.set({ holdings: g.holdings, prices, file: g.file, importedAt: g.readAt, importedBy: who }, { merge: true });
+      return json(res, 200, { holdings: g.holdings.length, prices, file: g.file });
+    } catch (e) { return json(res, 400, { error: String(e.message || e) }); }
+  }
+
   // ── transfers ──
   if (url === '/api/accounting/transfers' && req.method === 'GET') {
     const [snap, accounts] = await Promise.all([ws.collection('transfers').get(), listAccounts(ws)]);

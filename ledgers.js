@@ -391,4 +391,40 @@ async function linkTransfers(ctx, account, who, opts) {
   return { linked: made.length, transfers: made, unmatched: unmatched.length, unmatchedLines: unmatched.slice(0, 200) };
 }
 
-module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, parseMoney, LAYOUTS };
+// ── Gold & silver ───────────────────────────────────────────────────────────
+// Mario's bullion sits in one workbook: a `gold` sheet and two silver sheets, each with a
+// purchases table "buyer | date | amount paid | qty | unit | …" and a market price cell.
+// Read on the laptop, stored under settings/gold so the dashboard works anywhere.
+const OZ_PER_KG = 32.1507;
+const GOLD_FILE = process.env.GOLD_XLSX || 'D:/Dropbox/0. SHIFT/0. ACCOUNTING/ms/00. XLS/0. GOLD/20250422 gold+silver.xlsx';
+async function readGold(file) {
+  const ExcelJS = tryRequire('exceljs', EXTRA.exceljs);
+  if (!ExcelJS) throw new Error('exceljs is not installed on this machine — read the workbook from Mario\'s laptop');
+  file = file || GOLD_FILE;
+  if (!fs.existsSync(file)) throw new Error('workbook not found: ' + file);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(file);
+  const holdings = [], prices = {};
+  for (const ws of wb.worksheets) {
+    const name = ws.name.toLowerCase();
+    const metal = name.startsWith('gold') ? 'gold' : name.startsWith('silver') && !name.includes('history') ? 'silver' : '';
+    if (!metal) continue;
+    let head = 0;
+    ws.eachRow((row, i) => { if (!head && /^buyer$/i.test(str(row.values[1]))) head = i; });
+    if (!head) continue;
+    // market price: gold F3 ($/oz); silver F3 = $/kg, G3 = $/oz
+    const p = metal === 'gold' ? num(ws.getRow(3).values[6]) : num(ws.getRow(3).values[7]);
+    if (p && !prices[metal]) prices[metal] = p;
+    ws.eachRow((row, i) => {
+      if (i <= head) return;
+      const r = row.values, buyer = str(r[1]), date = day(r[2]), paid = num(r[3]), qty = num(r[4]), unit = str(r[5]);
+      if (!buyer || !qty) return;
+      const oz = /kg/i.test(unit) ? money(qty * OZ_PER_KG) : money(qty);
+      const owner = /mario/i.test(buyer) ? 'mario' : /therese/i.test(buyer) ? 'therese' : /youssef|yousef/i.test(buyer) ? 'youssef' : slugId(buyer);
+      holdings.push({ metal, owner, buyer, date, paid, qty, unit, oz, sheet: ws.name, row: i });
+    });
+  }
+  return { holdings, prices, file: path.basename(file), readAt: now() };
+}
+
+module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, parseMoney, LAYOUTS, readGold };

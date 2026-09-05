@@ -264,8 +264,11 @@ function inAccCurrency(amountBase, currency, currencyAmount, accId) {
 
 // ── Whish statement lines as virtual entries of the whish account ──
 function whishRows() {
-  const accId = D.settings.whishAccountId; if (!accId) return [];
+  // a Whish line lands in the Whish-mapped Budget account; a hub account's line in the account mapped to it in Settings
+  const hubMap = D.settings.hubAccounts || {};
   return D.whish.map(t => {
+    const accId = t.hub ? hubMap[t.whishAccount] : D.settings.whishAccountId;
+    if (!accId) return null;
     const o = D.whishMap.find(m => m.id === t.id) || {};
     const kindSub = t.kind === 'work' ? 'whish-work' : t.kind === 'personal' ? 'whish-personal' : 'whish-untagged';
     const label = t.payeeLabel || t.who || '';
@@ -275,7 +278,7 @@ function whishRows() {
       catId: o.catId || 'whish', subId: o.subId || (o.catId ? '' : kindSub), payeeId: o.payeeId || '',
       payeeLabel: label, phone: t.phone || '', contact: t.contact || '',
       notes: o.notes || note, name: label, service: t.service, balance: t.balance };
-  });
+  }).filter(Boolean);
 }
 const wExpenses = () => whishRows().filter(w => w.kind === 'expense');
 const wIncome = () => whishRows().filter(w => w.kind === 'income');
@@ -287,11 +290,13 @@ function balances() {
   for (const e of D.expenses) if (b[e.accountId] != null) b[e.accountId] -= eff(e);
   for (const e of D.income) if (b[e.accountId] != null) b[e.accountId] += eff(e);
   for (const t of D.transfers) { if (b[t.fromId] != null) b[t.fromId] -= t.fromAmount != null ? t.fromAmount : t.amount; if (b[t.toId] != null) b[t.toId] += t.toAmount != null ? t.toAmount : t.amount; }
-  const w = whishRows();
-  if (w.length && b[D.settings.whishAccountId] != null) {
-    // the statement carries its own running balance — trust the latest line
+  // a mapped stream carries its own running balance (the statement's, or the hub's) — trust its latest line
+  const streams = {};
+  for (const w of whishRows()) (streams[w.accountId] = streams[w.accountId] || []).push(w);
+  for (const [accId, w] of Object.entries(streams)) {
+    if (b[accId] == null) continue;
     const last = w.slice().sort((x, y) => (x.date + x.wid) < (y.date + y.wid) ? 1 : -1)[0];
-    if (last && last.balance != null) b[D.settings.whishAccountId] = last.balance;
+    if (last && last.balance != null) b[accId] = last.balance;
   }
   return b;
 }
@@ -1024,11 +1029,14 @@ function openSettings() {
     ${cs.map((c, i) => `<label>${esc(c.code)}</label><input type="number" step="any" id="f-rate-${i}" value="${c.rate == null ? '' : c.rate}" placeholder="not set">`).join('')}
     <label>New currency</label><div class="row"><input id="f-newcode" placeholder="code" style="width:70px"><input type="number" step="any" id="f-newrate" placeholder="rate"></div>
     <label>Whish account</label><select id="f-wacc"><option value="">— none —</option>${accOpts(D.settings.whishAccountId)}</select>
-    <div class="hint">Statement lines of the Whish page appear inside this account, marked <span class="tag">W</span>.</div>`, acts(''));
+    <div class="hint">Statement lines of the Whish page appear inside this account, marked <span class="tag">W</span>.</div>
+    ${(D.hubAccounts || []).map(h => `<label>${esc(h.name)}</label><select id="f-hub-${esc(h.id)}"><option value="">— not shown —</option>${accOpts((D.settings.hubAccounts || {})[h.id])}</select>`).join('')}
+    ${(D.hubAccounts || []).length ? '<div class="hint">Accounts of the Accounts page (Mario cash, Neo, the workers). Pick the Budget account each one feeds; its lines and balance come from there.</div>' : ''}`, acts(''));
   onSave = async () => {
     const currencies = cs.map((c, i) => ({ ...c, rate: v('f-rate-' + i) === '' ? null : Number(v('f-rate-' + i)) }));
     const nc = (v('f-newcode') || '').trim().toUpperCase(); if (nc && !currencies.some(c => c.code === nc)) currencies.push({ code: nc, name: nc, rate: Number(v('f-newrate')) || null });
-    const data = { currencies, whishAccountId: v('f-wacc') };
+    const hubAccounts = {}; for (const h of D.hubAccounts || []) hubAccounts[h.id] = v('f-hub-' + h.id) || '';
+    const data = { currencies, whishAccountId: v('f-wacc'), hubAccounts };
     await post('settings', data); Object.assign(D.settings, data); say('Saved'); render();
   };
 }
@@ -1045,7 +1053,7 @@ Admin.require('accounting', async () => {
     document.getElementById('m-body').innerHTML = `<div class="m-empty">${msg}</div>`;
     return;
   }
-  D.whishMap = D.whishMap || []; D.whish = D.whish || [];
+  D.whishMap = D.whishMap || []; D.whish = D.whish || []; D.hubAccounts = D.hubAccounts || [];
   if (MOBILE) S.screen = 'home';
   render();
 });
