@@ -30,7 +30,7 @@
   .legend .clr{margin-left:auto;color:var(--odoo);cursor:pointer;display:none;}
   .legend .clr.on{display:inline;}
   .wrap{flex:1;min-height:0;overflow:auto;}   /* grid scrolls; top bar, toolbar and header stay */
-  table{border-collapse:separate;border-spacing:0;width:100%;min-width:1300px;}
+  table{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;}
   thead th{position:sticky;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:2;}
   thead tr.hdr th{top:0;height:30px;cursor:pointer;user-select:none;}
   thead tr.hdr th:hover{color:var(--odoo);}
@@ -38,7 +38,7 @@
   thead tr.flt th{top:30px;height:30px;padding:0 4px;border-bottom:2px solid var(--line);}
   thead tr.flt input,thead tr.flt select{width:100%;height:22px;border:1px solid var(--line);border-radius:3px;font-size:11px;padding:0 5px;background:#fff;font-family:inherit;}
   thead tr.flt input.on,thead tr.flt select.on{border-color:var(--odoo);background:#f5f2f7;}
-  td{padding:3px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:nowrap;}
+  td{padding:3px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:normal;overflow-wrap:anywhere;}
   tr:hover td{background:#f5f2f7;}
   tr.personal td{color:#9aa0a6;}
   tr.personal td input,tr.personal td select{color:#9aa0a6;}
@@ -54,7 +54,8 @@
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:#8ab0e6;}
-  .c-date{width:92px;} .c-desc{min-width:220px;max-width:320px;white-space:normal;} .c-partner{min-width:170px;} .c-company{width:140px;} .c-proj{min-width:150px;} .c-note{min-width:110px;}
+  .c-date{width:9%;} .c-desc{width:20%;white-space:normal;} .c-partner{width:11%;} .c-company{width:9%;} .c-proj{width:13%;} td.num,th.num{width:6.5%;} .c-odoo{width:13%;}
+  td.num{white-space:nowrap;} .c-date .ref{overflow-wrap:anywhere;}
   .c-desc .svc{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-right:4px;}
   .c-desc .who{font-size:11.5px;color:var(--muted);cursor:pointer;margin-top:1px;}
   .c-desc .who:hover{text-decoration:underline;}
@@ -95,7 +96,7 @@
   .sug-act{margin-top:3px;flex-wrap:wrap;} .sug-act .what{flex-basis:100%;font-size:10.5px;color:var(--auto);font-style:italic;white-space:normal;line-height:1.25;}
   .sug-skip{color:#adb5bd;font-size:11px;margin-top:3px;} .sug-skip a{color:var(--odoo);cursor:pointer;}
   .ref{color:var(--muted);font-size:11px;}
-  .c-proj .plan{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .c-proj .plan{font-size:11px;color:var(--muted);margin-top:1px;}
   .pick-list div.new{color:var(--odoo);font-weight:600;border-top:1px solid var(--line);}
   .pick-list div.new.off{color:var(--muted);font-weight:400;cursor:not-allowed;}
   .odoo-ok{color:var(--green);text-decoration:none;font-weight:600;}
@@ -118,7 +119,7 @@
   .nat-transfer{color:var(--green);border-color:var(--green);} .nat-refund{color:#b8860b;border-color:#b8860b;} .nat-labour{color:var(--odoo);border-color:var(--odoo);} .nat-vendor{color:#b8860b;border-color:#b8860b;} .nat-expense{color:#6c757d;}
   .months td,.months th{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top;} .months th{text-align:left;font-size:12px;color:#495057;} .months .num{text-align:right;font-variant-numeric:tabular-nums;}
   .sug-why{font-size:10.5px;color:var(--auto);font-style:italic;margin-right:4px;}
-  .c-type{width:118px;} .c-type select{width:100%;font-size:12px;}
+  .c-type{width:7%;} .c-type select{width:100%;font-size:12px;}
   .locked{color:var(--muted);}
   td select:has(option[value=""]:checked){color:var(--auto);font-style:italic;} td input::placeholder{color:var(--auto);font-style:italic;}
   .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;display:block;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
@@ -258,7 +259,7 @@ const ALL_COLS = [
   { k: 'partner', l: 'Partner / cash',        f: 'text',   v: t => t.partnerName || '', c: 'c-partner' },
   { k: 'company', l: 'Company',               f: 'select', v: t => companyOf(t), c: 'c-company' },
   { k: 'proj',    l: 'Analytic (Odoo)',       f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
-  { k: 'odoo',    l: 'Odoo',                  f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length },
+  { k: 'odoo',    l: 'Odoo',                  f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length, c: 'c-odoo' },
 ];
 let COLS = ALL_COLS.filter(c => !c.only);
 function buildCols() { COLS = ALL_COLS.filter(c => !c.only || (account && c.only === account.type) || (c.only === 'ledger' && isExcelKept())); }
@@ -648,7 +649,7 @@ function render() {
         <div class="plan" id="an-${t.id}-plan">${esc(planOf(t.analyticId))}</div>
         ${t.projectFrom && t.analyticName && t.analyticSrc !== 'manual' ? `<div class="sug-act" title="${esc('Not written in the sheet: taken from the ' + t.projectFrom + '. ✓ keeps it, ✕ clears it so you pick one.')}"><span class="sug-why">from the ${esc(t.projectFrom)}</span> <button class="yes" onclick="confirmAnalytic('${t.id}', true)">✓</button><button class="no" onclick="confirmAnalytic('${t.id}', false)">✕</button></div>` : ''}
       </td>`}
-      <td>${odooCell(t)}</td>
+      <td class="c-odoo">${odooCell(t)}</td>
     </tr>`;
   }).join('');
   const counted = rows.filter(t => !t.excluded);
