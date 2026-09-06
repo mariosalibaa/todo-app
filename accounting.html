@@ -459,7 +459,7 @@ function buildHeader() {
         <option value="">all</option><option value="found" ${colF[c.k] === 'found' ? 'selected' : ''}>found</option>
         <option value="none" ${colF[c.k] === 'none' ? 'selected' : ''}>not found</option><option value="unchecked" ${colF[c.k] === 'unchecked' ? 'selected' : ''}>unchecked</option></select></th>`;
     if (c.f === 'select') {
-      const vals = c.k === 'company' ? ['Personal', ...companies.map(x => x.name)] : c.k === 'type' ? TYPES : c.k === 'paidby' ? PEOPLE : [...new Set(tx.map(c.v))].filter(Boolean).sort();
+      const vals = c.k === 'type' ? TYPES : c.k === 'paidby' ? PEOPLE : [...new Set(tx.map(c.v))].filter(Boolean).sort();
       return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)"><option value="">all</option>${vals.map(v => `<option ${colF[c.k] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}<option value="__unset" ${colF[c.k] === '__unset' ? 'selected' : ''}>not set</option></select></th>`;
     }
     return '<th></th>';
