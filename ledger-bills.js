@@ -73,7 +73,7 @@ async function analyticMapFor(ctx, account) {
   const map = await loadMap(ws);
   const tx = (await txCol(account).select('src', 'project', 'debit', 'nature').get()).docs.map(d => d.data());
   const used = {};
-  for (const t of tx) { if (t.src !== 'excel' || !t.project) continue; const k = norm(t.project); if (!k) continue; (used[k] = used[k] || { key: k, text: t.project, rows: 0 }).rows++; }
+  for (const t of tx) { if (t.src !== 'excel' || !t.project) continue; const k = norm(t.project); if (!k) continue; const u = used[k] = used[k] || { key: k, text: t.project, rows: 0, amount: 0 }; u.rows++; u.amount = money(u.amount + (t.debit || 0)); }
   const out = []; let changed = false;
   for (const u of Object.values(used)) {
     let e = map[u.key];
@@ -81,7 +81,7 @@ async function analyticMapFor(ctx, account) {
     out.push({ ...u, analyticId: e ? e.id : null, analyticName: e ? e.name : '', src: e ? e.src : '' });
   }
   if (changed) await mapRef(ws).set({ map, updatedAt: now() }, { merge: true });
-  return { projects: out.sort((a, b) => b.rows - a.rows), analytics: analytics.map(a => ({ id: a.id, name: a.name })) };
+  return { projects: out.sort((a, b) => b.amount - a.amount || b.rows - a.rows), analytics: analytics.map(a => ({ id: a.id, name: a.name })) };
 }
 // Push the map onto the rows (analyticId/Name with src 'excel'); a manual pick on a row stays.
 async function applyMap(ctx, account) {

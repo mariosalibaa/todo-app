@@ -1092,16 +1092,21 @@ function drawMonths() {
     const gap = m.unmapped.length ? `<div class="hint" title="${esc(m.unmapped.map(u => u.text + ' ×' + u.rows).join(', '))}">${m.unmapped.reduce((s, u) => s + u.rows, 0)} row${m.unmapped.reduce((s, u) => s + u.rows, 0) === 1 ? '' : 's'} on a project not mapped yet → GENERAL until mapped</div>` : '';
     return `<tr><td><b>${esc(m.month)}</b>${gap}</td>${cell(m, 'labour', m.labour, m.labourAmount)}${cell(m, 'expenses', m.expense, m.expenseAmount)}</tr>`;
   }).join('');
-  const prow = p => `<tr><td>${esc(p.text)}</td><td class="num hint">${p.rows}</td><td><select onchange="mapProject('${esc(p.key)}', this)"><option value="">— not mapped —</option>${analytics.map(a => `<option value="${a.id}" ${a.id === p.analyticId ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select> <span class="hint">${p.src === 'auto' ? 'guessed' : p.src === 'manual' ? 'chosen' : ''}</span></td></tr>`;
+  const prow = p => `<tr><td>${esc(p.text)}</td><td class="num hint">${p.rows}</td><td class="num">${fmt(p.amount || 0)}</td><td><input list="an-all" value="${esc(p.analyticName || '')}" placeholder="type to find the Odoo account…" style="width:100%;max-width:340px" onchange="mapProject('${esc(p.key)}', this)"> <span class="hint">${p.src === 'auto' ? 'guessed' : p.src === 'manual' ? 'chosen' : ''}</span></td></tr>`;
+  const byAmount = [...projects].sort((a, b) => (b.amount || 0) - (a.amount || 0) || b.rows - a.rows);
   document.getElementById('months-body').innerHTML = `
     <p class="hint">Two draft bills per month <b>from ${esc(account.odooPartner.name)}</b> in S LB (journal Bills, no tax), one line per Excel row: the <b>labour</b> bill carries his days on <i>621100 Sub Contractor A</i>; the <b>expenses</b> bill carries benzine on <i>626900 Fuel and Gas</i> and the rest on <i>626990 Other Expenses</i>. Every line has an analytic account: the row's project, else the project he worked that day, else the previous one, else GENERAL. Transfers and official-vendor rows are never in these bills. Rewriting a draft replaces its lines; a posted bill is left alone.</p>
     <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Month</th><th>Labour bill — his days</th><th></th><th>Expenses bill — benzine, misc</th><th></th></tr></thead><tbody>${mrows || '<tr><td colspan="5" class="hint">No labour or expense rows to book.</td></tr>'}</tbody></table>
     <h4 style="margin:16px 0 4px">Projects → analytic accounts ${unmapped.length ? `<span class="odoo-warn">${unmapped.length} still to map</span>` : '<span class="hint">all mapped</span>'}</h4>
     <p class="hint">The sheet's project names, matched to Odoo's analytic accounts. Fix any of them here; the choice holds for every import and every bill after.</p>
-    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>In the sheet</th><th class="num">Rows</th><th>Analytic account (Odoo)</th></tr></thead><tbody>${[...unmapped, ...projects.filter(p => p.analyticId)].map(prow).join('')}</tbody></table>`;
+    <datalist id="an-all">${analytics.map(a => `<option value="${esc(a.name)}">`).join('')}</datalist>
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>In the sheet</th><th class="num">Rows</th><th class="num">Spent</th><th>Analytic account (Odoo)</th></tr></thead><tbody>${[...byAmount.filter(p => !p.analyticId), ...byAmount.filter(p => p.analyticId)].map(prow).join('')}</tbody></table>`;
 }
 async function mapProject(key, sel) {
-  const id = +sel.value || null, name = id ? sel.options[sel.selectedIndex].text : '';
+  const typed = sel.value.trim();
+  const hit = typed ? (monthsData.analytics.find(a => a.name === typed) || monthsData.analytics.find(a => a.name.toLowerCase() === typed.toLowerCase())) : null;
+  if (typed && !hit) { say(`No Odoo analytic account called "${typed}" — pick one from the list`, 'err'); return; }
+  const id = hit ? hit.id : null, name = hit ? hit.name : '';
   sel.disabled = true;
   try {
     const r = await Admin.api('POST', '/api/accounting/analytic-map', { key, analyticId: id, analyticName: name, accountId: acc });
