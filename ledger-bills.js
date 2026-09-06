@@ -30,6 +30,8 @@ const VENDOR_WORDS = /attal|tchagh|solaris|khoury|kbm|khc|njk|\bsec\b|simon|nari
 // What a row is. `partnerRaw` is the sheet's own word for the counterparty.
 function natureOf({ credit, kind, partnerRaw, owner }) {
   const p = norm(partnerRaw);
+  // money back from a supplier keeps the supplier and the project; money from one of our cash accounts feeds the ledger, no project
+  if (credit && VENDOR_WORDS.test(p)) return { nature: 'refund', partnerKind: 'partner', cashAccountId: '' };
   if (credit) return { nature: 'transfer', partnerKind: 'cash', cashAccountId: PEOPLE_CASH[p] || 'mario-cash' };
   if (PEOPLE_CASH[p] && p !== owner) return { nature: 'transfer', partnerKind: 'cash', cashAccountId: PEOPLE_CASH[p] };
   if (kind === 'labour' || p === owner) return { nature: 'labour', partnerKind: 'partner', cashAccountId: '' };

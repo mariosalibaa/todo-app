@@ -196,7 +196,7 @@ async function importExcel(ctx, account, who) {
     // money in = someone handed it to him, so the counterparty is that person's cash;
     // money out = what he spent it on, as the sheet writes it
     const raw = String(r.partner || '').trim().toLowerCase();
-    const partnerName = credit ? (CASH_OF[raw] || titled(r.partner) || 'Mario cash') : titled(r.partner);
+    const partnerName = credit && !/attal|tchagh|solaris|khoury|kbm|khc|njk|narinco|medco|electromec|metaleo/i.test(raw) ? (CASH_OF[raw] || titled(r.partner) || 'Mario cash') : titled(r.partner);
     const vendorInLabel = raw === (lay.owner === 'khodr' ? 'khoder' : lay.owner) && /attal|tchagh|solaris|khoury|kbm|khc|njk|narinco|medco|electromec|metaleo|epoxy|steel|paint|laser/i.test(r.description || '');
     const nat = bills.natureOf({ credit, kind: vendorInLabel ? '' : r.kind, partnerRaw: vendorInLabel ? String(r.description).replace(/^abeds*·s*/i, '') : raw, owner: lay.owner === 'khodr' ? 'khoder' : lay.owner });
     if (vendorInLabel) { r.kind = ''; }
@@ -209,6 +209,7 @@ async function importExcel(ctx, account, who) {
   { const byDay = {}; for (const l of lines) if (l.project && l.kind === 'labour') byDay[l.date] = byDay[l.date] || l.project;
     let last = ''; for (const l of lines.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)) {
       if (l.project) { last = l.project; continue; }
+      if (l.nature === 'transfer') { l.project = ''; l.projectFrom = ''; continue; }
       if ((l.debit || l.credit) && l.kind !== 'note' && l.kind !== 'opening') { const after = () => { const d = Object.keys(byDay).sort().find(x => x > l.date); return d ? byDay[d] : ''; }; const p = byDay[l.date] || last || after(); if (p) { l.project = p; l.projectFrom = byDay[l.date] ? 'same day' : last ? 'day before' : 'day after'; } }
     } }
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
@@ -240,7 +241,7 @@ async function importExcel(ctx, account, who) {
     if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; }
     // money he was handed is not an expense of any company but the one that holds his account
     // money handed to him and everything unofficial live in S LB; an official vendor's bill is the SARL's until Odoo says otherwise
-    const co = t.credit || nature === 'labour' || nature === 'expense' ? 'S LB' : nature === 'vendor' ? 'SHIFT GROUP SARL (USD)' : '';
+    const co = nature === 'transfer' || nature === 'labour' || nature === 'expense' ? 'S LB' : nature === 'vendor' || nature === 'refund' ? 'SHIFT GROUP SARL (USD)' : '';
     if (prev.companySrc !== 'manual') Object.assign(data, { company: co, companySrc: co ? 'excel' : '' });
     const d = dup.get(t.id);
     const o = d ? byId[d.id] : null;
