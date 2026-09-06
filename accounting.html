@@ -115,7 +115,7 @@
   .srctog.off{opacity:.45;text-decoration:line-through;}
   .odoo-partner{color:#0d6efd;font-size:12px;margin-top:2px;white-space:normal;}
   .ptag{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-top:2px;text-decoration:none;} a.ptag.cash{color:var(--green);border-color:var(--green);}
-  .nat-transfer{color:var(--green);border-color:var(--green);} .nat-labour{color:var(--odoo);border-color:var(--odoo);} .nat-vendor{color:#b8860b;border-color:#b8860b;} .nat-expense{color:#6c757d;}
+  .nat-transfer{color:var(--green);border-color:var(--green);} .nat-refund{color:#b8860b;border-color:#b8860b;} .nat-labour{color:var(--odoo);border-color:var(--odoo);} .nat-vendor{color:#b8860b;border-color:#b8860b;} .nat-expense{color:#6c757d;}
   .months td,.months th{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top;} .months th{text-align:left;font-size:12px;color:#495057;} .months .num{text-align:right;font-variant-numeric:tabular-nums;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
@@ -578,7 +578,7 @@ function render() {
     const sugTxt = [sg.partner && sg.partner.name, sg.company].filter(Boolean).join(' / ');
     const st = isStatement(), own = account && (account.owner || 'mario');
     const paidFlag = t.paidBy && t.paidBy !== own ? `<div class="flag" title="${esc('Physically paid by ' + cap(t.paidBy) + (t.paidBySrc === 'odoo' ? ' — read from the Odoo attachment / memo' : ''))}">⚑ paid by ${esc(cap(t.paidBy))}</div>` : '';
-    const natChip = t.nature ? `<span class="src nat-${t.nature}" title="${esc({ transfer: 'Money moved between him and one of our accounts — never a bill', labour: 'His own work — booked in the month\'s bill from him, account Sub Contractor', expense: 'Unofficial spending he fronted — booked in the month\'s bill from him', vendor: 'An official supplier: its own bill, paid through Settlement by him' }[t.nature] || '')}">${esc(t.nature)}</span>` : '';
+    const natChip = t.nature ? `<span class="src nat-${t.nature}" title="${esc({ transfer: 'Money moved between him and one of our accounts — never a bill', labour: 'His own work — booked in the month\'s bill from him, account Sub Contractor', expense: 'Unofficial spending he fronted — booked in the month\'s bill from him', refund: 'Money back from a supplier — keeps the supplier and the project', vendor: 'An official supplier: its own bill, paid through Settlement by him' }[t.nature] || '')}">${esc(t.nature)}</span>` : '';
     const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '') + (t.src === 'excel' ? natChip : '');
     const onlyFlag = t.src === 'odoo' && t.odooOnly && t.excluded ? `<div class="flag" title="Booked in Odoo on this person's cash journal, but no row of the Excel ledger matches it. Not counted: the Excel is the account.">🟣 not in Excel</div>` : '';
     const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
