@@ -209,7 +209,7 @@ async function importExcel(ctx, account, who) {
   { const byDay = {}; for (const l of lines) if (l.project && l.kind === 'labour') byDay[l.date] = byDay[l.date] || l.project;
     let last = ''; for (const l of lines.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)) {
       if (l.project) { last = l.project; continue; }
-      if (l.debit && l.nature === 'expense') { const after = () => { const d = Object.keys(byDay).sort().find(x => x > l.date); return d ? byDay[d] : ''; }; const p = byDay[l.date] || last || after(); if (p) { l.project = p; l.projectFrom = byDay[l.date] ? 'same day' : last ? 'day before' : 'day after'; } }
+      if ((l.debit || l.credit) && l.kind !== 'note' && l.kind !== 'opening') { const after = () => { const d = Object.keys(byDay).sort().find(x => x > l.date); return d ? byDay[d] : ''; }; const p = byDay[l.date] || last || after(); if (p) { l.project = p; l.projectFrom = byDay[l.date] ? 'same day' : last ? 'day before' : 'day after'; } }
     } }
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines.filter(l => !(existing[l.id] || {}).bookedMove), odoo, { taken, loose: true });

@@ -329,13 +329,15 @@ async function selectAccount(a) {
 // Excluded lines (duplicates) are shown but not counted.
 function computeBalances() {
   if (!account || isStatement()) return;
-  const ord = [...tx].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.id).localeCompare(String(b.id)));
+  const ord = [...tx].sort(dayOrder);
   const mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
   const op = account.opening;
   let run = op ? op.amount - ord.filter(t => t.date < op.date).reduce((s, t) => s + mv(t), 0) : 0;
   for (const t of ord) { run = Math.round((run + mv(t)) * 100) / 100; t._bal = run; }
 }
-const closing = () => { if (!tx.length) return 0; if (isStatement()) { const o = [...tx].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (+a.ref) - (+b.ref)); return o[o.length - 1].balance; } const o = [...tx].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.id).localeCompare(String(b.id))); return o[o.length - 1]._bal; };
+// same date: the Excel row order (the sheet's own sequence), then the id
+const dayOrder = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : ((a.excelRow || 0) - (b.excelRow || 0)) || String(a.id).localeCompare(String(b.id));
+const closing = () => { if (!tx.length) return 0; if (isStatement()) { const o = [...tx].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (+a.ref) - (+b.ref)); return o[o.length - 1].balance; } const o = [...tx].sort(dayOrder); return o[o.length - 1]._bal; };
 // A line matched to an Odoo payment already knows its partner and its company:
 // they are facts from the ledger, not suggestions. Write them onto the line (purple)
 // unless you chose something yourself, so nothing asks you what Odoo already said.
@@ -506,7 +508,7 @@ function visible() {
     let x = col.v(a), y = col.v(b);
     if (typeof x === 'string') { x = x.toLowerCase(); y = y.toLowerCase(); }
     const r = x < y ? -1 : x > y ? 1 : 0;
-    return r ? r * sort.dir : (a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.ref || a.id).localeCompare(String(b.ref || b.id), undefined, { numeric: true })) * (sort.k === 'date' ? sort.dir : -1);
+    return r ? r * sort.dir : (isStatement() ? (a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.ref || a.id).localeCompare(String(b.ref || b.id), undefined, { numeric: true })) : dayOrder(a, b)) * (sort.k === 'date' ? sort.dir : -1);
   });
   return list;
 }
@@ -546,7 +548,7 @@ function odooCell(t) {
   const win = m.find(x => x.chosen);
   if (win) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
-    const differs = t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
+    const differs = t.src !== 'excel' && t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
     const docs = [...new Set((win.docs || []).filter(d => d && d !== win.move))];
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
       + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => win.docIds && win.docIds[d] ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${win.docIds[d]}">${esc(d)}</a>` : esc(d)).join(', ')}</div>` : '')
@@ -615,7 +617,7 @@ function render() {
                 ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
                 : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : ''}
       </td>
-            <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : ''}">
+            <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : t.analyticSrc === 'manual' ? 'Chosen by hand' : t.analyticSrc === 'excel' ? esc(t.projectFrom ? 'No project on this row: taken from the ' + t.projectFrom + (t.project ? ' (' + t.project + ')' : '') : 'The project written in the sheet' + (t.project ? ': ' + t.project : '')) : ''}">
         <div class="pick"><input type="text" id="an-${t.id}-txt" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="analytic"
           oninput="anFilter('an-${t.id}')" onkeydown="anKey(event,'an-${t.id}')" onblur="anBlur('an-${t.id}')">
           <input type="hidden" id="an-${t.id}" value="${esc(t.analyticId || '')}" data-row="${t.id}"><div class="pick-list" id="an-${t.id}-list"></div></div>
