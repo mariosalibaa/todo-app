@@ -1327,9 +1327,51 @@ async function openMonths() {
   document.getElementById('months').hidden = false;
   document.getElementById('months-title').textContent = 'Book the months — ' + (account ? account.name : '');
   document.getElementById('months-body').innerHTML = '<p class="hint">Reading the months and the projects…</p>';
-  try { monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths(); }
+  try {
+    // the months, and beside them the vendor rows: which expense rows name a supplier Odoo knows
+    // (they leave the month and become that supplier's bill), and which vendor rows still wait for their bill
+    const [md, vz, pv] = await Promise.all([
+      Admin.api('GET', `/api/accounting/accounts/${acc}/months`),
+      Admin.api('POST', `/api/accounting/accounts/${acc}/vendorize`, { dry: true }).catch(e => ({ error: e.message })),
+      Admin.api('POST', `/api/accounting/accounts/${acc}/post-vendors`, { dry: true }).catch(e => ({ error: e.message })),
+    ]);
+    monthsData = { ...md, vendorize: vz, vendors: pv }; drawMonths();
+  }
   catch (e) { document.getElementById('months-body').innerHTML = `<p class="hint">Could not load: ${esc(e.message)}</p>`; }
 }
+// The vendor rows of the ledger: retype the expense rows that name a known supplier, then book
+// every vendor row as its own bill from that supplier, settled "paid by" him.
+function drawVendors() {
+  const vz = monthsData.vendorize || {}, pv = monthsData.vendors || {};
+  const li = x => `<li>${esc(x.date)} · ${fmt(x.amount)} · <b>${esc(x.vendor)}</b> <span class="hint">${esc(x.text)}${x.bill ? ' — in ' + esc(x.bill) + (x.state ? ' (' + esc(x.state) + ')' : '') : ''}</span></li>`;
+  const flip = (vz.flipped || []).length, inBill = (vz.inBill || []).length, toBook = pv.posted || 0, noPartner = (pv.noPartner || []).length;
+  if (vz.error && pv.error) return `<p class="hint odoo-warn">Vendor rows: Odoo not reachable (${esc(vz.error)})</p>`;
+  return `<div style="margin:6px 0 14px;padding:8px 10px;border:1px solid var(--line, #dee2e6);border-radius:6px">
+    <b>Vendor rows</b> <span class="hint">— a row naming a supplier Odoo knows is that supplier's own bill, paid by ${esc(account.odooPartner.name)}; it never goes into a month.</span>
+    ${flip ? `<div style="margin-top:6px"><span class="odoo-warn">${flip} expense row${flip === 1 ? '' : 's'} name a known supplier</span> and would leave the month: <button class="btn sm" onclick="vendorizeRows(this)">Make them vendor rows</button><ul class="hint" style="margin:4px 0 0 18px">${vz.flipped.map(li).join('')}</ul></div>` : '<div class="hint" style="margin-top:6px">No expense row names a known supplier.</div>'}
+    ${inBill ? `<div class="hint" style="margin-top:6px">${inBill} such row${inBill === 1 ? ' is' : 's are'} already inside a month bill — left as ${inBill === 1 ? 'it is' : 'they are'}; retype by hand and Rewrite the draft if wanted:<ul style="margin:4px 0 0 18px">${vz.inBill.map(li).join('')}</ul></div>` : ''}
+    ${toBook ? `<div style="margin-top:6px"><b>${toBook} vendor row${toBook === 1 ? '' : 's'}</b> (${fmt(pv.total || 0)}) still without a bill: <button class="btn sm" onclick="bookVendors(this)">📗 Book as ${toBook === 1 ? 'its' : 'their'} own bill${toBook === 1 ? '' : 's'}</button><ul class="hint" style="margin:4px 0 0 18px">${(pv.preview || []).map(li).join('')}</ul></div>` : '<div class="hint" style="margin-top:6px">Every vendor row has its bill.</div>'}
+    ${noPartner ? `<div class="hint" style="margin-top:6px">${noPartner} vendor row${noPartner === 1 ? '' : 's'} name no supplier Odoo knows — create the vendor in Odoo or retype the row: ${esc(pv.noPartner.slice(0, 6).map(x => `${x.date} ${fmt(x.amount)} ${x.partner || ''}`).join('; '))}${noPartner > 6 ? '…' : ''}</div>` : ''}
+  </div>`;
+}
+async function vendorizeRows(btn) {
+  const n = (monthsData.vendorize.flipped || []).length;
+  if (!confirm(`Retype ${n} expense row${n === 1 ? '' : 's'} as vendor rows?\n\nThey leave the month's expenses bill (rewrite any draft month after) and can then be booked as the supplier's own bills.`)) return;
+  btn.disabled = true; btn.textContent = 'Working…';
+  try { const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/vendorize`, {}); say(`${r.flipped.length} row${r.flipped.length === 1 ? '' : 's'} retyped as vendor`); await openMonths(); await reloadTx(); render(); }
+  catch (e) { say('Could not retype: ' + e.message, 'err'); btn.disabled = false; }
+}
+async function bookVendors(btn) {
+  const pv = monthsData.vendors;
+  if (!confirm(`Book ${pv.posted} vendor row${pv.posted === 1 ? '' : 's'} (${fmt(pv.total)}) in Odoo?\n\nOne posted bill per row from the supplier, in ${bookCompanyName()}, settled through the Settlement journal as paid by ${account.odooPartner.name}.`)) return;
+  btn.disabled = true; btn.textContent = 'Booking…';
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/post-vendors`, {});
+    say(`${r.posted} bill${r.posted === 1 ? '' : 's'} made, ${r.found} already there${r.skipped.length ? '; ' + r.skipped.length + ' skipped: ' + r.skipped[0].error : ''}`, r.skipped.length ? 'err' : 'ok');
+    await openMonths(); await reloadTx(); render();
+  } catch (e) { say('Could not book: ' + e.message, 'err'); btn.disabled = false; }
+}
+const bookCompanyName = () => (account && account.billCompany) || 'S LB';
 function drawMonths() {
   const { months, projects, analytics } = monthsData;
   const unmapped = projects.filter(p => !p.analyticId);
@@ -1345,7 +1387,7 @@ function drawMonths() {
     const part = (n, a, tip) => n ? `<td class="num" title="${esc(tip)}">${fmt(a)}<div class="hint">${n} line${n === 1 ? '' : 's'}</div></td>` : '<td class="num hint">—</td>';
     return `<tr><td><b>${esc(m.month)}</b>${gap}</td>${cell(m, 'labour', m.labour, m.labourAmount)}${part(m.benzine, m.benzineAmount, 'Fuel rows of the month — 626900 Fuel and Gas in the expenses bill')}${part(m.misc, m.miscAmount, 'Everything else he fronted — 626990 Other Expenses in the expenses bill')}${cell(m, 'expenses', m.expense, m.expenseAmount)}</tr>`;
   }).join('');
-  document.getElementById('months-body').innerHTML = `
+  document.getElementById('months-body').innerHTML = drawVendors() + `
     <p class="hint">Two draft bills per month <b>from ${esc(account.odooPartner.name)}</b> in S LB (journal Bills, no tax), one line per Excel row: the <b>labour</b> bill carries his days on <i>621100 Sub Contractor A</i>; the <b>expenses</b> bill carries benzine on <i>626900 Fuel and Gas</i> and the rest on <i>626990 Other Expenses</i>. Every line has an analytic account: the row's project, else the project he worked that day, else the previous one, else GENERAL. Transfers and official-vendor rows are never in these bills. Rewriting a draft replaces its lines; a posted bill is left alone.${unmapped.length ? ` <span class="odoo-warn">${unmapped.length} project${unmapped.length === 1 ? '' : 's'} still to map</span> — see 🗂 Projects.` : ''}</p>
     <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Month</th><th>Labour bill — his days</th><th></th><th class="num">Benzine</th><th class="num">Misc</th><th>Expenses bill</th><th></th></tr></thead><tbody>${mrows || '<tr><td colspan="7" class="hint">No labour or expense rows to book.</td></tr>'}</tbody></table>`;
 }

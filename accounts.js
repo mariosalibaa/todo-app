@@ -611,7 +611,12 @@ async function handle(req, res, url, user, ctx) {
     if (!a) return json(res, 404, { error: 'no such account' });
     const b = await readBody(req);
     if (excelIn(b.excel)) { a.excel = { ...(a.excel || {}), ...excelIn(b.excel) }; await a.ref.set({ excel: a.excel }, { merge: true }); }
-    try { return json(res, 200, await ledgers.importExcel(ledgerCtx, a, who)); }
+    try {
+      const r = await ledgers.importExcel(ledgerCtx, a, who);
+      // a row naming a supplier Odoo knows is that supplier's own bill, not a line of the month (Mario, 2026-09-06)
+      if (!a.cashBox) { try { r.vendorized = await bills.vendorize(ledgerCtx, a, who, {}); } catch (e) { r.vendorized = { error: String(e.message || e).slice(0, 160) }; } }
+      return json(res, 200, r);
+    }
     catch (e) { console.error('import-excel', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/close-statement$/)) && req.method === 'POST') {
@@ -681,6 +686,14 @@ async function handle(req, res, url, user, ctx) {
     catch (e) { console.error('book-month', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   // the received rows as payments to him; the unofficial vendor tickets as bills settled by him
+  // expense rows that name a supplier Odoo knows become vendor rows (their own bill, out of the month); { dry } previews
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/vendorize$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await bills.vendorize(ledgerCtx, a, who, { dry: !!b.dry })); }
+    catch (e) { console.error('vendorize', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/post-(payments|vendors)$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });

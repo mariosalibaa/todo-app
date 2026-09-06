@@ -316,7 +316,8 @@ const SUP_STOP = new Set(['sarl', 'sal', 'ste', 'the', 'and', 'company', 'group'
   'industry', 'factory', 'generator', 'tiles', 'aluminum', 'cleaning', 'safety', 'uniform', 'manufacturer', 'petroleum', 'insurance', 'express', 'tech', 'equipment', 'international', 'chamber', 'commerce', 'agriculture',
   'beirut', 'mount', 'jisr', 'antelias', 'naccache', 'milede', 'brother', 'brothers', 'maid', 'gypsum', 'dad', 'mum', 'micro', 'plus', 'handy', 'ballouz', 'solutions',
   'georges', 'tony', 'ahmad', 'joseph', 'saliba', 'maya', 'walid', 'hibri', 'akiki', 'charbel', 'elie', 'jean', 'pierre', 'michel', 'paint', 'painter', 'plumber',
-  'abdel', 'abou', 'abo', 'mostafa', 'karam', 'salam', 'hassan', 'omar', 'zeid', 'issa']);   // first names: a row "georges saad" is not Georges El Hajj, "Abdel Rahman worker" is not Abdel Salam
+  'abdel', 'abou', 'abo', 'mostafa', 'karam', 'salam', 'hassan', 'omar', 'zeid', 'issa',   // first names: a row "georges saad" is not Georges El Hajj, "Abdel Rahman worker" is not Abdel Salam
+  'abed', 'mitri', 'khodr', 'khoder', 'ziad', 'mario', 'therese']);   // our own people: "abed · steel rack" is Abed's row, not the supplier Abed Tahan (found 2026-09-06)
 let _supCache = { at: 0, list: [] };
 async function suppliers(odooCall) {
   if (Date.now() - _supCache.at < 10 * 60000 && _supCache.list.length) return _supCache.list;
@@ -714,18 +715,20 @@ async function postVendors(ctx, account, who, opts) {
   const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
   const ctxO = { allowed_company_ids: [CO.companyId], company_id: CO.companyId };
   for (const t of rows) {
-    const v = handVendor(t, account);   // "abed · attal": the vendor is in the label
+    // "abed · attal": the vendor is in the label (hand list), else any supplier Odoo knows (Mario, 2026-09-06:
+    // a row naming a known vendor is that vendor's own bill, never a line of the month's bundle)
+    const v = await vendorOf(odooCall, t, account);
     if (!v) { out.noPartner.push({ id: t.id, date: t.date, amount: t.debit, partner: t.partnerName }); continue; }
-    if (opts && opts.dry) { out.posted++; out.total = money(out.total + t.debit); continue; }
+    if (opts && opts.dry) { out.posted++; out.total = money(out.total + t.debit); (out.preview = out.preview || []).push({ id: t.id, date: t.date, amount: t.debit, vendor: v.name, text: [t.partnerName, t.description].filter(Boolean).join(' · ') }); continue; }
     const ref = `${prefix}-${t.id}`;
     try {
       let [bill] = await odooCall('account.move', 'search_read', [[['ref', '=', ref], ['move_type', '=', 'in_invoice']]], { fields: ['id', 'name', 'state', 'payment_state'], context: ctxO, limit: 1 });
       const a = an[t.id] || { id: GENERAL, name: 'GENERAL' };
       if (bill) out.found++;
       else {
-        const id = await odooCall('account.move', 'create', [{ move_type: 'in_invoice', company_id: CO.companyId, journal_id: CO.journalId, partner_id: v[1], invoice_date: t.date, date: t.date, ref,
+        const id = await odooCall('account.move', 'create', [{ move_type: 'in_invoice', company_id: CO.companyId, journal_id: CO.journalId, partner_id: v.id, invoice_date: t.date, date: t.date, ref,
           narration: `${account.name}: paid by ${partner.name} on ${t.date} (Excel row, no VAT invoice). Made by Shift Hub.`,
-          invoice_line_ids: [[0, 0, { name: `${t.date} · ${t.description || v[2]}`, quantity: 1, price_unit: money(t.debit), account_id: CO.rawMaterials, tax_ids: [[6, 0, []]], analytic_distribution: { [String(a.id)]: 100 } }]] }], { context: ctxO });
+          invoice_line_ids: [[0, 0, { name: `${t.date} · ${t.description || v.name}`, quantity: 1, price_unit: money(t.debit), account_id: CO.rawMaterials, tax_ids: [[6, 0, []]], analytic_distribution: { [String(a.id)]: 100 } }]] }], { context: ctxO });
         await odooCall('account.move', 'action_post', [[id]], { context: ctxO });
         [bill] = await odooCall('account.move', 'read', [[id], ['id', 'name', 'state', 'payment_state']], { context: ctxO });
         out.posted++;
@@ -739,12 +742,38 @@ async function postVendors(ctx, account, who, opts) {
       }
       out.total = money(out.total + t.debit);
       await col.doc(t.id).set({ bookedMove: { id: bill.id, name: bill.name, ref, kind: 'vendor-bill', at: now(), state: bill.state, paymentState: bill.payment_state }, ref: bill.name, service: CO.company,
-        company: CO.company, companySrc: 'odoo', partnerId: v[1], analyticId: a.id, analyticName: a.name, analyticSrc: t.analyticSrc === 'manual' ? 'manual' : 'excel',
-        odoo: { checkedAt: now(), matches: [{ chosen: true, moveId: bill.id, move: bill.name, date: t.date, amount: money(t.debit), partner: v[2], partnerId: v[1], label: t.description,
+        company: CO.company, companySrc: 'odoo', partnerId: v.id, analyticId: a.id, analyticName: a.name, analyticSrc: t.analyticSrc === 'manual' ? 'manual' : 'excel',
+        odoo: { checkedAt: now(), matches: [{ chosen: true, moveId: bill.id, move: bill.name, date: t.date, amount: money(t.debit), partner: v.name, partnerId: v.id, label: t.description,
           company: CO.company, journal: CO.journal, state: bill.state, docs: [], analytics: [{ id: a.id, name: a.name, from: 'bill' }], score: 10, why: ['bill made from this row, settled by ' + partner.name] }] } }, { merge: true });
     } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount: t.debit, error: String(e.message || e).slice(0, 200) }); if (out.skipped.length > 5) break; }
   }
   return out;
 }
 
-module.exports = { postTransfers, postRefunds, postCashBox, postPayments, postVendors, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+// ── a known supplier's row is its own bill, never a line of the month ──────
+// The sheet reads "abed · deye 3700" as an expense he fronted; the month bundle would swallow it
+// into the expenses bill from him. Mario, 2026-09-06: when the row names a supplier Odoo already
+// knows, it is that supplier's own bill, settled "paid by" him — independent of the month. So
+// every expense row that resolves to a known vendor is retyped `vendor` here: after each Excel
+// import (the import recomputes types) and on demand from the page. A type chosen by hand is
+// never touched, and a row already inside a month bill is only reported: retype it by hand and
+// Rewrite the draft, or leave a posted month as it is.
+async function vendorize(ctx, account, who, opts) {
+  const { txCol, odooCall } = ctx;
+  const col = txCol(account);
+  const all = (await col.get()).docs.map(d => d.data());
+  const rows = all.filter(t => t.src === 'excel' && !t.excluded && t.debit > 0 && !t.noBook && t.nature === 'expense' && t.natureSrc !== 'manual');
+  const out = { checked: rows.length, flipped: [], inBill: [], dry: !!(opts && opts.dry) };
+  for (const t of rows) {
+    let v; try { v = await vendorOf(odooCall, t, account); } catch (e) { out.error = String(e.message || e).slice(0, 160); break; }   // Odoo away: leave the types as they are
+    if (!v) continue;
+    const item = { id: t.id, date: t.date, amount: t.debit, vendor: v.name, vendorId: v.id, text: [t.partnerName, t.description].filter(Boolean).join(' · ').slice(0, 90) };
+    if (t.bookedMove) { out.inBill.push({ ...item, bill: t.bookedMove.name || t.bookedMove.ref, state: t.bookedMove.state }); continue; }
+    out.flipped.push(item);
+    if (out.dry) continue;
+    await col.doc(t.id).set({ nature: 'vendor', natureSrc: 'odoo', partnerKind: 'partner', cashAccountId: '', vendorId: v.id, vendorName: v.name, updatedBy: who, updatedAt: now() }, { merge: true });
+  }
+  return out;
+}
+
+module.exports = { postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
