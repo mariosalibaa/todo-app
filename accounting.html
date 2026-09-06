@@ -270,7 +270,8 @@ const asks = t => t.src === 'excel' && !t.excluded && (!companyOf(t) || !t.natur
 let srcOff = new Set();                       // sources hidden by clicking their chip in the count
 const isExcelKept = () => !!(account && account.excel && account.excel.file);
 // every source starts shown — clicking its name in the count is what hides it
-const resetSources = () => { srcOff = new Set(); };
+// on a partner ledger the Odoo entries sit behind the rows, not among them: hidden until the chip is clicked
+const resetSources = () => { srcOff = isExcelKept() ? new Set(['odoo']) : new Set(); };
 
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
