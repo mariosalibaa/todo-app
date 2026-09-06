@@ -171,8 +171,15 @@ async function importOdoo(odooCall, account, who) {
     const M = moveIds.length ? await odooCall('account.move', 'read', [moveIds, ['name', 'ref', 'narration', 'move_type', 'attachment_ids']], { context: ctx }) : [];
     const byMove = Object.fromEntries(M.map(m => [m.id, m]));
     const payIds = [...new Set(L.map(l => l.payment_id && l.payment_id[0]).filter(Boolean))];
-    const P = payIds.length ? await odooCall('account.payment', 'read', [payIds, ['memo', 'reconciled_bill_ids', 'reconciled_invoice_ids', 'payment_type']], { context: ctx }) : [];
+    let P = payIds.length ? await odooCall('account.payment', 'read', [payIds, ['memo', 'reconciled_bill_ids', 'reconciled_invoice_ids', 'payment_type']], { context: ctx }) : [];
     const byPay = Object.fromEntries(P.map(p => [p.id, p]));
+    const settleByMove = {};
+    if (moveIds.length) {
+      try {
+        const S = await odooCall('account.payment', 'search_read', [[['x_transfer_move_id', 'in', moveIds]]], { fields: ['id', 'name', 'memo', 'reconciled_bill_ids', 'reconciled_invoice_ids', 'payment_type', 'x_transfer_move_id'], context: ctx });
+        for (const sp of S) { settleByMove[sp.x_transfer_move_id[0]] = sp; P.push(sp); }
+      } catch (e) { /* no settlement field on this database */ }
+    }
     const billIds = [...new Set(P.flatMap(p => [...(p.reconciled_bill_ids || []), ...(p.reconciled_invoice_ids || [])]))];
     const B = billIds.length ? await odooCall('account.move', 'read', [billIds, ['name', 'ref', 'invoice_date', 'amount_total', 'attachment_ids', 'move_type']], { context: ctx }) : [];
     const byBill = Object.fromEntries(B.map(b => [b.id, b]));
@@ -187,9 +194,10 @@ async function importOdoo(odooCall, account, who) {
 
     for (const l of L) {
       const m = byMove[l.move_id[0]] || {};
-      const p = l.payment_id ? byPay[l.payment_id[0]] : null;
+      const p = l.payment_id ? byPay[l.payment_id[0]] : (settleByMove[m.id] || null);
       const bills = p ? [...(p.reconciled_bill_ids || []), ...(p.reconciled_invoice_ids || [])].map(id => byBill[id]).filter(Boolean) : [];
-      const files = [...(m.attachment_ids || []), ...bills.flatMap(b => b.attachment_ids || [])].map(id => attName[id]).filter(Boolean);
+      const fileIds = [...new Set([...(m.attachment_ids || []), ...bills.flatMap(b => b.attachment_ids || [])])].filter(id => attName[id]).map(id => ({ id, name: attName[id] }));
+      const files = fileIds.map(x => x.name);
       const lineName = String(l.name || '').replace(/^Manual:\s*/, '');
       const desc = (p && p.memo) || m.ref || (lineName && lineName !== 'Manual' ? lineName : '') || (bills[0] && (bills[0].ref || bills[0].name)) || '';
       const other = (otherOf[m.id] || [])[0];
@@ -207,7 +215,7 @@ async function importOdoo(odooCall, account, who) {
         // Odoo debit on the cash account = money came in = statement credit.
         // On a payable it reads the same way: a credit is money he advanced, a debit is money he was paid.
         debit: money(l.credit), credit: money(l.debit), amountCurrency: l.amount_currency || 0,
-        state: l.parent_state, files, importedAt: now(),
+        state: l.parent_state, files, fileIds, importedAt: now(),
         odoo: { checkedAt: now(), matches: [{
           chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: l.debit || l.credit,
           partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,

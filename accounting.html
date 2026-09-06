@@ -562,6 +562,7 @@ function odooCell(t) {
     const oref = (t.bookedMove && t.bookedMove.ref) || win.odooRef || '';
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
       + (oref && oref !== win.move ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(oref)}</div>` : '')
+      + ((t.fileIds || []).length ? `<div class="odoo-doc">${t.fileIds.map(f => `<a target="_blank" href="https://shift2.odoo.com/web/content/${f.id}" title="${esc(f.name)}">📎 ${esc(f.name.length > 42 ? f.name.slice(0, 40) + '…' : f.name)}</a>`).join('<br>')}</div>` : '')
       + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => win.docIds && win.docIds[d] ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${win.docIds[d]}">${esc(d)}</a>` : esc(d)).join(', ')}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
@@ -609,7 +610,7 @@ function render() {
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><input class="note-in" value="${esc(t.note)}" onchange="saveField('${t.id}', 'note', this.value, this)"></div>` : '') : `<div class="noteline"><input class="note-in" value="${esc(t.note || '')}" placeholder="add note" onchange="saveField('${t.id}', 'note', this.value, this)"></div>`}
-        ${paidFlag}${reviewFlag}${onlyFlag}${t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
+        ${paidFlag}${reviewFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       ${typeCell}
       <td class="num debit">${fmt(t.debit)}</td>

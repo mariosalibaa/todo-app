@@ -250,7 +250,7 @@ async function importExcel(ctx, account, who) {
       linked++; if (d.loose) loose++;
       const win = (o.odoo && o.odoo.matches || []).find(m => m.chosen) || null;
       data.odoo = { checkedAt: now(), matches: win ? [{ ...win, why: [...(win.why || []), d.loose ? 'close amount, shared word' : 'same amount, same days'] }] : [] };
-      data.matchedOdoo = o.id; data.ref = o.ref || ''; data.files = o.files || []; data.service = o.service || 'Excel';
+      data.matchedOdoo = o.id; data.ref = o.ref || ''; data.files = o.files || []; data.fileIds = o.fileIds || []; data.service = o.service || 'Excel';
       // the row keeps the sheet's own word for the partner; the Odoo partner shows on a second line from the match
       if (o.partnerId && prev.partnerSrc !== 'manual') data.partnerId = o.partnerId;
       if (o.company && prev.companySrc !== 'manual') Object.assign(data, { company: o.company, companySrc: 'odoo', kind: prev.kindSrc === 'manual' ? prev.kind : (t.kind || 'work'), kindSrc: prev.kindSrc === 'manual' ? 'manual' : (t.kind ? 'excel' : 'odoo') });
