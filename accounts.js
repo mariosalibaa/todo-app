@@ -64,7 +64,7 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype'];
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask'];
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 
@@ -462,7 +462,7 @@ async function handle(req, res, url, user, ctx) {
     const data = {};
     for (const k of ANNOT) if (k in body) data[k] = body[k];
     // the line itself may be edited only when a person wrote it
-    if (cur.src === 'manual' || cur.src === 'telegram') for (const k of LINE) if (k in body) data[k] = k === 'debit' || k === 'credit' ? money(body[k]) : body[k];
+    if (cur.src === 'manual' || cur.src === 'telegram' || cur.src === 'whatsapp') for (const k of LINE) if (k in body) data[k] = k === 'debit' || k === 'credit' ? money(body[k]) : body[k];
     if ('excluded' in body || 'dupOf' in body) data.dupSrc = 'manual';
     if (body.excluded === false) data.review = false;
     if ('paidBy' in body) data.paidBySrc = body.paidBy ? 'manual' : '';

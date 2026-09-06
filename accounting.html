@@ -234,7 +234,7 @@
 const esc = Admin.esc;
 // 'We 2026-09-03': the weekday in front of every date, as the sheets write it
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const dayDate = d => /^d{4}-d{2}-d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
+const dayDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
 const SAME_CAP = 60;   // one number's repeats may go together; a crowd may not
@@ -269,7 +269,7 @@ let reviewImported = false;                   // the ❓ button: only WhatsApp l
 const TYPES = ['transfer', 'labour', 'expense', 'vendor', 'refund'];
 const TYPE_TIP = { transfer: 'Money moved between him and one of our accounts — never a bill, no project', labour: 'His own work — the month\'s labour bill from him', expense: 'Unofficial spending he fronted — the month\'s expenses bill', vendor: 'An official supplier: its own bill, settled by him', refund: 'Money back from a supplier — keeps the supplier and the project' };
 // a sheet row still missing its company, its type, or its project (transfers have none) is a question to answer
-const asks = t => t.src === 'excel' && !t.excluded && (!companyOf(t) || !t.nature || (t.nature !== 'transfer' && !t.analyticName));
+const asks = t => (t.src === 'excel' && !t.excluded && (!companyOf(t) || !t.nature || (t.nature !== 'transfer' && !t.analyticName))) || !!t.ask;
 let srcOff = new Set();                       // sources hidden by clicking their chip in the count
 const isExcelKept = () => !!(account && account.excel && account.excel.file);
 // every source starts shown — clicking its name in the count is what hides it
@@ -614,6 +614,7 @@ function render() {
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><input class="note-in" value="${esc(t.note)}" onchange="saveField('${t.id}', 'note', this.value, this)"></div>` : '') : `<div class="noteline"><input class="note-in" value="${esc(t.note || '')}" placeholder="add note" onchange="saveField('${t.id}', 'note', this.value, this)"></div>`}
+        ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}</div>` : ''}
         ${paidFlag}${reviewFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       ${typeCell}
@@ -828,6 +829,15 @@ async function saveType(id, v, el) {
   catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
 }
 // an inherited analytic: keep it as a choice, or clear it so a person picks one
+// a question carried by a proposed line: the answer sets the amount (and the wording) and the question goes
+async function answerAsk(id, i) {
+  const t = tx.find(x => x.id === id); if (!t || !t.ask) return;
+  const o = (t.ask.options || [])[i]; if (!o) return;
+  const data = { ask: null };
+  if (o.debit != null) data.debit = o.debit; if (o.credit != null) data.credit = o.credit; if (o.description) data.description = o.description;
+  try { await patch(id, data); Object.assign(t, data); computeBalances(); render(); say('Answered: ' + o.label); }
+  catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
 async function confirmAnalytic(id, keep) {
   const t = tx.find(x => x.id === id); if (!t) return;
   const data = keep ? { analyticSrc: 'manual', projectFrom: '' } : { analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '', projectFrom: '' };
