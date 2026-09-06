@@ -761,7 +761,10 @@ function render() {
   const bySrc = {}, countedBy = {};
   for (const t of tx) { const k = t.src || 'manual'; bySrc[k] = (bySrc[k] || 0) + 1; if (!t.excluded) countedBy[k] = (countedBy[k] || 0) + 1; }
   const ORDER = ['excel', 'odoo', 'whatsapp', 'budget', 'transfer', 'telegram', 'manual'];
-  const chips = ORDER.filter(k => bySrc[k]).map(k => {
+  // a source not fetched yet (Odoo, WhatsApp… behind an Excel-kept account) keeps its chip, so it can be clicked open
+  const unloaded = k => loadedSrc && !loadedSrc.has(k) && HIDDEN_SRCS.includes(k) && !(k === 'transfer' && !account.odooPartner);
+  const chips = ORDER.filter(k => bySrc[k] || unloaded(k)).map(k => {
+    if (!bySrc[k]) return `<a class="srctog off" onclick="toggleSrc('${k}')" title="Not loaded. Click to fetch and show the ${k} lines of this period.">… <span class="src">${k}</span></a>`;
     const n = bySrc[k], c = countedBy[k] || 0;
     const tail = c === n ? ' counted' : c ? ` (${c} counted)` : '';
     const off = srcOff.has(k);
