@@ -71,7 +71,7 @@ const hours = c => { const v = cell(c); return typeof v === 'number' ? money(v) 
 // amount, what the row says, the project it belongs to, its kind, and the counterparty:
 // on a row he was paid, who handed him the money; on a row he spent, what he spent it on.
 const OWNED = (amount, description, project, kind, extra) => ({ amount, description, project: project || '', kind: kind || '', ...(extra || {}) });
-const CASH_OF = { mario: 'Mario cash', ziad: 'Ziad cash', georges: 'Georges cash', abed: 'Abed cash', mitri: 'Mitri cash', khodr: 'Khodr cash', khoder: 'Khodr cash', therese: 'Therese' };
+const CASH_OF = { mario: 'Mario cash', ziad: 'Ziad cash', georges: 'Georges cash', abed: 'Abed cash', mitri: 'Mitri cash', khodr: 'Khoder cash', khoder: 'Khoder cash', therese: 'Therese' };   // spelt Khoder (Mario, 2026-09-06); the account id stays khodr-cash
 const titled = x => { const v = String(x || '').trim(); return v ? v[0].toUpperCase() + v.slice(1) : ''; };
 const LAYOUTS = {
   // A status | B date | C amount | D partner | E analytic | F label | G account
@@ -364,6 +364,9 @@ async function importExcel(ctx, account, who) {
     const prev = existing[t.id] || {};
     const { partnerName, project, nature, partnerKind, cashAccountId, ...rest } = t;
     const data = { ...rest, project, projectFrom: t.projectFrom || '', excluded: false, dupOf: null };          // the Excel row always counts
+    // an amount corrected by hand in the app stays (Mario, 2026-09-07); the workbook's own figure is kept
+    // beside it as `xlAmount`, so the row shows both and the sheet can be fixed later
+    if (prev.amountSrc === 'manual') { data.debit = prev.debit || 0; data.credit = prev.credit || 0; data.amountSrc = 'manual'; }
     // what the sheet itself says about the row
     if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerName: partnerName || '', partnerId: null, partnerSrc: partnerName ? 'excel' : '' });
     if (prev.natureSrc !== 'manual') Object.assign(data, { nature: nature || '', partnerKind: partnerKind || '', cashAccountId: cashAccountId || '' });
@@ -634,4 +637,160 @@ async function readGold(file) {
   return { holdings, prices, file: path.basename(file), readAt: now() };
 }
 
-module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, parseMoney, LAYOUTS, readGold, closeStatement };
+// ── Correcting a row in the workbook ────────────────────────────────────────
+// The workbook is the account (Mario's rule), so a correction typed in the grid is written into
+// the sheet itself rather than kept beside it: the cell the figure came from, the day, the hours
+// and the km behind it, the note. Formulas stay — a worker's day is hours × rate + km — and only
+// their cached value is rewritten, so the hub reads the number Excel will show when it opens.
+// A copy of the file goes to _backups first.
+//
+// Which column holds what, per layout. `sign` is how the sheet writes the hub's debit − credit:
+// the "owed" ledgers write it as it is, Ziad's wallet view writes it the other way round.
+const EDIT = {
+  mitri: { date: 3, hours: 4, type: 5, km: 6, note: 11, project: 12, sign: 1,
+    amount: { labour: 7, opening: 7, expense: 9, vendor: 9, transfer: 10, refund: 10 },
+    together: { 7: 8 } },                       // a day's pay is Due1 + Due2: refuse the edit if Due2 carries part of it
+  abed: { date: 2, note: 6, project: 5, sign: 1, amount: { '*': 3 } },
+  georges: { date: 2, note: 7, project: 6, sign: 1, amount: { '*': 3 } },
+  khoder: { date: 4, hours: 7, km: 11, note: 15, project: 13, sign: 1,
+    amount: { labour: 8, opening: 8, expense: 14, vendor: 14, transfer: 16, refund: 16 }, together: { 8: 9 } },
+  ziad: { date: 2, note: 4, project: 5, sign: -1, amount: { '*': 3 } },
+};
+const colName = i => { let s = '', n = i; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - r - 1) / 26; } return s; };
+const xmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const serial = d => Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse('1899-12-30T00:00:00Z')) / 86400000);
+const cellOf = (xml, ref) => { const m = new RegExp(`<c r="${ref}"[^>]*(?:/>|>[\\s\\S]*?</c>)`).exec(xml); return m ? m[0] : null; };
+const styleOf = c => (c && (/ s="(\d+)"/.exec(c) || [])[1]) || null;
+
+// Put one value in one cell, keeping the cell's style and (for a formula) its formula.
+function setCell(xml, row, colIdx, value, opts) {
+  const ref = colName(colIdx) + row;
+  const old = cellOf(xml, ref);
+  const s = styleOf(old) || (opts && opts.style) || null;
+  const sAttr = s ? ` s="${s}"` : '';
+  const f = old && (/<f[^>]*>[\s\S]*?<\/f>|<f[^>]*\/>/.exec(old) || [])[0];
+  let cell;
+  if (typeof value === 'number') {
+    cell = `<c r="${ref}"${sAttr}>${f && opts && opts.keepFormula ? f : ''}<v>${value}</v></c>`;
+  } else if (value === '' || value == null) {
+    cell = `<c r="${ref}"${sAttr}/>`;
+  } else {
+    cell = `<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(value)}</t></is></c>`;
+  }
+  if (old) return xml.replace(old, cell);
+  // the row exists but not this cell: put it in column order
+  const rowRe = new RegExp(`<row r="${row}"[^>]*>([\\s\\S]*?)</row>`);
+  const rm = rowRe.exec(xml);
+  if (!rm) throw new Error(`row ${row} is not in the sheet`);
+  const cells = rm[1].match(/<c [^>]*(?:\/>|>[\s\S]*?<\/c>)/g) || [];
+  const idxOf = c => { const r = (/ r="([A-Z]+)\d+"/.exec(c) || [])[1] || ''; return [...r].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0); };
+  const at = cells.findIndex(c => idxOf(c) > colIdx);
+  const next = at < 0 ? [...cells, cell] : [...cells.slice(0, at), cell, ...cells.slice(at)];
+  return xml.replace(rm[0], rm[0].replace(rm[1], next.join('')));
+}
+
+// A day's pay is a formula (hours × the hourly rate + km × the km rate, jeep = car × 4/3). We keep
+// the formula and work out what it now comes to, reading the rates from the sheet it points at.
+function dayValue(formula, rateSheetXml, { hours, km, jeep }) {
+  if (!formula || !rateSheetXml) return null;
+  const at = ref => { const m = new RegExp(`<c r="${ref}"[^>]*>(?:<f[^>]*>[\\s\\S]*?</f>)?<v>([-\\d.eE+]+)</v>`).exec(rateSheetXml); return m ? parseFloat(m[1]) : null; };
+  const hRef = (/rate!\$?([A-Z])\$?(\d+)/.exec(formula) || []);
+  const kRefs = [...formula.matchAll(/rate!\$?([A-Z])\$?(\d+)/g)];
+  if (kRefs.length < 2) return null;
+  const hourly = at(hRef[1] + hRef[2]), perKm = at(kRefs[1][1] + kRefs[1][2]);
+  if (hourly == null || perKm == null) return null;
+  const jeepFactor = /4\s*\/\s*3/.test(formula) ? 4 / 3 : 1;
+  return (hours || 0) * hourly + (km || 0) * perKm * (jeep ? jeepFactor : 1);
+}
+
+// `patch` may carry date, description, debit, credit, hours, km. Returns what was written.
+async function writeExcelRow(ctx, account, t, patch) {
+  const AdmZip = tryRequire('adm-zip', EXTRA['adm-zip']);
+  if (!AdmZip) throw new Error('adm-zip is not installed on this machine — correct the row from Mario\'s laptop');
+  const cfg = account.excel || {};
+  const layName = cfg.layout || account.owner;
+  const lay = LAYOUTS[layName], ed = EDIT[layName];
+  if (!cfg.file || !lay || !ed) throw new Error('this account has no Excel ledger that can be written');
+  if (!t || t.src !== 'excel' || !t.excelRow) throw new Error('only a row that came from the workbook can be written back');
+  if (!fs.existsSync(cfg.file)) throw new Error('workbook not found: ' + cfg.file);
+
+  const zip = new AdmZip(cfg.file);
+  const wbXml = zip.readAsText('xl/workbook.xml');
+  const partOf = name => {
+    const tag = (wbXml.match(/<sheet [^>]*>/g) || []).find(s => new RegExp('name="' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"', 'i').test(s));
+    const rId = tag && (/r:id="([^"]+)"/.exec(tag) || [])[1];
+    if (!rId) return null;
+    const rel = (zip.readAsText('xl/_rels/workbook.xml.rels').match(/<Relationship [^>]*>/g) || []).find(r => new RegExp('Id="' + rId + '"').test(r));
+    const target = rel && (/Target="([^"]+)"/.exec(rel) || [])[1];
+    return target ? (target.startsWith('/') ? target.slice(1) : 'xl/' + target) : null;
+  };
+  const part = partOf(cfg.sheet || lay.sheet);
+  if (!part) throw new Error(`sheet "${cfg.sheet || lay.sheet}" not in ${path.basename(cfg.file)}`);
+  let xml = zip.readAsText(part);
+  const ratePart = partOf('rate');
+  const rateXml = ratePart ? zip.readAsText(ratePart) : '';
+  const r = t.excelRow;
+  const wrote = [];
+
+  // only what really changed is written: an unchanged figure must not cost the row its formula
+  const same = (a, b) => (a == null ? '' : String(a).trim()) === (b == null ? '' : String(b).trim());
+  const has = k => Object.prototype.hasOwnProperty.call(patch, k)
+    && !(k === 'hours' && Number(patch.hours) === Number(t.hours || 0))
+    && !(k === 'description' && same(patch.description, t.description))
+    && !(k === 'debit' && money(patch.debit) === money(t.debit || 0))
+    && !(k === 'credit' && money(patch.credit) === money(t.credit || 0));
+  if (has('date') && patch.date !== t.date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(patch.date))) throw new Error('date as yyyy-mm-dd');
+    xml = setCell(xml, r, ed.date, serial(patch.date)); wrote.push(`${colName(ed.date)}${r} = ${patch.date}`);
+  }
+  if (has('description') && ed.note != null) { xml = setCell(xml, r, ed.note, String(patch.description || '')); wrote.push(`${colName(ed.note)}${r} = "${patch.description}"`); }
+  if (has('project') && ed.project != null) { xml = setCell(xml, r, ed.project, String(patch.project || '')); wrote.push(`${colName(ed.project)}${r} = "${patch.project}"`); }
+
+  const hoursNow = has('hours') ? Number(patch.hours) || 0 : (t.hours || 0);
+  const kmNow = has('km') ? Number(patch.km) || 0 : null;
+  if (has('hours')) { if (ed.hours == null) throw new Error('this sheet has no hours column'); xml = setCell(xml, r, ed.hours, hoursNow); wrote.push(`${colName(ed.hours)}${r} = ${hoursNow} h`); }
+  if (has('km')) { if (ed.km == null) throw new Error('this sheet has no km column'); xml = setCell(xml, r, ed.km, kmNow); wrote.push(`${colName(ed.km)}${r} = ${kmNow} km`); }
+
+  // the amount: into the column this kind of row comes from
+  const col = ed.amount[t.nature] || ed.amount['*'];
+  const amountEdited = has('debit') || has('credit');
+  const debit = has('debit') ? money(patch.debit) : (t.debit || 0);
+  const credit = has('credit') ? money(patch.credit) : (t.credit || 0);
+  if (amountEdited) {
+    if (!col) throw new Error(`a ${t.nature || 'plain'} row has no amount column in this sheet`);
+    const was = (t.debit || 0) - (t.credit || 0), net = debit - credit;
+    if (was && net && Math.sign(was) !== Math.sign(net)) throw new Error('this turns money owed into money received — move it to the right column in Excel itself');
+    const pair = ed.together && ed.together[col];
+    if (pair) { const c = cellOf(xml, colName(pair) + r); if (c && /<v>[-\d.]/.test(c) && !/<v>0<\/v>/.test(c)) throw new Error(`the pay on this row is split over ${colName(col)} and ${colName(pair)} — correct it in Excel`); }
+    // a day's pay is a formula: typing an amount over it would lose the hours × rate behind it
+    const c0 = cellOf(xml, colName(col) + r);
+    if (c0 && /<f[^>]*>/.test(c0)) throw new Error(`${colName(col)}${r} works the amount out from the hours and the km — change those instead, or clear the formula in Excel`);
+    xml = setCell(xml, r, col, ed.sign * net);
+    wrote.push(`${colName(col)}${r} = ${ed.sign * net}`);
+  }
+  // hours or km changed and the amount is a formula: keep it, refresh what it comes to
+  if ((has('hours') || has('km')) && !amountEdited && col) {
+    const c = cellOf(xml, colName(col) + r);
+    const f = c && (/<f[^>]*>([\s\S]*?)<\/f>/.exec(c) || [])[1];
+    if (f) {
+      const jeep = /jeep/i.test(has('type') ? String(patch.type) : String(t.description || ''));
+      const km = kmNow != null ? kmNow : (parseFloat((String(t.description || '').match(/(\d+(?:[.,]\d+)?)\s*km\b/i) || [])[1]) || 0);
+      const v = dayValue(f, rateXml, { hours: hoursNow, km, jeep });
+      if (v != null) { xml = setCell(xml, r, col, money(v), { keepFormula: true }); wrote.push(`${colName(col)}${r} = ${money(v)} (formula kept)`); }
+    }
+  }
+  if (!wrote.length) return { wrote: [], file: path.basename(cfg.file) };
+
+  const dir = path.dirname(cfg.file), base = path.basename(cfg.file), bak = path.join(dir, '_backups');
+  if (!fs.existsSync(bak)) fs.mkdirSync(bak);
+  fs.copyFileSync(cfg.file, path.join(bak, new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '') + ' ' + base));
+  zip.updateFile(part, Buffer.from(xml, 'utf8'));
+  let wb = wbXml;
+  wb = /<calcPr\b/.test(wb) ? wb.replace(/<calcPr\b([^>]*?)\/>/, (a, b) => '<calcPr' + b.replace(/\s*fullCalcOnLoad="[^"]*"/, '') + ' fullCalcOnLoad="1"/>') : wb.replace('</workbook>', '<calcPr calcId="0" fullCalcOnLoad="1"/></workbook>');
+  zip.updateFile('xl/workbook.xml', Buffer.from(wb, 'utf8'));
+  if (zip.getEntry('xl/calcChain.xml')) zip.deleteFile('xl/calcChain.xml');
+  zip.writeZip(cfg.file + '.tmp'); fs.renameSync(cfg.file + '.tmp', cfg.file);
+  return { wrote, file: base, row: r };
+}
+
+module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };

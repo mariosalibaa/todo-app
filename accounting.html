@@ -125,7 +125,10 @@
   .c-type{width:7%;} .c-type select{width:100%;font-size:12px;}
   .locked{color:var(--muted);}
   td select:has(option[value=""]:checked){color:var(--auto);font-style:italic;} td input::placeholder{color:var(--auto);font-style:italic;}
-  .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;display:block;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
+  .desc-in{border:none;background:transparent;color:inherit;font:inherit;width:calc(100% - 40px);padding:0;} .desc-in:hover{background:#f1f3f5;} .desc-in:focus{outline:none;border-bottom:1px solid #0d6efd;background:#fff;}
+  .date-in{border:none;background:transparent;color:inherit;font:inherit;padding:0;width:112px;} .date-in:hover{background:#f1f3f5;} .date-in:focus{outline:none;border-bottom:1px solid #0d6efd;background:#fff;}
+  .sheetline{font-size:12px;color:#6c757d;margin-top:1px;} .sheet-in{border:none;background:transparent;color:#0d6efd;font:inherit;width:44px;padding:0;text-align:right;} .sheet-in:hover{background:#f1f3f5;} .sheet-in:focus{outline:none;border-bottom:1px solid #0d6efd;background:#fff;}
+  .amt-in{border:none;background:transparent;color:inherit;font:inherit;text-align:right;width:100%;padding:0;} .amt-in:hover{background:#f1f3f5;} .amt-in:focus{outline:none;border-bottom:1px solid #0d6efd;background:#fff;} .amt-in.manual{color:#0d6efd;font-weight:600;} .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;display:block;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
   .src.per-new{background:#fff3cd;color:#7a5a00;border-color:#f2d98a;}
   .src.per-old{background:#f1f1f1;color:#888;}
@@ -192,6 +195,9 @@
   <span id="rowcount" style="font-size:12px;color:var(--muted);white-space:nowrap;cursor:help"></span>
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
+  <button class="btn" id="btn-undo" onclick="undoEdit()" title="Nothing to undo" disabled>↶ Undo</button>
+  <button class="btn" id="btn-redo" onclick="redoEdit()" title="Nothing to redo" disabled>↷ Redo</button>
+  <button class="btn" id="btn-log" onclick="openLog()" title="Every edit made on this account's lines: when, who, from what to what">🕘 Log</button>
   <button class="btn" id="btn-check" onclick="toggleReviewImported()" title="WhatsApp messages that match nothing in the Excel or in Odoo: not counted until you accept them" style="display:none">❓ To review</button>
   <button class="btn primary" id="btn-line" onclick="openLineForm()" title="Type a line: money in or out of this account">＋ Line</button>
   <label class="btn primary" for="file" id="btn-upload">⬆ Upload statement (PDF)</label>
@@ -746,11 +752,58 @@ function bookButton(t) {
   if (r.book === false) return `<span class="odoo-no" title="${esc((r.description || 'This rule fills the answers in but does not book.') + ' — ' + what)}">needs the bill</span>`;
   return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('Create the bill, post it and pay it from ' + (r.paymentJournalName || 'the cash journal') + ':\n' + what)}">${bk ? '📗 Post & pay' : '📗 Book'}</button>`;
 }
+// Every line's amount can be corrected here, on any account (Mario, 2026-09-07). An Odoo line mirrors
+// Odoo and stays read-only; a sheet row keeps the workbook's own figure in the tooltip and is marked
+// manual, so an import never silently puts the old number back.
+function amountCell(t, side) {
+  if (t.src === 'odoo' || t.src === 'transfer' || t.statement) return fmt(t[side]);
+  const sheet = t.xlAmount != null && t.src === 'excel' ? 'The workbook says ' + fmt(Math.abs(t.xlAmount)) + '. ' : '';
+  const tip = sheet + (t.amountSrc === 'manual' ? 'Typed here, kept across imports.' : 'Click to correct the amount.');
+  return `<input class="amt-in ${t.amountSrc === 'manual' ? 'manual' : ''}" value="${t[side] ? fmt(t[side]) : ''}" title="${esc(tip)}" onchange="saveAmount('${t.id}', '${side}', this.value, this)">`;
+}
+// A row of the workbook is corrected here and in the sheet: the hours and the km behind a day's
+// pay (the sheet works the amount out from them), the day itself, the words on the row.
+const HAS_HOURS = new Set(['mitri', 'khoder']);
+const layoutOf = () => (account && ((account.excel && account.excel.layout) || account.owner)) || '';
+function sheetEdit(t) {
+  if (t.src !== 'excel' || !HAS_HOURS.has(layoutOf()) || (t.nature !== 'labour' && !t.hours)) return '';
+  const km = (String(t.description || '').match(/(\d+(?:[.,]\d+)?)\s*km\b/i) || [])[1] || '';
+  return `<div class="sheetline"><input class="sheet-in" value="${t.hours || ''}" title="Hours on this day. The sheet works the pay out from them." onchange="saveSheet('${t.id}', 'hours', this.value, this)"> h`
+    + ` · <input class="sheet-in" value="${esc(km)}" title="Kilometres on this day" onchange="saveSheet('${t.id}', 'km', this.value, this)"> km</div>`;
+}
+async function saveSheet(id, field, value, el) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const numeric = field === 'hours' || field === 'km';
+  const v = numeric ? (String(value).trim() === '' ? 0 : parseFloat(String(value).replace(',', '.'))) : value;
+  if (numeric && !isFinite(v)) { flash(el, false); say('Not a number: ' + value, 'err'); return; }
+  el.classList.add('dirty');
+  try {
+    const r = await patch(id, { [field]: v });
+    if (r && r.sheet && r.sheet.error) { flash(el, false); say('The workbook was not changed: ' + r.sheet.error, 'err'); return; }
+    flash(el, true);
+    const wrote = r && r.sheet && r.sheet.wrote || [];
+    say(wrote.length ? `${r.sheet.file}: ${wrote.join(', ')}` : 'Saved');
+    await reloadTx(); computeBalances(); render();
+  } catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+async function saveAmount(id, side, value, el) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const raw = String(value).replace(/[, ]/g, '').trim();
+  const n = raw === '' ? 0 : Math.round(parseFloat(raw) * 100) / 100;
+  if (!isFinite(n) || n < 0) { flash(el, false); say('Not an amount: ' + value, 'err'); return; }
+  if (n === (t[side] || 0)) return;
+  const data = { [side]: n, amountSrc: n ? 'manual' : '' };
+  try { await patch(id, data); Object.assign(t, data); computeBalances(); render(); say(`${side === 'debit' ? 'Debit' : 'Credit'} set to ${fmt(n)}`); }
+  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+// the photos and PDFs of a line, as links into Odoo — shown even before the line has an entry
+const fileLinks = t => (t.fileIds || []).length
+  ? `<div class="odoo-doc">${t.fileIds.map(f => `<a target="_blank" href="https://shift2.odoo.com/web/content/${f.id}" title="${esc(f.name)}">📎 ${esc(f.name.length > 42 ? f.name.slice(0, 40) + '…' : f.name)}</a>`).join('<br>')}</div>` : '';
 function odooCell(t) {
   const btn = bookButton(t);
-  if (!t.odoo) return btn || '<span class="odoo-no" title="Not checked yet">·</span>';
+  if (!t.odoo) return (btn || '<span class="odoo-no" title="Not checked yet">·</span>') + fileLinks(t);
   const m = t.odoo.matches || [];
-  if (!m.length) return btn || '<span class="odoo-no" title="Checked ' + esc(t.odoo.checkedAt.slice(0, 10)) + ': nothing found in the Odoo journals of this account">—</span>';
+  if (!m.length) return (btn || '<span class="odoo-no" title="Checked ' + esc(t.odoo.checkedAt.slice(0, 10)) + ': nothing found in the Odoo journals of this account">—</span>') + fileLinks(t);
   const win = m.find(x => x.chosen);
   if (win) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
@@ -759,12 +812,12 @@ function odooCell(t) {
     const oref = (t.bookedMove && t.bookedMove.ref) || win.odooRef || '';
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
       + (oref && oref !== win.move ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(oref)}</div>` : '')
-      + ((t.fileIds || []).length ? `<div class="odoo-doc">${t.fileIds.map(f => `<a target="_blank" href="https://shift2.odoo.com/web/content/${f.id}" title="${esc(f.name)}">📎 ${esc(f.name.length > 42 ? f.name.slice(0, 40) + '…' : f.name)}</a>`).join('<br>')}</div>` : '')
+      + fileLinks(t)
       + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => { const id = win.docIds && (win.docIds[d] || (Object.entries(win.docIds).find(([k]) => d.startsWith(k)) || [])[1]); return id ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${id}">${esc(d)}</a>` : esc(d); }).join(', ')}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
   const tip = m.map(matchTip).join('\n');
-  return `<span class="odoo-multi" title="${esc(tip)}">${m.length} possible — pick one</span>`;
+  return `<span class="odoo-multi" title="${esc(tip)}">${m.length} possible — pick one</span>` + fileLinks(t);
 }
 
 function render() {
@@ -804,17 +857,18 @@ function render() {
         + (t.src === 'manual' || t.src === 'telegram' ? `<a onclick="openLineForm('${t.id}')" title="Edit">✎</a>` : '')
         + (['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '');
     return `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
-      <td class="c-date">${dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
+      <td class="c-date">${t.src === 'excel' ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this row falls on, in the workbook" onchange="saveSheet('${t.id}', 'date', this.value, this)">` : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
       <td class="c-desc" title="${esc(t.description)}">
-        <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
+        <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<input class="desc-in" value="${esc(t.description || '')}" title="What the workbook says on this row. Correct it here and the cell is corrected too." onchange="saveSheet('${t.id}', 'description', this.value, this)">` : esc(t.description)}</div>
+        ${sheetEdit(t)}
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
-        ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}</div>` : t.answer ? `<div class="sug-act"><span class="sug-why">Answered: ${esc(String(t.answer))}</span></div>` : ''}
+        ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}${(t.ask.options || []).some(o => o.debit != null || o.credit != null) ? ` <button class="yes" style="width:auto;padding:0 6px" onclick="answerCustom('${t.id}')" title="Type any amount for this row">Other amount…</button>` : ''}</div>` : t.answer ? `<div class="sug-act"><span class="sug-why">Answered: ${esc(String(t.answer))}</span></div>` : ''}
         ${paidFlag}${reviewFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       ${typeCell}
-      <td class="num debit">${fmt(t.debit)}</td>
-      <td class="num credit">${fmt(t.credit)}</td>
+      <td class="num debit">${amountCell(t, 'debit')}</td>
+      <td class="num credit">${amountCell(t, 'credit')}</td>
       <td class="num">${fmt(st ? t.balance : t._bal)}</td>
       <td class="c-partner ${srcClass(t.partnerName ? (t.partnerSrc || 'manual') : '')}" title="${t.partnerSrc === 'odoo' ? 'From the matched Odoo payment' : sg.partner ? esc('Suggested: ' + sg.partner.name + ' — ' + sg.partner.why) : ''}">
         <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : 'partner'}"
@@ -1078,7 +1132,58 @@ function pickBlur(id) {
 // ── Saving ──
 function flash(el, ok) { el.classList.remove('dirty'); el.classList.toggle('saved', ok); el.classList.toggle('dirty', !ok); setTimeout(() => el.classList.remove('saved'), 1200); }
 function mark(el, src) { const td = el.closest('td'); td.classList.remove('src-auto', 'src-manual', 'src-odoo'); if (src) td.classList.add(srcClass(src)); }
-async function patch(id, data) { return Admin.api('PATCH', `/api/accounting/accounts/${acc}/tx/${id}`, data); }
+// Every edit of a line goes through here and is remembered: ↶ puts back what the server says the line
+// said before, ↷ re-applies the edit. The server keeps the same history as the account's log (🕘).
+const undoStack = [], redoStack = [];
+async function patch(id, data, opts) {
+  const r = await Admin.api('PATCH', `/api/accounting/accounts/${acc}/tx/${id}`, opts && opts.undo ? { ...data, __undo: true } : data);
+  if (!(opts && opts.replay)) { undoStack.push({ id, before: r.before || {}, after: data }); redoStack.length = 0; if (undoStack.length > 200) undoStack.shift(); }
+  updateUndoButtons();
+  return r;
+}
+function updateUndoButtons() {
+  const u = document.getElementById('btn-undo'), d = document.getElementById('btn-redo');
+  if (u) { u.disabled = !undoStack.length; u.title = undoStack.length ? 'Undo: ' + describeEdit(undoStack[undoStack.length - 1]) : 'Nothing to undo'; }
+  if (d) { d.disabled = !redoStack.length; d.title = redoStack.length ? 'Redo: ' + describeEdit(redoStack[redoStack.length - 1]) : 'Nothing to redo'; }
+}
+const showVal = v => v == null || v === '' ? '—' : typeof v === 'object' ? (v.text || v.name || JSON.stringify(v).slice(0, 40)) : String(v).slice(0, 40);
+function describeEdit(e) { const t = tx.find(x => x.id === e.id); const keys = Object.keys(e.after).filter(k => !/Src$/.test(k)); return (t ? t.date + ' ' + (t.description || '').slice(0, 30) : e.id) + ' · ' + keys.map(k => k + ': ' + showVal(e.before[k]) + ' → ' + showVal(e.after[k])).join(', '); }
+async function applyEdit(e, fields) {
+  const t = tx.find(x => x.id === e.id);
+  const r = await patch(e.id, fields, { replay: true, undo: true });
+  if (t) Object.assign(t, fields);
+  computeBalances(); render(); updateUndoButtons();
+  return r;
+}
+async function undoEdit() {
+  const e = undoStack.pop(); if (!e) return;
+  try { await applyEdit(e, e.before); redoStack.push(e); say('Undone: ' + describeEdit(e)); }
+  catch (x) { undoStack.push(e); say('Could not undo: ' + x.message, 'err'); }
+  updateUndoButtons();
+}
+async function redoEdit() {
+  const e = redoStack.pop(); if (!e) return;
+  try { await applyEdit(e, e.after); undoStack.push(e); say('Redone: ' + describeEdit(e)); }
+  catch (x) { redoStack.push(e); say('Could not redo: ' + x.message, 'err'); }
+  updateUndoButtons();
+}
+document.addEventListener('keydown', ev => {
+  if (!(ev.ctrlKey || ev.metaKey) || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (ev.key === 'z' && !ev.shiftKey) { ev.preventDefault(); undoEdit(); }
+  else if (ev.key === 'y' || (ev.key === 'z' && ev.shiftKey)) { ev.preventDefault(); redoEdit(); }
+});
+// 🕘 the account's change log from the server: who changed which line, from what to what, when
+async function openLog() {
+  let box = document.getElementById('logbox');
+  if (!box) { box = document.createElement('div'); box.id = 'logbox'; box.style.cssText = 'position:fixed;top:60px;right:16px;width:min(720px,90vw);max-height:80vh;overflow:auto;background:var(--bg,#fff);color:inherit;border:1px solid var(--line,#ccc);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:10px 14px;z-index:1000;font-size:12px'; document.body.appendChild(box); }
+  box.innerHTML = '<b>Change log</b> <span style="color:var(--muted)">loading…</span>';
+  try {
+    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/log?limit=200`);
+    const rows = (r.entries || []).map(e => `<tr><td style="white-space:nowrap;color:var(--muted)">${esc(String(e.at || '').replace('T', ' ').slice(0, 16))}</td><td>${esc(e.who || '')}</td><td>${esc(e.line || e.txId)}${e.undo ? ' <i>(undo/redo)</i>' : ''}</td><td>${Object.keys(e.after || {}).filter(k => !/Src$/.test(k)).map(k => `<div><b>${esc(k)}</b>: ${esc(showVal((e.before || {})[k]))} → ${esc(showVal(e.after[k]))}</div>`).join('')}</td></tr>`).join('');
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b>Change log</b> <span style="color:var(--muted)">${(r.entries || []).length} latest edits · Ctrl+Z undo · Ctrl+Y redo</span><button class="btn" onclick="document.getElementById('logbox').remove()">✕</button></div><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr style="text-align:left;color:var(--muted)"><th>when</th><th>who</th><th>line</th><th>change</th></tr></thead><tbody>${rows || '<tr><td colspan=4>No edits logged yet.</td></tr>'}</tbody></table>`;
+    box.querySelectorAll('td').forEach(td => { td.style.borderTop = '1px solid var(--line,#eee)'; td.style.padding = '4px 6px'; td.style.verticalAlign = 'top'; });
+  } catch (e) { box.innerHTML = '<b>Change log</b> — could not load: ' + esc(e.message) + ' <button class="btn" onclick="document.getElementById(\'logbox\').remove()">✕</button>'; }
+}
 async function saveField(id, field, value, el) {
   el.classList.add('dirty');
   const t = tx.find(x => x.id === id); if (t) { t[field] = value; t[field + 'Src'] = value ? 'manual' : ''; }
@@ -1098,6 +1203,19 @@ async function saveType(id, v, el) {
 }
 // an inherited analytic: keep it as a choice, or clear it so a person picks one
 // a question carried by a proposed line: the answer sets the amount (and the wording) and the question goes
+// the answer is a number the options did not offer: type it ("consider that day 5$", Mario 2026-09-07)
+async function answerCustom(id) {
+  const t = tx.find(x => x.id === id); if (!t || !t.ask) return;
+  const opts = t.ask.options || [];
+  const side = opts.some(o => o.credit != null) && !opts.some(o => o.debit != null) ? 'credit' : 'debit';
+  const v = prompt(t.ask.text + '\n\nAmount (' + side + '):', String(t[side] || ''));
+  if (v == null) return;
+  const n = Math.round(parseFloat(String(v).replace(/,/g, '')) * 100) / 100;
+  if (!isFinite(n) || n < 0) { say('Not a number: ' + v, 'err'); return; }
+  const data = { ask: null, [side]: n, answer: 'custom ' + n.toFixed(2) };
+  try { await patch(id, data); Object.assign(t, data); computeBalances(); render(); say('Answered: ' + n.toFixed(2)); }
+  catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
 async function answerAsk(id, i) {
   const t = tx.find(x => x.id === id); if (!t || !t.ask) return;
   const o = (t.ask.options || [])[i]; if (!o) return;
@@ -1201,7 +1319,19 @@ async function toggleExcluded(id, on) {
     t.excluded = !!on; if (!on) { t.dupOf = null; t.review = false; }
     computeBalances(); render();
     say(on ? 'Line no longer counted in the balance' : 'Line counted again');
+    // accepting a proposed line books it into Odoo at once, photos and all (Mario, 2026-09-07)
+    if (!on && t.src !== 'excel' && t.src !== 'odoo' && !t.bookedMove && t.nature && t.nature !== 'note' && account && account.odooPartner) await autoBook(id);
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+async function autoBook(id) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  say('Booking ' + (t.description || '').slice(0, 40) + ' into Odoo…');
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-row`, { txId: id });
+    await loadTx();
+    say(r.already ? 'Already in Odoo: ' + r.move
+      : `Booked in Odoo: ${r.move || ''} (${r.kind})${r.photos ? ' · ' + r.photos + ' photo' + (r.photos > 1 ? 's' : '') + ' attached' : ''}${r.pendingExcel ? ' · still to be written into the workbook' : ''}`);
+  } catch (e) { say('Accepted, but Odoo refused it: ' + e.message, 'err'); }
 }
 async function renameContact(phone) {
   const cur = (contacts[phone] || {}).name || '';

@@ -51,8 +51,11 @@ const bills = require('./ledger-bills');  // a worker's month → one draft bill
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };   // true = handled
 const readBody = req => new Promise((resolve, reject) => {
-  let s = ''; req.on('data', c => { s += c; if (s.length > 4e6) req.destroy(); });
-  req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(e); } });
+  // keep the chunks as bytes and decode once: a "·" split across two chunks became U+FFFD and
+  // that character went straight into the workbook (2026-09-07)
+  const parts = []; let n = 0;
+  req.on('data', c => { parts.push(c); n += c.length; if (n > 4e6) req.destroy(); });
+  req.on('end', () => { try { const s = Buffer.concat(parts).toString('utf8'); resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(e); } });
   req.on('error', reject);
 });
 const money = n => Math.round(Number(n || 0) * 100) / 100;
@@ -65,9 +68,11 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer'];
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer', 'amountSrc', 'pendingExcel', 'noBook'];
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
+// what a correction can change in the workbook itself, on a row that came from it
+const SHEET_FIELDS = ['date', 'description', 'debit', 'credit', 'hours', 'km', 'project'];
 
 const PEOPLE = {
   mario: /\bmario\b/i, abed: /\babed\b|\babdo\b/i, georges: /\bgeorges?\b/i, ziad: /\bziad\b/i,
@@ -520,14 +525,55 @@ async function handle(req, res, url, user, ctx) {
     const data = {};
     for (const k of ANNOT) if (k in body) data[k] = body[k];
     // the line itself may be edited only when a person wrote it
-    if (cur.src === 'manual' || cur.src === 'telegram' || cur.src === 'whatsapp') for (const k of LINE) if (k in body) data[k] = k === 'debit' || k === 'credit' ? money(body[k]) : body[k];
+    // a person wrote it, or it is a row of the workbook — which is corrected in the sheet below
+    if (['manual', 'telegram', 'whatsapp', 'excel'].includes(cur.src)) {
+      for (const k of LINE) {
+        if (!Object.prototype.hasOwnProperty.call(body, k)) continue;
+        data[k] = k === 'debit' || k === 'credit' ? money(body[k]) : body[k];
+      }
+    }
+    // the amount itself may be corrected on ANY line of ANY account except an Odoo mirror line (Mario, 2026-09-07)
+    else if (cur.src !== 'odoo') for (const k of ['debit', 'credit']) if (k in body) data[k] = money(body[k]);
     if ('excluded' in body || 'dupOf' in body) data.dupSrc = 'manual';
     if (body.excluded === false) data.review = false;
     if ('paidBy' in body) data.paidBySrc = body.paidBy ? 'manual' : '';
-    if (!Object.keys(data).length) return json(res, 400, { error: 'nothing to update' });
+    // hours and km live in the workbook, not on the line: they may travel alone
+    if (!Object.keys(data).length && !(cur.src === 'excel' && SHEET_FIELDS.some(k => k in body))) return json(res, 400, { error: 'nothing to update' });
     data.updatedAt = now(); data.updatedBy = who;
+    // what the line said before, for undo and for the account's change log (Mario 2026-09-07)
+    const before = {}; for (const k of Object.keys(data)) if (k !== 'updatedAt' && k !== 'updatedBy') before[k] = k in cur ? cur[k] : null;
     await ref.set(data, { merge: true });
-    return json(res, 200, { ok: true });
+    // The workbook is the account (Mario, 2026-09-07): a correction to a sheet row is written into
+    // the sheet itself — the amount, the day, the hours and km behind it, the note — so the next
+    // import reads it back instead of putting the old figure in again.
+    let sheet = null;
+    if (cur.src === 'excel' && a.excel && a.excel.file && SHEET_FIELDS.some(k => k in body)) {
+      try {
+        sheet = await ledgers.writeExcelRow({ acc, txCol, ws, resolve, listAccounts, odooCall }, a, { ...cur, id: m[2] }, body);
+        if (sheet.wrote.length) {
+          const after = { sheetWrittenAt: data.updatedAt, amountSrc: '' };
+          if ('debit' in data || 'credit' in data) after.xlAmount = money((data.debit != null ? data.debit : cur.debit || 0) - (data.credit != null ? data.credit : cur.credit || 0));
+          if ('hours' in body) after.hours = Number(body.hours) || 0;
+          await ref.set(after, { merge: true });
+        }
+      } catch (e) {
+        // the sheet is the account: if it would not take the change, the line does not keep it either
+        sheet = { error: String(e.message || e) };
+        const back = {}; for (const k of LINE) if (k in data) back[k] = k in cur ? cur[k] : null;
+        if (Object.keys(back).length) await ref.set(back, { merge: true });
+      }
+    }
+    if (!body.__silent) await a.ref.collection('log').add({ at: data.updatedAt, who, txId: m[2], line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80), before, after: Object.fromEntries(Object.entries(data).filter(([k]) => k !== 'updatedAt' && k !== 'updatedBy')), undo: !!body.__undo });
+    return json(res, 200, { ok: true, before, ...(sheet ? { sheet } : {}) });
+  }
+
+  // the account's change log, newest first (undo/redo read it back after a reload)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/log$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const lim = Math.min(500, +(new URL(url, 'http://x').searchParams.get('limit') || 100));
+    const snap = await a.ref.collection('log').orderBy('at', 'desc').limit(lim).get();
+    return json(res, 200, { entries: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
   }
 
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)$/)) && req.method === 'DELETE') {
@@ -688,6 +734,15 @@ async function handle(req, res, url, user, ctx) {
     const b = await readBody(req);
     try { return json(res, 200, await bills.bookMonth(ledgerCtx, a, b.month, b.part || 'labour', who, { post: !!b.post, redo: !!b.redo })); }
     catch (e) { console.error('book-month', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // one accepted line → Odoo at once, with its WhatsApp photos moved onto the document (Mario 2026-09-07)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-row$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    if (!b.txId) return json(res, 400, { error: 'txId is required' });
+    try { return json(res, 200, await bills.bookRow(ledgerCtx, a, b.txId, who)); }
+    catch (e) { console.error('book-row', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   // the received rows as payments to him; the unofficial vendor tickets as bills settled by him
   // expense rows that name a supplier Odoo knows become vendor rows (their own bill, out of the month); { dry } previews

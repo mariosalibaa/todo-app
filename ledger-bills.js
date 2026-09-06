@@ -128,7 +128,12 @@ async function applyMap(ctx, account) {
 }
 
 // ── months ─────────────────────────────────────────────────────────────────
-const bookable = t => t.src === 'excel' && !t.excluded && t.debit > 0 && (t.nature === 'labour' || t.nature === 'expense' || t.nature === 'opening');
+// A line of the account: the Excel rows, plus a WhatsApp/typed line a person has ACCEPTED (Mario
+// 2026-09-07: "auto book to odoo when i accept"). An accepted proposal counts and books like a sheet
+// row; it still has to be written into the workbook, which the ✓ marks with `pendingExcel`.
+const isRow = t => t.src === 'excel' || ((t.src === 'whatsapp' || t.src === 'manual' || t.src === 'telegram') && !t.excluded && !t.review);
+const bookable = t => isRow(t) && !t.excluded && t.debit > 0 && (t.nature === 'labour' || t.nature === 'expense' || t.nature === 'opening');
+const onlyOne = (opts, t) => !opts || !opts.only || opts.only === t.id || (Array.isArray(opts.only) && opts.only.includes(t.id));
 async function months(ctx, account) {
   const { txCol, odooCall } = ctx;
   const tx = (await txCol(account).get()).docs.map(d => d.data());
@@ -397,7 +402,7 @@ async function postCashBox(ctx, account, who, opts) {
   const accounts = await listAccounts(ws);
   const col = txCol(account);
   const all = (await col.get()).docs.map(d => d.data());
-  const rows = all.filter(t => t.src === 'excel' && !t.excluded && (t.debit > 0 || t.credit > 0) && t.nature && t.nature !== 'note'
+  const rows = all.filter(t => isRow(t) && onlyOne(o, t) && !t.excluded && (t.debit > 0 || t.credit > 0) && t.nature && t.nature !== 'note'
       && !inOdoo(t) && !t.bookedMove && !t.noBook
       && (!o.from || t.date >= o.from) && (!o.to || t.date <= o.to))
     .sort((a, b) => a.date < b.date ? -1 : 1);
@@ -552,7 +557,7 @@ async function postTransfers(ctx, account, who, opts) {
   const accounts = await listAccounts(ws);
   const col = txCol(account);
   const rows = (await col.get()).docs.map(d => d.data())
-    .filter(t => t.src === 'excel' && !t.excluded && t.nature === 'transfer' && !inOdoo(t) && !t.bookedMove && !t.noBook
+    .filter(t => isRow(t) && onlyOne(opts, t) && !t.excluded && t.nature === 'transfer' && !inOdoo(t) && !t.bookedMove && !t.noBook
       && (t.debit > 0 || (t.credit > 0 && t.cashAccountId && t.cashAccountId !== 'mario-cash')))
     .sort((a, b) => a.date < b.date ? -1 : 1);
   const out = { rows: rows.length, posted: 0, found: 0, skipped: [], noPartner: [], total: 0 };
@@ -624,7 +629,7 @@ async function postPayments(ctx, account, who, opts) {
   const partner = account.odooPartner; if (!partner || !partner.id) throw new Error('set the account\'s Odoo partner first');
   const col = txCol(account);
   const rows = (await col.get()).docs.map(d => d.data())
-    .filter(t => t.src === 'excel' && !t.excluded && t.credit > 0 && t.nature === 'transfer' && t.cashAccountId === 'mario-cash' && !inOdoo(t) && !t.bookedMove && !t.noBook)
+    .filter(t => isRow(t) && onlyOne(opts, t) && !t.excluded && t.credit > 0 && t.nature === 'transfer' && t.cashAccountId === 'mario-cash' && !inOdoo(t) && !t.bookedMove && !t.noBook)
     .sort((a, b) => a.date < b.date ? -1 : 1);
   const out = { rows: rows.length, posted: 0, found: 0, skipped: [], total: 0 };
   if (opts && opts.dry) return { ...out, byYear: rows.reduce((o, t) => (o[t.date.slice(0, 4)] = (o[t.date.slice(0, 4)] || 0) + 1, o), {}) };
@@ -663,8 +668,8 @@ async function postRefunds(ctx, account, who, opts) {
   const map = await loadMap(ws);
   const col = txCol(account);
   const all = (await col.get()).docs.map(d => d.data());
-  const rows = all.filter(t => t.src === 'excel' && !t.excluded && t.credit > 0 && t.nature === 'refund' && !inOdoo(t) && !t.bookedMove && !t.noBook).sort((a, b) => a.date < b.date ? -1 : 1);
-  const an = analyticsFor(all.filter(t => t.src === 'excel' && !t.excluded && t.debit > 0), map);
+  const rows = all.filter(t => isRow(t) && onlyOne(opts, t) && !t.excluded && t.credit > 0 && t.nature === 'refund' && !inOdoo(t) && !t.bookedMove && !t.noBook).sort((a, b) => a.date < b.date ? -1 : 1);
+  const an = analyticsFor(all.filter(t => isRow(t) && !t.excluded && t.debit > 0), map);
   const out = { rows: rows.length, posted: 0, found: 0, noPartner: [], skipped: [], total: 0 };
   const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
   const ctxO = { allowed_company_ids: [CO.companyId], company_id: CO.companyId };
@@ -709,8 +714,8 @@ async function postVendors(ctx, account, who, opts) {
   const map = await loadMap(ws);
   const col = txCol(account);
   const all = (await col.get()).docs.map(d => d.data());
-  const rows = all.filter(t => t.src === 'excel' && !t.excluded && t.debit > 0 && t.nature === 'vendor' && !inOdoo(t) && !t.bookedMove && !t.noBook).sort((a, b) => a.date < b.date ? -1 : 1);
-  const an = analyticsFor(all.filter(t => t.src === 'excel' && !t.excluded && t.debit > 0), map);
+  const rows = all.filter(t => isRow(t) && onlyOne(opts, t) && !t.excluded && t.debit > 0 && t.nature === 'vendor' && !inOdoo(t) && !t.bookedMove && !t.noBook).sort((a, b) => a.date < b.date ? -1 : 1);
+  const an = analyticsFor(all.filter(t => isRow(t) && !t.excluded && t.debit > 0), map);
   const out = { rows: rows.length, posted: 0, found: 0, noPartner: [], skipped: [], total: 0 };
   const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
   const ctxO = { allowed_company_ids: [CO.companyId], company_id: CO.companyId };
@@ -776,4 +781,66 @@ async function vendorize(ctx, account, who, opts) {
   return out;
 }
 
-module.exports = { postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+// ── One accepted line → Odoo, straight away ────────────────────────────────
+// Mario, 2026-09-07: "auto book to odoo when i accept". Pressing ✓ on a WhatsApp line books exactly
+// that line the way its nature says, and the photos it carries move from the worker's partner record
+// onto the document they belong to (bill or payment), with a note in the chatter.
+//
+// The workbook is still the account: a line accepted here is marked `pendingExcel` until it is
+// written into the sheet, so nothing is forgotten.
+async function moveFilesToMove(odooCall, account, t, move, companyId) {
+  const files = (t.fileIds || []).filter(f => f && f.id);
+  if (!files.length || !move || !move.id) return files;
+  const ctxO = { allowed_company_ids: [companyId] };
+  const A = await odooCall('ir.attachment', 'read', [files.map(f => f.id), ['id', 'name', 'res_model', 'res_id']], { context: ctxO });
+  const moving = A.filter(a => !(a.res_model === 'account.move' && a.res_id === move.id));
+  if (moving.length) {
+    await odooCall('ir.attachment', 'write', [moving.map(a => a.id), { res_model: 'account.move', res_id: move.id }], { context: ctxO });
+    await odooCall('mail.message', 'create', [{ model: 'account.move', res_id: move.id, message_type: 'comment',
+      body: 'Photo' + (moving.length > 1 ? 's' : '') + ' sent by ' + (account.owner || 'the worker') + ' on WhatsApp for ' + t.date + ' — ' + String(t.description || '').slice(0, 120),
+      attachment_ids: [[6, 0, moving.map(a => a.id)]] }], { context: ctxO });
+  }
+  return A.map(a => ({ id: a.id, name: a.name }));
+}
+async function bookRow(ctx, account, txId, who) {
+  const { txCol, odooCall } = ctx;
+  const col = txCol(account);
+  const snap = await col.doc(txId).get();
+  if (!snap.exists) throw new Error('no such line');
+  const t = { id: txId, ...snap.data() };
+  if (t.excluded) throw new Error('the line is not counted — accept it first');
+  if (t.ask) throw new Error('answer the question on the line first — its amount is not settled');
+  const CO0 = bookCo(account);
+  // already booked (its month bill was written for another row): only the photos still have to follow
+  if (t.bookedMove || inOdoo(t)) {
+    const mv = t.bookedMove || { id: ((t.odoo.matches || []).find(m => m.chosen) || {}).moveId, name: ((t.odoo.matches || []).find(m => m.chosen) || {}).move };
+    const f = await moveFilesToMove(odooCall, account, t, mv, CO0.companyId).catch(() => (t.fileIds || []));
+    if (f.length) await col.doc(txId).set({ fileIds: f, files: f.map(x => x.name), updatedAt: now(), updatedBy: who }, { merge: true });
+    return { already: true, move: mv.name, id: mv.id, photos: f.length };
+  }
+  if (!t.nature || t.nature === 'note') throw new Error('the line has no type yet — pick one first');
+  const CO = bookCo(account);
+  const opts = { only: [txId], post: true };
+  let out, kind = t.nature;
+  if (account.cashBox) { out = await postCashBox(ctx, account, who, { only: [txId] }); kind = 'cash box'; }
+  else if (t.nature === 'labour' || t.nature === 'expense' || t.nature === 'opening') {
+    const part = t.nature === 'expense' ? 'expenses' : 'labour';
+    out = await bookMonth(ctx, account, t.date.slice(0, 7), part, who, { post: true, redo: true });
+    kind = 'month bill (' + part + ')';
+  } else if (t.nature === 'vendor') out = await postVendors(ctx, account, who, opts);
+  else if (t.nature === 'refund') out = await postRefunds(ctx, account, who, opts);
+  else if (t.nature === 'transfer' && t.credit > 0 && (!t.cashAccountId || t.cashAccountId === 'mario-cash')) out = await postPayments(ctx, account, who, opts);
+  else out = await postTransfers(ctx, account, who, opts);
+  const after = { id: txId, ...(await col.doc(txId).get()).data() };
+  const move = after.bookedMove || null;
+  const files = await moveFilesToMove(odooCall, account, after, move, CO.companyId).catch(() => (after.fileIds || []));
+  const data = { updatedAt: now(), updatedBy: who };
+  if (files.length) { data.fileIds = files; data.files = files.map(f => f.name); }
+  if (after.src !== 'excel' && account.excel && account.excel.file) data.pendingExcel = true;   // still to be written into the workbook
+  await col.doc(txId).set(data, { merge: true });
+  const err = (out && (out.skipped || []).find(s => s.id === txId)) || (out && (out.noPartner || []).find(s => s.id === txId));
+  if (!move && err) throw new Error(err.error || 'nothing booked for this line: ' + JSON.stringify(err).slice(0, 120));
+  return { kind, move: move && move.name, id: move && move.id, ref: move && move.ref, photos: files.length, pendingExcel: !!data.pendingExcel };
+}
+
+module.exports = { postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
