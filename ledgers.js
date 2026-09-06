@@ -214,7 +214,8 @@ async function importExcel(ctx, account, who) {
       if (l.nature === 'transfer') { l.project = ''; l.projectFrom = ''; continue; }
       if ((l.debit || l.credit) && l.kind !== 'note' && l.kind !== 'opening') { const after = () => { const d = Object.keys(byDay).sort().find(x => x > l.date); return d ? byDay[d] : ''; }; const p = byDay[l.date] || last || after(); if (p) { l.project = p; l.projectFrom = byDay[l.date] ? 'same day' : last ? 'day before' : 'day after'; } }
     } }
-  const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
+  // an Odoo line a person tied by hand is not up for pairing by amount
+  const taken = new Set([...Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean), ...odoo.filter(o => o.dupSrc === 'manual' && o.dupOf).map(o => o.id)]);
   const dup = pairUp(lines.filter(l => !(existing[l.id] || {}).bookedMove), odoo, { taken, loose: true });
   // a tie a person made by hand stands, whatever the amounts say
   for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) dup.set(o.dupOf, { id: o.id, loose: false });
