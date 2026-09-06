@@ -138,6 +138,12 @@
   .xl td.h{font-weight:bold;}
   .xl td.ar{text-align:right;direction:rtl;font-family:'Segoe UI',Arial;}
   .xl td.fix{color:#7a5a00;}
+  /* the statement is screenshotted for a phone in portrait: every column as narrow as it can be */
+  .xl.narrow{font-size:12px;max-width:420px;}
+  .xl.narrow td{padding:2px 5px;height:auto;line-height:1.25;}
+  .xl.narrow td.n{min-width:0;white-space:nowrap;}
+  .xl.narrow td.d{white-space:normal;max-width:130px;word-break:break-word;}
+  .xl.narrow td .sub{font-size:11px;color:#555;}
   #stmtsum{font-size:12px;color:var(--muted);white-space:nowrap;}
   #stmtsum b{color:var(--ink);}
   #stmtsum .g{color:#006100;}
@@ -904,13 +910,31 @@ function openStmt() {
   const rows = tx.filter(t => t.src === 'excel' && !t.excluded && t.period === 'new').sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
   const o = xlSum('old'), a = xlSum('all');
   const own = account.owner || '';
-  const line = t => { const v = xlAmt(t); const p = String(t.partnerName || '').toLowerCase(); const self = p === own || (t.nature === 'labour'); return `<tr><td>new</td><td>${esc(dayDate(t.date))}</td><td class="n ${v < 0 ? 'g' : ''}">${xlFmt(v)}</td><td class="${self ? 'p' : ''}">${esc(t.nature === 'transfer' ? String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase() : (t.partnerName || ''))}</td><td>${esc(t.nature === 'transfer' ? '' : (t.project || t.analyticName || ''))}</td></tr>`; };
+  // The block is screenshotted and sent over WhatsApp on a phone held upright, so it has to be
+  // narrow: four columns, no "#", the partner folded into the day itself (Mario, 2026-09-06).
+  // What the day was: hours, the clock, the car and the km, read off the row's own words.
+  const detail = t => {
+    const d = String(t.description || '');
+    const clock = (d.match(/\b\d{1,2}[:.]\d{2}\s*(?:[ap]\.?m\.?)?/gi) || []).map(x => x.replace(/\s+/g, ' ').trim());
+    const km = (d.match(/(\d+(?:[.,]\d+)?)\s*km\b/i) || [])[1];
+    const car = /jeep/i.test(d) ? 'jeep' : /tacoma/i.test(d) ? 'Tacoma' : /cherokee/i.test(d) ? 'Cherokee' : /\bcar\b/i.test(d) ? 'car' : '';
+    const parts = [t.hours ? t.hours + ' h' : '', clock.length > 1 ? clock[0] + '–' + clock[1] : '', [car, km ? km + ' km' : ''].filter(Boolean).join(' ')].filter(Boolean);
+    if (parts.length) return parts.join(' · ');
+    // not a day of work: his own words, the amount already said in its own column
+    return d.replace(/\s*·\s*/g, ' · ').replace(/^\s*\d+[.,]?\d*\s*\$?\s*/, '').slice(0, 60);
+  };
+  const line = t => { const v = xlAmt(t); const p = String(t.partnerName || '').toLowerCase(); const self = p === own || (t.nature === 'labour');
+    const who = t.nature === 'transfer' ? String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase() : (self ? '' : (t.partnerName || ''));
+    return `<tr><td class="${self ? 'p' : ''}">${esc(dayDate(t.date).replace(/^(\w\w) /, '$1 '))}${who ? '<div class="sub">' + esc(who) + '</div>' : ''}</td>`
+      + `<td class="d">${esc(detail(t))}</td>`
+      + `<td class="n ${v < 0 ? 'g' : ''}">${xlFmt(v)}</td>`
+      + `<td class="d">${esc(t.nature === 'transfer' ? '' : (t.project || t.analyticName || ''))}</td></tr>`; };
   document.getElementById('stmt-body').innerHTML = `
-    <table class="xl">
-      <tr><td>old</td><td>sum</td><td class="n ${o < 0 ? 'g' : ''}">${xlFmt(o)}</td><td class="ar ${o < 0 ? 'g' : ''}">${xlWord(o)}</td><td class="ar">حساب قديم</td></tr>
-      <tr><td>all</td><td>sum</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar">${xlWord(a)}</td><td class="ar">حساب جديد</td></tr>
-      <tr><td colspan="5" style="border:none;height:10px"></td></tr>
-      <tr><td class="h">#</td><td class="h">date</td><td class="h">amount</td><td class="h">partner</td><td class="h">analytical account</td></tr>
+    <table class="xl narrow">
+      <tr><td>old</td><td class="n ${o < 0 ? 'g' : ''}">${xlFmt(o)}</td><td class="ar ${o < 0 ? 'g' : ''}" colspan="2">${xlWord(o)} · حساب قديم</td></tr>
+      <tr><td>all</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="2">${xlWord(a)} · حساب جديد</td></tr>
+      <tr><td colspan="4" style="border:none;height:8px"></td></tr>
+      <tr><td class="h">date</td><td class="h">what</td><td class="h">amount</td><td class="h">project</td></tr>
       ${rows.map(line).join('')}
     </table>
     <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'} since the statement he last received. Screenshot this block and send it to him — then press the button so these rows become old in the sheet (column A) and here: old sum will read ${xlFmt(a)}.</p>
