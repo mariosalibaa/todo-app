@@ -443,7 +443,7 @@ async function ensureSources(keys) {
   const missing = keys.filter(k => !loadedSrc.has(k));
   if (!missing.length) return;
   say('Loading ' + missing.join(', ') + ' lines…');
-  const r = await Admin.api('GET', txUrl(missing));
+  const r = await Admin.api('GET', txUrl(missing) + '&carry=0');   // the grid already carries the earlier lines
   const have = new Set(tx.map(t => t.id));
   for (const t of (Array.isArray(r) ? r : r.tx || [])) if (!have.has(t.id)) tx.push(t);
   for (const k of missing) loadedSrc.add(k);

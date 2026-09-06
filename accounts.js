@@ -203,8 +203,10 @@ async function importOdoo(odooCall, account, who) {
       const desc = (p && p.memo) || m.ref || (lineName && lineName !== 'Manual' ? lineName : '') || (bills[0] && (bills[0].ref || bills[0].name)) || '';
       const other = (otherOf[m.id] || [])[0];
       const description = [desc, !desc && other ? other.account_id[1] : ''].filter(Boolean).join(' ');
-      const rec = anByMove[m.id] || { analytics: [], docs: [] };
-      const docs = [...new Set([...bills.map(b => b.name), ...rec.docs])].filter(d => d && d !== m.name);
+      const rec = anByMove[m.id] || { analytics: [], docs: [], docIds: {} };
+      // one entry per bill: the reconciled name "BILL/… (ref)" wins over the bare bill name
+      const docs = [...new Set([...rec.docs, ...bills.map(b => b.name).filter(n => !rec.docs.some(d => d.startsWith(n)))])].filter(d => d && d !== m.name);
+      const docIds = { ...(rec.docIds || {}), ...Object.fromEntries(bills.map(b => [b.name, b.id])), ...(p && p.name && p.move_id ? { [p.name]: p.move_id[0] } : {}) };
       const an = rec.analytics[0];
       const paidBy = paidByIn([...files, p && p.memo, m.ref, m.narration]);
       const counterparty = j.isPartner ? (other && other.partner_id ? other.partner_id : null) : l.partner_id;
@@ -220,7 +222,7 @@ async function importOdoo(odooCall, account, who) {
         odoo: { checkedAt: now(), matches: [{
           chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: l.debit || l.credit,
           partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
-          company: j.company, journal: j.name, state: l.parent_state, docs, docIds: Object.fromEntries([...bills.map(b => [b.name, b.id]), ...(p && p.name && p.move_id ? [[p.name, p.move_id[0]]] : [])]), odooRef: (p && p.memo) || m.ref || '', analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
+          company: j.company, journal: j.name, state: l.parent_state, docs, docIds, odooRef: (p && p.memo) || m.ref || '', analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
         }] },
       };
       // a question put to Mario on this Odoo entry, and his answer, live on the line across imports
@@ -461,12 +463,13 @@ async function handle(req, res, url, user, ctx) {
         return (await (since ? col.where('date', '>=', since) : col).get()).docs.filter(d => srcs.includes(d.data().src));
       }
     };
-    // the lines before the window, fields only: enough for a count and the balance they leave
-    const readBefore = async () => since ? (await col.where('date', '<', since).select('date', 'debit', 'credit', 'excluded').get()).docs.map(d => d.data()) : null;
+    // the lines before the window, fields only: enough for a count and the balance they leave.
+    // ?carry=0 skips it — a chip fetching one more source into a grid that already has the carry
+    const readBefore = async () => since && q.get('carry') !== '0' ? (await col.where('date', '<', since).select('date', 'debit', 'credit', 'excluded').get()).docs.map(d => d.data()) : null;
     const [docs, old] = await Promise.all([readPeriod(), readBefore()]);
     const tx = docs.map(d => d.data()).sort(order);
     let before = null;
-    if (since) {
+    if (old) {
       const mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
       const op = a.opening && a.opening.date ? a.opening : null;
       before = {
@@ -808,4 +811,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, resolve, listAccounts, txCol, journalsOf, ANNOT, paidByIn, importOdoo };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server
+module.exports = { handle, resolve, listAccounts, txCol, journalsOf, ANNOT, paidByIn, importOdoo, importBudget };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server
