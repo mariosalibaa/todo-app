@@ -144,6 +144,7 @@
   .xl.narrow td.n{min-width:0;white-space:nowrap;}
   .xl.narrow td.d{white-space:normal;max-width:130px;word-break:break-word;}
   .xl.narrow td .sub{font-size:11px;color:#555;}
+  .xl.narrow td.b{background:#f2f2f2;font-weight:bold;}   /* the running balance, as he counts it himself */
   #stmtsum{font-size:12px;color:var(--muted);white-space:nowrap;}
   #stmtsum b{color:var(--ink);}
   #stmtsum .g{color:#006100;}
@@ -290,7 +291,8 @@ let accounts = [], acc = null, account = null, tx = [], contacts = {}, partners 
 let plans = [], journals = [], budgetAccounts = [];
 const KNOWN = { '9613700985': 'Maya', '9613299799': 'Walid Hibri', '9613165168': 'Mario Saliba' };   // seeds until contacts are imported
 const PEOPLE = ['mario', 'abed', 'georges', 'ziad', 'mitri', 'khodr', 'therese', 'other'];
-const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
+const SPELT = { khodr: 'Khoder' };   // the key stays khodr (account id khodr-cash); the name is spelt Khoder (Mario, 2026-09-06)
+const cap = s => s ? (SPELT[s] || s[0].toUpperCase() + s.slice(1)) : '';
 const isStatement = () => !!(account && account.statement);          // Whish prints its own balance
 const isCash = () => !!(account && account.type === 'cash');
 
@@ -927,18 +929,22 @@ function openStmt() {
     // not a day of work: his own words, the amount already said in its own column
     return d.replace(/\s*·\s*/g, ' · ').replace(/^\s*\d+[.,]?\d*\s*\$?\s*/, '').slice(0, 60);
   };
+  // the balance as he would count it himself: the old sum, then row after row down to the new one
+  let run = o;
   const line = t => { const v = xlAmt(t); const p = String(t.partnerName || '').toLowerCase(); const self = p === own || (t.nature === 'labour');
     const who = t.nature === 'transfer' ? String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase() : (self ? '' : (t.partnerName || ''));
+    run += v;
     return `<tr><td class="${self ? 'p' : ''}">${esc(dayDate(t.date).replace(/^(\w\w) /, '$1 '))}${who ? '<div class="sub">' + esc(who) + '</div>' : ''}</td>`
       + `<td class="d">${esc(detail(t))}</td>`
       + `<td class="n ${v < 0 ? 'g' : ''}">${xlFmt(v)}</td>`
+      + `<td class="n b ${run < 0 ? 'g' : ''}">${xlFmt(run)}</td>`
       + `<td class="d">${esc(t.nature === 'transfer' ? '' : (t.analyticName || t.project || ''))}</td></tr>`; };   // the Odoo analytic account, not the sheet's shorthand (Mario, 2026-09-06)
   document.getElementById('stmt-body').innerHTML = `
     <table class="xl narrow">
-      <tr><td>old</td><td class="n ${o < 0 ? 'g' : ''}">${xlFmt(o)}</td><td class="ar ${o < 0 ? 'g' : ''}" colspan="2">${xlWord(o)} · حساب قديم</td></tr>
-      <tr><td>all</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="2">${xlWord(a)} · حساب جديد</td></tr>
-      <tr><td colspan="4" style="border:none;height:8px"></td></tr>
-      <tr><td class="h">date</td><td class="h">what</td><td class="h">amount</td><td class="h">project</td></tr>
+      <tr><td>old</td><td class="n ${o < 0 ? 'g' : ''}">${xlFmt(o)}</td><td class="ar ${o < 0 ? 'g' : ''}" colspan="3">${xlWord(o)} · حساب قديم</td></tr>
+      <tr><td>all</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="3">${xlWord(a)} · حساب جديد</td></tr>
+      <tr><td colspan="5" style="border:none;height:8px"></td></tr>
+      <tr><td class="h">date</td><td class="h">what</td><td class="h">amount</td><td class="h">balance</td><td class="h">project</td></tr>
       ${rows.map(line).join('')}
     </table>
     <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'} since the statement he last received. Screenshot this block and send it to him — then press the button so these rows become old in the sheet (column A) and here: old sum will read ${xlFmt(a)}.</p>
