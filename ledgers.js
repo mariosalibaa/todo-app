@@ -214,6 +214,8 @@ async function importExcel(ctx, account, who) {
     } }
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines.filter(l => !(existing[l.id] || {}).bookedMove), odoo, { taken, loose: true });
+  // a tie a person made by hand stands, whatever the amounts say
+  for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) dup.set(o.dupOf, { id: o.id, loose: false });
   const byId = Object.fromEntries(odoo.map(o => [o.id, o]));
   let added = 0, updated = 0, linked = 0, loose = 0;
   const odooWrites = {};                                              // Odoo line id → its new state
