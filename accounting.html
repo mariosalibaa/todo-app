@@ -80,6 +80,9 @@
   td:last-child{max-width:230px;}
   /* partner picker */
   .pick{position:relative;}
+  .acc-pick{display:inline-block;width:240px;}
+  .acc-pick input{border:1px solid var(--line);border-radius:4px;padding:5px 24px 5px 7px;font-size:13px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236c757d' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center/10px 6px;height:30px;font-family:inherit;}
+  .acc-pick .pick-list div.hi{background:#dbeafc;}
   .pick input{width:100%;}
   .pick-list{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--line);border-radius:0 0 4px 4px;max-height:210px;overflow:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.18);min-width:240px;}
   .pick-list.on{display:block;} .pick-list.empty{pointer-events:none;}
@@ -167,7 +170,12 @@
   <span class="who" id="who"></span>
 </div>
 <div class="bar">
-  <select id="acc" onchange="selectAccount(this.value)"></select>
+  <span class="pick acc-pick" id="accpick">
+    <input id="acc-in" type="text" autocomplete="off" placeholder="Search accounts…" title="Type to search, ↑↓ to move, Enter to open"
+           oninput="accSearch()" onfocus="accOpenList(true)" onkeydown="accKey(event)" onblur="accBlur()">
+    <div class="pick-list" id="acc-list"></div>
+  </span>
+  <select id="acc" hidden onchange="selectAccount(this.value)"></select>
   <select id="period" onchange="setPeriod(this.value)" title="Which lines to load. Earlier lines are summed into the opening balance, not shown."><option value="m">This month</option><option value="m3">Last 3 months</option><option value="year">This year</option><option value="y12">Last 12 months</option><option value="y2">Two years</option><option value="all">Everything</option></select>
   <button class="btn" onclick="openAccountForm()" title="Create a cash or bank account">＋</button>
   <button class="btn" id="btn-edit" onclick="openAccountForm(account)" title="Account settings: opening balance, Odoo journals, imports">⚙</button>
@@ -322,12 +330,57 @@ Admin.require('accounting', async me => {
   else openAccountForm();
 });
 
+const accLabel = a => `${a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
 async function loadAccounts() {
   accounts = (await Admin.api('GET', '/api/accounting/accounts')).filter(a => !a.archived);
   const sel = document.getElementById('acc');
-  const label = a => `${a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
-  sel.innerHTML = accounts.map(a => `<option value="${esc(a.id)}">${esc(label(a))}</option>`).join('')
+  sel.innerHTML = accounts.map(a => `<option value="${esc(a.id)}">${esc(accLabel(a))}</option>`).join('')
     || '<option value="">— no account yet —</option>';
+  accShow();
+}
+
+// the account picker: a plain box you can type in, so twelve accounts stay one keystroke away
+let accHi = -1, accHits = [];
+function accShow() {                                   // put the chosen account back in the box
+  const i = document.getElementById('acc-in');
+  if (i && document.activeElement !== i) i.value = account ? accLabel(account) : '';
+}
+function accMatches(q) {
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return accounts.filter(a => { const h = `${a.name} ${a.currency} ${a.type} ${a.owner || ''}`.toLowerCase(); return words.every(w => h.includes(w)); });
+}
+function accOpenList(all) {
+  const i = document.getElementById('acc-in');
+  accHits = accMatches(all ? '' : i.value);
+  if (all) i.select();
+  accHi = Math.max(0, accHits.findIndex(a => a.id === acc));
+  accPaint();
+}
+function accPaint() {
+  const box = document.getElementById('acc-list');
+  box.innerHTML = accHits.length
+    ? accHits.map((a, n) => `<div class="${n === accHi ? 'hi' : ''}" data-id="${esc(a.id)}" onmousedown="accPickBy('${esc(a.id)}')" onmousemove="accHover(${n})">${esc(accLabel(a))}${a.id === acc ? '<span class="g">open</span>' : ''}</div>`).join('')
+    : '<div class="none">no account matches</div>';
+  box.classList.add('on');
+  const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+}
+function accHover(n) { if (n === accHi) return; accHi = n; accPaint(); }
+function accSearch() { accHits = accMatches(document.getElementById('acc-in').value); accHi = accHits.length ? 0 : -1; accPaint(); }
+function accClose() { document.getElementById('acc-list').classList.remove('on'); }
+function accBlur() { accClose(); accShow(); }
+function accPickBy(id) { accClose(); document.getElementById('acc-in').blur(); if (id !== acc) selectAccount(id); else accShow(); }
+function accKey(e) {
+  const open = document.getElementById('acc-list').classList.contains('on');
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!open) return accOpenList(true);
+    if (!accHits.length) return;
+    accHi = (accHi + (e.key === 'ArrowDown' ? 1 : accHits.length - 1) + accHits.length) % accHits.length;
+    accPaint();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (accHits[accHi]) accPickBy(accHits[accHi].id);
+  } else if (e.key === 'Escape') { e.preventDefault(); accClose(); document.getElementById('acc-in').blur(); }
 }
 let contactsLoaded = false;
 async function loadContacts() {
@@ -356,6 +409,7 @@ async function selectAccount(a) {
   acc = a; localStorage.setItem('acct_id', a);
   account = accounts.find(x => x.id === a) || null;
   document.getElementById('acc').value = a;
+  accShow();
   buildCols(); colF = {}; buildHeader();
   // which buttons make sense here: a statement account is fed by uploads, the others by typing and Odoo
   const st = isStatement(), hasJ = !!(account && ((account.odooJournals || []).length || (account.odooPartner && account.odooPartner.id)));
