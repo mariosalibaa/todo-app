@@ -176,7 +176,7 @@ async function importOdoo(odooCall, account, who) {
     const settleByMove = {};
     if (moveIds.length) {
       try {
-        const S = await odooCall('account.payment', 'search_read', [[['x_transfer_move_id', 'in', moveIds]]], { fields: ['id', 'name', 'memo', 'reconciled_bill_ids', 'reconciled_invoice_ids', 'payment_type', 'x_transfer_move_id'], context: ctx });
+        const S = await odooCall('account.payment', 'search_read', [[['x_transfer_move_id', 'in', moveIds]]], { fields: ['id', 'name', 'memo', 'reconciled_bill_ids', 'reconciled_invoice_ids', 'payment_type', 'x_transfer_move_id', 'move_id'], context: ctx });
         for (const sp of S) { settleByMove[sp.x_transfer_move_id[0]] = sp; P.push(sp); }
       } catch (e) { /* no settlement field on this database */ }
     }
@@ -219,7 +219,7 @@ async function importOdoo(odooCall, account, who) {
         odoo: { checkedAt: now(), matches: [{
           chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: l.debit || l.credit,
           partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
-          company: j.company, journal: j.name, state: l.parent_state, docs, docIds: Object.fromEntries(bills.map(b => [b.name, b.id])), odooRef: (p && p.memo) || m.ref || '', analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
+          company: j.company, journal: j.name, state: l.parent_state, docs, docIds: Object.fromEntries([...bills.map(b => [b.name, b.id]), ...(p && p.name && p.move_id ? [[p.name, p.move_id[0]]] : [])]), odooRef: (p && p.memo) || m.ref || '', analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
         }] },
       };
       if (counterparty && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: counterparty[0], partnerName: counterparty[1], partnerSrc: 'odoo' });

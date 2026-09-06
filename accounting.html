@@ -563,7 +563,7 @@ function odooCell(t) {
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
       + (oref && oref !== win.move ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(oref)}</div>` : '')
       + ((t.fileIds || []).length ? `<div class="odoo-doc">${t.fileIds.map(f => `<a target="_blank" href="https://shift2.odoo.com/web/content/${f.id}" title="${esc(f.name)}">📎 ${esc(f.name.length > 42 ? f.name.slice(0, 40) + '…' : f.name)}</a>`).join('<br>')}</div>` : '')
-      + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => win.docIds && win.docIds[d] ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${win.docIds[d]}">${esc(d)}</a>` : esc(d)).join(', ')}</div>` : '')
+      + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => { const id = win.docIds && (win.docIds[d] || (Object.entries(win.docIds).find(([k]) => d.startsWith(k)) || [])[1]); return id ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${id}">${esc(d)}</a>` : esc(d); }).join(', ')}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
   const tip = m.map(matchTip).join('\n');
