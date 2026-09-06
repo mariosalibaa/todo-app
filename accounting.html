@@ -533,7 +533,7 @@ function computeBalances() {
   let run;
   if (before && op && before.netFromOpening != null) run = op.amount + before.netFromOpening;   // pinned before the period: the server added what followed
   else if (op) run = op.amount - ord.filter(t => t.date < op.date).reduce((s, t) => s + mv(t), 0) + (before ? before.net : 0);
-  else run = before ? before.net : 0;
+  else run = before ? (before.xlNet != null ? before.xlNet : before.net) : 0;   // the carry at the sheet's own precision
   // add at full precision and round only what is shown: rounding every step would drift a cent
   // per half-cent row (Mitri's 621 rows drifted 7 cents that way)
   for (const t of ord) { run += mv(t); t._bal = Math.round(run * 100) / 100; }
@@ -896,7 +896,11 @@ function growNote(el) { el.style.height = 'auto'; el.style.height = el.scrollHei
 // header sums each block: old sum = what he last saw, all sum = the balance now. Its sign is
 // the sheet's: + = owed to him (مطلوب), − = he holds money of ours (واصل اضافي).
 const xlAmt = t => t.xlAmount != null ? +t.xlAmount : (t.debit || 0) - (t.credit || 0);
-const xlSum = k => tx.filter(t => t.src === 'excel' && !t.excluded && (k === 'all' || t.period === k)).reduce((s, t) => s + xlAmt(t), 0);
+// The grid opens on a period, so the rows before it are not loaded — their sheet-exact net comes
+// with the carry. Without it the old and all sums read only the months on screen (Mitri showed
+// 773.54 against a sheet of (100.50) on a three-month window, 2026-09-06).
+const xlCarry = k => k === 'new' || !before || before.xlNet == null ? 0 : -before.xlNet;
+const xlSum = k => xlCarry(k) + tx.filter(t => t.src === 'excel' && !t.excluded && (k === 'all' || t.period === k)).reduce((s, t) => s + xlAmt(t), 0);
 const xlFmt = v => (v < -0.005 ? '$ (' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')' : '$ ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const xlWord = v => v < -0.005 ? 'واصل اضافي' : 'مطلوب';
 function stmtSummary() {
@@ -928,7 +932,7 @@ function openStmt() {
     return `<tr><td class="${self ? 'p' : ''}">${esc(dayDate(t.date).replace(/^(\w\w) /, '$1 '))}${who ? '<div class="sub">' + esc(who) + '</div>' : ''}</td>`
       + `<td class="d">${esc(detail(t))}</td>`
       + `<td class="n ${v < 0 ? 'g' : ''}">${xlFmt(v)}</td>`
-      + `<td class="d">${esc(t.nature === 'transfer' ? '' : (t.project || t.analyticName || ''))}</td></tr>`; };
+      + `<td class="d">${esc(t.nature === 'transfer' ? '' : (t.analyticName || t.project || ''))}</td></tr>`; };   // the Odoo analytic account, not the sheet's shorthand (Mario, 2026-09-06)
   document.getElementById('stmt-body').innerHTML = `
     <table class="xl narrow">
       <tr><td>old</td><td class="n ${o < 0 ? 'g' : ''}">${xlFmt(o)}</td><td class="ar ${o < 0 ? 'g' : ''}" colspan="2">${xlWord(o)} · حساب قديم</td></tr>

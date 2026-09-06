@@ -465,16 +465,20 @@ async function handle(req, res, url, user, ctx) {
     };
     // the lines before the window, fields only: enough for a count and the balance they leave.
     // ?carry=0 skips it — a chip fetching one more source into a grid that already has the carry
-    const readBefore = async () => since && q.get('carry') !== '0' ? (await col.where('date', '<', since).select('date', 'debit', 'credit', 'excluded').get()).docs.map(d => d.data()) : null;
+    const readBefore = async () => since && q.get('carry') !== '0' ? (await col.where('date', '<', since).select('date', 'debit', 'credit', 'excluded', 'xlAmount').get()).docs.map(d => d.data()) : null;
     const [docs, old] = await Promise.all([readPeriod(), readBefore()]);
     const tx = docs.map(d => d.data()).sort(order);
     let before = null;
     if (old) {
       const mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
+      // the same lines by the sheet's own unrounded figure, so the header sums and the balance
+      // read like the workbook even when the grid only loaded the last few months
+      const xlmv = t => t.excluded ? 0 : t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0);
       const op = a.opening && a.opening.date ? a.opening : null;
       before = {
         count: old.length,
         net: Math.round(old.reduce((s, t) => s + mv(t), 0) * 100) / 100,
+        xlNet: old.reduce((s, t) => s + xlmv(t), 0),
         // balance pinned at the opening date: what the lines from that day up to the window add to it
         netFromOpening: op && op.date <= since ? Math.round(old.filter(t => t.date >= op.date).reduce((s, t) => s + mv(t), 0) * 100) / 100 : null,
         first: old.length ? old.reduce((m, t) => t.date < m ? t.date : m, '9999') : null,
