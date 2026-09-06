@@ -120,6 +120,7 @@
   .sug-why{font-size:10.5px;color:var(--auto);font-style:italic;margin-right:4px;}
   .c-type{width:118px;} .c-type select{width:100%;font-size:12px;}
   .locked{color:var(--muted);}
+  td select:has(option[value=""]:checked){color:var(--auto);font-style:italic;} td input::placeholder{color:var(--auto);font-style:italic;}
   .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
@@ -264,6 +265,8 @@ let sugFilter = '';                           // '' | 'pending' | 'skipped' — 
 let reviewImported = false;                   // the ❓ button: only WhatsApp lines nobody wrote down elsewhere
 const TYPES = ['transfer', 'labour', 'expense', 'vendor', 'refund'];
 const TYPE_TIP = { transfer: 'Money moved between him and one of our accounts — never a bill, no project', labour: 'His own work — the month\'s labour bill from him', expense: 'Unofficial spending he fronted — the month\'s expenses bill', vendor: 'An official supplier: its own bill, settled by him', refund: 'Money back from a supplier — keeps the supplier and the project' };
+// a sheet row still missing its company, its type, or its project (transfers have none) is a question to answer
+const asks = t => t.src === 'excel' && !t.excluded && (!companyOf(t) || !t.nature || (t.nature !== 'transfer' && !t.analyticName));
 let srcOff = new Set();                       // sources hidden by clicking their chip in the count
 const isExcelKept = () => !!(account && account.excel && account.excel.file);
 // every source starts shown — clicking its name in the count is what hides it
@@ -484,7 +487,7 @@ function amountMatch(v, f) {
   return String(v).includes(f);
 }
 function passes(t) {
-  if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && t.projectFrom && t.analyticName && t.analyticSrc !== 'manual')) return false;
+  if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)))) return false;
   for (const c of COLS) {
     const f = colF[c.k]; if (!f) continue;
     const v = c.v(t);
@@ -590,7 +593,7 @@ function render() {
     const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '');
     const isTr = t.nature === 'transfer';
     const typeCell = !isExcelKept() ? '' : t.src === 'excel'
-      ? `<td class="c-type ${t.natureSrc === 'manual' ? 'src-manual' : ''}" title="${esc(TYPE_TIP[t.nature] || '')}"><select onchange="saveType('${t.id}', this.value, this)"><option value="" ${!t.nature ? 'selected' : ''}>—</option>${TYPES.map(k => `<option value="${k}" ${t.nature === k ? 'selected' : ''}>${k}</option>`).join('')}</select>${t.retype ? '<div class="hint" title="The type changed after this row was booked: press Rewrite on its month in Book months">↻ rebook month</div>' : ''}</td>`
+      ? `<td class="c-type ${t.natureSrc === 'manual' ? 'src-manual' : ''}" title="${esc(TYPE_TIP[t.nature] || '')}"><select onchange="saveType('${t.id}', this.value, this)"><option value="" ${!t.nature ? 'selected' : ''}>? which type</option>${TYPES.map(k => `<option value="${k}" ${t.nature === k ? 'selected' : ''}>${k}</option>`).join('')}</select>${t.retype ? '<div class="hint" title="The type changed after this row was booked: press Rewrite on its month in Book months">↻ rebook month</div>' : ''}</td>`
       : `<td class="c-type hint">${esc(t.nature || '')}</td>`;
     const onlyFlag = t.src === 'odoo' && t.odooOnly && t.excluded ? `<div class="flag" title="Booked in Odoo on this person's cash journal, but no row of the Excel ledger matches it. Not counted: the Excel is the account.">🟣 not in Excel</div>` : '';
     const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
@@ -620,7 +623,7 @@ function render() {
         ${t.partnerKind === 'cash' ? `<a class="ptag cash" href="/accounting/accounts?id=${esc(t.cashAccountId || '')}" title="One of our own accounts — this row is a transfer">cash</a>` : t.partnerKind === 'partner' ? '<span class="ptag" title="An Odoo partner">partner</span>' : ''}
       </td>
       ${isTr ? `<td class="c-company"><span class="locked" title="A transfer between our own accounts: S LB by rule">${esc(co || 'S LB')}</span></td>` : `<td class="c-company ${srcClass(co ? (t.companySrc || (t.kind ? t.kindSrc : '') || 'manual') : '')}"><select onchange="saveCompany('${t.id}', this.value, this)">
-        <option value="" ${!co ? 'selected' : ''}>${sg.company && !t.suggestSkip ? '↳ ' + esc(sg.company) + '?' : '—'}</option>
+        <option value="" ${!co ? 'selected' : ''}>${sg.company && !t.suggestSkip ? '↳ ' + esc(sg.company) + '?' : t.src === 'excel' ? '? which company' : '—'}</option>
         <option ${co === 'Personal' ? 'selected' : ''}>Personal</option>
         ${companies.map(x => `<option ${co === x.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
         ${co && co !== 'Personal' && !companies.some(x => x.name === co) ? `<option selected>${esc(co)}</option>` : ''}</select>
@@ -632,7 +635,7 @@ function render() {
                 : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : ''}
       </td>`}
             ${isTr ? `<td class="c-proj"><span class="locked" title="A transfer has no project — change the type to give it one">—</span></td>` : `<td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : t.analyticSrc === 'manual' ? 'Chosen by hand' : t.analyticSrc === 'excel' ? esc(t.projectFrom ? 'No project on this row: taken from the ' + t.projectFrom + (t.project ? ' (' + t.project + ')' : '') : 'The project written in the sheet' + (t.project ? ': ' + t.project : '')) : ''}">
-        <div class="pick"><input type="text" id="an-${t.id}-txt" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="analytic"
+        <div class="pick"><input type="text" id="an-${t.id}-txt" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="${t.src === 'excel' ? '? which project' : 'analytic'}"
           oninput="anFilter('an-${t.id}')" onkeydown="anKey(event,'an-${t.id}')" onblur="anBlur('an-${t.id}')">
           <input type="hidden" id="an-${t.id}" value="${esc(t.analyticId || '')}" data-row="${t.id}"><div class="pick-list" id="an-${t.id}-list"></div></div>
         <div class="plan" id="an-${t.id}-plan">${esc(planOf(t.analyticId))}</div>
@@ -673,7 +676,7 @@ function render() {
     `<td colspan="2">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}${rows.length !== counted.length ? ` (${rows.length - counted.length} not counted)` : ''}</td>
      <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${fmt(closing())}${op ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${COLS.length - 5}"></td>`;
   const rv = document.getElementById('btn-review');
-  const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => t.projectFrom && t.analyticName && t.analyticSrc !== 'manual').length;
+  const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => (t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)).length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
   rv.disabled = !waiting && sugFilter !== 'pending';
