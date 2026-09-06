@@ -121,7 +121,7 @@
   .c-type{width:118px;} .c-type select{width:100%;font-size:12px;}
   .locked{color:var(--muted);}
   td select:has(option[value=""]:checked){color:var(--auto);font-style:italic;} td input::placeholder{color:var(--auto);font-style:italic;}
-  .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
+  .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;display:block;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
   .c-paid{width:110px;}
@@ -587,6 +587,7 @@ function render() {
   const sameKey = t => { const g = sugFor(t); return g.any ? [t.phone || '', g.partner ? g.partner.name : '', g.company || ''].join('|') : ''; };
   const groups = {};
   for (const o of tx) { if (sugState(o) !== 'pending' || !o.phone) continue; const k = sameKey(o); if (k) (groups[k] = groups[k] || []).push(o.id); }
+  setTimeout(() => document.querySelectorAll('#rows .note-in').forEach(growNote), 0);
   document.getElementById('rows').innerHTML = rows.map(t => {
     const cn = contactName(t), sg = sugFor(t), co = companyOf(t);
     if (sg.any && !t.suggestSkip) pending++;
@@ -613,7 +614,7 @@ function render() {
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
-        ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><input class="note-in" value="${esc(t.note)}" onchange="saveField('${t.id}', 'note', this.value, this)"></div>` : '') : `<div class="noteline"><input class="note-in" value="${esc(t.note || '')}" placeholder="add note" onchange="saveField('${t.id}', 'note', this.value, this)"></div>`}
+        ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
         ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}</div>` : ''}
         ${paidFlag}${reviewFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
@@ -691,6 +692,7 @@ function render() {
   ck.textContent = toCheck ? `❓ ${toCheck} to review` : '❓ Nothing to review';
   ck.classList.toggle('primary', reviewImported);
 }
+function growNote(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 function toggleReviewImported() { reviewImported = !reviewImported; render(); }
 function toggleSrc(k) { if (srcOff.has(k)) srcOff.delete(k); else srcOff.add(k); render(); }
 
