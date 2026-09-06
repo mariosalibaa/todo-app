@@ -17,6 +17,7 @@
 // analytic accounts once, by name, and kept in settings/analyticMap; a person may fix any
 // of them from the page and the fix holds for every later import and booking.
 const money = n => Math.round(Number(n || 0) * 100) / 100;
+const fmt2 = n => money(n).toFixed(2);
 const now = () => new Date().toISOString();
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -229,6 +230,21 @@ async function bookMonth(ctx, account, month, part, who, opts) {
 // ── everything else that must reach Odoo ────────────────────────────────────
 const inOdoo = t => !!(t.odoo && (t.odoo.matches || []).some(x => x.chosen));
 const CASH_JOURNAL = { 'S LB': { id: 87, companyId: 7 }, 'SHIFT GROUP SARL (USD)': { id: 21, companyId: 2 } };
+const SARL_NAME = 'SHIFT GROUP SARL (USD)';
+// what the SARL owes the partner on a date (credit − debit on his payable there)
+async function sarlOwes(odooCall, partnerId, date) {
+  const L = await odooCall('account.move.line', 'search_read', [[['partner_id', '=', partnerId], ['company_id', '=', 2], ['account_id.account_type', '=', 'liability_payable'], ['parent_state', '=', 'posted'], ['date', '<=', date]]], { fields: ['debit', 'credit'], context: { allowed_company_ids: [2] }, limit: 5000 });
+  return money(L.reduce((s, l) => s + l.credit - l.debit, 0));
+}
+async function makePayment(odooCall, j, partner, amount, date, memo) {
+  const ctxO = { allowed_company_ids: [j.companyId], company_id: j.companyId };
+  let [p] = await odooCall('account.payment', 'search_read', [[['memo', '=', memo], ['company_id', '=', j.companyId], ['state', 'not in', ['canceled']]]], { fields: ['id', 'state', 'move_id', 'name'], context: ctxO, limit: 1 });
+  if (p) return { p, found: true };
+  const id = await odooCall('account.payment', 'create', [{ payment_type: 'outbound', partner_type: 'supplier', partner_id: +partner.id, amount: money(amount), date, journal_id: j.id, memo, company_id: j.companyId }], { context: ctxO });
+  await odooCall('account.payment', 'action_post', [[id]], { context: ctxO });
+  [p] = await odooCall('account.payment', 'read', [[id], ['id', 'state', 'move_id', 'name']], { context: ctxO });
+  return { p, found: false };
+}
 const VENDOR_IDS = [[/attal/i, 13, 'Ste. ATTAL'], [/tchagh/i, 24, 'Tchaghlassian Steel'], [/solaris/i, 214, 'SOLARIS s.a.l'], [/khc|khoury hardware/i, 233, 'KHC Khoury Hardware Center s.a.r.l'], [/kbm|khoury building/i, 234, 'KBM Khoury Building Materials'], [/njk|nicolas khoury/i, 244, 'NJK Nicolas Khoury'], [/^khoury$/i, 233, 'KHC Khoury Hardware Center s.a.r.l']];
 const RAW_MATERIALS = 5978;   // 611100 Purchasing Raw Materials, S LB
 
@@ -244,21 +260,22 @@ async function postPayments(ctx, account, who, opts) {
   if (opts && opts.dry) return { ...out, byYear: rows.reduce((o, t) => (o[t.date.slice(0, 4)] = (o[t.date.slice(0, 4)] || 0) + 1, o), {}) };
   const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
   for (const t of rows) {
-    const j = CASH_JOURNAL[t.company] || CASH_JOURNAL['S LB'];
-    const ctxO = { allowed_company_ids: [j.companyId], company_id: j.companyId };
     const memo = `${prefix}-${t.id}`;
     try {
-      let [p] = await odooCall('account.payment', 'search_read', [[['memo', '=', memo], ['company_id', '=', j.companyId]]], { fields: ['id', 'state', 'move_id', 'name'], context: ctxO, limit: 1 });
-      if (p) out.found++;
-      else {
-        const id = await odooCall('account.payment', 'create', [{ payment_type: 'outbound', partner_type: 'supplier', partner_id: +partner.id, amount: money(t.credit), date: t.date, journal_id: j.id, memo, company_id: j.companyId }], { context: ctxO });
-        await odooCall('account.payment', 'action_post', [[id]], { context: ctxO });
-        [p] = await odooCall('account.payment', 'read', [[id], ['id', 'state', 'move_id', 'name']], { context: ctxO });
-        out.posted++;
-      }
-      const moveId = p.move_id ? p.move_id[0] : null, name = p.name || (p.move_id ? p.move_id[1] : memo);
+      // the SARL's debt to him is paid first, from the SARL's own cash; the rest from S LB
+      const owed = await sarlOwes(odooCall, +partner.id, t.date);
+      const sarlPart = money(Math.min(Math.max(owed, 0), t.credit)), slbPart = money(t.credit - sarlPart);
+      const parts = [];
+      if (sarlPart > 0) parts.push({ j: CASH_JOURNAL[SARL_NAME], amount: sarlPart, memo: slbPart > 0 ? memo + '-sarl' : memo, company: SARL_NAME });
+      if (slbPart > 0) parts.push({ j: CASH_JOURNAL['S LB'], amount: slbPart, memo: sarlPart > 0 ? memo + '-slb' : memo, company: 'S LB' });
+      const made = [];
+      for (const part of parts) { const r = await makePayment(odooCall, part.j, partner, part.amount, t.date, part.memo); made.push({ ...part, p: r.p }); if (r.found) out.found++; else out.posted++; }
+      const first = made[0], p = first.p;
+      const moveId = p.move_id ? p.move_id[0] : null, name = made.map(m => m.p.name || m.p.move_id[1]).join(' + ');
+      const company = made.length === 1 ? first.company : 'SARL ' + fmt2(made[0].amount) + ' + S LB ' + fmt2(made[1].amount);
       out.total = money(out.total + t.credit);
-      await col.doc(t.id).set({ bookedMove: { id: moveId, name, ref: memo, kind: 'payment', at: now(), state: p.state }, ref: name, service: t.company || 'S LB',
+      await col.doc(t.id).set({ bookedMove: { id: moveId, name, ref: memo, kind: 'payment', at: now(), state: p.state, parts: made.map(m => ({ name: m.p.name, amount: m.amount, company: m.company })) }, ref: name, service: made.length === 1 ? first.company : 'split',
+        company: made.length === 1 ? first.company : made[0].company, companySrc: 'odoo',
         odoo: { checkedAt: now(), matches: [{ chosen: true, moveId, move: name, date: t.date, amount: money(t.credit), partner: partner.name, partnerId: +partner.id, label: 'paid to ' + partner.name + ' from Cash Mario',
           company: t.company || 'S LB', journal: 'Cash Mario USD', state: p.state, docs: [], analytics: [], score: 10, why: ['payment made from this row'] }] } }, { merge: true });
     } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount: t.credit, error: String(e.message || e).slice(0, 160) }); if (out.skipped.length > 5) break; }

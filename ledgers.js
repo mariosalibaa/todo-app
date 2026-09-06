@@ -238,7 +238,7 @@ async function importExcel(ctx, account, who) {
       Object.assign(data, e && e.id ? { analyticName: e.name, analyticId: e.id, analyticSrc: 'excel' } : { analyticName: project || '', analyticId: null, analyticSrc: project ? 'excel' : '' });
     }
     // a row already booked into a monthly bill keeps that link whatever else changes
-    if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; }
+    if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; if (prev.company) { data.company = prev.company; data.companySrc = 'odoo'; } }
     // money he was handed is not an expense of any company but the one that holds his account
     // money handed to him and everything unofficial live in S LB; an official vendor's bill is the SARL's until Odoo says otherwise
     const co = nature === 'transfer' || nature === 'labour' || nature === 'expense' ? 'S LB' : nature === 'vendor' || nature === 'refund' ? 'SHIFT GROUP SARL (USD)' : '';
