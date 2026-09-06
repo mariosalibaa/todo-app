@@ -279,7 +279,7 @@ async function postVendors(ctx, account, who, opts) {
   const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
   const ctxO = { allowed_company_ids: [SLB.companyId], company_id: SLB.companyId };
   for (const t of rows) {
-    const v = VENDOR_IDS.find(([rx]) => rx.test(t.partnerName || ''));
+    const v = VENDOR_IDS.find(([rx]) => rx.test(t.partnerName || '')) || VENDOR_IDS.find(([rx]) => rx.test(t.description || ''));   // "abed · attal": the vendor is in the label
     if (!v) { out.noPartner.push({ id: t.id, date: t.date, amount: t.debit, partner: t.partnerName }); continue; }
     if (opts && opts.dry) { out.posted++; out.total = money(out.total + t.debit); continue; }
     const ref = `${prefix}-${t.id}`;
