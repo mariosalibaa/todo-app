@@ -237,6 +237,11 @@ async function importOdoo(odooCall, account, who) {
     out.lines += L.length;
   }
   await acc.batchSet(account.ref.firestore, writes);
+  // an Odoo line that is gone (cancelled, deleted) leaves here too, unless a person tied something to it by hand
+  const seen = new Set(writes.map(w => w.ref.id));
+  const gone = Object.keys(existing).filter(id => !seen.has(id) && existing[id].dupSrc !== 'manual');
+  for (let i = 0; i < gone.length; i += 450) { const bt = account.ref.firestore.batch(); gone.slice(i, i + 450).forEach(id => bt.delete(col.doc(id))); await bt.commit(); }
+  out.removed = gone.length;
   await account.ref.set({ lastOdooImport: now(), lastOdooImportBy: who }, { merge: true });
   return out;
 }
