@@ -292,7 +292,7 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
 
   for (const l of L) {
     const mv = l.move_id[0];
-    const rec = out[mv] = out[mv] || { analytics: [], docs: [] };
+    const rec = out[mv] = out[mv] || { analytics: [], docs: [], docIds: {} };
     // analytic straight on the payment (rare, but honour it)
     for (const k of Object.keys(l.analytic_distribution || {})) for (const p of k.split(',')) {
       const a = byId[+p]; if (a && !rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: 'payment' });
@@ -301,7 +301,7 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
       const pr = P.find(x => x.id === pid); if (!pr) continue;
       for (const li of [pr.debit_move_id[0], pr.credit_move_id[0]]) {
         const doc = docOfLine[li]; if (!doc) continue;
-        if (!rec.docs.includes(doc[1])) rec.docs.push(doc[1]);
+        if (!rec.docs.includes(doc[1])) { rec.docs.push(doc[1]); rec.docIds[doc[1]] = doc[0]; }
         for (const p of (anOfDoc[doc[0]] || [])) {
           const a = byId[p]; if (a && !rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: doc[1] });
         }
@@ -332,12 +332,12 @@ async function odooCheck(odooCall, txs, opts = {}) {
 
   const anByMove = await analyticOfMoves(odooCall, [...new Set(lines.map(l => l.move_id[0]))], ctx);
   const asMatch = (l, score, why) => {
-    const rec = anByMove[l.move_id[0]] || { analytics: [], docs: [] };
+    const rec = anByMove[l.move_id[0]] || { analytics: [], docs: [], docIds: {} };
     return {
       lineId: l.id, moveId: l.move_id[0], move: l.move_id[1], date: l.date,
       amount: l.debit || l.credit, partner: l.partner_id ? l.partner_id[1] : '', partnerId: l.partner_id ? l.partner_id[0] : null, label: l.name || l.ref || '',
       company: l.company_id ? l.company_id[1] : '', journal: l.journal_id ? l.journal_id[1] : '', state: l.parent_state,
-      docs: rec.docs, analytics: rec.analytics, score: Math.round(score * 10) / 10, why
+      docs: rec.docs, docIds: rec.docIds || {}, analytics: rec.analytics, score: Math.round(score * 10) / 10, why
     };
   };
 
@@ -544,5 +544,5 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, analyticAccounts, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone,
+module.exports = { handle, analyticAccounts, analyticOfMoves, parseStatement, parseCsvStatement, isCsvStatement, normalizePhone,
   odooCheck, partnersAndCompanies, journalsNamed, similarity, analyticOfMoves, batchSet };

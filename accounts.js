@@ -37,6 +37,7 @@
 //   POST   /api/accounting/accounts/<id>/import-budget   { budgetAccountId } pull the HomeBudget history
 //   POST   /api/accounting/accounts/<id>/import-excel    read the account's Excel ledger (local machine only)
 //   POST   /api/accounting/accounts/<id>/import-whatsapp read the account's WhatsApp group (local machine only)
+//   POST   /api/accounting/accounts/<id>/close-statement the statement was sent: every "new" row of the Excel becomes "old" (local machine only)
 //   POST   /api/accounting/accounts/<id>/link-transfers  { loose? } join "from mario" lines with Mario's cash as transfers
 //   GET    /api/accounting/whatsapp-groups?q=            the archive's groups, for the ⚙ form
 //   GET    /api/accounting/odoo/journals                 the Odoo bank/cash journals, for the "+" form
@@ -64,7 +65,7 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask'];
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer'];
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 
@@ -222,6 +223,10 @@ async function importOdoo(odooCall, account, who) {
           company: j.company, journal: j.name, state: l.parent_state, docs, docIds: Object.fromEntries([...bills.map(b => [b.name, b.id]), ...(p && p.name && p.move_id ? [[p.name, p.move_id[0]]] : [])]), odooRef: (p && p.memo) || m.ref || '', analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
         }] },
       };
+      // a question put to Mario on this Odoo entry, and his answer, live on the line across imports
+      if (prev.ask) t.ask = prev.ask;
+      if (prev.answer) t.answer = prev.answer;
+      if (prev.note && !t.note) t.note = prev.note;
       if (counterparty && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: counterparty[0], partnerName: counterparty[1], partnerSrc: 'odoo' });
       if (prev.companySrc !== 'manual') Object.assign(t, { company: j.company, companySrc: 'odoo', kind: 'work', kindSrc: 'odoo' });
       if (an && prev.analyticSrc !== 'manual') Object.assign(t, { analyticId: an.id, analyticName: an.name, analyticSrc: 'odoo', analyticFrom: an.from });
@@ -232,10 +237,13 @@ async function importOdoo(odooCall, account, who) {
         t.excluded = true;
         // the settlement's own entry names the row it settles ("… - ABEDCASH-xl-…")
         const byRef = String([m.ref, m.narration, p && p.memo, lineName].join(' ')).match(new RegExp(account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '') + '-(xl-[\\w-]+)'));
-        const fromRow = madeFrom[m.id] || (byRef && byRef[1].replace(/-(sarl|slb)$/, ''));   // a payment split between the companies carries a suffix
+        // a payment of a bill a row is booked to (his own cash paying an Attal invoice the row was tied to) belongs to that row as well
+        const fromRow = madeFrom[m.id] || bills.map(b => madeFrom[b.id]).find(Boolean) || (byRef && byRef[1].replace(/-(sarl|slb)$/, ''));   // a payment split between the companies carries a suffix
         t.tiedBy = '';
         if (fromRow) { t.dupOf = fromRow; t.dupSrc = 'auto'; t.odooOnly = false; t.tiedBy = madeFrom[m.id] ? 'made' : 'ref'; }
-        else if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; }
+        else if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; if (prev.dupSrc === 'manual') t.tiedBy = prev.tiedBy || 'manual'; }
+        // a cents adjustment between the sheet and the supplier's invoice lives in Odoo only — never a line here (Mario, 2026-09-06)
+        else if (/-ROUNDING-/i.test(String(m.ref || ''))) { t.odooOnly = false; t.dupOf = null; t.tiedBy = 'rounding'; }
         else { t.odooOnly = true; t.dupOf = null; }
       } else if (paidBy && owner && paidBy !== owner) out.paidByOthers++;
       if (existing[id]) out.updated++; else out.added++;
@@ -414,6 +422,8 @@ async function handle(req, res, url, user, ctx) {
     if ('archived' in b) data.archived = !!b.archived;
     if ('odooJournals' in b) data.odooJournals = journalsIn(b.odooJournals);
     if ('odooPartner' in b) data.odooPartner = odooPartnerIn(b.odooPartner);
+    // which company carries his bills and his payable ('S LB' by default, 'SHIFT DEVELOPMENT' for Georges)
+    if ('billCompany' in b) data.billCompany = String(b.billCompany || '').trim() || null;
     if ('opening' in b) data.opening = openingIn(b.opening);
     if ('excel' in b) data.excel = excelIn(b.excel) ? { ...(a.excel || {}), ...excelIn(b.excel) } : null;
     if ('whatsapp' in b) data.whatsapp = whatsappIn(b.whatsapp) ? { ...(a.whatsapp || {}), ...whatsappIn(b.whatsapp) } : null;
@@ -424,9 +434,50 @@ async function handle(req, res, url, user, ctx) {
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx$/)) && req.method === 'GET') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
-    const snap = await txCol(a).get();
-    const tx = snap.docs.map(d => d.data()).sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : String(x.ref || x.id).localeCompare(String(y.ref || y.id), undefined, { numeric: true }));
-    return json(res, 200, tx);
+    // ?since=YYYY-MM-DD  only the lines from that day on (the page opens on the current year:
+    //                    Ziad's account holds 6,000+ lines over four years, 6 MB, half a minute)
+    // ?src=excel,manual  only these sources (an Excel-kept account shows its Excel rows; the
+    //                    Odoo/WhatsApp lines behind them are fetched when their chip is clicked)
+    // With ?since the answer is { tx, before } — `before` carries what the earlier lines add up
+    // to, so the running balance starts right without loading them. Without it: the plain array.
+    const q = new URL(req.url, 'http://x').searchParams;
+    const t0 = Date.now();
+    const json = (r, code, body) => { const s = JSON.stringify(body); console.log(`tx ${m[1]} ${req.url.split('?')[1] || 'all'}: ${Array.isArray(body) ? body.length : body.tx.length} lines, ${Math.round(s.length / 1024)} KB, ${Date.now() - t0} ms`); r.writeHead(code, { 'Content-Type': 'application/json' }); r.end(s); return true; };
+    const since = /^\d{4}-\d{2}-\d{2}$/.test(q.get('since') || '') ? q.get('since') : '';
+    const srcs = (q.get('src') || '').split(',').map(s => s.trim()).filter(Boolean);
+    const order = (x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : String(x.ref || x.id).localeCompare(String(y.ref || y.id), undefined, { numeric: true });
+    if (!since && !srcs.length) {
+      const snap = await txCol(a).get();
+      return json(res, 200, snap.docs.map(d => d.data()).sort(order));
+    }
+    const col = txCol(a);
+    const readPeriod = async () => {
+      if (!srcs.length) return (await col.where('date', '>=', since).get()).docs;
+      try {   // src + date needs the composite index (src asc, date asc) on the tx group; before it exists, read the period and filter here
+        return (await (since ? col.where('src', 'in', srcs.slice(0, 30)).where('date', '>=', since) : col.where('src', 'in', srcs.slice(0, 30))).get()).docs;
+      } catch (e) {
+        if (!/index/i.test(String(e.message))) throw e;
+        console.warn('tx: no (src, date) index yet, filtering in memory —', String(e.message).slice(0, 400));
+        return (await (since ? col.where('date', '>=', since) : col).get()).docs.filter(d => srcs.includes(d.data().src));
+      }
+    };
+    // the lines before the window, fields only: enough for a count and the balance they leave
+    const readBefore = async () => since ? (await col.where('date', '<', since).select('date', 'debit', 'credit', 'excluded').get()).docs.map(d => d.data()) : null;
+    const [docs, old] = await Promise.all([readPeriod(), readBefore()]);
+    const tx = docs.map(d => d.data()).sort(order);
+    let before = null;
+    if (since) {
+      const mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
+      const op = a.opening && a.opening.date ? a.opening : null;
+      before = {
+        count: old.length,
+        net: Math.round(old.reduce((s, t) => s + mv(t), 0) * 100) / 100,
+        // balance pinned at the opening date: what the lines from that day up to the window add to it
+        netFromOpening: op && op.date <= since ? Math.round(old.filter(t => t.date >= op.date).reduce((s, t) => s + mv(t), 0) * 100) / 100 : null,
+        first: old.length ? old.reduce((m, t) => t.date < m ? t.date : m, '9999') : null,
+      };
+    }
+    return json(res, 200, { tx, before, since, src: srcs });
   }
 
   // A line typed by hand (or sent from Telegram). Money out is `debit`, money in `credit`,
@@ -560,6 +611,12 @@ async function handle(req, res, url, user, ctx) {
     try { return json(res, 200, await ledgers.importExcel(ledgerCtx, a, who)); }
     catch (e) { console.error('import-excel', e); return json(res, 400, { error: String(e.message || e) }); }
   }
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/close-statement$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    try { return json(res, 200, await ledgers.closeStatement(ledgerCtx, a, who)); }
+    catch (e) { console.error('close-statement', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-whatsapp$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
@@ -581,6 +638,37 @@ async function handle(req, res, url, user, ctx) {
     if (!a) return json(res, 404, { error: 'no such account' });
     try { const map = await bills.analyticMapFor(ledgerCtx, a); return json(res, 200, { months: await bills.months(ledgerCtx, a), ...map }); }   // the map first, so the months know what is mapped
     catch (e) { console.error('months', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // a cash box (Ziad): money in and out of his cash account, and the bills his cash paid
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/post-cashbox$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await bills.postCashBox(ledgerCtx, a, who, { dry: !!b.dry, from: b.from || '', to: b.to || '' })); }
+    catch (e) { console.error('post-cashbox', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // money a supplier gave back that stayed with him: a credit note from that supplier, settled by him
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/post-refunds$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await bills.postRefunds(ledgerCtx, a, who, { dry: !!b.dry })); }
+    catch (e) { console.error('post-refunds', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // money he moved back to us, or that came from another worker's cash: an entry between the two accounts
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/post-transfers$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await bills.postTransfers(ledgerCtx, a, who, { dry: !!b.dry })); }
+    catch (e) { console.error('post-transfers', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // the sheet's projects → Odoo analytic accounts, with what each project cost (labour / benzine / misc / vendors)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/analytic-map$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    try { return json(res, 200, await bills.analyticMapFor(ledgerCtx, a)); }
+    catch (e) { console.error('analytic-map', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-month$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
@@ -720,4 +808,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, resolve, listAccounts, txCol, journalsOf, ANNOT, paidByIn };
+module.exports = { handle, resolve, listAccounts, txCol, journalsOf, ANNOT, paidByIn, importOdoo };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server

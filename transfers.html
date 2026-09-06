@@ -91,7 +91,7 @@
 const esc = Admin.esc;
 // 'We 2026-09-03': the weekday in front of every date, as the sheets write it
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const dayDate = d => /^d{4}-d{2}-d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
+const dayDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
 const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 let accounts = [], list = [], editing = null;
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }

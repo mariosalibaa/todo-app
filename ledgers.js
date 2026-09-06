@@ -32,6 +32,7 @@ function tryRequire(name, extra) {
 }
 const EXTRA = {
   exceljs: ['D:/vscode/georges-sheet/node_modules/exceljs', 'D:/vscode/accounting/node_modules/exceljs'],
+  'adm-zip': ['D:/vscode/georges-sheet/node_modules/adm-zip'],
   'better-sqlite3': ['D:/vscode/whatsapp-local/node_modules/better-sqlite3'],
 };
 
@@ -49,6 +50,10 @@ const cell = c => {
   return c;
 };
 const num = c => { const v = cell(c); if (v === '' || v == null) return 0; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '')); return isFinite(n) ? money(n) : 0; };
+// The sheet's own figure, unrounded. A worker's header sums full precision (Mitri's hours ×
+// rate land on half-cents), so a row keeps it as `raw` and the grid's footer reads exactly
+// like the sheet; the cents between that and the booked amounts live in one Odoo rounding entry.
+const exact = c => { const v = cell(c); if (v === '' || v == null) return 0; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '')); return isFinite(n) ? n : 0; };
 const str = c => { const v = cell(c); return v instanceof Date ? '' : String(v).replace(/\s+/g, ' ').trim(); };
 const day = c => {
   const v = cell(c);
@@ -70,7 +75,7 @@ const CASH_OF = { mario: 'Mario cash', ziad: 'Ziad cash', georges: 'Georges cash
 const titled = x => { const v = String(x || '').trim(); return v ? v[0].toUpperCase() + v.slice(1) : ''; };
 const LAYOUTS = {
   // A status | B date | C amount | D partner | E analytic | F label | G account
-  abed: { sheet: 'Abed', date: 2, status: 1, owner: 'abed',
+  abed: { sheet: 'Abed', date: 2, status: 1, amountCol: 3, owner: 'abed',
     rows: (r, own) => { const a = num(r[3]);
       const partner = str(r[4]), label = str(r[6]), an = str(r[5]);
       if (!a) return [OWNED(0, [partner, label].filter(Boolean).join(' · ') || 'note', /^payment$/i.test(an) ? '' : an, 'note')];   // a row without an amount is still a row
@@ -85,47 +90,86 @@ const LAYOUTS = {
       return [OWNED(a, desc, /^payment$/i.test(an) ? '' : an, isPay ? 'transfer' : self ? 'labour' : '',
         { partner: payer, ...(self && !isPay ? { withSon: a === 70 || a === 35 } : {}) })]; } },
   // A status | B date | C amount | D account (person / vendor) | E vendor bill | F project | G note
-  georges: { sheet: 'Georges', date: 2, status: 1, owner: 'georges',
+  // Column F says "invoice paid" on a row that is a purchase covered by an official invoice —
+  // a marker, not a project. His own day is his name against a real project; everything else
+  // is something he bought ("20 bag cement", "benzine") or passed on ("to monzer", "to ziad"),
+  // and the note names the counterparty (Mario, 2026-09-06).
+  georges: { sheet: 'Georges', date: 2, status: 1, amountCol: 3, owner: 'georges',
     rows: (r, own) => { const a = num(r[3]);
       const who = str(r[4]), bill = str(r[5]), note = str(r[7]);
-      if (!a) return [OWNED(0, [who, bill, note].filter(Boolean).join(' · ') || 'note', str(r[6]), 'note')];
+      const official = /invoice paid/i.test(str(r[6]));
+      const project = official ? '' : str(r[6]);
+      if (!a) return [OWNED(0, [who, bill, note].filter(Boolean).join(' · ') || 'note', project, 'note')];
       const self = new RegExp('^' + own, 'i').test(who);
       const isPay = a < 0;
-      const desc = isPay ? ['received', who && !self ? 'from ' + who : '', note].filter(Boolean).join(' ') || 'received'
+      const passedTo = (note.match(/^\s*to\s+(.+)$/i) || [])[1] || '';    // "to monzer", "to ziad": money he handed on
+      const from = (note.match(/^\s*from\s+(.+)$/i) || [])[1] || '';
+      const desc = isPay ? ['received', from ? 'from ' + from : who && !self ? 'from ' + who : '', from ? '' : note].filter(Boolean).join(' ') || 'received'
         : [who, bill, note].filter(Boolean).join(' · ') || 'expense';
-      return [OWNED(a, desc, str(r[6]), isPay ? 'transfer' : self && !bill ? 'labour' : '', { partner: who || (isPay ? 'mario' : '') })]; } },
+      const kind = isPay ? 'transfer' : (self && project && !bill) ? 'labour' : '';
+      const partner = isPay ? (from || (who && !self ? who : 'mario'))
+        : passedTo || ((official || !project) ? (note || who) : who);
+      return [OWNED(a, desc, project, kind, { partner, ...(official ? { official: true } : {}) })]; } },
   // A ID | B name | C status | D date | E start | F end | G h | H Due1 | I Due2 | J Type | K Km | L T2 | M Project | N Due4 | O Note Exp | P Credit | Q Credit Account | R Note Credit
-  khoder: { sheet: 'data', date: 4, status: 3, owner: 'khodr',
+  khoder: { sheet: 'data', date: 4, status: 3, owner: 'khodr', valueCols: ['G', 'H', 'I', 'N', 'P'],
     rows: r => { const out = [];
       const h = hours(r[7]), wage = money(num(r[8]) + num(r[9])), exp = num(r[14]), cr = num(r[16]);   // the sheet's own total = Due1 + Due2 + Due4 + Credit
       const project = str(r[13]);
-      if (wage) out.push(OWNED(wage, `${h ? h.toFixed(2) + ' h' : 'labour'}${num(r[9]) ? ' + transport' : ''}`, project, 'labour', { hours: h, partner: 'khodr' }));
+      // his day reads with the clock: "9.20 h · 10:45 → 18:24 + transport" (Mario, 2026-09-06)
+      const clock = c => { const v = cell(c); return v instanceof Date ? v.toISOString().slice(11, 16) : (typeof v === 'number' ? String(Math.floor(v * 24)).padStart(2, '0') + ':' + String(Math.round((v * 24 % 1) * 60)).padStart(2, '0') : ''); };
+      const arrive = clock(r[5]), leave = clock(r[6]);
+      const span = arrive && leave ? ` · ${arrive} → ${leave}` : '';
+      if (wage) out.push(OWNED(wage, `${h ? h.toFixed(2) + ' h' : 'labour'}${span}${num(r[9]) ? ' + transport' : ''}`, project, 'labour', { hours: h, arrive, leave, partner: 'khodr' }));
       if (exp) { const what = str(r[15]) || 'expense'; out.push(OWNED(exp, what, project, /previous balance/i.test(what) ? 'opening' : '', { partner: /previous balance/i.test(what) ? '' : what })); }
       if (cr) { const from = str(r[17]), note = str(r[18]); out.push(OWNED(cr, [cr < 0 ? 'received' : 'given', from ? (cr < 0 ? 'from ' : 'to ') + from : '', note].filter(Boolean).join(' '), '', 'transfer', { partner: from || 'mario' })); }
       return out; } },
   // A yy-mm | B status | C date | D Hr | E type | F KM | G Due1 | H Due2 | I Due3 | J Received | K Note | L Project
-  mitri: { sheet: 'data', date: 3, status: 2, owner: 'mitri',
+  mitri: { sheet: 'data', date: 3, status: 2, owner: 'mitri', valueCols: ['D', 'G', 'H', 'I', 'J'],
     rows: r => { const out = [];
       const h = hours(r[4]), wage = num(r[7]) + num(r[8]), exp = num(r[9]), rec = num(r[10]);
       const note = str(r[11]), project = str(r[12]);
       const nameIn = t => (String(t || '').match(/from\s+([a-z]+)/i) || [])[1] || '';
-      if (wage) out.push(OWNED(wage, `${h ? h + ' h' : 'labour'}${str(r[5]) ? ' ' + str(r[5]) : ''}${num(r[6]) ? ' ' + num(r[6]) + ' km' : ''}${note && !exp && !rec ? ' · ' + note : ''}`, project, 'labour', { hours: h, partner: 'mitri' }));
+      if (wage) out.push(OWNED(wage, `${h ? h + ' h' : 'labour'}${str(r[5]) ? ' ' + str(r[5]) : ''}${num(r[6]) ? ' ' + num(r[6]) + ' km' : ''}${note && !exp && !rec ? ' · ' + note : ''}`, project, 'labour', { hours: h, partner: 'mitri', raw: exact(r[7]) + exact(r[8]) }));
       if (exp) out.push(OWNED(exp, note || 'expense', project, '', { partner: note.replace(/\d+[.,]?\d*\s*\$?/g, '').trim().slice(0, 40) }));
       if (rec) out.push(OWNED(rec, rec < 0 ? (note || 'received') : (note || 'bonus'), project, rec < 0 ? 'transfer' : '', { partner: rec < 0 ? (nameIn(note) || 'mario') : 'mitri' }));
       return out; } },
   // A status | B date | C amount (+ in, − out) | D label | E project | F type | G account | H account2
-  ziad: { sheet: 'accounting', date: 2, status: 1, owner: 'ziad',
+  ziad: { sheet: 'accounting', date: 2, status: 1, amountCol: 3, owner: 'ziad',
     rows: r => { const a = num(r[3]);
       const label = str(r[4]), acct = str(r[7]), tag = str(r[8]), type = str(r[6]);
       if (!a) return [OWNED(0, label || 'note', '', 'note')];
       const isTr = /transfer/i.test([type, acct, tag].join(' '));
       const isPrev = /previous balance/i.test(label + type);
       const from = (label.match(/from\s+([a-z]+)/i) || [])[1] || '';
+      // "to mario" / "to mitri" in the label names one of our own cash accounts: money leaving his box, not spending
+      const to = (label.match(/^\s*to\s+([a-z]+)/i) || [])[1] || '';
+      const OURS = /^(mario|ziad|abed|georges|mitri|khodr|khoder|therese|neo)$/i;
+      const backTo = a < 0 && OURS.test(to) ? to.toLowerCase() : '';
       return [OWNED(-a, [label, acct && !/transfer/i.test(acct) && !new RegExp(acct, 'i').test(label) ? acct : '', /official|invoice/i.test(tag) ? tag.toLowerCase() : ''].filter(Boolean).join(' · '),
-        str(r[5]) === 'general' ? '' : str(r[5]), isPrev ? 'opening' : isTr ? 'transfer' : '',
-        { lbp: num(r[10]) || 0, partner: a > 0 ? (from || 'mario') : (acct && !/transfer/i.test(acct) ? acct : '') })]; } },
+        str(r[5]) === 'general' ? '' : str(r[5]), isPrev ? 'opening' : (isTr || backTo) ? 'transfer' : '',
+        { lbp: num(r[10]) || 0, partner: a > 0 ? (from || 'mario') : (backTo || (acct && !/transfer/i.test(acct) ? acct : '')) })]; } },
 };
 
+// Which cells of a sheet really hold something, straight from the workbook XML: { row: Set(columns) }.
+// null when the zip reader is not on this machine — the caller then trusts ExcelJS as before.
+const EMPTY = new Set();
+function xmlFilledCells(file, sheetName) {
+  const AdmZip = tryRequire('adm-zip', EXTRA['adm-zip']);
+  if (!AdmZip) return null;
+  try {
+    const zip = new AdmZip(file);
+    const wb = zip.readAsText('xl/workbook.xml');
+    const tag = (wb.match(/<sheet [^>]*>/g) || []).find(s => new RegExp('name="' + sheetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"').test(s));
+    const rId = tag && (/r:id="([^"]+)"/.exec(tag) || [])[1];
+    const rel = rId && (zip.readAsText('xl/_rels/workbook.xml.rels').match(/<Relationship [^>]*>/g) || []).find(r => new RegExp('Id="' + rId + '"').test(r));
+    const target = rel && (/Target="([^"]+)"/.exec(rel) || [])[1];
+    if (!target) return null;
+    const xml = zip.readAsText(target.startsWith('/') ? target.slice(1) : 'xl/' + target);
+    const out = {};
+    for (const m of xml.matchAll(/<c r="([A-Z]+)(\d+)"[^>]*?>(?=<f|<v|<is)/g)) (out[+m[2]] = out[+m[2]] || new Set()).add(m[1]);
+    return out;
+  } catch (e) { return null; }
+}
 async function readExcel(file, layoutName, sheetName) {
   const ExcelJS = tryRequire('exceljs', EXTRA.exceljs);
   if (!ExcelJS) throw new Error('exceljs is not installed on this machine — run the import from Mario\'s laptop');
@@ -136,15 +180,79 @@ async function readExcel(file, layoutName, sheetName) {
   await wb.xlsx.readFile(file);
   const ws = wb.getWorksheet(sheetName || lay.sheet);
   if (!ws) throw new Error(`sheet "${sheetName || lay.sheet}" not in ${path.basename(file)} (has: ${wb.worksheets.map(w => w.name).join(', ')})`);
+  // ExcelJS can hand back the row ABOVE for a row whose cells exist but are empty (Khodr's
+  // row 62, 2026-09-06: a lone project name, and the library reported a full second day). The
+  // sheet XML is what Excel itself reads, so a row only counts when the XML shows a value in
+  // one of the layout's amount columns.
+  const filled = xmlFilledCells(file, ws.name);
+  const valueCols = lay.valueCols || (lay.amountCol ? [String.fromCharCode(64 + lay.amountCol)] : null);
   const rows = [];
   ws.eachRow((row, i) => {
     const r = row.values;                                // 1-based
     const date = day(r[lay.date]);
     if (!date) return;
+    if (filled && valueCols && !valueCols.some(c => (filled[i] || EMPTY).has(c))) return;   // nothing in the sheet on this row
     const status = str(r[lay.status]).toLowerCase();
-    for (const mv of lay.rows(r, lay.owner)) rows.push({ ...mv, date, period: status === 'old' || status === 'new' ? status : '', row: i });
+    // the sheet's own unrounded figure (formulas like 500000/89500), so the old / new / all sums read as Excel prints them
+    const rawV = lay.amountCol ? cell(r[lay.amountCol]) : '';
+    const raw = typeof rawV === 'number' && isFinite(rawV) ? rawV : null;
+    for (const mv of lay.rows(r, lay.owner)) rows.push({ ...mv, date, period: status === 'old' || status === 'new' ? status : '', row: i, ...(raw != null && money(raw) === mv.amount ? { raw } : {}) });
   });
   return { rows, sheet: ws.name, file: path.basename(file) };
+}
+
+// ── Statement close ─────────────────────────────────────────────────────────
+// Mario sends the worker a picture of the sheet's "new" block. Once sent, those rows are
+// marked "old" in the status column, so `old sum` stays exactly the balance the worker saw
+// and the rows added afterwards are the next statement. The sheet XML is edited in place:
+// the pivot, the styles and the formulas stay byte-identical (a round-trip would lose them).
+async function closeStatement(ctx, account, who) {
+  const AdmZip = tryRequire('adm-zip', EXTRA['adm-zip']);
+  if (!AdmZip) throw new Error('adm-zip is not installed on this machine — close the statement from Mario\'s laptop');
+  const cfg = account.excel || {};
+  const lay = LAYOUTS[cfg.layout || account.owner];
+  if (!cfg.file || !lay || !lay.status) throw new Error('this account has no Excel ledger with a status column');
+  if (!fs.existsSync(cfg.file)) throw new Error('workbook not found: ' + cfg.file);
+  const dir = path.dirname(cfg.file), base = path.basename(cfg.file), bak = path.join(dir, '_backups');
+  if (!fs.existsSync(bak)) fs.mkdirSync(bak);
+  fs.copyFileSync(cfg.file, path.join(bak, new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '') + ' ' + base));
+  const zip = new AdmZip(cfg.file);
+  const wbXml = zip.readAsText('xl/workbook.xml');
+  const sheetName = cfg.sheet || lay.sheet;
+  const tag = (wbXml.match(/<sheet [^>]*>/g) || []).find(s => new RegExp('name="' + sheetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"').test(s));
+  const rId = tag && (/r:id="([^"]+)"/.exec(tag) || [])[1];
+  if (!rId) throw new Error(`sheet "${sheetName}" not in ${base}`);
+  const rel = (zip.readAsText('xl/_rels/workbook.xml.rels').match(/<Relationship [^>]*>/g) || []).find(r => new RegExp('Id="' + rId + '"').test(r));
+  const target = rel && (/Target="([^"]+)"/.exec(rel) || [])[1];
+  if (!target) throw new Error('worksheet part not found for ' + sheetName);
+  const part = target.startsWith('/') ? target.slice(1) : 'xl/' + target;
+  let xml = zip.readAsText(part);
+  const sst = zip.getEntry('xl/sharedStrings.xml') ? zip.readAsText('xl/sharedStrings.xml') : '';
+  const items = [...sst.matchAll(/<si>([\s\S]*?)<\/si>/g)].map(x => x[1].replace(/<[^>]+>/g, '').trim().toLowerCase());
+  const OLD = items.indexOf('old'), NEW = items.indexOf('new');
+  const colL = String.fromCharCode(64 + lay.status);
+  const oldCell = (r, s) => OLD >= 0 ? `<c r="${colL}${r}"${s} t="s"><v>${OLD}</v></c>` : `<c r="${colL}${r}"${s} t="inlineStr"><is><t>old</t></is></c>`;
+  // only the data rows the hub read as "new" — the sheet's header also says "new" (the SUMIFS label) and must stay
+  const col = ctx.txCol(account);
+  const cur = await col.where('src', '==', 'excel').get();
+  const newRows = new Set(cur.docs.map(d => d.data()).filter(t => t.period === 'new' && t.excelRow).map(t => String(t.excelRow)));
+  let flipped = 0;
+  if (NEW >= 0) xml = xml.replace(new RegExp(`<c r="${colL}(\\d+)"([^>]*?) t="s"><v>${NEW}</v></c>`, 'g'), (a, r, s) => { if (!newRows.has(r)) return a; flipped++; return oldCell(r, s); });
+  xml = xml.replace(new RegExp(`<c r="${colL}(\\d+)"([^>]*?) t="inlineStr"><is><t[^>]*>new</t></is></c>`, 'g'), (a, r, s) => { if (!newRows.has(r)) return a; flipped++; return oldCell(r, s); });
+  if (!flipped) return { flipped: 0, rows: 0, file: base };
+  zip.updateFile(part, Buffer.from(xml, 'utf8'));
+  // Excel recomputes the old / new / all sums on open
+  let wb = wbXml;
+  wb = /<calcPr\b/.test(wb) ? wb.replace(/<calcPr\b([^>]*?)\/>/, (a, b) => '<calcPr' + b.replace(/\s*fullCalcOnLoad="[^"]*"/, '') + ' fullCalcOnLoad="1"/>') : wb.replace('</workbook>', '<calcPr calcId="0" fullCalcOnLoad="1"/></workbook>');
+  zip.updateFile('xl/workbook.xml', Buffer.from(wb, 'utf8'));
+  if (zip.getEntry('xl/calcChain.xml')) zip.deleteFile('xl/calcChain.xml');
+  zip.writeZip(cfg.file + '.tmp'); fs.renameSync(cfg.file + '.tmp', cfg.file);
+  // the hub rows follow the sheet
+  let rows = 0;
+  const db = col.firestore; let b = db.batch(), n = 0;
+  for (const d of cur.docs) { if (d.data().period !== 'new') continue; b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '' }, { merge: true }); rows++; if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; } }
+  if (n) await b.commit();
+  return { flipped, rows, file: base };
 }
 
 // ── Matching ────────────────────────────────────────────────────────────────
@@ -203,34 +311,52 @@ async function importExcel(ctx, account, who) {
     const nat = bills.natureOf({ credit, kind: vendorInLabel ? '' : r.kind, partnerRaw: vendorInLabel ? String(r.description).replace(/^abeds*·s*/i, '') : raw, owner: lay.owner === 'khodr' ? 'khoder' : lay.owner });
     if (vendorInLabel) { r.kind = ''; }
     return { id, src: 'excel', date: r.date, ref: '', service: 'Excel', phone: '', description: r.description, debit, credit,
-      project: r.project || '', partnerName, period: r.period || '', ...nat,
+      project: r.project || '', partnerName, period: r.period || '', xlAmount: r.raw != null ? r.raw : r.amount, ...nat,
       kind: r.kind || '', kindSrc: r.kind ? 'excel' : '', hours: r.hours || 0, excelRow: r.row, importedAt: now() };
   });
 
-  // a spend with no project (benzine) belongs to the site he worked that day, else the last one seen
-  { const byDay = {}; for (const l of lines) if (l.project && l.kind === 'labour') byDay[l.date] = byDay[l.date] || l.project;
-    let last = ''; for (const l of lines.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)) {
-      if (l.project) { last = l.project; continue; }
+  // A spend with no project of its own (benzine on the way to a site) belongs to the site he
+  // worked that day, else the day before, else the day after — but only within NEAR days. A
+  // guess reached across a longer gap says nothing: a VAT payment in November does not belong
+  // to the site somebody worked back in March. Those rows keep no project and ask in the app.
+  { const NEAR = 7;                                    // a working week: the natural run of days on one site
+    const byDay = {}; for (const l of lines) if (l.project && l.kind === 'labour') byDay[l.date] = byDay[l.date] || l.project;
+    const days = Object.keys(byDay).sort();
+    const gap = (a, b) => Math.abs(new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000;
+    for (const l of lines.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)) {
+      if (l.project) continue;
       if (l.nature === 'transfer') { l.project = ''; l.projectFrom = ''; continue; }
-      if ((l.debit || l.credit) && l.kind !== 'note' && l.kind !== 'opening') { const after = () => { const d = Object.keys(byDay).sort().find(x => x > l.date); return d ? byDay[d] : ''; }; const p = byDay[l.date] || last || after(); if (p) { l.project = p; l.projectFrom = byDay[l.date] ? 'same day' : last ? 'day before' : 'day after'; } }
+      if (!(l.debit || l.credit) || l.kind === 'note' || l.kind === 'opening') continue;
+      const before = [...days].reverse().find(d => d < l.date && gap(d, l.date) <= NEAR);
+      const after = days.find(d => d > l.date && gap(d, l.date) <= NEAR);
+      const p = byDay[l.date] ? { p: byDay[l.date], from: 'same day' } : before ? { p: byDay[before], from: 'day before' } : after ? { p: byDay[after], from: 'day after' } : null;
+      if (p) { l.project = p.p; l.projectFrom = p.from; }
     } }
-  // an Odoo line a person tied by hand is not up for pairing by amount
-  const taken = new Set([...Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean), ...odoo.filter(o => o.dupSrc === 'manual' && o.dupOf).map(o => o.id)]);
+  // an entry the hub made from a row (a monthly bill, a payment, a cash-box entry) stays that row's entry
+  const madeFrom = {}; for (const l of lines) { const b = (existing[l.id] || {}).bookedMove; if (b && b.id && !madeFrom[b.id]) madeFrom[b.id] = l.id; }
+  const madeLine = o => { const mid = o.odoo && o.odoo.matches && o.odoo.matches[0] && o.odoo.matches[0].moveId; return !!(mid && madeFrom[mid]); };
+  // an Odoo line a person tied by hand, or one the hub made for another row, is not up for pairing by amount
+  // (Ziad's 1 Sep transport 15.56 had borrowed the entry made for his 31 Aug transport 15.56, found 2026-09-06)
+  const taken = new Set([...Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean), ...odoo.filter(o => (o.dupSrc === 'manual' && o.dupOf) || madeLine(o)).map(o => o.id)]);
   const dup = pairUp(lines.filter(l => !(existing[l.id] || {}).bookedMove), odoo, { taken, loose: true });
   // a tie a person made by hand stands, whatever the amounts say
   for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) dup.set(o.dupOf, { id: o.id, loose: false });
   const byId = Object.fromEntries(odoo.map(o => [o.id, o]));
   let added = 0, updated = 0, linked = 0, loose = 0;
   const odooWrites = {};                                              // Odoo line id → its new state
-  for (const o of odoo) odooWrites[o.id] = { excluded: true, odooOnly: true, dupOf: null, dupSrc: '' };
-  // an Odoo entry the hub made from a row (a monthly bill, a payment) stays that row's entry
-  const madeFrom = {}; for (const l of lines) { const b = (existing[l.id] || {}).bookedMove; if (b && b.id && !madeFrom[b.id]) madeFrom[b.id] = l.id; }
+  // a cents adjustment between the sheet and a supplier's invoice belongs to Odoo alone: it is
+  // never "not in Excel", because no row of the sheet will ever match it
+  for (const o of odoo) odooWrites[o.id] = o.tiedBy === 'rounding'
+    ? { excluded: true, odooOnly: false, dupOf: null, dupSrc: '', tiedBy: 'rounding' }
+    : { excluded: true, odooOnly: true, dupOf: null, dupSrc: '' };
   for (const o of odoo) { const mid = o.odoo && o.odoo.matches && o.odoo.matches[0] && o.odoo.matches[0].moveId; if (mid && madeFrom[mid]) odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: madeFrom[mid], dupSrc: 'auto' }; }
   // an entry the Odoo import tied by name to a row keeps that tie while the row exists
   const rowIds = new Set(lines.map(l => l.id));
   for (const o of odoo) if (o.tiedBy && o.dupOf && rowIds.has(o.dupOf)) odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: o.dupOf, dupSrc: 'auto' };
   // a person's own link (dupSrc manual) is kept as it is
-  for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) odooWrites[o.id] = { excluded: true, odooOnly: false };
+  // a tie made by hand keeps its row: without dupOf/dupSrc here the earlier reset would wipe it,
+  // and the next import would call the entry "not in Excel" all over again
+  for (const o of odoo) if (o.dupSrc === 'manual' && o.dupOf) odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: o.dupOf, dupSrc: 'manual', tiedBy: o.tiedBy || 'manual' };
   const writes = lines.map(t => {
     const prev = existing[t.id] || {};
     const { partnerName, project, nature, partnerKind, cashAccountId, ...rest } = t;
@@ -246,7 +372,7 @@ async function importExcel(ctx, account, who) {
     if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; if (prev.company) { data.company = prev.company; data.companySrc = 'odoo'; } if (prev.fileIds) { data.fileIds = prev.fileIds; data.files = prev.files || []; } }
     // money he was handed is not an expense of any company but the one that holds his account
     // money handed to him and everything unofficial live in S LB; an official vendor's bill is the SARL's until Odoo says otherwise
-    const co = nature === 'transfer' || nature === 'labour' || nature === 'expense' ? 'S LB' : nature === 'vendor' || nature === 'refund' ? 'SHIFT GROUP SARL (USD)' : '';
+    const co = nature === 'transfer' || nature === 'labour' || nature === 'expense' || nature === 'opening' ? 'S LB' : nature === 'vendor' || nature === 'refund' ? 'SHIFT GROUP SARL (USD)' : '';
     if (prev.companySrc !== 'manual') Object.assign(data, { company: co, companySrc: co ? 'excel' : '' });
     const d = dup.get(t.id);
     const o = d ? byId[d.id] : null;
@@ -261,7 +387,8 @@ async function importExcel(ctx, account, who) {
       if (o.company && prev.companySrc !== 'manual') Object.assign(data, { company: o.company, companySrc: 'odoo', kind: prev.kindSrc === 'manual' ? prev.kind : (t.kind || 'work'), kindSrc: prev.kindSrc === 'manual' ? 'manual' : (t.kind ? 'excel' : 'odoo') });
       if (o.analyticId && prev.analyticSrc !== 'manual') Object.assign(data, { analyticId: o.analyticId, analyticName: o.analyticName, analyticSrc: 'odoo', analyticFrom: o.analyticFrom || '' });
       if (o.paidBy && prev.paidBySrc !== 'manual') Object.assign(data, { paidBy: o.paidBy, paidBySrc: 'odoo' });
-      odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: t.id, dupSrc: 'auto' };
+      // a tie a person made by hand stays "manual", or the next import would forget it and call the entry "not in Excel"
+      odooWrites[o.id] = { excluded: true, odooOnly: false, dupOf: t.id, dupSrc: o.dupSrc === 'manual' ? 'manual' : 'auto', ...(o.dupSrc === 'manual' ? { tiedBy: o.tiedBy || 'manual' } : {}) };
     } else if (prev.matchedOdoo) {
       // matched last time, not any more: the sheet's own facts (set above) stand alone again
       data.odoo = null; data.matchedOdoo = null; data.ref = ''; data.files = []; data.service = 'Excel';
@@ -504,4 +631,4 @@ async function readGold(file) {
   return { holdings, prices, file: path.basename(file), readAt: now() };
 }
 
-module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, parseMoney, LAYOUTS, readGold };
+module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, parseMoney, LAYOUTS, readGold, closeStatement };

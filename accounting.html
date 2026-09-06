@@ -124,6 +124,20 @@
   td select:has(option[value=""]:checked){color:var(--auto);font-style:italic;} td input::placeholder{color:var(--auto);font-style:italic;}
   .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;display:block;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
+  .src.per-new{background:#fff3cd;color:#7a5a00;border-color:#f2d98a;}
+  .src.per-old{background:#f1f1f1;color:#888;}
+  /* the sheet's own header: old sum / new sum / all sum, green when he holds money of ours */
+  .xl{border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:14px;color:#000;background:#fff;margin:6px 0;}
+  .xl td{border:1px solid #d0d0d0;padding:2px 8px;height:22px;white-space:nowrap;}
+  .xl td.n{text-align:right;min-width:90px;}
+  .xl td.g{background:#c6efce;color:#006100;}
+  .xl td.p{background:#ffe699;}
+  .xl td.h{font-weight:bold;}
+  .xl td.ar{text-align:right;direction:rtl;font-family:'Segoe UI',Arial;}
+  .xl td.fix{color:#7a5a00;}
+  #stmtsum{font-size:12px;color:var(--muted);white-space:nowrap;}
+  #stmtsum b{color:var(--ink);}
+  #stmtsum .g{color:#006100;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
   .c-paid{width:110px;}
   .form{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;align-items:center;font-size:13px;}
@@ -154,6 +168,7 @@
 </div>
 <div class="bar">
   <select id="acc" onchange="selectAccount(this.value)"></select>
+  <select id="period" onchange="setPeriod(this.value)" title="Which lines to load. Earlier lines are summed into the opening balance, not shown."><option value="year">This year</option><option value="y12">Last 12 months</option><option value="y2">Two years</option><option value="all">Everything</option></select>
   <button class="btn" onclick="openAccountForm()" title="Create a cash or bank account">＋</button>
   <button class="btn" id="btn-edit" onclick="openAccountForm(account)" title="Account settings: opening balance, Odoo journals, imports">⚙</button>
   <input type="date" id="from" onchange="render()" title="From">
@@ -170,6 +185,8 @@
   <button class="btn" id="btn-contacts" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the account's Odoo journals">⇄ Check Odoo</button>
   <button class="btn" id="btn-months" onclick="openMonths()" title="One draft bill per month from this person, one line per Excel row, each with its project" style="display:none">📅 Book months</button>
+  <button class="btn" id="btn-projects" onclick="openProjects()" title="The sheet's project names matched to Odoo's analytic accounts, with what each project cost him: days, benzine, misc, vendors" style="display:none">🗂 Projects</button>
+  <button class="btn" id="btn-stmt" onclick="openStmt()" title="The statement as the Excel shows it: old sum (what he last saw), the new rows, all sum. Once sent, mark the new rows old." style="display:none">📄 Statement</button>
   <button class="btn" id="btn-bills" onclick="openBills()" title="Recurring payments with a standing rule — create their draft bills in Odoo">📗 Odoo bills</button>
 </div>
 <div class="legend">
@@ -183,6 +200,22 @@
       <span class="sp" style="flex:1"></span>
       <button class="btn" onclick="closeBills()">✕ Close</button></div>
     <div class="sheet-body" id="bills-body"></div>
+  </div>
+</div>
+<div class="sheet" id="projects" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head"><b id="projects-title">Projects → analytic accounts</b>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn" onclick="document.getElementById('projects').hidden = true">✕ Close</button></div>
+    <div class="sheet-body" id="projects-body"></div>
+  </div>
+</div>
+<div class="sheet" id="stmt" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head"><b>Statement — the sheet's new block</b>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn" onclick="document.getElementById('stmt').hidden = true">✕ Close</button></div>
+    <div class="sheet-body" id="stmt-body"></div>
   </div>
 </div>
 <div class="sheet" id="months" hidden>
@@ -267,22 +300,22 @@ let sort = { k: 'date', dir: -1 };            // newest first, like an Odoo bank
 let colF = {};                                // column filters, key → string
 let sugFilter = '';                           // '' | 'pending' | 'skipped' — the Review button
 let reviewImported = false;                   // the ❓ button: only WhatsApp lines nobody wrote down elsewhere
-const TYPES = ['transfer', 'labour', 'expense', 'vendor', 'refund'];
-const TYPE_TIP = { transfer: 'Money moved between him and one of our accounts — never a bill, no project', labour: 'His own work — the month\'s labour bill from him', expense: 'Unofficial spending he fronted — the month\'s expenses bill', vendor: 'An official supplier: its own bill, settled by him', refund: 'Money back from a supplier — keeps the supplier and the project' };
+const TYPES = ['transfer', 'labour', 'expense', 'vendor', 'refund', 'opening'];
+const TYPE_TIP = { transfer: 'Money moved between him and one of our accounts — never a bill, no project', labour: 'His own work — the month\'s labour bill from him', expense: 'Unofficial spending he fronted — the month\'s expenses bill', vendor: 'An official supplier: its own bill, settled by him', refund: 'Money back from a supplier — keeps the supplier and the project', opening: 'What he was already owed the day the sheet starts — a line of the first labour bill' };
 // a sheet row still missing its company, its type, or its project (transfers have none) is a question to answer
-const asks = t => (t.src === 'excel' && !t.excluded && (!companyOf(t) || !t.nature || (t.nature !== 'transfer' && !t.analyticName))) || !!t.ask;
+const asks = t => (t.src === 'excel' && !t.excluded && (t.debit || t.credit) && (!companyOf(t) || !t.nature || (t.nature !== 'transfer' && !t.analyticName))) || !!t.ask;   // a note row (no amount) asks nothing
 let srcOff = new Set();                       // sources hidden by clicking their chip in the count
 const isExcelKept = () => !!(account && account.excel && account.excel.file);
 // every source starts shown — clicking its name in the count is what hides it
 // on a partner ledger the Odoo entries sit behind the rows, not among them: hidden until the chip is clicked
-const resetSources = () => { srcOff = isExcelKept() ? new Set(['odoo']) : new Set(); };
+const resetSources = () => { srcOff = isExcelKept() ? new Set(['odoo', 'whatsapp', 'telegram', 'transfer']) : new Set(); };   // an Excel-kept account shows its Excel rows only; click a chip to see the rest
 
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
 Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.name || me.email;
   buildHeader();
-  await Promise.all([loadAccounts(), loadContacts()]);
+  await loadAccounts();   // contacts (9,000 phone numbers) load only when a Whish statement is opened
   loadPartners();
   const want = new URLSearchParams(location.search).get('id') || localStorage.getItem('acct_id') || localStorage.getItem('whish_acc');
   if (accounts.length) selectAccount(accounts.some(a => a.id === want) ? want : accounts[0].id);
@@ -296,17 +329,24 @@ async function loadAccounts() {
   sel.innerHTML = accounts.map(a => `<option value="${esc(a.id)}">${esc(label(a))}</option>`).join('')
     || '<option value="">— no account yet —</option>';
 }
+let contactsLoaded = false;
 async function loadContacts() {
+  if (contactsLoaded) return;
   contacts = {};
   for (const c of await Admin.api('GET', '/api/accounting/whish/contacts')) contacts[c.phone] = c;
+  contactsLoaded = true;
 }
 async function loadPartners() {
   try {
-    const r = await Admin.api('GET', '/api/accounting/partners');
+    // the four Odoo lists side by side (the server keeps each for ten minutes)
+    const [r, an, pl, ru] = await Promise.all([
+      Admin.api('GET', '/api/accounting/partners'),
+      Admin.api('GET', '/api/accounting/analytic').catch(() => []),
+      Admin.api('GET', '/api/accounting/analytic/plans').catch(() => []),
+      Admin.api('GET', '/api/accounting/whish/rules').catch(() => []),
+    ]);
     partners = r.partners || []; companies = r.companies || [];
-    analytic = await Admin.api('GET', '/api/accounting/analytic').catch(() => []);
-    plans = await Admin.api('GET', '/api/accounting/analytic/plans').catch(() => []);
-    rules = await Admin.api('GET', '/api/accounting/whish/rules').catch(() => []);
+    analytic = an; plans = pl; rules = ru;
     matchMemo.clear();
     if (acc) await adoptOdooFacts();   // now the partner ids can be filled in too
     buildHeader(); render();
@@ -324,7 +364,7 @@ async function selectAccount(a) {
   document.getElementById('btn-line').style.display = st ? 'none' : '';
   document.getElementById('btn-import').style.display = hasJ ? '' : 'none';
   document.getElementById('btn-months').style.display = isExcelKept() && account.odooPartner && account.odooPartner.id ? '' : 'none';
-  document.getElementById('btn-odoo').style.display = (st || hasJ) ? '' : 'none';
+  document.getElementById('btn-projects').style.display = isExcelKept() ? '' : 'none';  document.getElementById('btn-odoo').style.display = (st || hasJ) ? '' : 'none';
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
   document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
   document.getElementById('lg-src').innerHTML = st ? '<i style="background:#fff"></i>Date, service, description, amounts: the Whish statement as printed'
@@ -332,10 +372,67 @@ async function selectAccount(a) {
     : '<i style="background:#fff"></i>Lines from Odoo <span class="src">odoo</span>, HomeBudget <span class="src">budget</span>, the Excel ledger <span class="src">excel</span>, the WhatsApp group <span class="src">whatsapp</span>, typed here <span class="src">manual</span> or transfers <span class="src">transfer</span>';
   document.getElementById('empty-hint').textContent = st ? 'Export the statement as PDF from the Whish app (up to 6 months) and upload it here.'
     : hasJ ? 'Press ⇄ Import Odoo to pull the journal lines, or ＋ Line to type one.' : 'Type a line with ＋ Line, or add Odoo journals to this account with ⚙.';
-  tx = a ? await Admin.api('GET', `/api/accounting/accounts/${a}/tx`) : [];
   resetSources();
-  computeBalances();
+  if (isStatement()) { try { await loadContacts(); } catch (e) { say('Contacts not loaded: ' + e.message, 'err'); } }
+  await loadTx();
   await adoptOdooFacts();
+  render();
+}
+
+// ── What the page fetches ──
+// The grid opens on a period (this year by default) and, on an Excel-kept account, on the
+// Excel rows only. The lines before the period are summed on the server (`before`), so the
+// running balance is right without them; the sources behind the chips arrive when clicked.
+let before = null;                 // { count, net, netFromOpening, first } for the lines before the period
+let loadedSrc = null;              // null = every source is in `tx`; else the Set of sources fetched so far
+const PERIODS = { year: 'This year', y12: 'Last 12 months', y2: 'Two years', all: 'Everything' };
+let period = localStorage.getItem('acct_period') || 'year';
+if (!PERIODS[period]) period = 'year';
+function sinceOf(p) {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  if (p === 'year') return d.getFullYear() + '-01-01';
+  if (p === 'y12') { d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); }
+  if (p === 'y2') { d.setFullYear(d.getFullYear() - 2); return d.toISOString().slice(0, 10); }
+  return '';
+}
+function txUrl(srcs) {
+  const p = new URLSearchParams();
+  const s = sinceOf(period); if (s) p.set('since', s);
+  if (srcs) p.set('src', srcs.join(','));
+  const qs = p.toString();
+  return `/api/accounting/accounts/${acc}/tx${qs ? '?' + qs : ''}`;
+}
+async function loadTx() {
+  if (!acc) { tx = []; before = null; loadedSrc = null; return; }
+  const sel = document.getElementById('period'); if (sel) sel.value = period;
+  // an Excel-kept account: only the sources shown at first; the others come with their chip
+  const want = isExcelKept() ? ['excel', 'budget', 'manual'].filter(k => !srcOff.has(k)) : null;
+  const r = await Admin.api('GET', txUrl(want));
+  if (Array.isArray(r)) { tx = r; before = null; }
+  else { tx = r.tx || []; before = r.before || null; }
+  loadedSrc = want ? new Set(want) : null;
+  computeBalances();
+}
+// Make sure these sources are in `tx` (fetching the missing ones) before they are shown
+async function ensureSources(keys) {
+  if (!acc || !loadedSrc) return;
+  const missing = keys.filter(k => !loadedSrc.has(k));
+  if (!missing.length) return;
+  say('Loading ' + missing.join(', ') + ' lines…');
+  const r = await Admin.api('GET', txUrl(missing));
+  const have = new Set(tx.map(t => t.id));
+  for (const t of (Array.isArray(r) ? r : r.tx || [])) if (!have.has(t.id)) tx.push(t);
+  for (const k of missing) loadedSrc.add(k);
+  say('');
+  computeBalances();
+}
+const HIDDEN_SRCS = ['odoo', 'whatsapp', 'telegram', 'transfer'];
+async function setPeriod(p) {
+  if (!PERIODS[p]) return;
+  period = p; localStorage.setItem('acct_period', p);
+  const shown = loadedSrc ? [...loadedSrc] : null;
+  await loadTx();
+  if (shown && loadedSrc) await ensureSources(shown.filter(k => !loadedSrc.has(k)));   // keep the chips that were open
   render();
 }
 // Non-statement accounts are balanced from the opening row: the balance right before the
@@ -346,7 +443,10 @@ function computeBalances() {
   const ord = [...tx].sort(dayOrder);
   const mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
   const op = account.opening;
-  let run = op ? op.amount - ord.filter(t => t.date < op.date).reduce((s, t) => s + mv(t), 0) : 0;
+  let run;
+  if (before && op && before.netFromOpening != null) run = op.amount + before.netFromOpening;   // pinned before the period: the server added what followed
+  else if (op) run = op.amount - ord.filter(t => t.date < op.date).reduce((s, t) => s + mv(t), 0) + (before ? before.net : 0);
+  else run = before ? before.net : 0;
   for (const t of ord) { run = Math.round((run + mv(t)) * 100) / 100; t._bal = run; }
 }
 // same date: the Excel row order (the sheet's own sequence), then the id
@@ -449,6 +549,7 @@ function sugFor(t) {
   return out;
 }
 function sugState(t) {
+  if (t.excluded) return '';        // a line that is not counted (already in the Excel, or dropped) needs no partner or company
   if (!sugFor(t).any) return '';
   return t.suggestSkip ? 'skipped' : 'pending';
 }
@@ -492,7 +593,7 @@ function amountMatch(v, f) {
   return String(v).includes(f);
 }
 function passes(t) {
-  if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)))) return false;
+  if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)))) return false;
   for (const c of COLS) {
     const f = colF[c.k]; if (!f) continue;
     const v = c.v(t);
@@ -510,7 +611,7 @@ function visible() {
     if (from && t.date < from) return false;
     if (to && t.date > to) return false;
     if (reviewImported && !t.review) return false;
-    if (srcOff.has(t.src || 'manual')) return false;
+    if (srcOff.has(t.src || 'manual') && !(sugFilter === 'pending' && t.ask)) return false;   // a hidden Odoo line still surfaces while it carries a question
     if (q) {
       const hay = [t.date, t.service, t.description, t.phone, contactName(t).name, t.partnerName, companyOf(t), t.note, t.analyticName, t.ref, fmt(t.debit), fmt(t.credit), String(t.debit || t.credit)].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
@@ -597,7 +698,8 @@ function render() {
     const st = isStatement(), own = account && (account.owner || 'mario');
     const paidFlag = t.paidBy && t.paidBy !== own ? `<div class="flag" title="${esc('Physically paid by ' + cap(t.paidBy) + (t.paidBySrc === 'odoo' ? ' — read from the Odoo attachment / memo' : ''))}">⚑ paid by ${esc(cap(t.paidBy))}</div>` : '';
     const natChip = t.nature ? `<span class="src nat-${t.nature}" title="${esc({ transfer: 'Money moved between him and one of our accounts — never a bill', labour: 'His own work — booked in the month\'s bill from him, account Sub Contractor', expense: 'Unofficial spending he fronted — booked in the month\'s bill from him', refund: 'Money back from a supplier — keeps the supplier and the project', vendor: 'An official supplier: its own bill, paid through Settlement by him' }[t.nature] || '')}">${esc(t.nature)}</span>` : '';
-    const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '');
+    const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '')
+      + (t.period ? `<span class="src per-${t.period}" title="${t.period === 'old' ? 'On a statement he already received (column A of the sheet says old)' : 'Not yet on a statement — it goes on the next one (column A says new)'}">${t.period}</span>` : '');
     const isTr = t.nature === 'transfer';
     const typeCell = !isExcelKept() ? '' : t.src === 'excel'
       ? `<td class="c-type ${t.natureSrc === 'manual' ? 'src-manual' : ''}" title="${esc(TYPE_TIP[t.nature] || '')}"><select onchange="saveType('${t.id}', this.value, this)"><option value="" ${!t.nature ? 'selected' : ''}>? which type</option>${TYPES.map(k => `<option value="${k}" ${t.nature === k ? 'selected' : ''}>${k}</option>`).join('')}</select>${t.retype ? '<div class="hint" title="The type changed after this row was booked: press Rewrite on its month in Book months">↻ rebook month</div>' : ''}</td>`
@@ -616,7 +718,7 @@ function render() {
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
-        ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}</div>` : ''}
+        ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}</div>` : t.answer ? `<div class="sug-act"><span class="sug-why">Answered: ${esc(String(t.answer))}</span></div>` : ''}
         ${paidFlag}${reviewFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       ${typeCell}
@@ -669,7 +771,8 @@ function render() {
       + (only ? ` ${only} of them match no row of the Excel ledger.` : '');
     return `<a class="srctog${off ? ' off' : ''}" onclick="toggleSrc('${k}')" title="${esc(tip)}">${n} <span class="src">${k}</span>${tail}${extra}</a>`;
   }).join(' · ');
-  rc.innerHTML = tx.length ? chips + (rows.length !== tx.length ? ` · ${rows.length} shown` : '') : '';
+  const earlier = before && before.count ? ` · <a class="srctog off" onclick="setPeriod('all')" title="${esc(`${before.count} lines before ${sinceOf(period)} (from ${before.first}) are not loaded; their balance is carried. Click to load everything.`)}">+${before.count} earlier</a>` : '';
+  rc.innerHTML = tx.length ? chips + (rows.length !== tx.length ? ` · ${rows.length} shown` : '') + earlier : (earlier ? earlier.replace(/^ · /, '') : '');
   const parts = [['excel', 'Excel rows'], ['whatsapp', 'WhatsApp messages'], ['odoo', 'Odoo entries'], ['budget', 'HomeBudget rows'], ['transfer', 'transfer lines'], ['telegram', 'Telegram lines'], ['manual', 'lines typed here']]
     .filter(([k]) => bySrc[k]).map(([k, l]) => `${bySrc[k]} ${l}`);
   const hidden = tx.length - rows.length;
@@ -682,9 +785,10 @@ function render() {
   const op = account && account.opening;
   document.getElementById('totals').innerHTML =
     `<td colspan="2">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}${rows.length !== counted.length ? ` (${rows.length - counted.length} not counted)` : ''}</td>
-     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${fmt(closing())}${op ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${COLS.length - 5}"></td>`;
+     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${fmt(closing())}${op ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${COLS.length - 5}"><span id="stmtsum">${stmtSummary()}</span></td>`;
+  document.getElementById('btn-stmt').style.display = isExcelKept() && tx.some(t => t.period) ? '' : 'none';
   const rv = document.getElementById('btn-review');
-  const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => (t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)).length;
+  const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t))).length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
   rv.disabled = !waiting && sugFilter !== 'pending';
@@ -694,8 +798,49 @@ function render() {
   ck.classList.toggle('primary', reviewImported);
 }
 function growNote(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
-function toggleReviewImported() { reviewImported = !reviewImported; render(); }
-function toggleSrc(k) { if (srcOff.has(k)) srcOff.delete(k); else srcOff.add(k); render(); }
+
+// ── The statement, the way the sheet shows it ──────────────────────────────
+// Column A of the sheet says old (already on a statement he received) or new. The sheet's
+// header sums each block: old sum = what he last saw, all sum = the balance now. Its sign is
+// the sheet's: + = owed to him (مطلوب), − = he holds money of ours (واصل اضافي).
+const xlAmt = t => t.xlAmount != null ? +t.xlAmount : (t.debit || 0) - (t.credit || 0);
+const xlSum = k => tx.filter(t => t.src === 'excel' && !t.excluded && (k === 'all' || t.period === k)).reduce((s, t) => s + xlAmt(t), 0);
+const xlFmt = v => (v < -0.005 ? '$ (' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')' : '$ ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const xlWord = v => v < -0.005 ? 'واصل اضافي' : 'مطلوب';
+function stmtSummary() {
+  if (!isExcelKept() || !tx.some(t => t.period)) return '';
+  const o = xlSum('old'), n = xlSum('new'), a = xlSum('all');
+  const cell = v => `<b class="${v < -0.005 ? 'g' : ''}">${xlFmt(v)}</b>`;
+  return `<span title="As the sheet's header: old sum = the balance on the statement he last received, new sum = the rows since, all sum = the balance now. Green = he holds money of ours.">old ${cell(o)} ${xlWord(o)} · new ${cell(n)} · all ${cell(a)} ${xlWord(a)}</span>`;
+}
+function openStmt() {
+  document.getElementById('stmt').hidden = false;
+  const rows = tx.filter(t => t.src === 'excel' && !t.excluded && t.period === 'new').sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
+  const o = xlSum('old'), a = xlSum('all');
+  const own = account.owner || '';
+  const line = t => { const v = xlAmt(t); const p = String(t.partnerName || '').toLowerCase(); const self = p === own || (t.nature === 'labour'); return `<tr><td>new</td><td>${esc(dayDate(t.date))}</td><td class="n ${v < 0 ? 'g' : ''}">${xlFmt(v)}</td><td class="${self ? 'p' : ''}">${esc(t.nature === 'transfer' ? String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase() : (t.partnerName || ''))}</td><td>${esc(t.nature === 'transfer' ? '' : (t.project || t.analyticName || ''))}</td></tr>`; };
+  document.getElementById('stmt-body').innerHTML = `
+    <table class="xl">
+      <tr><td>old</td><td>sum</td><td class="n ${o < 0 ? 'g' : ''}">${xlFmt(o)}</td><td class="ar ${o < 0 ? 'g' : ''}">${xlWord(o)}</td><td class="ar">حساب قديم</td></tr>
+      <tr><td>all</td><td>sum</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar">${xlWord(a)}</td><td class="ar">حساب جديد</td></tr>
+      <tr><td colspan="5" style="border:none;height:10px"></td></tr>
+      <tr><td class="h">#</td><td class="h">date</td><td class="h">amount</td><td class="h">partner</td><td class="h">analytical account</td></tr>
+      ${rows.map(line).join('')}
+    </table>
+    <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'} since the statement he last received. Screenshot this block and send it to him — then press the button so these rows become old in the sheet (column A) and here: old sum will read ${xlFmt(a)}.</p>
+    <button class="btn primary" onclick="stmtSent()" ${rows.length ? '' : 'disabled'}>✓ Sent — mark these ${rows.length} rows old</button>`;
+}
+async function stmtSent() {
+  if (!confirm('Mark every new row of the sheet as old? Do this only after the statement was sent.')) return;
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/close-statement`, {});
+    say(`${r.rows} rows marked old in the sheet (${r.file}) and here`);
+    await reloadTx(); render();
+    document.getElementById('stmt').hidden = true;
+  } catch (e) { say('Could not close the statement: ' + e.message, 'err'); }
+}
+async function toggleReviewImported() { reviewImported = !reviewImported; if (reviewImported) await ensureSources(HIDDEN_SRCS); render(); }
+async function toggleSrc(k) { if (srcOff.has(k)) { srcOff.delete(k); await ensureSources([k]); } else srcOff.add(k); render(); }
 
 // ── Partner picker: type to filter the Odoo partners, ↑↓, Enter or click ──
 const P = {};
@@ -838,6 +983,8 @@ async function answerAsk(id, i) {
   const o = (t.ask.options || [])[i]; if (!o) return;
   const data = { ask: null };
   if (o.debit != null) data.debit = o.debit; if (o.credit != null) data.credit = o.credit; if (o.description) data.description = o.description;
+  if (o.set) Object.assign(data, o.set);                       // a decision the answer records (e.g. answer:'mine') for the follow-up run
+  if (!o.set && o.debit == null && o.credit == null) data.answer = o.label;
   try { await patch(id, data); Object.assign(t, data); computeBalances(); render(); say('Answered: ' + o.label); }
   catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
@@ -972,12 +1119,15 @@ async function skipRow(id, on) {
     say(on ? 'Suggestion skipped for this line' : 'Suggestion back');
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
-function reviewSuggestions() {
+async function reviewSuggestions() {
   sugFilter = sugFilter === 'pending' ? '' : 'pending';
+  if (sugFilter) await ensureSources(HIDDEN_SRCS);   // a hidden Odoo line surfaces here while it carries a question
   render();
   say(sugFilter ? 'Showing only the lines with a suggestion waiting — ✓ to apply, ✕ to skip' : '');
 }
-function showSkipped() { sugFilter = sugFilter === 'skipped' ? '' : 'skipped'; render(); }
+async function showSkipped() { sugFilter = sugFilter === 'skipped' ? '' : 'skipped'; if (sugFilter) await ensureSources(HIDDEN_SRCS); render(); }
+// After an import or a booking: fetch the grid again, keeping the chips that were open
+async function reloadTx() { const shown = loadedSrc ? [...loadedSrc] : null; await loadTx(); if (shown && loadedSrc) await ensureSources(shown); return tx; }
 // The only bulk action left: pending lines from the SAME number carrying the SAME
 // suggested partner and company. That is one decision applied to its own repeats, never a
 // mixed batch — accepting 161 different guesses on one click was too easy to get wrong.
@@ -1111,29 +1261,49 @@ function drawMonths() {
   };
   const mrows = months.map(m => {
     const gap = m.unmapped.length ? `<div class="hint" title="${esc(m.unmapped.map(u => u.text + ' ×' + u.rows).join(', '))}">${m.unmapped.reduce((s, u) => s + u.rows, 0)} row${m.unmapped.reduce((s, u) => s + u.rows, 0) === 1 ? '' : 's'} on a project not mapped yet → GENERAL until mapped</div>` : '';
-    return `<tr><td><b>${esc(m.month)}</b>${gap}</td>${cell(m, 'labour', m.labour, m.labourAmount)}${cell(m, 'expenses', m.expense, m.expenseAmount)}</tr>`;
+    const part = (n, a, tip) => n ? `<td class="num" title="${esc(tip)}">${fmt(a)}<div class="hint">${n} line${n === 1 ? '' : 's'}</div></td>` : '<td class="num hint">—</td>';
+    return `<tr><td><b>${esc(m.month)}</b>${gap}</td>${cell(m, 'labour', m.labour, m.labourAmount)}${part(m.benzine, m.benzineAmount, 'Fuel rows of the month — 626900 Fuel and Gas in the expenses bill')}${part(m.misc, m.miscAmount, 'Everything else he fronted — 626990 Other Expenses in the expenses bill')}${cell(m, 'expenses', m.expense, m.expenseAmount)}</tr>`;
   }).join('');
-  const prow = p => `<tr><td>${esc(p.text)}</td><td class="num hint">${p.rows}</td><td class="num">${fmt(p.amount || 0)}</td><td><input list="an-all" value="${esc(p.analyticName || '')}" placeholder="type to find the Odoo account…" style="width:100%;max-width:340px" onchange="mapProject('${esc(p.key)}', this)"> <span class="hint">${p.src === 'auto' ? 'guessed' : p.src === 'manual' ? 'chosen' : ''}</span></td></tr>`;
-  const byAmount = [...projects].sort((a, b) => (b.amount || 0) - (a.amount || 0) || b.rows - a.rows);
   document.getElementById('months-body').innerHTML = `
-    <p class="hint">Two draft bills per month <b>from ${esc(account.odooPartner.name)}</b> in S LB (journal Bills, no tax), one line per Excel row: the <b>labour</b> bill carries his days on <i>621100 Sub Contractor A</i>; the <b>expenses</b> bill carries benzine on <i>626900 Fuel and Gas</i> and the rest on <i>626990 Other Expenses</i>. Every line has an analytic account: the row's project, else the project he worked that day, else the previous one, else GENERAL. Transfers and official-vendor rows are never in these bills. Rewriting a draft replaces its lines; a posted bill is left alone.</p>
-    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Month</th><th>Labour bill — his days</th><th></th><th>Expenses bill — benzine, misc</th><th></th></tr></thead><tbody>${mrows || '<tr><td colspan="5" class="hint">No labour or expense rows to book.</td></tr>'}</tbody></table>
-    <h4 style="margin:16px 0 4px">Projects → analytic accounts ${unmapped.length ? `<span class="odoo-warn">${unmapped.length} still to map</span>` : '<span class="hint">all mapped</span>'}</h4>
-    <p class="hint">The sheet's project names, matched to Odoo's analytic accounts. Fix any of them here; the choice holds for every import and every bill after.</p>
+    <p class="hint">Two draft bills per month <b>from ${esc(account.odooPartner.name)}</b> in S LB (journal Bills, no tax), one line per Excel row: the <b>labour</b> bill carries his days on <i>621100 Sub Contractor A</i>; the <b>expenses</b> bill carries benzine on <i>626900 Fuel and Gas</i> and the rest on <i>626990 Other Expenses</i>. Every line has an analytic account: the row's project, else the project he worked that day, else the previous one, else GENERAL. Transfers and official-vendor rows are never in these bills. Rewriting a draft replaces its lines; a posted bill is left alone.${unmapped.length ? ` <span class="odoo-warn">${unmapped.length} project${unmapped.length === 1 ? '' : 's'} still to map</span> — see 🗂 Projects.` : ''}</p>
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Month</th><th>Labour bill — his days</th><th></th><th class="num">Benzine</th><th class="num">Misc</th><th>Expenses bill</th><th></th></tr></thead><tbody>${mrows || '<tr><td colspan="7" class="hint">No labour or expense rows to book.</td></tr>'}</tbody></table>`;
+}
+// ── Projects → analytic accounts, with what each project cost ──────────────
+let projectsData = null;
+async function openProjects() {
+  document.getElementById('projects').hidden = false;
+  document.getElementById('projects-title').textContent = 'Projects → analytic accounts — ' + (account ? account.name : '');
+  document.getElementById('projects-body').innerHTML = '<p class="hint">Reading the projects…</p>';
+  try { projectsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/analytic-map`); drawProjects(); }
+  catch (e) { document.getElementById('projects-body').innerHTML = `<p class="hint">Could not load: ${esc(e.message)}</p>`; }
+}
+function drawProjects() {
+  const { projects, analytics } = projectsData;
+  const unmapped = projects.filter(p => !p.analyticId);
+  const num = v => v ? fmt(v) : '<span class="hint">—</span>';
+  const prow = p => `<tr><td>${esc(p.text)}</td><td class="num hint">${p.rows}</td><td class="num">${num(p.labour)}</td><td class="num">${num(p.benzine)}</td><td class="num">${num(p.misc)}</td><td class="num">${num(p.vendor)}</td><td class="num"><b>${fmt(p.amount || 0)}</b></td><td><input list="an-all" value="${esc(p.analyticName || '')}" placeholder="type to find the Odoo account…" style="width:100%;max-width:340px" onchange="mapProject('${esc(p.key)}', this)"> <span class="hint">${p.src === 'auto' ? 'guessed' : p.src === 'manual' ? 'chosen' : ''}</span></td></tr>`;
+  const byAmount = [...projects].sort((a, b) => (b.amount || 0) - (a.amount || 0) || b.rows - a.rows);
+  const tot = k => projects.reduce((s, p) => s + (p[k] || 0), 0);
+  document.getElementById('projects-body').innerHTML = `
+    <p class="hint">The sheet's project names, matched to Odoo's analytic accounts — ${unmapped.length ? `<span class="odoo-warn">${unmapped.length} still to map</span>` : 'all mapped'}. Fix any of them here; the choice holds for every import and every bill after. The columns are what the project cost through him: <b>labour</b> his days, <b>benzine</b> fuel, <b>misc</b> the rest he fronted, <b>vendors</b> official suppliers paid by him.</p>
     <datalist id="an-all">${analytics.map(a => `<option value="${esc(a.name)}">`).join('')}</datalist>
-    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>In the sheet</th><th class="num">Rows</th><th class="num">Spent</th><th>Analytic account (Odoo)</th></tr></thead><tbody>${[...byAmount.filter(p => !p.analyticId), ...byAmount.filter(p => p.analyticId)].map(prow).join('')}</tbody></table>`;
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>In the sheet</th><th class="num">Rows</th><th class="num">Labour</th><th class="num">Benzine</th><th class="num">Misc</th><th class="num">Vendors</th><th class="num">Total</th><th>Analytic account (Odoo)</th></tr></thead>
+    <tbody>${[...byAmount.filter(p => !p.analyticId), ...byAmount.filter(p => p.analyticId)].map(prow).join('')}</tbody>
+    <tfoot><tr><td><b>All projects</b></td><td class="num hint">${tot('rows')}</td><td class="num">${fmt(tot('labour'))}</td><td class="num">${fmt(tot('benzine'))}</td><td class="num">${fmt(tot('misc'))}</td><td class="num">${fmt(tot('vendor'))}</td><td class="num"><b>${fmt(tot('amount'))}</b></td><td></td></tr></tfoot></table>`;
 }
 async function mapProject(key, sel) {
   const typed = sel.value.trim();
-  const hit = typed ? (monthsData.analytics.find(a => a.name === typed) || monthsData.analytics.find(a => a.name.toLowerCase() === typed.toLowerCase())) : null;
+  const list = (projectsData || monthsData).analytics;
+  const hit = typed ? (list.find(a => a.name === typed) || list.find(a => a.name.toLowerCase() === typed.toLowerCase())) : null;
   if (typed && !hit) { say(`No Odoo analytic account called "${typed}" — pick one from the list`, 'err'); return; }
   const id = hit ? hit.id : null, name = hit ? hit.name : '';
   sel.disabled = true;
   try {
     const r = await Admin.api('POST', '/api/accounting/analytic-map', { key, analyticId: id, analyticName: name, accountId: acc });
     say(`${id ? name : 'Unmapped'}: ${r.rowsUpdated} row${r.rowsUpdated === 1 ? '' : 's'} updated`);
-    monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths();
-    tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
+    projectsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/analytic-map`); drawProjects();
+    if (!document.getElementById('months').hidden) { monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths(); }
+    await reloadTx(); render();
   } catch (e) { say('Could not save: ' + e.message, 'err'); sel.disabled = false; }
 }
 async function bookMonth(month, part, btn) {
@@ -1142,7 +1312,7 @@ async function bookMonth(month, part, btn) {
     const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-month`, { month, part });
     say(`${month} ${part}: ${r.move} ${r.action} — ${r.rows} lines, ${fmt(r.total)}${r.inherited ? '; ' + r.inherited + ' took the day\'s project' : ''}${r.general ? '; ' + r.general + ' on GENERAL (map the project, then Rewrite)' : ''}`);
     monthsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/months`); drawMonths();
-    tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
+    await reloadTx(); render();
   } catch (e) { say('Could not book: ' + e.message, 'err'); btn.disabled = false; btn.textContent = 'Create'; }
 }
 let billsData = null;
@@ -1191,7 +1361,7 @@ async function bookLine(id) {
   const one = (r.results || [])[0] || {};
   if (one.error) throw new Error(one.error);
   await Admin.api('POST', `/api/accounting/accounts/${acc}/odoo-check`, { ids: [id] }).catch(() => {});
-  tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`);
+  await reloadTx();
   render();
   return one;
 }
@@ -1229,7 +1399,7 @@ async function checkOdoo() {
     const found = await Admin.api('POST', `/api/accounting/accounts/${acc}/odoo-check`, { ids });
     const hits = Object.values(found).filter(m => m.length).length;
     const withPartner = Object.values(found).filter(m => (m.find(x => x.chosen) || {}).partner).length;
-    tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`);   // the check may have filled partner and company
+    await reloadTx();   // the check may have filled partner and company
     computeBalances(); render();
     say(`Odoo: ${hits} of ${ids.length} lines found` + (withPartner ? `, ${withPartner} partner${withPartner > 1 ? 's' : ''} and compan${withPartner > 1 ? 'ies' : 'y'} taken from the matched payments` : ''));
   } catch (e) { say('Odoo check failed: ' + e.message, 'err'); }
@@ -1434,7 +1604,7 @@ async function saveLine() {
     if (lineEditing) await Admin.api('PATCH', `/api/accounting/accounts/${acc}/tx/${lineEditing.id}`, body);
     else await Admin.api('POST', `/api/accounting/accounts/${acc}/tx`, body);
     closeSheet('lineform');
-    tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
+    await reloadTx(); render();
     say(lineEditing ? 'Line updated' : `Added ${fmt(amt)} ${dir} on ${date}`);
   } catch (e) { document.getElementById('lineform-msg').textContent = 'Could not save: ' + e.message; }
 }
@@ -1474,7 +1644,7 @@ async function saveTransfer() {
   try {
     const r = await Admin.api('POST', '/api/accounting/transfers', body);
     closeSheet('trform');
-    tx = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx`); computeBalances(); render();
+    await reloadTx(); render();
     say(`Transfer saved: ${fmt(r.amount)} ${esc(r.fromName)} → ${esc(r.toName)}`);
   } catch (e) { document.getElementById('trform-msg').textContent = 'Could not save: ' + e.message; }
 }
