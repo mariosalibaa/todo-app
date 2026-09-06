@@ -83,6 +83,9 @@
 <script src="/admin-shared.js"></script>
 <script>
 const esc = Admin.esc;
+// 'We 2026-09-03': the weekday in front of every date, as the sheets write it
+const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const dayDate = d => /^d{4}-d{2}-d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
 const fmt = n => (n < 0 ? '−' : '') + Math.abs(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt0 = n => (n < 0 ? '−' : '') + Math.abs(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
@@ -135,7 +138,7 @@ function render() {
   document.getElementById('asof').textContent = `Balances as of now · metal prices as of ${P.asOf || '—'}${gold.importedAt ? ' · workbook read ' + gold.importedAt.slice(0, 10) : ''}`;
 
   const row = b => `<tr><td><a class="acc" href="/accounting/accounts?id=${esc(b.id)}">${esc(b.name)}</a>${b.review ? `<span class="flag" title="WhatsApp lines to review">❓ ${b.review}</span>` : ''}${!b.pinned ? '<span class="flag" title="No opening balance: summed from the first line">no opening</span>' : ''}</td>
-      <td>${esc(cap(b.owner))}</td><td class="num ${cls(b.balance)}">${fmt(b.balance)}</td><td class="muted">${b.counted}${b.lines !== b.counted ? ' <span title="not counted">(' + (b.lines - b.counted) + ')</span>' : ''}</td><td class="muted">${esc(b.last)}</td></tr>`;
+      <td>${esc(cap(b.owner))}</td><td class="num ${cls(b.balance)}">${fmt(b.balance)}</td><td class="muted">${b.counted}${b.lines !== b.counted ? ' <span title="not counted">(' + (b.lines - b.counted) + ')</span>' : ''}</td><td class="muted">${esc(dayDate(b.last))}</td></tr>`;
   const grp = (name, list) => list.length ? `<tr><td class="grp" colspan="2">${name}</td><td class="grp num ${cls(sum(list))}">${fmt(sum(list))}</td><td class="grp" colspan="2"></td></tr>` + list.sort((a, b) => a.name.localeCompare(b.name)).map(row).join('') : '';
   document.getElementById('acc-rows').innerHTML = grp('Cash', cash) + grp('Bank', bank) || '<tr><td colspan="5" class="muted">No accounts yet — create one on the Accounts page.</td></tr>';
   document.getElementById('acc-foot').innerHTML = `<tr><td colspan="2">Cash + bank</td><td class="num ${cls(sum(live))}">${fmt(sum(live))}</td><td colspan="2"></td></tr>`;

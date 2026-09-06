@@ -89,6 +89,9 @@
 <script src="/admin-shared.js"></script>
 <script>
 const esc = Admin.esc;
+// 'We 2026-09-03': the weekday in front of every date, as the sheets write it
+const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const dayDate = d => /^d{4}-d{2}-d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
 const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 let accounts = [], list = [], editing = null;
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
@@ -114,7 +117,7 @@ function render() {
   document.getElementById('grid').style.display = list.length ? '' : 'none';
   document.getElementById('empty').style.display = list.length ? 'none' : '';
   document.getElementById('rows').innerHTML = rows.map(t => `<tr>
-    <td>${esc(t.date)}</td>
+    <td>${esc(dayDate(t.date))}</td>
     <td>${accLink(t.fromId, t.fromName)}${t.fromTxId ? '<span class="linked" title="Linked to an existing line on the source account">linked</span>' : ''}</td>
     <td class="arrow">→</td>
     <td>${accLink(t.toId, t.toName)}${t.toTxId ? '<span class="linked" title="Linked to an existing line on the destination account">linked</span>' : ''}</td>

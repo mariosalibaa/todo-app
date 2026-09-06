@@ -232,6 +232,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 const esc = Admin.esc;
+// 'We 2026-09-03': the weekday in front of every date, as the sheets write it
+const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const dayDate = d => /^d{4}-d{2}-d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
 const SAME_CAP = 60;   // one number's repeats may go together; a crowd may not
@@ -606,7 +609,7 @@ function render() {
         + (t.src === 'manual' || t.src === 'telegram' ? `<a onclick="openLineForm('${t.id}')" title="Edit">✎</a>` : '')
         + (['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '');
     return `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
-      <td class="c-date">${t.date}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
+      <td class="c-date">${dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
@@ -1443,7 +1446,7 @@ function openTransferForm(id) {
   const others = accounts.filter(a => a.id !== acc);
   document.getElementById('trform-msg').textContent = '';
   document.getElementById('trform-body').innerHTML = `
-    <label>This line</label><div>${esc(t.date)} · <b>${fmt(t.debit || t.credit)}</b> ${out ? 'out of' : 'into'} ${esc(account.name)}<div class="hint">${esc(t.description || '')}</div></div>
+    <label>This line</label><div>${esc(dayDate(t.date))} · <b>${fmt(t.debit || t.credit)}</b> ${out ? 'out of' : 'into'} ${esc(account.name)}<div class="hint">${esc(t.description || '')}</div></div>
     <label>${out ? 'Goes to' : 'Comes from'}</label><select id="tf-other">${others.map(a => `<option value="${esc(a.id)}">${esc(a.name)} (${esc(a.currency)})</option>`).join('')}</select>
     <label>Note</label><input id="tf-note" placeholder="optional">
     <label></label><div class="hint">A counter-line is written on the other account (unless you link an existing one from the Transfers page). Neither side counts as income or expense.</div>`;
