@@ -118,6 +118,9 @@
   .nat-transfer{color:var(--green);border-color:var(--green);} .nat-refund{color:#b8860b;border-color:#b8860b;} .nat-labour{color:var(--odoo);border-color:var(--odoo);} .nat-vendor{color:#b8860b;border-color:#b8860b;} .nat-expense{color:#6c757d;}
   .months td,.months th{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top;} .months th{text-align:left;font-size:12px;color:#495057;} .months .num{text-align:right;font-variant-numeric:tabular-nums;}
   .sug-why{font-size:10.5px;color:var(--auto);font-style:italic;margin-right:4px;}
+  .c-type{width:96px;} .c-type select{width:100%;}
+  .locked{color:var(--muted);}
+  .noteline{margin-top:1px;} .note-in{border:none;background:transparent;color:#0d6efd;font-size:12px;width:100%;padding:0;font-family:inherit;} .note-in::placeholder{color:transparent;} tr:hover .note-in::placeholder{color:#adb5bd;} .note-in:focus{outline:none;border-bottom:1px solid #0d6efd;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
   .c-paid{width:110px;}
@@ -243,22 +246,24 @@ const isCash = () => !!(account && account.type === 'cash');
 // `only` limits a column to one account type: who physically paid matters for a wallet, not for a bank.
 const ALL_COLS = [
   { k: 'date',    l: 'Date / ref',            f: 'text',   v: t => t.date + ' ' + (t.ref || ''), c: 'c-date' },
-  { k: 'desc',    l: 'Description',           f: 'text',   v: t => [t.service, t.description, contactName(t).name].filter(Boolean).join(' '), c: 'c-desc' },
+  { k: 'desc',    l: 'Description',           f: 'text',   v: t => [t.service, t.description, contactName(t).name, t.note].filter(Boolean).join(' '), c: 'c-desc' },
+  { k: 'type',    l: 'Type',                  f: 'select', v: t => t.nature || '', c: 'c-type', only: 'ledger' },
   { k: 'out',     l: 'Debit',                 f: 'amount', v: t => t.debit || 0, num: true },
   { k: 'in',      l: 'Credit',                f: 'amount', v: t => t.credit || 0, num: true },
   { k: 'bal',     l: 'Balance',               f: 'amount', v: t => isStatement() ? t.balance : t._bal, num: true },
   { k: 'partner', l: 'Partner / cash',        f: 'text',   v: t => t.partnerName || '', c: 'c-partner' },
   { k: 'company', l: 'Company',               f: 'select', v: t => companyOf(t), c: 'c-company' },
   { k: 'proj',    l: 'Analytic (Odoo)',       f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
-  { k: 'note',    l: 'Note',                  f: 'text',   v: t => t.note || '', c: 'c-note' },
   { k: 'odoo',    l: 'Odoo',                  f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length },
 ];
 let COLS = ALL_COLS.filter(c => !c.only);
-function buildCols() { COLS = ALL_COLS.filter(c => !c.only || (account && c.only === account.type)); }
+function buildCols() { COLS = ALL_COLS.filter(c => !c.only || (account && c.only === account.type) || (c.only === 'ledger' && isExcelKept())); }
 let sort = { k: 'date', dir: -1 };            // newest first, like an Odoo bank statement
 let colF = {};                                // column filters, key → string
 let sugFilter = '';                           // '' | 'pending' | 'skipped' — the Review button
 let reviewImported = false;                   // the ❓ button: only WhatsApp lines nobody wrote down elsewhere
+const TYPES = ['transfer', 'labour', 'expense', 'vendor', 'refund'];
+const TYPE_TIP = { transfer: 'Money moved between him and one of our accounts — never a bill, no project', labour: 'His own work — the month\'s labour bill from him', expense: 'Unofficial spending he fronted — the month\'s expenses bill', vendor: 'An official supplier: its own bill, settled by him', refund: 'Money back from a supplier — keeps the supplier and the project' };
 let srcOff = new Set();                       // sources hidden by clicking their chip in the count
 const isExcelKept = () => !!(account && account.excel && account.excel.file);
 // every source starts shown — clicking its name in the count is what hides it
@@ -454,7 +459,7 @@ function buildHeader() {
         <option value="">all</option><option value="found" ${colF[c.k] === 'found' ? 'selected' : ''}>found</option>
         <option value="none" ${colF[c.k] === 'none' ? 'selected' : ''}>not found</option><option value="unchecked" ${colF[c.k] === 'unchecked' ? 'selected' : ''}>unchecked</option></select></th>`;
     if (c.f === 'select') {
-      const vals = c.k === 'company' ? ['Personal', ...companies.map(x => x.name)] : c.k === 'paidby' ? PEOPLE : [...new Set(tx.map(c.v))].filter(Boolean).sort();
+      const vals = c.k === 'company' ? ['Personal', ...companies.map(x => x.name)] : c.k === 'type' ? TYPES : c.k === 'paidby' ? PEOPLE : [...new Set(tx.map(c.v))].filter(Boolean).sort();
       return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)"><option value="">all</option>${vals.map(v => `<option ${colF[c.k] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}<option value="__unset" ${colF[c.k] === '__unset' ? 'selected' : ''}>not set</option></select></th>`;
     }
     return '<th></th>';
@@ -582,7 +587,11 @@ function render() {
     const st = isStatement(), own = account && (account.owner || 'mario');
     const paidFlag = t.paidBy && t.paidBy !== own ? `<div class="flag" title="${esc('Physically paid by ' + cap(t.paidBy) + (t.paidBySrc === 'odoo' ? ' — read from the Odoo attachment / memo' : ''))}">⚑ paid by ${esc(cap(t.paidBy))}</div>` : '';
     const natChip = t.nature ? `<span class="src nat-${t.nature}" title="${esc({ transfer: 'Money moved between him and one of our accounts — never a bill', labour: 'His own work — booked in the month\'s bill from him, account Sub Contractor', expense: 'Unofficial spending he fronted — booked in the month\'s bill from him', refund: 'Money back from a supplier — keeps the supplier and the project', vendor: 'An official supplier: its own bill, paid through Settlement by him' }[t.nature] || '')}">${esc(t.nature)}</span>` : '';
-    const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '') + (t.src === 'excel' ? natChip : '');
+    const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '');
+    const isTr = t.nature === 'transfer';
+    const typeCell = !isExcelKept() ? '' : t.src === 'excel'
+      ? `<td class="c-type ${t.natureSrc === 'manual' ? 'src-manual' : ''}" title="${esc(TYPE_TIP[t.nature] || '')}"><select onchange="saveType('${t.id}', this.value, this)"><option value="" ${!t.nature ? 'selected' : ''}>—</option>${TYPES.map(k => `<option value="${k}" ${t.nature === k ? 'selected' : ''}>${k}</option>`).join('')}</select>${t.retype ? '<div class="hint" title="The type changed after this row was booked: press Rewrite on its month in Book months">↻ rebook month</div>' : ''}</td>`
+      : `<td class="c-type hint">${esc(t.nature || '')}</td>`;
     const onlyFlag = t.src === 'odoo' && t.odooOnly && t.excluded ? `<div class="flag" title="Booked in Odoo on this person's cash journal, but no row of the Excel ledger matches it. Not counted: the Excel is the account.">🟣 not in Excel</div>` : '';
     const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
     const acts = st ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>`
@@ -596,8 +605,10 @@ function render() {
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${esc(t.description)}</div>
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
+        ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><input class="note-in" value="${esc(t.note)}" onchange="saveField('${t.id}', 'note', this.value, this)"></div>` : '') : `<div class="noteline"><input class="note-in" value="${esc(t.note || '')}" placeholder="add note" onchange="saveField('${t.id}', 'note', this.value, this)"></div>`}
         ${paidFlag}${reviewFlag}${onlyFlag}${t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
+      ${typeCell}
       <td class="num debit">${fmt(t.debit)}</td>
       <td class="num credit">${fmt(t.credit)}</td>
       <td class="num">${fmt(st ? t.balance : t._bal)}</td>
@@ -605,10 +616,10 @@ function render() {
         <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : 'partner'}"
           oninput="pickFilter('pp-${t.id}')" onkeydown="pickKey(event,'pp-${t.id}')" onblur="pickBlur('pp-${t.id}')">
           <input type="hidden" id="pp-${t.id}" value="${esc(t.partnerId || '')}" data-row="${t.id}"><div class="pick-list" id="pp-${t.id}-list"></div></div>
-        ${(() => { const w = t.odoo && (t.odoo.matches || []).find(x => x.chosen); return w && w.partner && t.partnerSrc !== 'odoo' && similarity(w.partner, t.partnerName || '') < 0.95 ? `<div class="odoo-partner" title="The partner on the Odoo entry this row matches">${esc(w.partner)}</div>` : ''; })()}
+        ${(() => { const w = t.odoo && (t.odoo.matches || []).find(x => x.chosen); return w && w.partner && (t.nature === 'vendor' || t.nature === 'refund' || !t.nature) && t.partnerSrc !== 'odoo' && similarity(w.partner, t.partnerName || '') < 0.95 ? `<div class="odoo-partner" title="The partner on the Odoo entry this row matches">${esc(w.partner)}</div>` : ''; })()}
         ${t.partnerKind === 'cash' ? `<a class="ptag cash" href="/accounting/accounts?id=${esc(t.cashAccountId || '')}" title="One of our own accounts — this row is a transfer">cash</a>` : t.partnerKind === 'partner' ? '<span class="ptag" title="An Odoo partner">partner</span>' : ''}
       </td>
-      <td class="c-company ${srcClass(co ? (t.companySrc || (t.kind ? t.kindSrc : '') || 'manual') : '')}"><select onchange="saveCompany('${t.id}', this.value, this)">
+      ${isTr ? `<td class="c-company"><span class="locked" title="A transfer between our own accounts: S LB by rule">${esc(co || 'S LB')}</span></td>` : `<td class="c-company ${srcClass(co ? (t.companySrc || (t.kind ? t.kindSrc : '') || 'manual') : '')}"><select onchange="saveCompany('${t.id}', this.value, this)">
         <option value="" ${!co ? 'selected' : ''}>${sg.company && !t.suggestSkip ? '↳ ' + esc(sg.company) + '?' : '—'}</option>
         <option ${co === 'Personal' ? 'selected' : ''}>Personal</option>
         ${companies.map(x => `<option ${co === x.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
@@ -619,15 +630,14 @@ function render() {
               return `<div class="sug-act"><button class="yes" title="Apply to this line only: ${esc(sugTxt)}" onclick="acceptRow('${t.id}')">✓</button><button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button>${n > 1 ? (n > SAME_CAP
                 ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
                 : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : ''}
-      </td>
-            <td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : t.analyticSrc === 'manual' ? 'Chosen by hand' : t.analyticSrc === 'excel' ? esc(t.projectFrom ? 'No project on this row: taken from the ' + t.projectFrom + (t.project ? ' (' + t.project + ')' : '') : 'The project written in the sheet' + (t.project ? ': ' + t.project : '')) : ''}">
+      </td>`}
+            ${isTr ? `<td class="c-proj"><span class="locked" title="A transfer has no project — change the type to give it one">—</span></td>` : `<td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : t.analyticSrc === 'manual' ? 'Chosen by hand' : t.analyticSrc === 'excel' ? esc(t.projectFrom ? 'No project on this row: taken from the ' + t.projectFrom + (t.project ? ' (' + t.project + ')' : '') : 'The project written in the sheet' + (t.project ? ': ' + t.project : '')) : ''}">
         <div class="pick"><input type="text" id="an-${t.id}-txt" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="analytic"
           oninput="anFilter('an-${t.id}')" onkeydown="anKey(event,'an-${t.id}')" onblur="anBlur('an-${t.id}')">
           <input type="hidden" id="an-${t.id}" value="${esc(t.analyticId || '')}" data-row="${t.id}"><div class="pick-list" id="an-${t.id}-list"></div></div>
         <div class="plan" id="an-${t.id}-plan">${esc(planOf(t.analyticId))}</div>
         ${t.projectFrom && t.analyticName && t.analyticSrc !== 'manual' ? `<div class="sug-act" title="${esc('Not written in the sheet: taken from the ' + t.projectFrom + '. ✓ keeps it, ✕ clears it so you pick one.')}"><span class="sug-why">from the ${esc(t.projectFrom)}</span> <button class="yes" onclick="confirmAnalytic('${t.id}', true)">✓</button><button class="no" onclick="confirmAnalytic('${t.id}', false)">✕</button></div>` : ''}
-      </td>
-      <td class="c-note ${srcClass(t.note ? (t.noteSrc || 'manual') : '')}"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
+      </td>`}
       <td>${odooCell(t)}</td>
     </tr>`;
   }).join('');
@@ -801,6 +811,14 @@ async function saveField(id, field, value, el) {
 }
 // An analytic account has to be one Odoo really has, or the booking later cannot use it.
 // Anything else snaps back to what was there before.
+// the type of a row decides what booking does with it; a transfer drops its project and sits in S LB
+async function saveType(id, v, el) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const data = { nature: v, natureSrc: 'manual', partnerKind: v === 'transfer' ? 'cash' : 'partner', retype: !!t.bookedMove };
+  if (v === 'transfer') Object.assign(data, { analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '', projectFrom: '', company: 'S LB', companySrc: 'excel' });
+  try { await patch(id, data); Object.assign(t, data); render(); say(`Type: ${v}${data.retype ? ' — press Rewrite on its month in Book months' : ''}`); }
+  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
 // an inherited analytic: keep it as a choice, or clear it so a person picks one
 async function confirmAnalytic(id, keep) {
   const t = tx.find(x => x.id === id); if (!t) return;

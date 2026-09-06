@@ -212,7 +212,7 @@ async function bookMonth(ctx, account, month, part, who, opts) {
   const total = money(rows.reduce((s, t) => s + t.debit, 0));
   const at = now();
   const writes = lines.map(l => ({ ref: col.doc(l.t.id), data: {
-    bookedMove: { id: moveId, name: moveName, ref, month, part, at, state },
+    bookedMove: { id: moveId, name: moveName, ref, month, part, at, state }, retype: false,
     ref: moveName, service: SLB.company,
     company: SLB.company, companySrc: 'odoo', kind: l.t.kind || 'work', kindSrc: l.t.kindSrc || 'odoo',
     partnerId: +partner.id,
