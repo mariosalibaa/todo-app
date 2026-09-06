@@ -80,8 +80,10 @@ const LAYOUTS = {
       const dayOf = x => x === 70 ? 'day with son' : x === 50 ? 'day alone' : x === 25 ? 'half day' : x === 35 ? 'half day with son' : 'work';
       const desc = isPay ? ['received', str(r[7]) && str(r[7]) !== own ? 'from ' + str(r[7]) : '', label].filter(Boolean).join(' ') || 'received'
         : self && !label ? 'Abed · ' + dayOf(a) : [partner, label].filter(Boolean).join(' · ') || 'expense';
+      // money he received: the payer is column G when column D only says "abed"
+      const payer = isPay ? ((self || !partner) ? (str(r[7]) || 'mario') : partner) : partner;
       return [OWNED(a, desc, /^payment$/i.test(an) ? '' : an, isPay ? 'transfer' : self ? 'labour' : '',
-        { partner: partner || (isPay ? 'mario' : ''), ...(self && !isPay ? { withSon: a === 70 || a === 35 } : {}) })]; } },
+        { partner: payer, ...(self && !isPay ? { withSon: a === 70 || a === 35 } : {}) })]; } },
   // A status | B date | C amount | D account (person / vendor) | E vendor bill | F project | G note
   georges: { sheet: 'Georges', date: 2, status: 1, owner: 'georges',
     rows: (r, own) => { const a = num(r[3]);
@@ -240,7 +242,7 @@ async function importExcel(ctx, account, who) {
       Object.assign(data, e && e.id ? { analyticName: e.name, analyticId: e.id, analyticSrc: 'excel' } : { analyticName: project || '', analyticId: null, analyticSrc: project ? 'excel' : '' });
     }
     // a row already booked into a monthly bill keeps that link whatever else changes
-    if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; if (prev.company) { data.company = prev.company; data.companySrc = 'odoo'; } }
+    if (prev.bookedMove) { data.bookedMove = prev.bookedMove; data.ref = prev.ref; data.service = prev.service; data.odoo = prev.odoo; if (prev.company) { data.company = prev.company; data.companySrc = 'odoo'; } if (prev.fileIds) { data.fileIds = prev.fileIds; data.files = prev.files || []; } }
     // money he was handed is not an expense of any company but the one that holds his account
     // money handed to him and everything unofficial live in S LB; an official vendor's bill is the SARL's until Odoo says otherwise
     const co = nature === 'transfer' || nature === 'labour' || nature === 'expense' ? 'S LB' : nature === 'vendor' || nature === 'refund' ? 'SHIFT GROUP SARL (USD)' : '';
