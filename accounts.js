@@ -232,7 +232,7 @@ async function importOdoo(odooCall, account, who) {
         t.excluded = true;
         // the settlement's own entry names the row it settles ("… - ABEDCASH-xl-…")
         const byRef = String([m.ref, m.narration, p && p.memo, lineName].join(' ')).match(new RegExp(account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '') + '-(xl-[\\w-]+)'));
-        const fromRow = madeFrom[m.id] || (byRef && byRef[1]);
+        const fromRow = madeFrom[m.id] || (byRef && byRef[1].replace(/-(sarl|slb)$/, ''));   // a payment split between the companies carries a suffix
         t.tiedBy = '';
         if (fromRow) { t.dupOf = fromRow; t.dupSrc = 'auto'; t.odooOnly = false; t.tiedBy = madeFrom[m.id] ? 'made' : 'ref'; }
         else if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; }
