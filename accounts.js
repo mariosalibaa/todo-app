@@ -64,7 +64,7 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId'];
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom'];
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 
@@ -211,7 +211,7 @@ async function importOdoo(odooCall, account, who) {
         odoo: { checkedAt: now(), matches: [{
           chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: l.debit || l.credit,
           partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
-          company: j.company, journal: j.name, state: l.parent_state, docs, docIds: Object.fromEntries(bills.map(b => [b.name, b.id])), analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
+          company: j.company, journal: j.name, state: l.parent_state, docs, docIds: Object.fromEntries(bills.map(b => [b.name, b.id])), odooRef: (p && p.memo) || m.ref || '', analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
         }] },
       };
       if (counterparty && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: counterparty[0], partnerName: counterparty[1], partnerSrc: 'odoo' });

@@ -25,7 +25,7 @@ const SLB = { companyId: 7, company: 'S LB', journalId: 85, journal: 'Bills',
   accounts: { labour: 6026, fuel: 5983, other: 6072 }, accountNames: { 6026: '621100 Sub Contractor A', 5983: '626900 Fuel And Gas', 6072: '626990 Other Expenses' } };
 const isFuel = t => /benzin|fuel|mazout|gasoil|diesel|tank/i.test(t || '');
 const PEOPLE_CASH = { mario: 'mario-cash', abed: 'abed-cash', georges: 'georges-cash', ziad: 'ziad-cash', mitri: 'mitri-cash', khodr: 'khodr-cash', khoder: 'khodr-cash' };
-const VENDOR_WORDS = /attal|tchagh|solaris|khoury|kbm|khc|njk|\bsec\b|simon|narinco|medco|electromec|metaleo|phoenix|astro|mecano|ayoub|karam|mousawi|hamdan|armco|richani|isf tanks|linkifi|pharmac|sakr|fuser|coil/i;
+const VENDOR_WORDS = /attal|tchagh|solaris|khoury|kbm|khc|njk|\bsec\b|simon|narinco|medco|electromec|metaleo|phoenix|astro|mecano|ayoub|karam|mousawi|hamdan|armco|linkifi|pharmac|sakr|fuser/i;
 
 // What a row is. `partnerRaw` is the sheet's own word for the counterparty.
 function natureOf({ credit, kind, partnerRaw, owner }) {

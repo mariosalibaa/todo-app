@@ -117,6 +117,7 @@
   .ptag{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-top:2px;text-decoration:none;} a.ptag.cash{color:var(--green);border-color:var(--green);}
   .nat-transfer{color:var(--green);border-color:var(--green);} .nat-refund{color:#b8860b;border-color:#b8860b;} .nat-labour{color:var(--odoo);border-color:var(--odoo);} .nat-vendor{color:#b8860b;border-color:#b8860b;} .nat-expense{color:#6c757d;}
   .months td,.months th{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top;} .months th{text-align:left;font-size:12px;color:#495057;} .months .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .sug-why{font-size:10.5px;color:var(--auto);font-style:italic;margin-right:4px;}
   .src{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:1px;letter-spacing:.02em;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
   .c-paid{width:110px;}
@@ -478,7 +479,7 @@ function amountMatch(v, f) {
   return String(v).includes(f);
 }
 function passes(t) {
-  if (sugFilter && sugState(t) !== sugFilter) return false;
+  if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && t.projectFrom && t.analyticName && t.analyticSrc !== 'manual')) return false;
   for (const c of COLS) {
     const f = colF[c.k]; if (!f) continue;
     const v = c.v(t);
@@ -550,7 +551,9 @@ function odooCell(t) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
     const differs = t.src !== 'excel' && t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
     const docs = [...new Set((win.docs || []).filter(d => d && d !== win.move))];
+    const oref = (t.bookedMove && t.bookedMove.ref) || win.odooRef || '';
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
+      + (oref && oref !== win.move ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(oref)}</div>` : '')
       + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => win.docIds && win.docIds[d] ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${win.docIds[d]}">${esc(d)}</a>` : esc(d)).join(', ')}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
@@ -622,6 +625,7 @@ function render() {
           oninput="anFilter('an-${t.id}')" onkeydown="anKey(event,'an-${t.id}')" onblur="anBlur('an-${t.id}')">
           <input type="hidden" id="an-${t.id}" value="${esc(t.analyticId || '')}" data-row="${t.id}"><div class="pick-list" id="an-${t.id}-list"></div></div>
         <div class="plan" id="an-${t.id}-plan">${esc(planOf(t.analyticId))}</div>
+        ${t.projectFrom && t.analyticName && t.analyticSrc !== 'manual' ? `<div class="sug-act" title="${esc('Not written in the sheet: taken from the ' + t.projectFrom + '. ✓ keeps it, ✕ clears it so you pick one.')}"><span class="sug-why">from the ${esc(t.projectFrom)}</span> <button class="yes" onclick="confirmAnalytic('${t.id}', true)">✓</button><button class="no" onclick="confirmAnalytic('${t.id}', false)">✕</button></div>` : ''}
       </td>
       <td class="c-note ${srcClass(t.note ? (t.noteSrc || 'manual') : '')}"><input type="text" value="${esc(t.note || '')}" placeholder="note" data-f="note" onchange="saveField('${t.id}', 'note', this.value, this)"></td>
       <td>${odooCell(t)}</td>
@@ -659,7 +663,7 @@ function render() {
     `<td colspan="2">${rows.length} line${rows.length === 1 ? '' : 's'}${rows.length !== tx.length ? ' of ' + tx.length : ''}${rows.length !== counted.length ? ` (${rows.length - counted.length} not counted)` : ''}</td>
      <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${fmt(closing())}${op ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${COLS.length - 5}"></td>`;
   const rv = document.getElementById('btn-review');
-  const waiting = tx.filter(t => sugState(t) === 'pending').length;
+  const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => t.projectFrom && t.analyticName && t.analyticSrc !== 'manual').length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
   rv.disabled = !waiting && sugFilter !== 'pending';
@@ -797,6 +801,13 @@ async function saveField(id, field, value, el) {
 }
 // An analytic account has to be one Odoo really has, or the booking later cannot use it.
 // Anything else snaps back to what was there before.
+// an inherited analytic: keep it as a choice, or clear it so a person picks one
+async function confirmAnalytic(id, keep) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const data = keep ? { analyticSrc: 'manual', projectFrom: '' } : { analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '', projectFrom: '' };
+  try { await patch(id, data); Object.assign(t, data); render(); say(keep ? 'Analytic kept' : 'Analytic cleared — pick one on the row'); }
+  catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
 async function saveAnalytic(id, a, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
   const data = a ? { analyticId: a.id, analyticName: a.name, analyticSrc: 'manual', analyticFrom: '' }
