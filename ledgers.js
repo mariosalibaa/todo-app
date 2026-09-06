@@ -130,8 +130,8 @@ const LAYOUTS = {
       const note = str(r[11]), project = str(r[12]);
       const nameIn = t => (String(t || '').match(/from\s+([a-z]+)/i) || [])[1] || '';
       if (wage) out.push(OWNED(wage, `${h ? h + ' h' : 'labour'}${str(r[5]) ? ' ' + str(r[5]) : ''}${num(r[6]) ? ' ' + num(r[6]) + ' km' : ''}${note && !exp && !rec ? ' · ' + note : ''}`, project, 'labour', { hours: h, partner: 'mitri', raw: exact(r[7]) + exact(r[8]) }));
-      if (exp) out.push(OWNED(exp, note || 'expense', project, '', { partner: note.replace(/\d+[.,]?\d*\s*\$?/g, '').trim().slice(0, 40) }));
-      if (rec) out.push(OWNED(rec, rec < 0 ? (note || 'received') : (note || 'bonus'), project, rec < 0 ? 'transfer' : '', { partner: rec < 0 ? (nameIn(note) || 'mario') : 'mitri' }));
+      if (exp) out.push(OWNED(exp, note || 'expense', project, '', { partner: note.replace(/\d+[.,]?\d*\s*\$?/g, '').trim().slice(0, 40), raw: exact(r[9]) }));
+      if (rec) out.push(OWNED(rec, rec < 0 ? (note || 'received') : (note || 'bonus'), project, rec < 0 ? 'transfer' : '', { partner: rec < 0 ? (nameIn(note) || 'mario') : 'mitri', raw: exact(r[10]) }));
       return out; } },
   // A status | B date | C amount (+ in, − out) | D label | E project | F type | G account | H account2
   ziad: { sheet: 'accounting', date: 2, status: 1, amountCol: 3, owner: 'ziad',
@@ -307,7 +307,10 @@ async function importExcel(ctx, account, who) {
     // money out = what he spent it on, as the sheet writes it
     const raw = String(r.partner || '').trim().toLowerCase();
     const partnerName = credit && !/attal|tchagh|solaris|khoury|kbm|khc|njk|narinco|medco|electromec|metaleo/i.test(raw) ? (CASH_OF[raw] || titled(r.partner) || 'Mario cash') : titled(r.partner);
-    const vendorInLabel = raw === (lay.owner === 'khodr' ? 'khoder' : lay.owner) && /attal|tchagh|solaris|khoury|kbm|khc|njk|narinco|medco|electromec|metaleo|epoxy|steel|paint|laser/i.test(r.description || '');
+    // "abed · attal": his own name against a supplier's word is a vendor ticket, not a day —
+    // but only on a row that is not a day at all. Mitri writes his route in the note ("… Attal
+    // garage mckinzy …"), and a row with hours on it stays his labour (Mario, 2026-09-06).
+    const vendorInLabel = raw === (lay.owner === 'khodr' ? 'khoder' : lay.owner) && !r.hours && /attal|tchagh|solaris|khoury|kbm|khc|njk|narinco|medco|electromec|metaleo|epoxy|steel|paint|laser/i.test(r.description || '');
     const nat = bills.natureOf({ credit, kind: vendorInLabel ? '' : r.kind, partnerRaw: vendorInLabel ? String(r.description).replace(/^abeds*·s*/i, '') : raw, owner: lay.owner === 'khodr' ? 'khoder' : lay.owner });
     if (vendorInLabel) { r.kind = ''; }
     return { id, src: 'excel', date: r.date, ref: '', service: 'Excel', phone: '', description: r.description, debit, credit,

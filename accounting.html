@@ -519,13 +519,18 @@ async function setPeriod(p) {
 function computeBalances() {
   if (!account || isStatement()) return;
   const ord = [...tx].sort(dayOrder);
-  const mv = t => t.excluded ? 0 : (t.credit || 0) - (t.debit || 0);
+  // an Excel row moves the balance by the sheet's own figure, not by the rounded cents it is
+  // booked with: the running balance and the closing then read exactly like the sheet's header
+  // (Mitri's hours × rate land on half-cents; the difference lives in one Odoo rounding entry)
+  const mv = t => t.excluded ? 0 : t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0);
   const op = account.opening;
   let run;
   if (before && op && before.netFromOpening != null) run = op.amount + before.netFromOpening;   // pinned before the period: the server added what followed
   else if (op) run = op.amount - ord.filter(t => t.date < op.date).reduce((s, t) => s + mv(t), 0) + (before ? before.net : 0);
   else run = before ? before.net : 0;
-  for (const t of ord) { run = Math.round((run + mv(t)) * 100) / 100; t._bal = run; }
+  // add at full precision and round only what is shown: rounding every step would drift a cent
+  // per half-cent row (Mitri's 621 rows drifted 7 cents that way)
+  for (const t of ord) { run += mv(t); t._bal = Math.round(run * 100) / 100; }
 }
 // same date: the Excel row order (the sheet's own sequence), then the id
 const dayOrder = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : ((a.excelRow || 0) - (b.excelRow || 0)) || String(a.id).localeCompare(String(b.id));
