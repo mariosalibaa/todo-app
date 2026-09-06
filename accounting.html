@@ -168,7 +168,7 @@
 </div>
 <div class="bar">
   <select id="acc" onchange="selectAccount(this.value)"></select>
-  <select id="period" onchange="setPeriod(this.value)" title="Which lines to load. Earlier lines are summed into the opening balance, not shown."><option value="year">This year</option><option value="y12">Last 12 months</option><option value="y2">Two years</option><option value="all">Everything</option></select>
+  <select id="period" onchange="setPeriod(this.value)" title="Which lines to load. Earlier lines are summed into the opening balance, not shown."><option value="m">This month</option><option value="m3">Last 3 months</option><option value="year">This year</option><option value="y12">Last 12 months</option><option value="y2">Two years</option><option value="all">Everything</option></select>
   <button class="btn" onclick="openAccountForm()" title="Create a cash or bank account">＋</button>
   <button class="btn" id="btn-edit" onclick="openAccountForm(account)" title="Account settings: opening balance, Odoo journals, imports">⚙</button>
   <input type="date" id="from" onchange="render()" title="From">
@@ -385,29 +385,53 @@ async function selectAccount(a) {
 // running balance is right without them; the sources behind the chips arrive when clicked.
 let before = null;                 // { count, net, netFromOpening, first } for the lines before the period
 let loadedSrc = null;              // null = every source is in `tx`; else the Set of sources fetched so far
-const PERIODS = { year: 'This year', y12: 'Last 12 months', y2: 'Two years', all: 'Everything' };
-let period = localStorage.getItem('acct_period') || 'year';
-if (!PERIODS[period]) period = 'year';
+const PERIODS = { m: 'This month', m3: 'Last 3 months', year: 'This year', y12: 'Last 12 months', y2: 'Two years', all: 'Everything' };
+let period = localStorage.getItem('acct_period') || 'm3';
+if (!PERIODS[period]) period = 'm3';
 function sinceOf(p) {
   const d = new Date(); d.setHours(0, 0, 0, 0);
+  if (p === 'm') return d.toISOString().slice(0, 8) + '01';
+  if (p === 'm3') { d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10); }
   if (p === 'year') return d.getFullYear() + '-01-01';
   if (p === 'y12') { d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); }
   if (p === 'y2') { d.setFullYear(d.getFullYear() - 2); return d.toISOString().slice(0, 10); }
   return '';
 }
-function txUrl(srcs) {
+function txUrl(srcs, id, per) {
   const p = new URLSearchParams();
-  const s = sinceOf(period); if (s) p.set('since', s);
+  const s = sinceOf(per || period); if (s) p.set('since', s);
   if (srcs) p.set('src', srcs.join(','));
   const qs = p.toString();
-  return `/api/accounting/accounts/${acc}/tx${qs ? '?' + qs : ''}`;
+  return `/api/accounting/accounts/${id || acc}/tx${qs ? '?' + qs : ''}`;
 }
+// Which sources this account was showing last time, so the fetch below can be started
+// before the account record is known ('*' = every source).
+const SRC_KEY = id => 'acct_src_' + id;
+// The grid's own fetch, started while the sign-in is still going. The account, the period
+// and the sources are all known from the URL and this device's last visit, and the stored
+// session token is enough to ask — so the lines travel during the ~2 s that
+// /api/config → /api/me → /api/accounting/accounts used to cost before the grid even began.
+let prefetch = null;
+(() => {
+  try {
+    const id = new URLSearchParams(location.search).get('id') || localStorage.getItem('acct_id') || localStorage.getItem('whish_acc');
+    const tok = localStorage.getItem('todo_session');
+    const src = id && localStorage.getItem(SRC_KEY(id));
+    if (!id || !tok || !src) return;   // never opened here before: no guess to make, ask the normal way
+    const url = txUrl(src === '*' ? null : src.split(','), id);
+    prefetch = { url, promise: fetch(url, { headers: { Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null).catch(() => null) };
+  } catch {}
+})();
 async function loadTx() {
   if (!acc) { tx = []; before = null; loadedSrc = null; return; }
   const sel = document.getElementById('period'); if (sel) sel.value = period;
   // an Excel-kept account: only the sources shown at first; the others come with their chip
   const want = isExcelKept() ? ['excel', 'budget', 'manual'].filter(k => !srcOff.has(k)) : null;
-  const r = await Admin.api('GET', txUrl(want));
+  const url = txUrl(want);
+  try { localStorage.setItem(SRC_KEY(acc), want ? want.join(',') : '*'); } catch {}
+  let r = prefetch && prefetch.url === url ? await prefetch.promise : null;
+  prefetch = null;                                   // one shot: from here the grid asks for itself
+  if (!r) r = await Admin.api('GET', url);
   if (Array.isArray(r)) { tx = r; before = null; }
   else { tx = r.tx || []; before = r.before || null; }
   loadedSrc = want ? new Set(want) : null;

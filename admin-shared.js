@@ -72,9 +72,10 @@
   }
 
   // true = the request was answered (allowed, no-app, or not-approved screen shown)
-  async function tryMe(onReady) {
+  async function tryMe(onReady, pre) {
     try {
-      const me = await A.api('GET', '/api/me');
+      const me = pre ? await pre : await A.api('GET', '/api/me');
+      if (me instanceof Error) throw me;
       A.me = me;
       if (A.app && !(me.apps || []).includes(A.app)) {
         overlay(card(`${esc(me.email)} is signed in but has no access to <b>${esc(A.app)}</b> yet. Ask Mario to enable it.`, false,
@@ -98,6 +99,9 @@
   A.require = function (app, onReady) {
     A.app = app;
     (async () => {
+      // with a session already stored, ask who it is at the same time as the config —
+      // one round trip instead of two before the page can start loading its own data
+      const pre = A.session ? A.api('GET', '/api/me').catch(e => e) : null;
       const cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
       if (cfg.authDisabled) {   // local machine: no sign-in, everything open
         A.disabled = true;
@@ -105,7 +109,7 @@
         ready = true; overlay(''); onReady(A.me); return;
       }
       overlay(card('Checking session…'));
-      if (A.session && await tryMe(onReady)) return;
+      if (A.session && await tryMe(onReady, pre)) return;
       fbAuth.onAuthStateChanged(async user => {
         if (!user) { if (!ready) overlay(card('Sign in with your Google account to continue', true)); return; }
         A.user = user; idToken = await user.getIdToken();
