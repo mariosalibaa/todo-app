@@ -376,6 +376,74 @@ const excelIn = x => x && x.file ? { file: String(x.file).trim(), sheet: String(
 const whatsappIn = x => x && x.chatId ? { chatId: +x.chatId, since: /^\d{4}-\d{2}-\d{2}$/.test(String(x.since || '')) ? String(x.since) : '', lbpRate: +x.lbpRate || 0 } : null;
 
 // ── Router ───────────────────────────────────────────────────────────────────
+// ── A worker's day, read out of his WhatsApp group ───────────────────────────
+// Khodr posts his arrival and his finish (in Arabic, with or without the hour) and then
+// the project on a line of its own. `day-read.mjs` in D:\vscode\wa-contacts drives the
+// signed-in browser; here we only turn what it read into a proposed line.
+const WA_CHATS = { 'khodr-cash': 'accounting khoder', 'georges-cash': 'accounting georges',
+  'abed-cash': 'accounting abed', 'ziad-cash': 'accounting ziad (money)💰', 'mitri-cash': 'accounting mitri+mario' };
+const WA_DIR = 'D:\\vscode\\wa-contacts';
+
+function runWaDay(chat, date) {
+  return new Promise((resolve, reject) => {
+    const p = require('child_process').spawn(process.execPath, ['day-read.mjs', '--chat', chat, '--date', date],
+      { cwd: WA_DIR, windowsHide: true });
+    let out = '', err = '';
+    const timer = setTimeout(() => { p.kill(); reject(new Error('WhatsApp did not answer in three minutes')); }, 200000);
+    p.stdout.on('data', d => out += d);
+    p.stderr.on('data', d => err += d);
+    p.on('error', e => { clearTimeout(timer); reject(e); });
+    p.on('close', () => {
+      clearTimeout(timer);
+      try { resolve(JSON.parse(out.slice(out.indexOf('{')))); }
+      catch (e) { reject(new Error((err || out || 'no answer').trim().slice(0, 200))); }
+    });
+  });
+}
+
+// "وصلت الساعة 8:37 AM" / "أنا وصلت" → in;  "انا خلصت 2:04PM" / "خلصت" → out.
+// A short line that is neither is the project ("Ajaltoun", "Mckinsey", "Naqqache").
+const HOUR = /(\d{1,2})[:.](\d{2})\s*([AP]\.?M\.?)?/i;
+function hourIn(text, fallback) {
+  const m = String(text).match(HOUR);
+  if (!m) return fallback;
+  let h = +m[1]; const mi = +m[2], ap = (m[3] || '').toUpperCase().replace(/\./g, '');
+  if (ap === 'PM' && h < 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  // he writes 5 for five in the afternoon as often as not — trust the message's own clock
+  if (!ap && fallback && h < 12 && +fallback.slice(0, 2) >= 12) h += 12;
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+const mins = t => (+t.slice(0, 2)) * 60 + (+t.slice(3, 5));
+
+function dayFromMessages(messages, account) {
+  const his = messages.filter(m => m.from !== 'me');
+  let arrived = '', finished = '', projects = [], notes = [];
+  for (const m of his) {
+    const t = String(m.text || '').trim();
+    if (!t || t.startsWith('[')) continue;
+    if (/وصلت|wasalt|arrived/i.test(t)) { arrived = hourIn(t, m.at); continue; }
+    if (/خلصت|khalast|finish/i.test(t)) { finished = hourIn(t, m.at); continue; }
+    // a bare short line with no digits is the project he was on
+    for (const line of t.split(/\n+/).map(s => s.trim()).filter(Boolean)) {
+      if (/^[\p{L} .'&-]{3,28}$/u.test(line) && !/\d/.test(line)) projects.push(line);
+      else notes.push(line);
+    }
+  }
+  const hours = arrived && finished && mins(finished) > mins(arrived)
+    ? Math.round((mins(finished) - mins(arrived)) / 6) / 10 : 0;
+  // his day is hours × the hourly rate plus a flat transport (see the labour-rate note)
+  const rate = account.hourlyRate || 25 / 9, transport = account.transport == null ? 5 : account.transport;
+  const amount = hours ? Math.round((hours * rate + transport) * 100) / 100 : 0;
+  return {
+    accountId: account.id, arrived, finished, hours, amount,
+    projects: [...new Set(projects)],
+    project: projects[0] || '',
+    description: [arrived && finished ? `${arrived}–${finished} · ${hours} h` : '', ...notes].filter(Boolean).join(' · '),
+    why: !arrived || !finished ? 'he did not write both his arrival and his finish — check the messages' : ''
+  };
+}
+
 async function handle(req, res, url, user, ctx) {
   const { db, admin, TEAM_ID, odooCall } = ctx;
   const ws = db.collection('workspaces').doc(TEAM_ID);
@@ -385,6 +453,79 @@ async function handle(req, res, url, user, ctx) {
   if (url === '/api/accounting/odoo/journals' && req.method === 'GET') {
     try { return json(res, 200, await odooJournals(odooCall)); }
     catch (e) { return json(res, 502, { error: String(e.message || e) }); }
+  }
+
+  // Khodr writes his day in his WhatsApp group instead of on the paper — arrival, finish,
+  // and the project on its own line. The archive under whatsapp-local is only as fresh as
+  // the last phone backup, so the day is read live through the browser (laptop only).
+  if (url.startsWith('/api/accounting/daily/whatsapp') && req.method === 'GET') {
+    if (!ctx.local) return json(res, 400, { error: 'WhatsApp is read from the laptop' });
+    const q = new URL(req.url, 'http://x').searchParams;
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(q.get('date') || '') ? q.get('date') : new Date().toISOString().slice(0, 10);
+    const id = String(q.get('account') || 'khodr-cash');
+    const acc = await resolve(ws, id);
+    if (!acc) return json(res, 404, { error: 'no such person' });
+    const chat = (acc.whatsapp && acc.whatsapp.chatName) || WA_CHATS[id];
+    if (!chat) return json(res, 400, { error: 'no WhatsApp group is set for ' + (acc.name || id) });
+    let read;
+    try { read = await runWaDay(chat, date); }
+    catch (e) { return json(res, 502, { error: String(e.message || e).slice(0, 300) }); }
+    if (read.error) return json(res, 502, { error: read.error, names: read.names });
+    return json(res, 200, { date, chat: read.chat, messages: read.messages || [], proposal: dayFromMessages(read.messages || [], acc) });
+  }
+
+  // ── The day report ───────────────────────────────────────────────────────
+  // The paper Mario fills on site: one line per person per day — who worked, on which
+  // project, what he did, and what he is owed for it. Every line lands on that person's
+  // own ledger as a normal typed row, so 📅 Book months picks it up unchanged.
+  // Accounts on the sheet are the ones flagged `daily` (a person, not a wallet).
+  if (url.startsWith('/api/accounting/daily') && req.method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(q.get('date') || '') ? q.get('date') : new Date().toISOString().slice(0, 10);
+    const days = Math.min(31, Math.max(1, +(q.get('days') || 1) || 1));   // 1 = that day; more = that day and the ones before
+    const from = new Date(date + 'T00:00:00Z'); from.setUTCDate(from.getUTCDate() - (days - 1));
+    const since = from.toISOString().slice(0, 10);
+    const all = await listAccounts(ws);
+    const people = all.filter(a => a.daily && !a.archived);
+    const lines = [];
+    await Promise.all(people.map(async a => {
+      const acc = await resolve(ws, a.id);
+      const snap = await txCol(acc).where('date', '>=', since).where('date', '<=', date).get();
+      snap.docs.forEach(d => { const t = d.data(); if (t.src !== 'odoo') lines.push({ ...t, accountId: a.id, accountName: a.name }); });
+    }));
+    lines.sort((x, y) => x.date < y.date ? 1 : x.date > y.date ? -1 : String(x.accountName).localeCompare(String(y.accountName)));
+    return json(res, 200, { date, since, people: people.map(p => ({ id: p.id, name: p.name, owner: p.owner || '', odooPartner: p.odooPartner || null, defaultRate: p.defaultRate || 0, defaultProject: p.defaultProject || null, wa: !!((p.whatsapp && p.whatsapp.chatName) || WA_CHATS[p.id]) })), lines });
+  }
+
+  // Several lines at once — the whole day in one round trip (the phone is on site data).
+  if (url === '/api/accounting/daily' && req.method === 'POST') {
+    const b = await readBody(req);
+    const rows = Array.isArray(b.lines) ? b.lines.slice(0, 60) : [];
+    if (!rows.length) return json(res, 400, { error: 'no lines' });
+    const out = [];
+    for (const r of rows) {
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) ? r.date : String(b.date || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { out.push({ error: 'a date is needed' }); continue; }
+      const acc = await resolve(ws, String(r.accountId || ''));
+      if (!acc) { out.push({ error: 'no such person' }); continue; }
+      const debit = money(r.debit), credit = money(r.credit);
+      const id = 'm-' + newId();
+      const t = { id, src: 'manual', date, ref: '', service: '', phone: '',
+        description: String(r.description || '').trim(), debit, credit,
+        nature: ['labour', 'expense', 'vendor', 'transfer'].includes(r.nature) ? r.nature : 'labour', natureSrc: 'manual',
+        analyticId: r.analyticId || null, analyticName: String(r.analyticName || ''), analyticSrc: r.analyticId ? 'manual' : '',
+        analyticText: r.analyticId ? '' : String(r.analyticText || ''),
+        partnerId: acc.odooPartner ? acc.odooPartner.id : null, partnerName: acc.odooPartner ? acc.odooPartner.name : '',
+        partnerSrc: acc.odooPartner ? 'auto' : '',
+        note: String(r.note || ''), noteSrc: r.note ? 'manual' : '', daily: true,
+        createdAt: now(), createdBy: who, updatedAt: now(), updatedBy: who };
+      // A day with no price yet (Mario, 2026-09-07: Anthony's line is 0 until he prices it)
+      // is kept, but never booked until the amount is filled in.
+      if (!debit && !credit) { t.noBook = true; t.ask = 'no amount yet — price this day before booking'; }
+      await txCol(acc).doc(id).set(t);
+      out.push({ ok: true, id, accountId: acc.id });
+    }
+    return json(res, 200, { saved: out.filter(o => o.ok).length, lines: out });
   }
 
   if (url === '/api/accounting/accounts' && req.method === 'GET') return json(res, 200, await listAccounts(ws));
@@ -419,6 +560,9 @@ async function handle(req, res, url, user, ctx) {
     const journals = journalsIn(b.odooJournals);
     const data = { id, name, type, currency: String(b.currency || 'USD').toUpperCase(), provider: b.provider || (journals.length ? 'odoo' : 'manual'),
       owner: String(b.owner || '').toLowerCase(), odooJournals: journals, opening: openingIn(b.opening), statement: false, createdAt: now(), createdBy: who };
+    if (b.daily) data.daily = true;
+    if (b.defaultRate) data.defaultRate = money(b.defaultRate);
+    if (b.defaultProject) data.defaultProject = b.defaultProject;
     if (odooPartnerIn(b.odooPartner)) data.odooPartner = odooPartnerIn(b.odooPartner);
     if (excelIn(b.excel)) data.excel = excelIn(b.excel);
     if (whatsappIn(b.whatsapp)) data.whatsapp = whatsappIn(b.whatsapp);
@@ -446,6 +590,10 @@ async function handle(req, res, url, user, ctx) {
     if ('odooPartner' in b) data.odooPartner = odooPartnerIn(b.odooPartner);
     // which company carries his bills and his payable ('S LB' by default, 'SHIFT DEVELOPMENT' for Georges)
     if ('billCompany' in b) data.billCompany = String(b.billCompany || '').trim() || null;
+    // a person whose day is written on the Day report sheet, and what his day costs by default
+    if ('daily' in b) data.daily = !!b.daily;
+    if ('defaultRate' in b) data.defaultRate = money(b.defaultRate);
+    if ('defaultProject' in b) data.defaultProject = b.defaultProject || null;
     if ('opening' in b) data.opening = openingIn(b.opening);
     if ('excel' in b) data.excel = excelIn(b.excel) ? { ...(a.excel || {}), ...excelIn(b.excel) } : null;
     if ('whatsapp' in b) data.whatsapp = whatsappIn(b.whatsapp) ? { ...(a.whatsapp || {}), ...whatsappIn(b.whatsapp) } : null;

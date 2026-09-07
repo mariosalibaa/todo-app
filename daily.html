@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Day report · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1080px;margin:0 auto;padding:20px 18px 90px;}
+  .back{font-size:.78rem;color:var(--overlay0);text-decoration:none;display:inline-block;margin-bottom:14px;}
+  .back:hover{color:var(--text);}
+
+  .daybar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .daybar h1{font-size:1.15rem;margin:0;font-weight:600;flex:1;min-width:170px;}
+  .daynav{display:flex;align-items:center;gap:8px;}
+  .daynav input[type=date]{width:158px;}
+  .daybar h1 em{font-style:normal;color:var(--overlay0);font-size:.78rem;display:block;font-weight:400;margin-top:2px;}
+  button,.btn{background:var(--surface0);color:var(--text);border:1px solid var(--surface1);border-radius:9px;padding:8px 12px;font-size:.82rem;cursor:pointer;font-family:inherit;}
+  button:hover,.btn:hover{border-color:var(--amber);}
+  button:disabled{opacity:.45;cursor:default;border-color:var(--surface1);}
+  button.go{background:var(--amber);color:var(--crust);border-color:var(--amber);font-weight:600;}
+  button.ghost{background:transparent;}
+  input,select{background:var(--crust);color:var(--text);border:1px solid var(--surface0);border-radius:8px;padding:8px 9px;font-size:.85rem;font-family:inherit;width:100%;}
+  input:focus,select:focus{outline:none;border-color:var(--amber);}
+  input[type=date]{color-scheme:dark;}
+
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th{text-align:left;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay0);font-weight:600;padding:0 8px 7px;border-bottom:1px solid var(--surface0);}
+  td{padding:8px;border-bottom:1px solid var(--mantle);vertical-align:middle;}
+  tr.line:hover td{background:var(--mantle);}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .due{color:var(--green);font-weight:600;}
+  .deb{color:var(--red);}
+  .muted{color:var(--overlay0);}
+  .who-cell{font-weight:600;}
+  .proj{color:var(--blue);font-size:.78rem;}
+  .proj.typed{color:var(--amber);}
+  .tag{font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);border:1px solid var(--surface0);border-radius:4px;padding:1px 5px;margin-left:6px;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:16px;margin-bottom:18px;}
+  .card h2{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+  .empty{color:var(--overlay0);font-size:.85rem;padding:18px 4px;}
+  .msg{font-size:.8rem;color:var(--amber);min-height:1.1em;margin-top:8px;}
+
+  /* the draft rows — the paper being filled in */
+  .draft{display:grid;grid-template-columns:1.1fr 1fr 1.6fr 92px 96px 34px;gap:8px;align-items:center;margin-bottom:8px;}
+  .draft .lbl{display:none;}
+  .drafthead{display:grid;grid-template-columns:1.1fr 1fr 1.6fr 92px 96px 34px;gap:8px;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay0);margin-bottom:6px;padding:0 2px;}
+  .x{background:transparent;border:none;color:var(--overlay0);font-size:1rem;padding:4px;}
+  .x:hover{color:var(--red);}
+  .foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+  .totals{display:flex;gap:18px;flex-wrap:wrap;font-size:.8rem;color:var(--sub);margin-top:10px;}
+  .totals b{color:var(--text);font-variant-numeric:tabular-nums;}
+  .pill{background:var(--crust);border:1px solid var(--surface0);border-radius:20px;padding:4px 11px;font-size:.75rem;}
+  .pill b{color:var(--green);}
+  .docbtn{background:transparent;border:none;color:var(--overlay0);cursor:pointer;font-size:.9rem;padding:2px 4px;}
+  .docbtn:hover{color:var(--amber);}
+  @media (max-width:640px){
+    header{padding:12px 14px;} main{padding:14px 12px 90px;}
+    .daybar h1{flex:1 0 100%;}
+    .daynav{flex:1 0 100%;}
+    .daynav input[type=date]{flex:1;width:auto;}
+    .drafthead{display:none;}
+    .draft{grid-template-columns:1fr 1fr;gap:6px;background:var(--crust);border:1px solid var(--surface0);border-radius:10px;padding:10px;}
+    .draft .lbl{display:block;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);margin-bottom:3px;}
+    .draft .wide{grid-column:1 / -1;}
+    .draft > div:last-child{grid-column:2;text-align:right;}
+    table thead{display:none;}
+    table tr.line{display:grid;grid-template-columns:1fr auto;background:var(--crust);border:1px solid var(--surface0);border-radius:10px;padding:8px 10px;margin-bottom:8px;}
+    table td{border:none;padding:2px 0;}
+    table td.num{text-align:right;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>DAY REPORT</small></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <a class="back" href="/accounting">&lsaquo; Accounting</a>
+
+  <div class="daybar">
+    <h1 id="daytitle">Day report<em id="daysub"></em></h1>
+    <div class="daynav">
+      <button class="ghost" onclick="step(-1)" title="The day before">&lsaquo;</button>
+      <input type="date" id="day" onchange="load()">
+      <button class="ghost" onclick="step(1)" title="The day after">&rsaquo;</button>
+      <button class="ghost" onclick="today()">Today</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Write the day <span class="muted" id="ratehint"></span></h2>
+    <div class="drafthead"><div>Who</div><div>Project</div><div>What he did</div><div>Debit</div><div>Due to</div><div></div></div>
+    <div id="drafts"></div>
+    <div class="foot">
+      <button onclick="addDraft()">+ Person</button>
+      <button onclick="copyPrevious()" title="The same crew and projects as the last day worked">⧉ Copy last day</button>
+      <span id="wabox" hidden><select id="wa-who" style="width:auto"></select>
+        <button id="wabtn" onclick="pullWa()" title="Read his arrival, his finish and the project out of his WhatsApp group">⟳ Read his WhatsApp day</button></span>
+      <button class="go" id="savebtn" onclick="saveDrafts()">Save the day</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span id="linestitle">The day</span><span><button class="ghost" id="spanbtn" onclick="toggleSpan()">Last 7 days</button></span></h2>
+    <div id="lines"></div>
+    <div class="totals" id="totals"></div>
+  </div>
+</main>
+
+<datalist id="ans"></datalist>
+<input type="file" id="photo" accept="image/*" capture="environment" hidden>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+let people = [], lines = [], analytic = [], drafts = [], span = 1;
+const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+const fmt = n => (Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const el = id => document.getElementById(id);
+const say = (t) => { el('msg').textContent = t || ''; };
+const dayOf = () => el('day').value || new Date().toISOString().slice(0, 10);
+const pretty = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+function step(n) {
+  const d = new Date(dayOf() + 'T00:00:00'); d.setDate(d.getDate() + n);
+  el('day').value = d.toISOString().slice(0, 10); load();
+}
+function today() { el('day').value = new Date().toISOString().slice(0, 10); load(); }
+function toggleSpan() { span = span === 1 ? 7 : 1; el('spanbtn').textContent = span === 1 ? 'Last 7 days' : 'This day only'; load(); }
+
+// ── the draft rows ──────────────────────────────────────────────────────────
+function addDraft(seed) {
+  drafts.push(Object.assign({ accountId: '', project: '', description: '', debit: '', credit: '', nature: 'labour' }, seed || {}));
+  drawDrafts();
+}
+function delDraft(i) { drafts.splice(i, 1); drawDrafts(); }
+function setDraft(i, k, v) {
+  drafts[i][k] = v;
+  // his day has a price of its own — fill it in the first time he is picked
+  if (k === 'accountId' && !drafts[i].credit && !drafts[i].debit) {
+    const p = people.find(x => x.id === v);
+    if (p && p.defaultRate) { drafts[i].credit = String(p.defaultRate); drawDrafts(); }
+    if (p && p.defaultProject && !drafts[i].project) { drafts[i].project = p.defaultProject.name || ''; drawDrafts(); }
+  }
+}
+function drawDrafts() {
+  el('drafts').innerHTML = drafts.map((d, i) => `
+    <div class="draft">
+      <div><div class="lbl">Who</div><select onchange="setDraft(${i},'accountId',this.value)">
+        <option value="">— who —</option>
+        ${people.map(p => `<option value="${esc(p.id)}" ${d.accountId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+      </select></div>
+      <div><div class="lbl">Project</div><input list="ans" value="${esc(d.project)}" placeholder="project" oninput="setDraft(${i},'project',this.value)"></div>
+      <div class="wide"><div class="lbl">What he did</div><input value="${esc(d.description)}" placeholder="what he did" oninput="setDraft(${i},'description',this.value)"></div>
+      <div><div class="lbl">Debit</div><input type="number" step="0.01" min="0" value="${esc(d.debit)}" placeholder="0" oninput="setDraft(${i},'debit',this.value)"></div>
+      <div><div class="lbl">Due to</div><input type="number" step="0.01" min="0" value="${esc(d.credit)}" placeholder="0" oninput="setDraft(${i},'credit',this.value)"></div>
+      <div><button class="x" onclick="delDraft(${i})" title="Remove this line">✕</button></div>
+    </div>`).join('') || '<div class="empty">Press <b>+ Person</b> to start the day.</div>';
+}
+
+// The paper writes what we owe him in the "Due to" column. His ledger is kept the other way
+// round — what he is owed is a debit on his account — so "Due to" is stored as a debit and
+// "Debit" (money he received, or a correction) as a credit. The screen stays the paper's way.
+function saveDrafts() {
+  const rows = drafts.filter(d => d.accountId);
+  if (!rows.length) return say('Pick who worked first.');
+  const date = dayOf();
+  const payload = rows.map(d => {
+    const due = +d.credit || 0, back = +d.debit || 0;
+    const a = analytic.find(x => norm(x.name) === norm(d.project));
+    return { accountId: d.accountId, date, description: d.description.trim(),
+      debit: due, credit: back, nature: d.nature || 'labour',
+      analyticId: a ? a.id : null, analyticName: a ? a.name : '', analyticText: a ? '' : d.project.trim() };
+  });
+  el('savebtn').disabled = true; say('Saving…');
+  Admin.api('POST', '/api/accounting/daily', { date, lines: payload })
+    .then(r => {
+      const bad = (r.lines || []).filter(x => x.error);
+      drafts = [];
+      say(`${r.saved} line${r.saved === 1 ? '' : 's'} written to ${r.saved === 1 ? 'his ledger' : 'their ledgers'}${bad.length ? ` · ${bad.length} refused: ${bad[0].error}` : ''}`);
+      return load();
+    })
+    .catch(e => say('Could not save: ' + e.message))
+    .then(() => { el('savebtn').disabled = false; });
+}
+async function copyPrevious() {
+  // the last day anybody worked, before the day on screen
+  const d = dayOf();
+  const r = await Admin.api('GET', `/api/accounting/daily?date=${d}&days=14`);
+  const before = (r.lines || []).filter(t => t.date < d);
+  if (!before.length) return say('No earlier day to copy in the last two weeks.');
+  const last = before[0].date;
+  drafts = before.filter(t => t.date === last).map(t => ({
+    accountId: t.accountId, project: t.analyticName || t.analyticText || '', description: '',
+    debit: t.credit ? String(t.credit) : '', credit: t.debit ? String(t.debit) : '', nature: t.nature || 'labour' }));
+  drawDrafts();
+  say(`Copied the crew of ${pretty(last)} — write what each of them did.`);
+}
+
+// ── his day, read out of his WhatsApp group ─────────────────────────────────
+// Khodr writes his arrival and his finish there instead of on the paper. Only the laptop
+// can read it: the signed-in browser lives here (Mario, 2026-09-07).
+function drawWa() {
+  // Khodr is the one who writes his day there, so he leads the list
+  const has = people.filter(p => p.wa).sort((x, y) => (x.id === 'khodr-cash' ? -1 : 0) - (y.id === 'khodr-cash' ? -1 : 0));
+  const box = el('wabox');
+  box.hidden = !(Admin.me && Admin.me.local && has.length);
+  if (box.hidden) return;
+  el('wa-who').innerHTML = has.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+}
+async function pullWa() {
+  const id = el('wa-who').value, b = el('wabtn');
+  b.disabled = true; say('Opening WhatsApp — this takes about a minute…');
+  try {
+    const r = await Admin.api('GET', `/api/accounting/daily/whatsapp?account=${id}&date=${dayOf()}`);
+    const p = r.proposal || {};
+    if (!r.messages.length) { say(`He wrote nothing in ${r.chat} on ${pretty(dayOf())}.`); return; }
+    drafts.push({ accountId: id, project: p.project || '', description: p.description || '',
+      debit: '', credit: p.amount ? String(p.amount) : '', nature: 'labour' });
+    drawDrafts();
+    const extra = (p.projects || []).length > 1 ? ` · he named ${p.projects.length} projects: ${p.projects.join(', ')}` : '';
+    say(p.why ? `Read ${r.messages.length} messages — ${p.why}${extra}`
+      : `${p.arrived}–${p.finished} = ${p.hours} h → ${fmt(p.amount)} (hours × rate + transport)${extra}. Check it, then save.`);
+  } catch (e) { say('WhatsApp: ' + e.message); }
+  finally { b.disabled = false; }
+}
+
+// ── what is already written ─────────────────────────────────────────────────
+function drawLines() {
+  const d = dayOf();
+  const show = span === 1 ? lines.filter(t => t.date === d) : lines;
+  el('linestitle').textContent = span === 1 ? 'Written for this day' : 'Written in the last 7 days';
+  if (!show.length) { el('lines').innerHTML = '<div class="empty">Nothing written for this day yet.</div>'; el('totals').innerHTML = ''; return; }
+  el('lines').innerHTML = `<table><thead><tr>
+      <th style="width:96px">Date</th><th style="width:17%">Partner</th><th style="width:15%">Analytical</th><th>Description</th>
+      <th class="num" style="width:90px">Debit</th><th class="num" style="width:100px">Due to</th><th style="width:34px"></th></tr></thead>
+    <tbody>${show.map(t => {
+      const proj = t.analyticName || t.analyticText || '';
+      const typed = !t.analyticId && !!t.analyticText;
+      return `<tr class="line">
+        <td class="muted">${esc(t.date.slice(8) + '/' + t.date.slice(5, 7))}</td>
+        <td class="who-cell">${esc(t.accountName)}</td>
+        <td class="proj ${typed ? 'typed' : ''}">${esc(proj) || '<span class="muted">—</span>'}</td>
+        <td>${esc(t.description || '')}${t.bookedMove ? '<span class="tag">booked</span>' : ''}${t.noBook ? '<span class="tag">no price</span>' : ''}</td>
+        <td class="num deb">${t.credit ? fmt(t.credit) : ''}</td>
+        <td class="num due">${t.debit ? fmt(t.debit) : ''}</td>
+        <td><button class="docbtn" onclick="attach('${t.accountId}','${t.id}')" title="${(t.docs || []).length ? (t.docs || []).length + ' file(s)' : 'Photograph the paper'}">${(t.docs || []).length ? '📎' : '📷'}</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+
+  const byPerson = {}, byProject = {};
+  for (const t of show) {
+    byPerson[t.accountName] = (byPerson[t.accountName] || 0) + (t.debit || 0) - (t.credit || 0);
+    const p = t.analyticName || t.analyticText || '—';
+    byProject[p] = (byProject[p] || 0) + (t.debit || 0) - (t.credit || 0);
+  }
+  const total = show.reduce((s, t) => s + (t.debit || 0) - (t.credit || 0), 0);
+  el('totals').innerHTML =
+    `<span class="pill">Owed for the day <b>${fmt(total)}</b></span>` +
+    Object.entries(byPerson).map(([k, v]) => `<span class="pill">${esc(k)} <b>${fmt(v)}</b></span>`).join('') +
+    Object.entries(byProject).map(([k, v]) => `<span class="pill" style="border-color:#45475a">${esc(k)} <b style="color:var(--blue)">${fmt(v)}</b></span>`).join('');
+}
+
+// ── the paper itself, photographed ──────────────────────────────────────────
+function shrink(file) {
+  return new Promise(resolve => {
+    if (!/^image\//.test(file.type)) return resolve(null);
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+const readAsDataUrl = f => new Promise(r => { const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(f); });
+function attach(accountId, txId) {
+  const inp = el('photo');
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; inp.value = '';
+    if (!f) return;
+    say('Attaching the paper…');
+    const small = await shrink(f);
+    try {
+      await Admin.api('POST', `/api/accounting/accounts/${accountId}/tx/${txId}/docs`,
+        { name: (f.name.replace(/\.[^.]+$/, '') || 'day') + (small ? '.jpg' : ''), mime: small ? 'image/jpeg' : (f.type || 'application/octet-stream'),
+          dataBase64: small || await readAsDataUrl(f), from: 'camera' });
+      say('The paper is on the line.');
+      await load();
+    } catch (e) { say('Could not attach: ' + e.message); }
+  };
+  inp.click();
+}
+
+// ── loading ─────────────────────────────────────────────────────────────────
+async function load() {
+  const d = dayOf();
+  el('daysub').textContent = pretty(d);
+  const r = await Admin.api('GET', `/api/accounting/daily?date=${d}&days=${span}`);
+  people = r.people || []; lines = r.lines || [];
+  el('ratehint').textContent = people.length ? `${people.length} people on the sheet` : 'no people flagged yet — open an account and tick “on the day report”';
+  drawDrafts();
+  drawWa();
+  drawLines();
+}
+Admin.require('accounting', async me => {
+  el('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  el('day').value = new Date().toISOString().slice(0, 10);
+  try { analytic = await Admin.api('GET', '/api/accounting/analytic'); } catch (e) { analytic = []; }
+  el('ans').innerHTML = analytic.map(a => `<option value="${esc(a.name)}">`).join('');
+  await load();
+  if (!drafts.length) addDraft();
+});
+</script>
+</body>
+</html>
