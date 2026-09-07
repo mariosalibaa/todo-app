@@ -584,13 +584,28 @@ const handler = async (req, res) => {
     res.end();
     return;
   }
+  // Vercel bundles a file with the function only when it can SEE the path: a literal
+  // `path.join(__dirname, 'x.html')`. Built from a variable, the page is missing at
+  // runtime and the route answers 500 (it cost an afternoon on 2026-09-07) — so every
+  // page is written out here in full.
+  const FILE = {
+    'todo.html': path.join(__dirname, 'todo.html'),
+    'hub.html': path.join(__dirname, 'hub.html'),
+    'accounting-home.html': path.join(__dirname, 'accounting-home.html'),
+    'accounting.html': path.join(__dirname, 'accounting.html'),
+    'daily.html': path.join(__dirname, 'daily.html'),
+    'transfers.html': path.join(__dirname, 'transfers.html'),
+    'wise.html': path.join(__dirname, 'wise.html'),
+    'budget.html': path.join(__dirname, 'budget.html'),
+    'dashboard.html': path.join(__dirname, 'dashboard.html'),
+  };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
-    const html = fs.readFileSync(path.join(__dirname, page), 'utf8');
+    const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store'
