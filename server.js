@@ -25,7 +25,10 @@ try {
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  projectId: serviceAccount.project_id
+  projectId: serviceAccount.project_id,
+  // where a photo taken on the phone (or a scan, or a dropped file) is kept before it
+  // travels to Odoo as the entry's attachment
+  storageBucket: process.env.STORAGE_BUCKET || (serviceAccount.project_id + '.firebasestorage.app')
 });
 
 const db = admin.firestore();
@@ -90,6 +93,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'dashboard.html'));
   fs.readFileSync(path.join(__dirname, 'ledgers.js'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
+  fs.readFileSync(path.join(__dirname, 'phone-preview.js'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
@@ -598,7 +602,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/sw.js', '/admin-shared.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
@@ -709,7 +713,9 @@ const handler = async (req, res) => {
   if (url.startsWith('/api/accounting/')) {
     if (!access.apps.includes('accounting')) return noApp('accounting');
     try {
-      const ctx = { db, admin, TEAM_ID, odooCall };
+      // `local` = this is the laptop, not Render/Vercel: the scanner and the Excel/WhatsApp
+      // imports only exist here
+      const ctx = { db, admin, TEAM_ID, odooCall, local: AUTH_DISABLED };
       // the Whish account is one account among others now: its old per-line URLs map onto the generic ones
       const aurl = url.replace(/^\/api\/accounting\/whish\/(\d+)\/(tx|tx-bulk|odoo-check|book|book-preview)(\/|$)/, '/api/accounting/accounts/$1/$2$3');
       const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)

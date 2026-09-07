@@ -28,10 +28,14 @@
 //   GET    /api/accounting/accounts/<id>                 one account
 //   PATCH  /api/accounting/accounts/<id>                 name / opening / journals
 //   GET    /api/accounting/accounts/<id>/tx              lines (date, then id)
+//   GET    /api/accounting/accounts/<id>/search?q=       every matching line of the account, any year
 //   POST   /api/accounting/accounts/<id>/tx              add a manual line
 //   PATCH  /api/accounting/accounts/<id>/tx/<txId>       annotate (same fields as Whish + paidBy, excluded)
 //   DELETE /api/accounting/accounts/<id>/tx/<txId>       manual / budget lines only
 //   POST   /api/accounting/accounts/<id>/tx-bulk         { items: [{ id, ...fields }] }
+//   POST   /api/accounting/accounts/<id>/tx/<txId>/docs   attach a photo / scan / file to a line
+//   GET    /api/accounting/accounts/<id>/tx/<txId>/docs/<docId>   the file itself
+//   DELETE /api/accounting/accounts/<id>/tx/<txId>/docs/<docId>
 //   POST   /api/accounting/accounts/<id>/odoo-check      match lines against the account's Odoo journals
 //   POST   /api/accounting/accounts/<id>/import-odoo     pull every line of the account's Odoo journals
 //   POST   /api/accounting/accounts/<id>/import-budget   { budgetAccountId } pull the HomeBudget history
@@ -39,22 +43,28 @@
 //   POST   /api/accounting/accounts/<id>/import-whatsapp read the account's WhatsApp group (local machine only)
 //   POST   /api/accounting/accounts/<id>/close-statement the statement was sent: every "new" row of the Excel becomes "old" (local machine only)
 //   POST   /api/accounting/accounts/<id>/link-transfers  { loose? } join "from mario" lines with Mario's cash as transfers
+//   POST   /api/accounting/scan/launch                   open HP Smart on this laptop
+//   GET    /api/accounting/scan/new?since=<ms>            the page it just scanned, as bytes
 //   GET    /api/accounting/whatsapp-groups?q=            the archive's groups, for the ⚙ form
 //   GET    /api/accounting/odoo/journals                 the Odoo bank/cash journals, for the "+" form
 //   GET    /api/accounting/transfers                     list
 //   POST   /api/accounting/transfers                     { date, fromId, toId, amount, note, fromTxId?, toTxId? }
 //   PATCH  /api/accounting/transfers/<id>                { date?, amount?, note? }
 //   DELETE /api/accounting/transfers/<id>
+// HP Smart saves its pages here (overridable, e.g. if the folder is ever moved)
+const SCAN_DIR = process.env.SCAN_DIR
+  || require('path').join(require('os').homedir(), 'OneDrive', 'Desktop', 'to arrange', 'shift group usd');
+
 const acc = require('./accounting');
 const ledgers = require('./ledgers');   // the workers' Excel ledgers, WhatsApp groups, transfer linking
 const bills = require('./ledger-bills');  // a worker's month → one draft bill; the analytic map
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };   // true = handled
-const readBody = req => new Promise((resolve, reject) => {
+const readBody = (req, max) => new Promise((resolve, reject) => {
   // keep the chunks as bytes and decode once: a "·" split across two chunks became U+FFFD and
   // that character went straight into the workbook (2026-09-07)
   const parts = []; let n = 0;
-  req.on('data', c => { parts.push(c); n += c.length; if (n > 4e6) req.destroy(); });
+  req.on('data', c => { parts.push(c); n += c.length; if (n > (max || 4e6)) req.destroy(); });
   req.on('end', () => { try { const s = Buffer.concat(parts).toString('utf8'); resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(e); } });
   req.on('error', reject);
 });
@@ -68,7 +78,12 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer', 'amountSrc', 'pendingExcel', 'noBook'];
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer', 'amountSrc', 'pendingExcel', 'noBook',
+  // What was typed on the phone before Odoo had a say: free text, never rejected.
+  // The laptop turns it into a real partner / analytic when you accept the proposal.
+  'partnerText', 'analyticText',
+  // asked for from the phone, booked from the laptop after you look at it
+  'bookWanted', 'bookWantedAt', 'bookWantedBy'];   // `docs` is written by the upload route only, never by a PATCH
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 // what a correction can change in the workbook itself, on a row that came from it
@@ -492,6 +507,152 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, { tx, before, since, src: srcs });
   }
 
+  // Search the WHOLE account, not the loaded window (Mario, 2026-09-07): the grid only ever
+  // holds a period, but the search box must find a line from any year. The collection is read
+  // once and filtered here — Firestore has no substring index — and only the matches travel.
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/search$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const p = new URL(req.url, 'http://x').searchParams;
+    const q = String(p.get('q') || '').trim().toLowerCase();
+    if (q.length < 2) return json(res, 400, { error: 'type at least two characters' });
+    const cap = Math.min(2000, +(p.get('limit') || 500));
+    const t0 = Date.now();
+    const words = q.split(/\s+/).filter(Boolean);
+    // ?field=  narrows the search to one column, the way Odoo's search box offers
+    // "Search Partner for: attal" — everything, or exactly the column you picked.
+    const FIELDS = {
+      description: t => [t.description, t.service],
+      ref: t => [t.ref],
+      partner: t => [t.partnerName, t.phone],
+      company: t => [t.company],
+      analytic: t => [t.analyticName, t.project],
+      note: t => [t.note],
+      amount: t => [t.debit, t.credit, t.debit ? Number(t.debit).toFixed(2) : '', t.credit ? Number(t.credit).toFixed(2) : ''],
+      date: t => [t.date],
+      paidby: t => [t.paidBy],
+    };
+    const field = FIELDS[String(p.get('field') || '').toLowerCase()] || null;
+    const hay = t => (field ? field(t) : [t.date, t.ref, t.description, t.note, t.partnerName, t.analyticName, t.company,
+      t.service, t.phone, t.paidBy, t.src, t.debit, t.credit]).filter(v => v != null && v !== '').join(' ').toLowerCase();
+    const snap = await txCol(a).get();
+    const all = snap.docs.map(d => d.data());
+    const hits = all.filter(t => { const h = hay(t); return words.every(w => h.includes(w)); })
+      .sort((x, y) => x.date < y.date ? 1 : x.date > y.date ? -1 : 0);   // newest first
+    console.log(`search ${m[1]} "${q}"${p.get('field') ? ' in ' + p.get('field') : ''}: ${hits.length} of ${all.length} lines, ${Date.now() - t0} ms`);
+    return json(res, 200, { q, field: p.get('field') || '', scanned: all.length, found: hits.length, tx: hits.slice(0, cap), capped: hits.length > cap });
+  }
+
+  // ── The HP scanner, on this laptop ─────────────────────────────────────────
+  // "Launch" opens HP Smart; the page then asks "anything new?" until a page appears in
+  // the scan folder, and attaches it to the line. Local machine only — there is no
+  // scanner behind the Render/Vercel copy.
+  if (url === '/api/accounting/scan/launch' && req.method === 'POST') {
+    if (!ctx.local) return json(res, 400, { error: 'the scanner is on the laptop, not on the server' });
+    try {
+      require('child_process').spawn('cmd', ['/c', 'start', '', 'hpsmart:'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      return json(res, 200, { ok: true, folder: SCAN_DIR, at: Date.now() });
+    } catch (e) { return json(res, 500, { error: 'could not open HP Smart: ' + e.message }); }
+  }
+  // the newest scan dropped after ?since=<ms>, as bytes, so the page can attach it
+  if (url.startsWith('/api/accounting/scan/new') && req.method === 'GET') {
+    if (!ctx.local) return json(res, 400, { error: 'the scanner is on the laptop, not on the server' });
+    const since = +(new URL(req.url, 'http://x').searchParams.get('since') || 0);
+    try {
+      const fs2 = require('fs'), path2 = require('path');
+      if (!fs2.existsSync(SCAN_DIR)) return json(res, 200, { waiting: true, folder: SCAN_DIR, missing: true });
+      const hits = fs2.readdirSync(SCAN_DIR)
+        .filter(f => /\.(pdf|jpe?g|png|tiff?)$/i.test(f))
+        .map(f => ({ f, st: fs2.statSync(path2.join(SCAN_DIR, f)) }))
+        .filter(x => x.st.isFile() && x.st.mtimeMs > since)
+        .sort((a, b) => b.st.mtimeMs - a.st.mtimeMs);
+      if (!hits.length) return json(res, 200, { waiting: true, folder: SCAN_DIR });
+      const top = hits[0];
+      const buf = fs2.readFileSync(path2.join(SCAN_DIR, top.f));
+      const ext = top.f.split('.').pop().toLowerCase();
+      const mime = ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ext.startsWith('tif') ? 'image/tiff' : 'image/jpeg';
+      return json(res, 200, { name: top.f, mime, size: buf.length, dataBase64: buf.toString('base64') });
+    } catch (e) { return json(res, 500, { error: String(e.message || e) }); }
+  }
+
+  // ── The paper behind a line ────────────────────────────────────────────────
+  // A photo taken on the phone, a file dropped on the laptop, or a page off the HP
+  // scanner. It lands in the project's Storage bucket and the line keeps a small record
+  // of it; when the line is booked, the file goes to Odoo as the entry's attachment.
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)\/docs$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const ref = txCol(a).doc(m[2]);
+    const cur = (await ref.get()).data();
+    if (!cur) return json(res, 404, { error: 'no such line' });
+    const b = await readBody(req, 20e6);   // a scan or a photo travels base64, so allow the room
+    const raw = String(b.dataBase64 || '').replace(/^data:[^,]*,/, '');
+    if (!raw) return json(res, 400, { error: 'no file' });
+    const buf = Buffer.from(raw, 'base64');
+    if (!buf.length) return json(res, 400, { error: 'the file is empty' });
+    if (buf.length > 12e6) return json(res, 400, { error: 'the file is larger than 12 MB' });
+    const mime = String(b.mime || 'application/octet-stream').slice(0, 80);
+    const ext = (String(b.name || '').match(/\.([a-z0-9]{1,5})$/i) || [, mime.split('/')[1] || 'bin'])[1].toLowerCase();
+    const docId = newId();
+    const key = `tx-docs/${a.id}/${m[2]}/${docId}.${ext}`;
+    // The bucket is the right home for these. Firebase Storage is not switched on for this
+    // project yet, so until it is, the bytes go in a document of their own — never on the
+    // line itself, which the grid reads by the thousand (Mario, 2026-09-07).
+    let store = 'bucket';
+    try {
+      const bk = admin.storage().bucket();
+      const [live] = await bk.exists();
+      if (!live) throw new Error('bucket not created');
+      await bk.file(key).save(buf, { contentType: mime, resumable: false, metadata: { metadata: { account: a.id, tx: m[2], by: who } } });
+    } catch (e) {
+      if (buf.length > 900e3) return json(res, 400, { error: 'Firebase Storage is not enabled for this project, so a file must stay under 900 KB. Enable Storage in the Firebase console and any size will work.' });
+      await ws.collection('txDocs').doc(docId).set({ account: a.id, tx: m[2], mime, name: String(b.name || '').slice(0, 120), b64: buf.toString('base64'), at: now(), by: who });
+      store = 'firestore';
+      console.warn('tx doc kept in Firestore (Storage not enabled):', e.message);
+    }
+    const doc = { id: docId, name: String(b.name || ('photo.' + ext)).slice(0, 120), mime, size: buf.length,
+      key, store, at: now(), by: who, from: String(b.from || 'upload').slice(0, 20) };   // camera | upload | scan
+    const docs = [...(cur.docs || []), doc];
+    await ref.set({ docs, updatedAt: now(), updatedBy: who }, { merge: true });
+    return json(res, 200, doc);
+  }
+
+  // the file itself, streamed back through the app (the bucket stays private)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)\/docs\/([\w-]+)$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const cur = (await txCol(a).doc(m[2]).get()).data();
+    const doc = (cur && cur.docs || []).find(d => d.id === m[3]);
+    if (!doc) return json(res, 404, { error: 'no such file' });
+    let buf;
+    if (doc.store === 'firestore') {
+      const d = (await ws.collection('txDocs').doc(doc.id).get()).data();
+      if (!d) return json(res, 404, { error: 'the file is gone' });
+      buf = Buffer.from(d.b64, 'base64');
+    } else {
+      [buf] = await admin.storage().bucket().file(doc.key).download();
+    }
+    res.writeHead(200, { 'Content-Type': doc.mime || 'application/octet-stream',
+      'Content-Disposition': `inline; filename="${doc.name.replace(/"/g, '')}"`, 'Cache-Control': 'private, max-age=3600' });
+    res.end(buf);
+    return true;
+  }
+
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)\/docs\/([\w-]+)$/)) && req.method === 'DELETE') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const ref = txCol(a).doc(m[2]);
+    const cur = (await ref.get()).data();
+    const doc = (cur && cur.docs || []).find(d => d.id === m[3]);
+    if (!doc) return json(res, 404, { error: 'no such file' });
+    try {
+      if (doc.store === 'firestore') await ws.collection('txDocs').doc(doc.id).delete();
+      else await admin.storage().bucket().file(doc.key).delete();
+    } catch (e) { console.warn('doc delete', e.message); }
+    await ref.set({ docs: (cur.docs || []).filter(d => d.id !== m[3]), updatedAt: now(), updatedBy: who }, { merge: true });
+    return json(res, 200, { ok: true });
+  }
+
   // A line typed by hand (or sent from Telegram). Money out is `debit`, money in `credit`,
   // as on a bank statement.
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx$/)) && req.method === 'POST') {
@@ -584,6 +745,13 @@ async function handle(req, res, url, user, ctx) {
     if (!cur) return json(res, 404, { error: 'no such line' });
     if (!['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(cur.src)) return json(res, 400, { error: 'only typed or imported ledger lines can be deleted; Odoo and statement lines are facts' });
     if (cur.transferId) return json(res, 400, { error: 'this line belongs to a transfer — delete the transfer' });
+    // the paper goes with the line, wherever it was kept
+    for (const d of cur.docs || []) {
+      try {
+        if (d.store === 'firestore') await ws.collection('txDocs').doc(d.id).delete();
+        else await admin.storage().bucket().file(d.key).delete();
+      } catch (e) { console.warn('doc delete with line', e.message); }
+    }
     await ref.delete();
     return json(res, 200, { ok: true });
   }
