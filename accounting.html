@@ -567,8 +567,12 @@ async function selectAccount(a) {
 let before = null;                 // { count, net, netFromOpening, first } for the lines before the period
 let loadedSrc = null;              // null = every source is in `tx`; else the Set of sources fetched so far
 const PERIODS = { m: 'This month', m3: 'Last 3 months', year: 'This year', y12: 'Last 12 months', y2: 'Two years', all: 'Everything' };
-let period = localStorage.getItem('acct_period') || 'm3';
-if (!PERIODS[period]) period = 'm3';
+// The whole account by default (Mario, 2026-09-07): the grid draws 80 lines at a time, so
+// a long history costs nothing to look at. It still costs something to FETCH — Ziad's
+// account is 6,127 lines and 6 MB — so 'all' is loaded in two passes: the recent months
+// arrive first and are drawn, then the rest follows in the background (see loadTx).
+let period = localStorage.getItem('acct_period') || 'all';
+if (!PERIODS[period]) period = 'all';
 function sinceOf(p) {
   const d = new Date(); d.setHours(0, 0, 0, 0);
   if (p === 'm') return d.toISOString().slice(0, 8) + '01';
@@ -592,6 +596,7 @@ const SRC_KEY = id => 'acct_src_' + id;
 // and the sources are all known from the URL and this device's last visit, and the stored
 // session token is enough to ask — so the lines travel during the ~2 s that
 // /api/config → /api/me → /api/accounting/accounts used to cost before the grid even began.
+const TAIL_SINCE = 'y12';        // what the first pass asks for when the period is 'all'
 let prefetch = null;
 (() => {
   try {
@@ -599,17 +604,24 @@ let prefetch = null;
     const tok = localStorage.getItem('todo_session');
     const src = id && localStorage.getItem(SRC_KEY(id));
     if (!id || !tok || !src) return;   // never opened here before: no guess to make, ask the normal way
-    const url = txUrl(src === '*' ? null : src.split(','), id);
+    // must ask for exactly what loadTx will ask for, or the prefetch is wasted:
+    // with the period on 'all' that is the first pass, not the whole history
+    const url = txUrl(src === '*' ? null : src.split(','), id, period === 'all' ? TAIL_SINCE : null);
     prefetch = { url, promise: fetch(url, { headers: { Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null).catch(() => null) };
   } catch {}
 })();
+// 'all' arrives in two passes so the page is usable at once: the recent months, drawn
+// immediately, then the whole history merged in behind them. `tailing` is the second pass.
+let tailing = null;
 async function loadTx() {
-  if (!acc) { tx = []; before = null; loadedSrc = null; return; }
+  if (!acc) { tx = []; before = null; loadedSrc = null; tailing = null; return; }
   const sel = document.getElementById('period'); if (sel) sel.value = period;
   // an Excel-kept account: only the sources shown at first; the others come with their chip
   const want = isExcelKept() ? ['excel', 'budget', 'manual'].filter(k => !srcOff.has(k)) : null;
-  const url = txUrl(want);
   try { localStorage.setItem(SRC_KEY(acc), want ? want.join(',') : '*'); } catch {}
+  tailing = null;
+  const twoPass = period === 'all';
+  const url = txUrl(want, null, twoPass ? TAIL_SINCE : null);
   let r = prefetch && prefetch.url === url ? await prefetch.promise : null;
   prefetch = null;                                   // one shot: from here the grid asks for itself
   if (!r) r = await Admin.api('GET', url);
@@ -617,6 +629,32 @@ async function loadTx() {
   else { tx = r.tx || []; before = r.before || null; }
   loadedSrc = want ? new Set(want) : null;
   computeBalances();
+  // nothing older than the first pass: the account is already whole
+  if (twoPass && (!before || !before.count)) return;
+  if (twoPass) tailing = loadTail(want, acc);
+}
+// The rest of the history, fetched behind the first screen and merged in.
+async function loadTail(want, forAcc) {
+  const mark = document.getElementById('rowcount');
+  if (mark) mark.dataset.tail = '1';
+  try {
+    const r = await Admin.api('GET', txUrl(want, forAcc, 'all'));
+    if (acc !== forAcc || period !== 'all') return;   // the account or the period moved on
+    const rows = Array.isArray(r) ? r : (r.tx || []);
+    const have = new Set(tx.map(t => t.id));
+    let added = 0;
+    for (const t of rows) if (!have.has(t.id)) { tx.push(t); added++; }
+    before = null;                                    // there is nothing "earlier" any more
+    computeBalances();
+    render();
+    if (added) say(`${added} earlier line${added === 1 ? '' : 's'} loaded — the whole account is here`);
+  } catch (e) {
+    console.warn('tail load', e.message);
+    say('The earlier lines did not load: ' + e.message + ' — pick a shorter period to work meanwhile', 'err');
+  } finally {
+    if (mark) delete mark.dataset.tail;
+    tailing = null;
+  }
 }
 // Make sure these sources are in `tx` (fetching the missing ones) before they are shown
 async function ensureSources(keys) {
@@ -1156,7 +1194,12 @@ function render() {
       + (only ? ` ${only} of them match no row of the Excel ledger.` : '');
     return `<a class="srctog${off ? ' off' : ''}" onclick="toggleSrc('${k}')" title="${esc(tip)}">${n} <span class="src">${k}</span>${tail}${extra}</a>`;
   }).join(' · ');
-  const earlier = before && before.count ? ` · <a class="srctog off" onclick="setPeriod('all')" title="${esc(`${before.count} lines before ${sinceOf(period)} (from ${before.first}) are not loaded; their balance is carried. Click to load everything.`)}">+${before.count} earlier</a>` : '';
+  const earlier = before && before.count
+    ? (tailing
+      // the period is 'all' and the rest is still on its way: say so rather than offering a click
+      ? ` · <span class="srctog off" title="${esc(`${before.count} earlier lines (from ${before.first}) are loading now. Their balance is already carried, so the figures are right meanwhile.`)}">↻ loading ${before.count} earlier…</span>`
+      : ` · <a class="srctog off" onclick="setPeriod('all')" title="${esc(`${before.count} lines before ${sinceOf(period)} (from ${before.first}) are not loaded; their balance is carried. Click to load everything.`)}">+${before.count} earlier</a>`)
+    : '';
   rc.innerHTML = tx.length ? chips + (all.length !== tx.length ? ` · ${all.length} shown` : '') + earlier : (earlier ? earlier.replace(/^ · /, '') : '');
   const parts = [['excel', 'Excel rows'], ['whatsapp', 'WhatsApp messages'], ['odoo', 'Odoo entries'], ['budget', 'HomeBudget rows'], ['transfer', 'transfer lines'], ['telegram', 'Telegram lines'], ['manual', 'lines typed here']]
     .filter(([k]) => bySrc[k]).map(([k, l]) => `${bySrc[k]} ${l}`);
@@ -1270,9 +1313,12 @@ function pickFilter(id) {
   if (raw && !exact) {
     const row = tx.find(x => x.id === (document.getElementById(id) || {}).dataset?.row);
     const co = row && companies.find(c => c.name === companyOf(row));
+    // The partner itself is shared by every company (company_id = false, like 229 of the 231
+    // that exist). The company on the line only says vendor or customer — so the hint must
+    // not read as though the partner gets locked to it (Mario, 2026-09-07).
     html += co
-      ? `<div class="new" onmousedown="event.preventDefault();pickCreate('${id}')"><span>＋ Create "${esc(raw)}" in Odoo</span><span class="g">${esc(co.name)} · ${row && +row.credit > 0 ? 'customer' : 'vendor'}</span></div>`
-      : `<div class="new off"><span>＋ Create "${esc(raw)}"</span><span class="g">choose the company first</span></div>`;
+      ? `<div class="new" onmousedown="event.preventDefault();pickCreate('${id}')"><span>＋ Create "${esc(raw)}" in Odoo</span><span class="g" title="Created for every company; the line's company only decides vendor or customer">all companies · ${row && +row.credit > 0 ? 'customer' : 'vendor'}</span></div>`
+      : `<div class="new off"><span>＋ Create "${esc(raw)}"</span><span class="g" title="The partner is created for every company — the company on the line only decides whether it is a vendor or a customer">pick the company: it only decides vendor or customer</span></div>`;
   }
   if (!html) html = '<div class="none">no Odoo partner matches — type the exact name to check spelling</div>';
   box.innerHTML = html;
@@ -1516,9 +1562,11 @@ async function pickCreate(id) {
   const row = tx.find(x => x.id === hidden.dataset.row); if (!row) return;
   const coName = companyOf(row);
   const co = companies.find(c => c.name === coName);
-  if (!co) { say('Choose the company on this line first — it decides where the partner is created', 'err'); return; }
+  if (!co) { say('Pick the company on this line first — the partner is created for every company, but the company says whether it is a vendor or a customer', 'err'); return; }
   const kind = (+row.credit > 0) ? 'customer' : 'vendor';
-  if (!confirm(`Create "${name}" in Odoo as a ${kind}, under ${co.name}?`)) return;
+  if (!confirm(`Create "${name}" in Odoo as a ${kind}?
+
+It is created for every company — ${co.name} on this line is only what makes it a ${kind}.`)) return;
   try {
     const r = await Admin.api('POST', '/api/accounting/partners', { name, companyId: co.id, kind, phone: row.phone || '' });
     if (!partners.some(x => x.id === r.id)) { partners.push({ id: r.id, name: r.name, isCompany: true, company: '', customer: kind === 'customer', vendor: kind === 'vendor', phone: String(row.phone || '').replace(/\D/g, '') }); partners.sort((a, b) => a.name.localeCompare(b.name)); }
