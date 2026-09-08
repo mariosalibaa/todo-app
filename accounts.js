@@ -36,6 +36,7 @@
 //   POST   /api/accounting/accounts/<id>/tx/<txId>/docs   attach a photo / scan / file to a line
 //   GET    /api/accounting/accounts/<id>/tx/<txId>/docs/<docId>   the file itself
 //   DELETE /api/accounting/accounts/<id>/tx/<txId>/docs/<docId>
+//   GET    /api/accounting/odoo-file/<attachmentId>     an Odoo attachment, for the viewer
 //   POST   /api/accounting/accounts/<id>/odoo-check      match lines against the account's Odoo journals
 //   POST   /api/accounting/accounts/<id>/import-odoo     pull every line of the account's Odoo journals
 //   POST   /api/accounting/accounts/<id>/import-budget   { budgetAccountId } pull the HomeBudget history
@@ -763,6 +764,22 @@ async function handle(req, res, url, user, ctx) {
     const docs = [...(cur.docs || []), doc];
     await ref.set({ docs, updatedAt: now(), updatedBy: who }, { merge: true });
     return json(res, 200, doc);
+  }
+
+  // An Odoo attachment, streamed through the app so the page can show it: the browser has no
+  // Odoo session on this domain, so /web/content would only ever hand back a login page.
+  if ((m = url.match(/^\/api\/accounting\/odoo-file\/(\d+)$/)) && req.method === 'GET') {
+    try {
+      const [f] = await odooCall('ir.attachment', 'read', [[+m[1]], ['name', 'mimetype', 'datas']],
+        { context: { allowed_company_ids: [2, 4, 7, 8, 9, 10] } });
+      if (!f || !f.datas) return json(res, 404, { error: 'no such attachment' });
+      const buf = Buffer.from(f.datas, 'base64');
+      res.writeHead(200, { 'Content-Type': f.mimetype || 'application/octet-stream',
+        'Content-Disposition': `inline; filename="${String(f.name || 'file').replace(/"/g, '')}"`,
+        'Cache-Control': 'private, max-age=86400' });
+      res.end(buf);
+      return true;
+    } catch (e) { return json(res, 400, { error: String(e.message || e) }); }
   }
 
   // the file itself, streamed back through the app (the bucket stays private)
