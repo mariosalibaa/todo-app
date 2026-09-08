@@ -79,7 +79,7 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer', 'amountSrc', 'pendingExcel', 'noBook',
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer', 'amountSrc', 'pendingExcel', 'noBook', 'waAccepted',
   // What was typed on the phone before Odoo had a say: free text, never rejected.
   // The laptop turns it into a real partner / analytic when you accept the proposal.
   'partnerText', 'analyticText',
@@ -862,6 +862,10 @@ async function handle(req, res, url, user, ctx) {
     else if (cur.src !== 'odoo') for (const k of ['debit', 'credit']) if (k in body) data[k] = money(body[k]);
     if ('excluded' in body || 'dupOf' in body) data.dupSrc = 'manual';
     if (body.excluded === false) data.review = false;
+    // ✓ on a WhatsApp line is the acceptance that lets it reach Odoo and the workbook — nothing
+    // read off WhatsApp is booked before that (Mario, 2026-09-08)
+    if (cur.src === 'whatsapp' && (body.excluded === false || body.review === false || 'answer' in body || body.waAccepted === true)) data.waAccepted = true;
+    if (cur.src === 'whatsapp' && (body.excluded === true || body.waAccepted === false)) data.waAccepted = false;
     if ('paidBy' in body) data.paidBySrc = body.paidBy ? 'manual' : '';
     // hours and km live in the workbook, not on the line: they may travel alone
     if (!Object.keys(data).length && !(cur.src === 'excel' && SHEET_FIELDS.some(k => k in body))) return json(res, 400, { error: 'nothing to update' });

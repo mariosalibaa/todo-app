@@ -82,6 +82,9 @@
   #pv.on{display:flex;}
   #pv .stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
   #pv img,#pv iframe{max-width:92vw;max-height:82vh;background:#fff;border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+  #pv img{transform-origin:center;transition:transform .15s ease;}
+  #pv img.q1,#pv img.q3{max-width:82vh;max-height:92vw;}   /* on its side, the long edge is the screen's height */
+  #pv img.q1{transform:rotate(90deg);} #pv img.q2{transform:rotate(180deg);} #pv img.q3{transform:rotate(270deg);}
   #pv iframe{width:92vw;height:82vh;border:0;}
   #pv .nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:76px;border:0;border-radius:6px;
     background:rgba(255,255,255,.14);color:#fff;font-size:30px;cursor:pointer;line-height:1;}
@@ -404,6 +407,7 @@
   <div class="stage">
     <div class="bar">
       <span class="nm" id="pv-name"></span><span class="cnt" id="pv-count"></span><span class="sp"></span>
+      <button type="button" id="pv-rot" onclick="pvRotate(1)" title="Rotate a quarter turn (r; shift+r the other way) — remembered for this file">⟳ Rotate</button>
       <a id="pv-odoo" target="_blank" rel="noopener">Open in Odoo</a>
       <a id="pv-open" target="_blank" rel="noopener">Full size</a>
       <button type="button" onclick="pvClose()">✕ Close</button>
@@ -938,6 +942,10 @@ function visible() {
   });
   const col = COLS.find(c => c.k === sort.k) || COLS[0];
   list.sort((a, b) => {
+    // on the date column, order by the sheet's own sequence — sorting on "date + ref" text put a
+    // row of the same day above the one that follows it, so the top row showed a running balance
+    // that was not the account's closing one (Mario, 2026-09-08)
+    if (col.k === 'date' && !isStatement()) return dayOrder(a, b) * sort.dir;
     let x = col.v(a), y = col.v(b);
     if (typeof x === 'string') { x = x.toLowerCase(); y = y.toLowerCase(); }
     const r = x < y ? -1 : x > y ? 1 : 0;
@@ -1155,6 +1163,9 @@ function render() {
       : `<td class="c-type hint">${esc(t.nature || '')}</td>`;
     const onlyFlag = t.src === 'odoo' && t.odooOnly && t.excluded ? `<div class="flag" title="Booked in Odoo on this person's cash journal, but no row of the Excel ledger matches it. Not counted: the Excel is the account.">🟣 not in Excel</div>` : '';
     const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
+    // nothing read off WhatsApp reaches Odoo or the workbook before Mario presses ✓ (2026-09-08)
+    const waFlag = t.src === 'whatsapp' && !t.waAccepted && !t.excluded && !t.review
+      ? `<div class="flag" title="Read from WhatsApp. It counts on this page, but it is not written to Odoo or to the workbook until you accept it.">✋ waiting for your ✓</div>` : '';
     const acts = st ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>`
       : (t.excluded ? `<a onclick="toggleExcluded('${t.id}', false)" title="${esc(t.dupOf ? 'Not counted: repeats ' + t.dupOf + '. Click to count it.' : t.review ? 'Not counted: nobody wrote this down in the Excel or in Odoo. Click to accept and count it.' : 'Not counted. Click to count it.')}">${t.review ? '✓ accept' : '⊘ count'}</a>`
         : `<a onclick="toggleExcluded('${t.id}', true)" title="Do not count this line (it repeats another one)">⊘</a>`)
@@ -1162,6 +1173,8 @@ function render() {
         + (t.src === 'manual' || t.src === 'telegram' ? `<a onclick="openLineForm('${t.id}')" title="Edit">✎</a>` : '')
         + (['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '')
         + (t.src !== 'odoo' && !t.bookedMove ? `<a class="wantbook${t.bookWanted ? ' on' : ''}" onclick="wantBook('${t.id}', ${!t.bookWanted})" title="${t.bookWanted ? 'Waiting to be booked — click to take it off the list' : 'Ask for this line to be booked in Odoo. Nothing is written until it is approved on the laptop.'}">📗</a>` : '')
+        + (t.src === 'whatsapp' && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this WhatsApp line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
+        + (t.src === 'whatsapp' && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + ((t.docs || []).length ? `<a class="paper" onclick="openDocs('${t.id}')" title="${(t.docs || []).length} file${t.docs.length === 1 ? '' : 's'} on this line: ${esc(t.docs.map(d => d.name).join(', '))}">📎${t.docs.length > 1 ? t.docs.length : ''}</a>` : '');
     return `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
       <td class="c-date">${t.src === 'excel' ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this row falls on, in the workbook" onchange="saveSheet('${t.id}', 'date', this.value, this)">` : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
@@ -1171,7 +1184,7 @@ function render() {
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
         ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}${(t.ask.options || []).some(o => o.debit != null || o.credit != null) ? ` <button class="yes" style="width:auto;padding:0 6px" onclick="answerCustom('${t.id}')" title="Type any amount for this row">Other amount…</button>` : ''}</div>` : t.answer ? `<div class="sug-act"><span class="sug-why">Answered: ${esc(String(t.answer))}</span></div>` : ''}
-        ${paidFlag}${reviewFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
+        ${paidFlag}${reviewFlag}${waFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       ${typeCell}
       <td class="num debit${t.debit ? '' : ' zero'}">${amountCell(t, 'debit')}</td>
@@ -2251,6 +2264,18 @@ async function bookQueue() {
 //    files uploaded here — is one strip you walk with ‹ ›, the arrow keys, or the filmstrip.
 //    Odoo files come through the app: the browser has no Odoo session on this domain.
 let pvList = [], pvAt = 0, pvTx = '';
+// how many quarter turns each file needs to read straight — the phone photos arrive on their side.
+// Kept per file in this browser, so the next time it opens the right way up (Mario, 2026-09-08).
+const PV_ROT = 'accRotate';
+const rotOf = url => { try { return +(JSON.parse(localStorage.getItem(PV_ROT) || '{}')[url] || 0) % 4; } catch { return 0; } };
+const setRot = (url, q) => { try { const m = JSON.parse(localStorage.getItem(PV_ROT) || '{}'); if (q) m[url] = q; else delete m[url]; localStorage.setItem(PV_ROT, JSON.stringify(m)); } catch {} };
+function pvRotate(step) {
+  const f = pvList[pvAt]; if (!f || !f.img) return;
+  const q = (rotOf(f.url) + (step || 1) + 4) % 4;
+  setRot(f.url, q);
+  const img = document.querySelector('#pv-body img');
+  if (img) img.className = q ? 'q' + q : '';
+}
 function filesOf(t) {
   return [
     ...(t.fileIds || []).map(f => ({ name: f.name, url: `/api/accounting/odoo-file/${f.id}`,
@@ -2269,9 +2294,11 @@ function openViewer(id, at) {
 function pvShow() {
   const f = pvList[pvAt], many = pvList.length > 1;
   const wa = /^wa /.test(f.name);
+  const q = f.img ? rotOf(f.url) : 0;
   document.getElementById('pv-body').innerHTML = f.img
-    ? `<img src="${f.url}" alt="${esc(f.name)}">`
+    ? `<img src="${f.url}" alt="${esc(f.name)}" class="${q ? 'q' + q : ''}">`
     : `<iframe src="${f.url}"></iframe>`;
+  document.getElementById('pv-rot').style.display = f.img ? '' : 'none';
   document.getElementById('pv-name').textContent = f.name;
   document.getElementById('pv-count').textContent = many ? `${pvAt + 1} / ${pvList.length}` : '';
   document.getElementById('pv-odoo').style.display = f.odoo ? '' : 'none';
@@ -2293,7 +2320,17 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') { e.preventDefault(); pvStep(1); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); pvStep(-1); }
   else if (e.key === 'Escape') { e.preventDefault(); pvClose(); }
+  else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); pvRotate(e.shiftKey ? -1 : 1); }
 });
+
+// ✓ on a WhatsApp line: the moment Mario accepts it, and only then, it may go to Odoo and the sheet
+async function acceptWa(id, yes) {
+  try {
+    await patch(id, { waAccepted: !!yes });
+    const t = tx.find(x => x.id === id); if (t) t.waAccepted = !!yes;
+    render(); say(yes ? 'Accepted — it can be booked now' : 'Back on hold');
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
 
 // 📎 on a row opens the paper in the viewer; the files are managed in the line's form
 function openDocs(id) {

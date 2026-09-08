@@ -131,7 +131,11 @@ async function applyMap(ctx, account) {
 // A line of the account: the Excel rows, plus a WhatsApp/typed line a person has ACCEPTED (Mario
 // 2026-09-07: "auto book to odoo when i accept"). An accepted proposal counts and books like a sheet
 // row; it still has to be written into the workbook, which the ✓ marks with `pendingExcel`.
-const isRow = t => t.src === 'excel' || ((t.src === 'whatsapp' || t.src === 'manual' || t.src === 'telegram') && !t.excluded && !t.review);
+// A WhatsApp line is a PROPOSAL until Mario presses ✓ on it (2026-09-08: "do not post on odoo nor
+// excel the whatsapp entries before i accept them, for all hub workers") — `waAccepted` is that press.
+const isRow = t => t.src === 'excel'
+  || ((t.src === 'manual' || t.src === 'telegram') && !t.excluded && !t.review)
+  || (t.src === 'whatsapp' && !t.excluded && !t.review && t.waAccepted === true);
 const bookable = t => isRow(t) && !t.excluded && t.debit > 0 && (t.nature === 'labour' || t.nature === 'expense' || t.nature === 'opening');
 const onlyOne = (opts, t) => !opts || !opts.only || opts.only === t.id || (Array.isArray(opts.only) && opts.only.includes(t.id));
 async function months(ctx, account) {

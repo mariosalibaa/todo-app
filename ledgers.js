@@ -196,7 +196,13 @@ async function readExcel(file, layoutName, sheetName) {
     // the sheet's own unrounded figure (formulas like 500000/89500), so the old / new / all sums read as Excel prints them
     const rawV = lay.amountCol ? cell(r[lay.amountCol]) : '';
     const raw = typeof rawV === 'number' && isFinite(rawV) ? rawV : null;
-    for (const mv of lay.rows(r, lay.owner)) rows.push({ ...mv, date, period: status === 'old' || status === 'new' ? status : '', row: i, ...(raw != null && money(raw) === mv.amount ? { raw } : {}) });
+    // the sheet's own figure, at its own precision and in the row's sign: Ziad's column is negative
+    // for spending and Abed's positive, and the old test only kept it when the signs already agreed —
+    // so his rows fell back to rounded cents and 2,763 of them drifted the closing by 0.10 (2026-09-08)
+    for (const mv of lay.rows(r, lay.owner)) {
+      const signed = raw == null ? null : money(raw) === mv.amount ? raw : money(-raw) === mv.amount ? -raw : null;
+      rows.push({ ...mv, date, period: status === 'old' || status === 'new' ? status : '', row: i, ...(signed != null ? { raw: signed } : {}) });
+    }
   });
   return { rows, sheet: ws.name, file: path.basename(file) };
 }
