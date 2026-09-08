@@ -258,6 +258,15 @@ async function closeStatement(ctx, account, who) {
   const db = col.firestore; let b = db.batch(), n = 0;
   for (const d of cur.docs) { if (d.data().period !== 'new') continue; b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '' }, { merge: true }); rows++; if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; } }
   if (n) await b.commit();
+  // remember what was sent and when: the Statements page reads this instead of guessing from the
+  // sheet's old block, and it is the record Mario checks a month later (2026-09-08)
+  const counted = cur.docs.map(d => d.data()).filter(t => !t.excluded);
+  const bal = counted.reduce((s, t) => s + (t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0)), 0);
+  const dates = counted.map(t => t.date).filter(Boolean).sort();
+  try {
+    await account.ref.set({ statement: { date: dates[dates.length - 1] || new Date().toISOString().slice(0, 10),
+      balance: Math.round(bal * 100) / 100, sentAt: now(), by: who || '', rows } }, { merge: true });
+  } catch (e) { /* the flip is what matters; the record is a convenience */ }
   return { flipped, rows, file: base };
 }
 

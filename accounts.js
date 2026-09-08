@@ -46,6 +46,7 @@
 //   POST   /api/accounting/accounts/<id>/link-transfers  { loose? } join "from mario" lines with Mario's cash as transfers
 //   POST   /api/accounting/scan/launch                   open HP Smart on this laptop
 //   GET    /api/accounting/scan/new?since=<ms>            the page it just scanned, as bytes
+//   GET    /api/accounting/statements                    per worker: last statement, sheet/hub/Odoo agreement, what waits for the ✓
 //   GET    /api/accounting/whatsapp-groups?q=            the archive's groups, for the ⚙ form
 //   GET    /api/accounting/odoo/journals                 the Odoo bank/cash journals, for the "+" form
 //   GET    /api/accounting/transfers                     list
@@ -58,7 +59,8 @@ const SCAN_DIR = process.env.SCAN_DIR
 
 const acc = require('./accounting');
 const ledgers = require('./ledgers');   // the workers' Excel ledgers, WhatsApp groups, transfer linking
-const bills = require('./ledger-bills');  // a worker's month → one draft bill; the analytic map
+const bills = require('./ledger-bills');
+const statements = require('./statements');   // the workers' statement round: last sent, what agrees, what is waiting  // a worker's month → one draft bill; the analytic map
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };   // true = handled
 const readBody = (req, max) => new Promise((resolve, reject) => {
@@ -446,7 +448,7 @@ function dayFromMessages(messages, account) {
 }
 
 async function handle(req, res, url, user, ctx) {
-  const { db, admin, TEAM_ID, odooCall } = ctx;
+  const { db, admin, TEAM_ID, odooCall, local } = ctx;
   const ws = db.collection('workspaces').doc(TEAM_ID);
   const who = user.email || user.uid;
   let m;
@@ -1106,6 +1108,33 @@ async function handle(req, res, url, user, ctx) {
       if (b.accountId) { const a = await resolve(ws, b.accountId); if (a) rows = await bills.applyMap(ledgerCtx, a); }
       return json(res, 200, { ok: true, key, rowsUpdated: rows });
     } catch (e) { return json(res, 400, { error: String(e.message || e) }); }
+  }
+
+  // where each worker stands: his last statement, whether sheet/hub/Odoo still agree with it,
+  // and what has come in since that is waiting for the ✓ (Mario, 2026-09-08)
+  if (url.startsWith('/api/accounting/statements') && req.method === 'GET') {
+    try { return json(res, 200, await statements.summary({ db, admin, TEAM_ID, odooCall, local }, { fast: /fast=1/.test(url) })); }
+    catch (e) { console.error('statements', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+
+  // the statement he is about to receive — prepared, never sent on its own
+  if (url.startsWith('/api/accounting/statements/draft') && req.method === 'GET') {
+    const id = new URL('http://x' + url).searchParams.get('id') || '';
+    const a = await resolve(ws, id);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    try {
+      const all = await statements.summary({ db, admin, TEAM_ID, odooCall, local }, { fast: true });
+      const row = (all.accounts || []).find(x => x.id === a.id);
+      if (!row) return json(res, 400, { error: 'not a worker account' });
+      return json(res, 200, { text: statements.draft(row), row });
+    } catch (e) { return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // read each worker's accounting group through the browser on this laptop: how far it has been
+  // read, and how much he has written since his last statement
+  if (url.startsWith('/api/accounting/statements/scan') && req.method === 'POST') {
+    if (!local) return json(res, 400, { error: 'the groups can only be read from the laptop' });
+    try { return json(res, 200, await statements.scanGroups({ db, admin, TEAM_ID, odooCall, local })); }
+    catch (e) { console.error('statements scan', e); return json(res, 400, { error: String(e.message || e) }); }
   }
 
   if (url.startsWith('/api/accounting/whatsapp-groups') && req.method === 'GET') {

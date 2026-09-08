@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Statements · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1240px;margin:0 auto;padding:20px 18px 90px;}
+  .back{font-size:.78rem;color:var(--overlay0);text-decoration:none;display:inline-block;margin-bottom:14px;}
+  .back:hover{color:var(--text);}
+  h1{font-size:1.15rem;margin:0 0 4px;font-weight:600;}
+  .lede{color:var(--overlay0);font-size:.8rem;margin:0 0 16px;max-width:74ch;line-height:1.55;}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  button,.btn{background:var(--surface0);color:var(--text);border:1px solid var(--surface1);border-radius:9px;padding:8px 12px;font-size:.82rem;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block;}
+  button:hover,.btn:hover{border-color:var(--amber);}
+  button:disabled{opacity:.45;cursor:default;border-color:var(--surface1);}
+  .note{font-size:.76rem;color:var(--overlay0);}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;}
+  th{text-align:left;font-weight:600;color:var(--sub);padding:8px 10px;border-bottom:1px solid var(--surface1);white-space:nowrap;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;}
+  td{padding:10px;border-bottom:1px solid var(--surface0);vertical-align:top;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .name{font-weight:600;} .sub{color:var(--overlay0);font-size:.72rem;margin-top:2px;}
+  .ok{color:var(--green);} .bad{color:var(--red);} .warn{color:var(--amber);} .dim{color:var(--overlay0);}
+  .pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:.72rem;border:1px solid var(--surface1);}
+  .pill.ok{border-color:rgba(166,227,161,.4);background:rgba(166,227,161,.08);color:var(--green);}
+  .pill.bad{border-color:rgba(243,139,168,.4);background:rgba(243,139,168,.08);color:var(--red);}
+  .pill.wait{border-color:rgba(242,169,59,.45);background:rgba(242,169,59,.10);color:var(--amber);}
+  .draft{white-space:pre-wrap;background:var(--crust);border:1px solid var(--surface0);border-radius:10px;padding:12px 14px;font-size:.8rem;line-height:1.5;margin-top:8px;}
+  dialog{background:var(--mantle);color:var(--text);border:1px solid var(--surface1);border-radius:14px;padding:18px;max-width:580px;width:92vw;}
+  dialog::backdrop{background:rgba(0,0,0,.6);}
+  #msg{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--surface0);border:1px solid var(--surface1);border-radius:10px;padding:9px 16px;font-size:.82rem;opacity:0;transition:opacity .2s;pointer-events:none;}
+  #msg.on{opacity:1;}
+  @media (max-width:760px){ td,th{padding:8px 6px;font-size:.76rem;} .hide-s{display:none;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT<span>.</span><small>HUB</small></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <a class="back" href="/accounting">← Accounting</a>
+  <h1>Statements</h1>
+  <p class="lede">Where each man stands: the last statement he received on WhatsApp, whether his workbook, this hub and Odoo still tell the same story, and what has arrived since that is waiting for your ✓. Nothing read off WhatsApp reaches the sheet or Odoo until you accept it.</p>
+  <div class="bar">
+    <button id="refresh" onclick="load(true)">↻ Refresh</button>
+    <button id="scan" onclick="scan()">💬 Read the groups</button>
+    <span class="note" id="at"></span>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Worker</th>
+      <th>Last statement</th>
+      <th class="num">Balance sent</th>
+      <th class="num hide-s">Sheet now</th>
+      <th class="num">Hub now</th>
+      <th class="num">Odoo now</th>
+      <th>Agree</th>
+      <th class="num hide-s">Booked since</th>
+      <th>Waiting for ✓</th>
+      <th></th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="10" class="dim">Loading…</td></tr></tbody>
+  </table>
+  <p class="note" id="foot" style="margin-top:14px"></p>
+</main>
+<dialog id="dlg"><div id="dlg-body"></div>
+  <div class="bar" style="margin:14px 0 0;justify-content:flex-end">
+    <button onclick="document.getElementById('dlg').close()">Close</button>
+    <button id="dlg-copy">Copy</button>
+  </div>
+</dialog>
+<div id="msg"></div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const el = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = n => n == null ? '—' : (n < 0 ? '−' : '') + Math.abs(n).toFixed(2);
+let data = null;
+function say(t, bad) { const m = el('msg'); m.textContent = t; m.style.borderColor = bad ? 'var(--red)' : 'var(--surface1)'; m.classList.add('on'); clearTimeout(say._t); say._t = setTimeout(() => m.classList.remove('on'), 4000); }
+const ago = d => { if (!d) return ''; const n = Math.round((Date.now() - new Date(d + 'T12:00:00')) / 864e5); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago'; };
+
+function draw() {
+  const rows = data.accounts || [];
+  el('rows').innerHTML = rows.map(a => {
+    const agree = a.agree ? '<span class="pill ok">✔ same</span>' : '<span class="pill bad">✖ differ</span>';
+    const wait = a.pending.lines
+      ? '<span class="pill wait">' + a.pending.lines + ' line' + (a.pending.lines === 1 ? '' : 's') + ' · ' + fmt(a.pending.value) + '</span>'
+        + (a.pending.first ? '<div class="sub">' + esc(a.pending.first) + (a.pending.last !== a.pending.first ? ' → ' + esc(a.pending.last) : '') + '</div>' : '')
+      : '<span class="dim">nothing</span>';
+    const since = a.bookedSince == null ? '<span class="dim">—</span>'
+      : Math.abs(a.bookedSince) < 0.005 ? '<span class="ok">nothing</span>'
+      : '<span class="warn">' + fmt(a.bookedSince) + '</span>';
+    const waSub = a.wa && a.wa.at ? '<div class="sub">group read ' + esc(String(a.wa.at).slice(0, 16).replace('T', ' ')) + (a.wa.newMessages ? ' · ' + a.wa.newMessages + ' message(s) since' : '') + '</div>' : '';
+    return '<tr>'
+      + '<td><div class="name">' + esc(a.name) + '</div><div class="sub">' + esc(a.group || '') + '</div>' + waSub + '</td>'
+      + '<td>' + (a.statement.date ? esc(a.statement.date) + '<div class="sub">' + ago(a.statement.date) + (a.statement.recorded ? '' : ' · read off the sheet') + '</div>' : '<span class="dim">never</span>') + '</td>'
+      + '<td class="num">' + fmt(a.statement.balance) + '</td>'
+      + '<td class="num hide-s">' + (a.sheet ? (a.sheet.error ? '<span class="bad" title="' + esc(a.sheet.error) + '">error</span>' : fmt(a.sheet.all)) : '<span class="dim">laptop only</span>') + '</td>'
+      + '<td class="num">' + fmt(a.hubNow) + '</td>'
+      + '<td class="num">' + (a.odooError ? '<span class="bad" title="' + esc(a.odooError) + '">error</span>' : fmt(a.odooNow)) + '</td>'
+      + '<td>' + agree + (a.matchesStatement ? '<div class="sub ok">= last statement</div>' : '') + '</td>'
+      + '<td class="num hide-s">' + since + '</td>'
+      + '<td>' + wait + '</td>'
+      + '<td style="white-space:nowrap"><a class="btn" href="/accounting/accounts?id=' + encodeURIComponent(a.id) + '">open</a> '
+      + '<button onclick="prep(\'' + a.id + '\')" title="Prepare the statement to send him">statement…</button></td>'
+      + '</tr>';
+  }).join('') || '<tr><td colspan="10" class="dim">no worker accounts</td></tr>';
+  el('at').textContent = 'read ' + new Date(data.at).toLocaleTimeString() + (data.local ? '' : ' · workbooks are only readable on the laptop');
+  const waiting = rows.reduce((s, a) => s + a.pending.lines, 0);
+  el('foot').textContent = waiting
+    ? waiting + ' line' + (waiting === 1 ? '' : 's') + ' waiting for your ✓. Open a worker, accept line by line, then come back and send his statement.'
+    : 'Nothing is waiting for your ✓.';
+}
+
+async function load(force) {
+  el('refresh').disabled = true;
+  try { data = await Admin.api('GET', '/api/accounting/statements' + (force ? '?t=' + Date.now() : '')); draw(); }
+  catch (e) { say('Could not load: ' + e.message, true); }
+  el('refresh').disabled = false;
+}
+
+// Reading the groups needs the browser on this laptop — the same Playwright session the Day report uses
+async function scan() {
+  el('scan').disabled = true; say('Reading the WhatsApp groups… this takes a minute');
+  try { const r = await Admin.api('POST', '/api/accounting/statements/scan', {}); say(r.read ? 'Read ' + r.read + ' group(s)' : 'Nothing read'); await load(true); }
+  catch (e) { say('Could not read: ' + e.message, true); }
+  el('scan').disabled = false;
+}
+
+// The statement he is about to receive — shown first, sent only when you say so
+async function prep(id) {
+  const a = (data.accounts || []).find(x => x.id === id); if (!a) return;
+  let text = '';
+  try { const r = await Admin.api('GET', '/api/accounting/statements/draft?id=' + encodeURIComponent(id)); text = r.text || ''; }
+  catch (e) { text = 'Could not prepare: ' + e.message; }
+  el('dlg-body').innerHTML = '<h1 style="margin:0 0 8px">' + esc(a.name) + '</h1>'
+    + '<p class="note">' + (a.pending.lines
+      ? '<span class="warn">' + a.pending.lines + ' line(s) are still waiting for your ✓ — accept or drop them first, or the statement will not match what he wrote.</span>'
+      : 'Nothing is waiting for your ✓.') + '</p>'
+    + '<div class="draft">' + esc(text) + '</div>'
+    + '<p class="note" style="margin-top:10px">Copy it into ' + esc(a.group) + ' yourself. Sending from here is one more press — say the word and I will wire it.</p>';
+  el('dlg-copy').onclick = () => { navigator.clipboard.writeText(text); say('Copied'); };
+  el('dlg').showModal();
+}
+
+Admin.require('accounting', async me => {
+  el('who').innerHTML = esc(me.email) + ' <a href="#" onclick="Admin.signOut();return false;">Sign out</a>';
+  await load();
+});
+</script>
+</body>
+</html>

@@ -88,6 +88,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'budget.html'));
   fs.readFileSync(path.join(__dirname, 'wise.html'));
   fs.readFileSync(path.join(__dirname, 'accounting-home.html'));
+  fs.readFileSync(path.join(__dirname, 'statements.html'));
   fs.readFileSync(path.join(__dirname, 'accounts.js'));
   fs.readFileSync(path.join(__dirname, 'transfers.html'));
   fs.readFileSync(path.join(__dirname, 'dashboard.html'));
@@ -593,6 +594,7 @@ const handler = async (req, res) => {
     'hub.html': path.join(__dirname, 'hub.html'),
     'accounting-home.html': path.join(__dirname, 'accounting-home.html'),
     'accounting.html': path.join(__dirname, 'accounting.html'),
+    'statements.html': path.join(__dirname, 'statements.html'),
     'daily.html': path.join(__dirname, 'daily.html'),
     'transfers.html': path.join(__dirname, 'transfers.html'),
     'wise.html': path.join(__dirname, 'wise.html'),
@@ -602,7 +604,7 @@ const handler = async (req, res) => {
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
-    '/accounting/daily': 'daily.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html' };
+    '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
