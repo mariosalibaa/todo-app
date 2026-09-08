@@ -658,6 +658,20 @@ async function postPayments(ctx, account, who, opts) {
   return out;
 }
 
+// ── settle a document through the Settlement journal, "Paid by" him ────────
+// The bill's "Journal Entry Info" popover (the little box on the paid ribbon) only ever renders
+// Amount / Memo / Date / Journal — it is an OWL widget, not a view, so Studio cannot add the
+// "Paid by (other vendor)" field to it. Mario, 2026-09-08: put the payer at the head of the memo
+// instead, so who fronted the money is readable without opening the payment.
+async function settlePaidBy(odooCall, ctxO, moveId, journalId, date, partner) {
+  const wctx = { ...ctxO, active_model: 'account.move', active_ids: [moveId] };
+  const wiz = await odooCall('account.payment.register', 'create', [{ journal_id: journalId, payment_date: date, x_paid_by: +partner.id }], { context: wctx });
+  const [w] = await odooCall('account.payment.register', 'read', [[wiz], ['communication']], { context: wctx });
+  const memo = (w && w.communication) || '';
+  if (!/^Paid by /.test(memo)) await odooCall('account.payment.register', 'write', [[wiz], { communication: `Paid by ${partner.name}${memo ? ' · ' + memo : ''}` }], { context: wctx });
+  await odooCall('account.payment.register', 'action_create_payments', [[wiz]], { context: wctx });
+}
+
 // Money a supplier gave back that stayed in his pocket: a credit note from that supplier in
 // S LB, settled by him, so his account is debited exactly as a bill of his credits it.
 async function postRefunds(ctx, account, who, opts) {
@@ -691,9 +705,7 @@ async function postRefunds(ctx, account, who, opts) {
         out.posted++;
       }
       if (note.payment_state === 'not_paid') {
-        const wctx = { ...ctxO, active_model: 'account.move', active_ids: [note.id] };
-        const wiz = await odooCall('account.payment.register', 'create', [{ journal_id: CO.sett, payment_date: t.date, x_paid_by: +partner.id }], { context: wctx });
-        await odooCall('account.payment.register', 'action_create_payments', [[wiz]], { context: wctx });
+        await settlePaidBy(odooCall, ctxO, note.id, CO.sett, t.date, partner);
         [note] = await odooCall('account.move', 'read', [[note.id], ['id', 'name', 'state', 'payment_state']], { context: ctxO });
       }
       out.total = money(out.total + t.credit);
@@ -706,6 +718,39 @@ async function postRefunds(ctx, account, who, opts) {
   return out;
 }
 
+// ── the supplier's bill may already be in Odoo ────────────────────────────
+// Monzer's stone walls (Mario, 2026-09-08): the $2,450 bill was in Odoo with its own scan, and
+// Georges' two rows for it (1,000 and 750) were part payments of it — the hub booked each row as
+// a bill of its own, so the same purchase was in the books twice. Before making anything from a
+// row, look at what that supplier already has in that company: a bill of the same amount within
+// ten days that no other row claims, or a payment of the same amount already made against one.
+// Either way the row is left alone and reported — which of the two it is, is Mario's call.
+const dupCache = new Map();
+async function supplierHas(odooCall, vendorId, companyId) {
+  const key = vendorId + '|' + companyId;
+  if (dupCache.has(key)) return dupCache.get(key);
+  const ctxO = { allowed_company_ids: [companyId], company_id: companyId };
+  const hubMade = m => /-xl-/.test(m.ref || '') || /Made by Shift Hub/.test(m.narration || '');
+  const bills = (await odooCall('account.move', 'search_read', [[['move_type', '=', 'in_invoice'], ['state', '=', 'posted'], ['partner_id', '=', vendorId]]],
+    { fields: ['id', 'name', 'ref', 'narration', 'amount_total', 'amount_residual', 'invoice_date'], context: ctxO, limit: 300 })).filter(m => !hubMade(m));
+  const real = new Set(bills.map(b => b.id));
+  const pays = bills.length ? (await odooCall('account.payment', 'search_read', [[['partner_id', '=', vendorId]]],
+    { fields: ['id', 'name', 'amount', 'date', 'memo', 'journal_id', 'reconciled_bill_ids'], context: ctxO, limit: 300 }))
+    .filter(p => !/-xl-/.test(p.memo || '') && (p.reconciled_bill_ids || []).some(b => real.has(b))) : [];
+  const v = { bills, pays };
+  dupCache.set(key, v);
+  return v;
+}
+const daysApart = (a, b) => Math.abs(new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000;
+async function alreadyInOdoo(odooCall, vendorId, amount, date, companyId, usedBills) {
+  const { bills, pays } = await supplierHas(odooCall, vendorId, companyId);
+  const b = bills.find(x => Math.abs(x.amount_total - amount) < 0.02 && daysApart(x.invoice_date, date) <= 10 && !usedBills.has(x.id));
+  if (b) return { name: b.name, why: 'a bill of ' + fmt2(b.amount_total) + ' dated ' + b.invoice_date + (b.amount_residual > 0.005 ? ' (still open)' : ' (already paid)') + ' is in Odoo already' };
+  const p = pays.find(x => Math.abs(x.amount - amount) < 0.02 && daysApart(x.date, date) <= 35);
+  if (p) return { name: p.name, why: 'a payment of ' + fmt2(p.amount) + ' on ' + p.date + ' (' + p.journal_id[1] + ') already settles this much of that supplier’s own bill' };
+  return null;
+}
+
 // An unofficial supplier ticket he paid: the supplier's bill in S LB (no VAT), paid through Settlement by him.
 async function postVendors(ctx, account, who, opts) {
   const CO = bookCo(account);
@@ -716,14 +761,18 @@ async function postVendors(ctx, account, who, opts) {
   const all = (await col.get()).docs.map(d => d.data());
   const rows = all.filter(t => isRow(t) && onlyOne(opts, t) && !t.excluded && t.debit > 0 && t.nature === 'vendor' && !inOdoo(t) && !t.bookedMove && !t.noBook).sort((a, b) => a.date < b.date ? -1 : 1);
   const an = analyticsFor(all.filter(t => isRow(t) && !t.excluded && t.debit > 0), map);
-  const out = { rows: rows.length, posted: 0, found: 0, noPartner: [], skipped: [], total: 0 };
+  const out = { rows: rows.length, posted: 0, found: 0, noPartner: [], skipped: [], dupSuspect: [], total: 0 };
   const prefix = account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '');
   const ctxO = { allowed_company_ids: [CO.companyId], company_id: CO.companyId };
+  const usedBills = new Set(all.filter(t => t.bookedMove && t.bookedMove.id).map(t => t.bookedMove.id));   // a bill another row already answers for
   for (const t of rows) {
     // "abed · attal": the vendor is in the label (hand list), else any supplier Odoo knows (Mario, 2026-09-06:
     // a row naming a known vendor is that vendor's own bill, never a line of the month's bundle)
     const v = await vendorOf(odooCall, t, account);
     if (!v) { out.noPartner.push({ id: t.id, date: t.date, amount: t.debit, partner: t.partnerName }); continue; }
+    // the supplier's own bill may already be in Odoo: never book the same purchase twice
+    const dup = await alreadyInOdoo(odooCall, v.id, money(t.debit), t.date, CO.companyId, usedBills).catch(() => null);
+    if (dup) { out.dupSuspect.push({ id: t.id, date: t.date, amount: money(t.debit), vendor: v.name, bill: dup.name, why: dup.why, text: [t.partnerName, t.description].filter(Boolean).join(' · ') }); continue; }
     if (opts && opts.dry) { out.posted++; out.total = money(out.total + t.debit); (out.preview = out.preview || []).push({ id: t.id, date: t.date, amount: t.debit, vendor: v.name, text: [t.partnerName, t.description].filter(Boolean).join(' · ') }); continue; }
     const ref = `${prefix}-${t.id}`;
     try {
@@ -740,9 +789,7 @@ async function postVendors(ctx, account, who, opts) {
       }
       if (bill.payment_state === 'not_paid') {
         // Settlement journal + Paid by = him: the automation moves the debt onto his account
-        const wctx = { ...ctxO, active_model: 'account.move', active_ids: [bill.id] };
-        const wiz = await odooCall('account.payment.register', 'create', [{ journal_id: CO.sett, payment_date: t.date, x_paid_by: +partner.id }], { context: wctx });
-        await odooCall('account.payment.register', 'action_create_payments', [[wiz]], { context: wctx });
+        await settlePaidBy(odooCall, ctxO, bill.id, CO.sett, t.date, partner);
         [bill] = await odooCall('account.move', 'read', [[bill.id], ['id', 'name', 'state', 'payment_state']], { context: ctxO });
       }
       out.total = money(out.total + t.debit);
@@ -838,9 +885,11 @@ async function bookRow(ctx, account, txId, who) {
   if (files.length) { data.fileIds = files; data.files = files.map(f => f.name); }
   if (after.src !== 'excel' && account.excel && account.excel.file) data.pendingExcel = true;   // still to be written into the workbook
   await col.doc(txId).set(data, { merge: true });
+  const dup = out && (out.dupSuspect || []).find(s => s.id === txId);
+  if (!move && dup) throw new Error('not booked: ' + dup.why + ' (' + dup.bill + ') — tie the row to it or say it is a different purchase');
   const err = (out && (out.skipped || []).find(s => s.id === txId)) || (out && (out.noPartner || []).find(s => s.id === txId));
   if (!move && err) throw new Error(err.error || 'nothing booked for this line: ' + JSON.stringify(err).slice(0, 120));
   return { kind, move: move && move.name, id: move && move.id, ref: move && move.ref, photos: files.length, pendingExcel: !!data.pendingExcel };
 }
 
-module.exports = { postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+module.exports = { alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
