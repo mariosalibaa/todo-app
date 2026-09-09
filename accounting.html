@@ -1579,7 +1579,21 @@ function openStmt() {
 }
 // The block leaves as a file — a picture for WhatsApp, or an A4 PDF — drawn from the table exactly
 // as it stands on screen (Mario, 2026-09-09). The two libraries load only when asked for.
-const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('could not load ' + src)); document.head.appendChild(s); });
+// resolves once the library's global exists — a second click while the first load is still on its
+// way must wait for it, not find the tag and run ahead ("Cannot destructure 'jsPDF'", 2026-09-09)
+const loadScript = (src, global) => new Promise((ok, no) => {
+  if (window[global]) return ok();
+  if (!document.querySelector(`script[src="${src}"]`)) { const s = document.createElement('script'); s.src = src; s.onerror = () => no(new Error('could not load ' + src.split('/').pop() + ' — is the internet on?')); document.head.appendChild(s); }
+  const t0 = Date.now();
+  (function wait() { if (window[global]) return ok(); if (Date.now() - t0 > 30000) return no(new Error(global + ' did not load in 30 s')); setTimeout(wait, 100); })();
+});
+// a real link in the page, clicked, then removed: a detached anchor is ignored by some browsers
+function saveFile(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
+}
 async function stmtExport(kind) {
   const table = document.querySelector('#stmt-body table.xl');
   if (!table) return;
@@ -1588,14 +1602,15 @@ async function stmtExport(kind) {
   const base = `${who} statement ${from || 'start'} → ${to || localYmd(new Date())}`;
   say('Drawing the statement…');
   try {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
     const canvas = await html2canvas(table, { scale: 2, backgroundColor: '#ffffff', logging: false });
     if (kind === 'png') {
-      const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = base + '.png'; a.click();
-      say('Image saved: ' + a.download);
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+      saveFile(blob, base + '.png');
+      say('Image saved to your downloads: ' + base + '.png');
       return;
     }
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'jspdf');
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     const margin = 12, pw = 210 - margin * 2, ph = 297 - margin * 2;
@@ -1608,8 +1623,8 @@ async function stmtExport(kind) {
       pdf.setFontSize(9); pdf.setTextColor(120); pdf.text(`${base}${page ? ' · ' + (page + 1) : ''}`, margin, 8);
       pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, pw, slice.height * ratio);   // JPEG: a PNG page weighs megabytes
     }
-    pdf.save(base + '.pdf');
-    say('PDF saved: ' + base + '.pdf');
+    saveFile(pdf.output('blob'), base + '.pdf');
+    say('PDF saved to your downloads: ' + base + '.pdf');
   } catch (e) { say('Could not export: ' + e.message, 'err'); }
 }
 async function stmtSent() {
