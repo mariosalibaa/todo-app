@@ -473,6 +473,9 @@ function dayFromMessages(messages, account) {
 
 async function handle(req, res, url, user, ctx) {
   const { db, admin, TEAM_ID, odooCall, local } = ctx;
+  // Everything that reads or writes a workbook on D:\ or the WhatsApp archive only exists on
+  // Mario's laptop (Mario, 2026-09-09): online the button is off and the route says so.
+  const LOCAL_ONLY = "this reads the Excel/WhatsApp on Mario's laptop — it only works there, not on the website";
   const ws = db.collection('workspaces').doc(TEAM_ID);
   const who = user.email || user.uid;
   let m;
@@ -911,6 +914,15 @@ async function handle(req, res, url, user, ctx) {
     // read off WhatsApp is booked before that (Mario, 2026-09-08)
     if (cur.src === 'whatsapp' && (body.excluded === false || body.review === false || 'answer' in body || body.waAccepted === true)) data.waAccepted = true;
     if (cur.src === 'whatsapp' && (body.excluded === true || body.waAccepted === false)) data.waAccepted = false;
+    // A transfer moves against one of our own cash accounts — whichever the row names ("from
+    // Mario", "to Ziad"), Mario's when it names nobody. The type dropdown and the WhatsApp lines
+    // used to leave it empty, and an empty one is what no poster would book, so the line sat
+    // accepted and unbooked (Mario, 2026-09-09: "this should be auto linked to mario cash").
+    const willBe = 'nature' in data ? data.nature : cur.nature;
+    if (willBe === 'transfer' && !('cashAccountId' in data) && !cur.cashAccountId) {
+      data.partnerKind = data.partnerKind || cur.partnerKind || 'cash';
+      data.cashAccountId = bills.cashAccountFor([cur.partnerName, cur.partnerText, cur.description].filter(Boolean).join(' '), a.owner);
+    }
     if ('paidBy' in body) data.paidBySrc = body.paidBy ? 'manual' : '';
     // ☑ Reviewed is stamped here, not by the page, so the column always says who really looked and
     // when. An undo/redo carries its own reviewedAt back and is replayed as it was.
@@ -935,6 +947,7 @@ async function handle(req, res, url, user, ctx) {
     let sheet = null;
     if (cur.src === 'excel' && a.excel && a.excel.file && SHEET_FIELDS.some(k => k in body)) {
       try {
+        if (!local) throw new Error(LOCAL_ONLY);
         sheet = await ledgers.writeExcelRow({ acc, txCol, ws, resolve, listAccounts, odooCall }, a, { ...cur, id: m[2] }, body);
         if (sheet.wrote.length) {
           const after = { sheetWrittenAt: data.updatedAt, amountSrc: '' };
@@ -1050,8 +1063,9 @@ async function handle(req, res, url, user, ctx) {
   }
 
   // the workers' ledgers — read on Mario's machine, matched here
-  const ledgerCtx = { acc, txCol, ws, resolve, listAccounts, odooCall };
+  const ledgerCtx = { acc, txCol, ws, resolve, listAccounts, odooCall, local };
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-excel$/)) && req.method === 'POST') {
+    if (!local) return json(res, 400, { error: LOCAL_ONLY });
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
     const b = await readBody(req);
@@ -1072,6 +1086,7 @@ async function handle(req, res, url, user, ctx) {
     catch (e) { console.error('close-statement', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-whatsapp$/)) && req.method === 'POST') {
+    if (!local) return json(res, 400, { error: LOCAL_ONLY });
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
     const b = await readBody(req);
@@ -1134,6 +1149,7 @@ async function handle(req, res, url, user, ctx) {
   // one accepted line → Odoo at once, with its WhatsApp photos moved onto the document (Mario 2026-09-07)
   // the hours behind his pay, month by month and project by project
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/timesheet$/)) && req.method === 'GET') {
+    if (!local) return json(res, 400, { error: LOCAL_ONLY });
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
     const cfg = a.timesheet || {};
@@ -1146,6 +1162,7 @@ async function handle(req, res, url, user, ctx) {
   }
 
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-timesheet$/)) && req.method === 'POST') {
+    if (!local) return json(res, 400, { error: LOCAL_ONLY });
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
     const b = await readBody(req);

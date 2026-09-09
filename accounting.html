@@ -652,6 +652,8 @@ async function selectAccount(a) {
   const hasWa = !!(account && (account.whatsapp || {}).chatId), hasXl = !!(account && (account.excel || {}).file);
   // Every account shows the same row of actions (Mario, 2026-09-07): one that does not
   // apply here is greyed out and says why, instead of disappearing so you wonder where it went.
+  // The Excel workbooks live on D:\ and WhatsApp is read through the browser on Mario's
+  // laptop: on the website (Vercel) those buttons are off and say why (Mario, 2026-09-09).
   const able = (id, ok, why) => {
     const b = document.getElementById(id); if (!b) return;
     b.style.display = '';
@@ -663,13 +665,13 @@ async function selectAccount(a) {
   };
   able('btn-line', !st, 'Whish lines come from the statement PDF — nothing is typed into this account');
   able('btn-upload', st, 'Only the Whish account is fed by a statement PDF');
-  able('btn-wa', hasWa, 'No WhatsApp group on this account yet — add one with ⚙');
-  able('btn-xl', hasXl, 'No Excel ledger on this account — add one with ⚙');
+  able('btn-wa', hasWa && isLocal(), hasWa ? LOCAL_WHY : 'No WhatsApp group on this account yet — add one with ⚙');
+  able('btn-xl', hasXl && isLocal(), hasXl ? LOCAL_WHY : 'No Excel ledger on this account — add one with ⚙');
   able('btn-import', hasJ, 'No Odoo journal or partner on this account yet — add one with ⚙');
   able('btn-odoo', st || hasJ, 'Nothing to check against: give the account an Odoo journal with ⚙');
   able('btn-contacts', st, 'Contacts name the phone numbers on a Whish statement — this account has none');
   able('btn-months', isExcelKept() && !!(account.odooPartner && account.odooPartner.id), 'Months are booked for a worker ledger with an Odoo partner');
-  able('btn-timesheet', !!account.timesheet && !!(account.odooPartner && account.odooPartner.id), 'Only an account whose workbook keeps a timesheet');
+  able('btn-timesheet', !!account.timesheet && !!(account.odooPartner && account.odooPartner.id) && isLocal(), account.timesheet ? LOCAL_WHY : 'Only an account whose workbook keeps a timesheet');
   able('btn-projects', isExcelKept(), 'Projects come from an Excel ledger');
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
   document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
@@ -689,6 +691,10 @@ async function selectAccount(a) {
 // The grid opens on a period (this year by default) and, on an Excel-kept account, on the
 // Excel rows only. The lines before the period are summed on the server (`before`), so the
 // running balance is right without them; the sources behind the chips arrive when clicked.
+// Asked when a button is drawn, not at load: Admin.me arrives after the page script runs.
+const isLocal = () => !!(Admin.me && Admin.me.local);   // this is the laptop, not the website
+const LOCAL_WHY = "Only on Mario's laptop: the Excel workbooks and WhatsApp are read from that machine";
+
 let before = null;                 // { count, net, netFromOpening, first } for the lines before the period
 let loadedSrc = null;              // null = every source is in `tx`; else the Set of sources fetched so far
 const PERIODS = { m: 'This month', m3: 'Last 3 months', year: 'This year', y12: 'Last 12 months', y2: 'Two years', all: 'Everything' };
@@ -1134,15 +1140,35 @@ async function saveAmount(id, side, value, el) {
   try { await patch(id, data); Object.assign(t, data); computeBalances(); render(); say(`${side === 'debit' ? 'Debit' : 'Credit'} set to ${fmt(n)}`); }
   catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
 }
-// the photos and PDFs of a line, as links into Odoo — shown even before the line has an entry
-const fileLinks = t => (t.fileIds || []).length
-  ? `<div class="odoo-doc">${t.fileIds.map((f, i) => `<a href="/api/accounting/odoo-file/${f.id}" onclick="event.preventDefault();openViewer('${t.id}',${i})" title="${esc(f.name + (/^wa /.test(f.name) ? ' — a WhatsApp photo of that day: the day’s paper sits on every spending row of the day, so it does not necessarily belong to this amount' : ''))}">📎 ${esc(f.name.length > 42 ? f.name.slice(0, 40) + '…' : f.name)}</a>`).join('<br>')}</div>` : '';
+// The paper of a line, in the Odoo column: what Odoo holds, then what was attached on the hub —
+// both read the same way, so the evidence of a line sits in one place, not half of it under the
+// date (Mario, 2026-09-09: "make them like the others in the right column named Odoo").
+const fileLinks = t => {
+  const F = t.fileIds || [], D = t.docs || [];
+  if (!F.length && !D.length) return '';
+  const why = n => /^wa /.test(n) ? ' — a WhatsApp photo of that day: the day’s paper sits on every spending row of the day, so it does not necessarily belong to this amount' : '';
+  const cut = n => esc(n.length > 42 ? n.slice(0, 40) + '…' : n);
+  const one = (name, i, href) => `<a ${href ? `href="${href}" ` : ''}onclick="event.preventDefault();openViewer('${t.id}',${i})" title="${esc(name + why(name))}">📎 ${cut(name)}</a>`;
+  return `<div class="odoo-doc">${[...F.map((f, i) => one(f.name, i, '/api/accounting/odoo-file/' + f.id)),
+    ...D.map((d, i) => one(d.name, F.length + i, ''))].join('<br>')}</div>`;
+};
 function odooCell(t) {
   const btn = bookButton(t);
+  const m = (t.odoo && t.odoo.matches) || [];
+  const won = m.find(x => x.chosen);
+  // What the hub itself wrote is as good as a match: a vendor bill goes straight to Odoo and
+  // leaves no match behind, so its column read "—" though the bill was posted and paid
+  // (Mario, 2026-09-09: "not booked on odoo (khoder hub)").
+  if (!won && t.bookedMove && t.bookedMove.id) {
+    const b = t.bookedMove;
+    const tip = ['Booked by the hub' + (b.at ? ' on ' + String(b.at).slice(0, 10) : ''), b.kind || '', b.state || '', b.paymentState || ''].filter(Boolean).join(' · ');
+    return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}" title="${esc(tip)}">✓ ${esc(b.name || '')}</a>`
+      + (b.ref && b.ref !== b.name ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(b.ref)}</div>` : '')
+      + fileLinks(t);
+  }
   if (!t.odoo) return (btn || '<span class="odoo-no" title="Not checked yet">·</span>') + fileLinks(t);
-  const m = t.odoo.matches || [];
   if (!m.length) return (btn || '<span class="odoo-no" title="Checked ' + esc(t.odoo.checkedAt.slice(0, 10)) + ': nothing found in the Odoo journals of this account">—</span>') + fileLinks(t);
-  const win = m.find(x => x.chosen);
+  const win = won;
   if (win) {
     const tip = [matchTip(win), m.length > 1 ? 'also possible: ' + m.slice(1).map(x => x.move).join(', ') : ''].filter(Boolean).join('\n');
     const differs = t.src !== 'excel' && t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
@@ -1303,7 +1329,7 @@ function render() {
         + (t.src !== 'odoo' && !t.bookedMove ? `<a class="wantbook${t.bookWanted ? ' on' : ''}" onclick="wantBook('${t.id}', ${!t.bookWanted})" title="${t.bookWanted ? 'Waiting to be booked — click to take it off the list' : 'Ask for this line to be booked in Odoo. Nothing is written until it is approved on the laptop.'}">📗</a>` : '')
         + (t.src === 'whatsapp' && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this WhatsApp line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
         + (t.src === 'whatsapp' && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
-        + ((t.docs || []).length ? `<a class="paper" onclick="openDocs('${t.id}')" title="${(t.docs || []).length} file${t.docs.length === 1 ? '' : 's'} on this line: ${esc(t.docs.map(d => d.name).join(', '))}">📎${t.docs.length > 1 ? t.docs.length : ''}</a>` : '');
+        + '';   // the line's paper is listed by name in the Odoo column now, not counted here
     return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
       <td class="c-date">${t.src === 'excel' ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this row falls on, in the workbook" onchange="saveSheet('${t.id}', 'date', this.value, this)">`
         // a line a person typed, or one read off WhatsApp, can be moved to its right day: the
@@ -1544,16 +1570,29 @@ async function toggleSrc(k) { if (srcOff.has(k)) { srcOff.delete(k); await ensur
 
 // ── Partner picker: type to filter the Odoo partners, ↑↓, Enter or click ──
 const P = {};
+const rank = (x, row) => x.id === (row && row.cashAccountId) ? 0 : x.id === 'mario-cash' ? 1 : 2;
 function pickFilter(id) {
   const txt = document.getElementById(id + '-txt'), box = document.getElementById(id + '-list');
   if (!txt || !box) return;
   const q = norm(txt.value);
-  const list = (q ? partners.filter(p => norm(p.name).includes(q)) : partners.slice(0, 40)).slice(0, 40);
+  const row = tx.find(x => x.id === (document.getElementById(id) || {}).dataset?.row);
+  // The other side of a transfer is one of OUR OWN accounts, never an Odoo partner — so they head
+  // the list, and picking one is what ties the row to Mario's box (Mario, 2026-09-09: "why i
+  // cannot select mario cash from here").
+  const mine = row && (row.nature === 'transfer' || row.partnerKind === 'cash')
+    ? accounts.filter(x => x.id !== acc && (!q || norm(x.name).includes(q) || norm(x.owner || '').includes(q)))
+        // the one the row already names first, then Mario's box: money reaching a worker is almost
+        // always Mario's, so it should be one click away (Mario, 2026-09-09)
+        .sort((x, y) => rank(x, row) - rank(y, row) || x.name.localeCompare(y.name))
+        .slice(0, 8).map(x => ({ id: x.id, name: x.name, cash: true }))
+    : [];
+  const list = mine.concat((q ? partners.filter(p => norm(p.name).includes(q)) : partners.slice(0, 40)).slice(0, 40));
   P[id] = { list, hi: 0 };
   const raw = txt.value.trim(), exact = list.some(p => norm(p.name) === q);
-  let html = list.map((p, i) => `<div class="${i === 0 ? 'hi' : ''}" onmousedown="event.preventDefault();pickChoose('${id}',${p.id})"><span>${esc(p.name)}</span><span class="g">${p.vendor && p.customer ? 'vendor · customer' : p.vendor ? 'vendor' : p.customer ? 'customer' : ''}</span></div>`).join('');
+  let html = list.map((p, i) => p.cash
+    ? `<div class="${i === 0 ? 'hi' : ''}" onmousedown="event.preventDefault();pickCash('${id}','${esc(p.id)}')"><span>${esc(p.name)}</span><span class="g">our account</span></div>`
+    : `<div class="${i === 0 ? 'hi' : ''}" onmousedown="event.preventDefault();pickChoose('${id}',${p.id})"><span>${esc(p.name)}</span><span class="g">${p.vendor && p.customer ? 'vendor · customer' : p.vendor ? 'vendor' : p.customer ? 'customer' : ''}</span></div>`).join('');
   if (raw && !exact) {
-    const row = tx.find(x => x.id === (document.getElementById(id) || {}).dataset?.row);
     const co = row && companies.find(c => c.name === companyOf(row));
     // The partner itself is shared by every company (company_id = false, like 229 of the 231
     // that exist). The company on the line only says vendor or customer — so the hint must
@@ -1577,7 +1616,9 @@ function pickKey(e, id) {
     st.hi = Math.min(st.list.length - 1, Math.max(0, st.hi + (e.key === 'ArrowDown' ? 1 : -1)));
     [...box.children].forEach((c, i) => c.className = i === st.hi ? 'hi' : '');
     const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
-  } else if (e.key === 'Enter') { e.preventDefault(); if (!box.className.includes('on')) return; if (st.list.length) pickChoose(id, st.list[st.hi].id); else pickCreate(id); }
+  } else if (e.key === 'Enter') { e.preventDefault(); if (!box.className.includes('on')) return;
+    if (!st.list.length) { pickCreate(id); return; }
+    const it = st.list[st.hi]; if (it.cash) pickCash(id, it.id); else pickChoose(id, it.id); }
 }
 // ── Analytic picker ────────────────────────────────────────────────────────
 // Same widget as the partner cell, so both columns behave alike. The plan is
@@ -1639,6 +1680,23 @@ function anBlur(id) {
   }, 160);
 }
 
+// The other side of a transfer is one of our own accounts, so the row keeps its id: booking reads
+// it to know which box the money came from or went to (Mario, 2026-09-09).
+function pickCash(id, accId) {
+  const a = accounts.find(x => x.id === accId); if (!a) return;
+  const hidden = document.getElementById(id), txt = document.getElementById(id + '-txt');
+  hidden.value = ''; txt.value = a.name; P[id] = null;
+  document.getElementById(id + '-list').className = 'pick-list';
+  saveCash(hidden.dataset.row, a, txt);
+}
+async function saveCash(rowId, a, el) {
+  const t = tx.find(x => x.id === rowId); if (!t) return;
+  const data = { partnerKind: 'cash', cashAccountId: a.id, partnerName: a.name, partnerSrc: 'manual', partnerId: null };
+  Object.assign(t, data);
+  if (el) { el.classList.add('dirty'); mark(el, 'manual'); }
+  try { await patch(rowId, data); if (el) flash(el, true); say('Other side: ' + a.name); render(); }
+  catch (e) { if (el) flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
 function pickChoose(id, partnerId) {
   const p = partners.find(x => x.id === partnerId); if (!p) return;
   const hidden = document.getElementById(id), txt = document.getElementById(id + '-txt');
@@ -1652,6 +1710,10 @@ function pickBlur(id) {
     document.getElementById(id + '-list').className = 'pick-list';
     const row = tx.find(x => x.id === hidden.dataset.row); if (!row) return;
     if (!txt.value.trim()) { if (row.partnerName) savePartner(row.id, null, '', txt); return; }
+    if (row.nature === 'transfer' || row.partnerKind === 'cash') {
+      const own = accounts.find(x => x.id !== acc && norm(x.name) === norm(txt.value));
+      if (own) { if (own.id !== row.cashAccountId) pickCash(id, own.id); return; }
+    }
     const exact = partners.find(p => norm(p.name) === norm(txt.value));
     if (exact) { if (exact.id !== row.partnerId) { hidden.value = exact.id; txt.value = exact.name; savePartner(row.id, exact, 'manual', txt); } return; }
     txt.value = row.partnerName || '';   // no such partner: snap back
@@ -2513,7 +2575,7 @@ async function openAccountForm(a) {
     <label></label><div class="hint">The person's cash workbook on this machine. Rows come in as <span class="src">excel</span> lines; a row that repeats an Odoo line is linked and not counted twice.${xs.first ? ' Last read: ' + esc(xs.first) + ' → ' + esc(xs.last) + ' (' + esc(xs.lastFile || '') + ')' : ''}</div>
     <label>WhatsApp group</label><div class="row"><input id="af-wchat" value="${esc(xw.chatId || '')}" placeholder="chat id" style="flex:1" list="wa-groups"><input id="af-wq" placeholder="find a group…" style="flex:2" oninput="findGroups(this.value)"><input id="af-wsince" type="date" value="${esc(xw.since || '')}" title="read messages from this date"><input id="af-wrate" type="number" value="${xw.lbpRate || ''}" placeholder="LBP/$ 89500" style="width:110px" title="rate for amounts written in Lebanese pounds"></div><datalist id="wa-groups"></datalist>
     <label></label><div class="hint">Money messages ("100$ from mario", "٨٠٠ الف اجرة طريق") come in as <span class="src">whatsapp</span> lines. One matching an Excel or Odoo line is linked; one found nowhere else waits under ❓ until you accept it.${xw.name ? ' Group: ' + esc(xw.name) + (xw.first ? ' · read ' + esc(xw.first) + ' → ' + esc(xw.last) : '') : ''}</div>` : ''}
-    ${a ? `<label>Imports</label><div class="row"><button class="btn" onclick="importOdooLines()" ${(a.odooJournals || []).length ? '' : 'disabled'}>⇄ Import Odoo now</button><button class="btn" onclick="importBudgetLines()" ${a.budgetAccountId ? '' : 'disabled'}>📊 Import Budget now</button><button class="btn" onclick="importExcelLines()" ${xs.file ? '' : 'disabled'}>📗 Import Excel now</button><button class="btn" onclick="importWhatsappLines()" ${xw.chatId ? '' : 'disabled'}>💬 Import WhatsApp now</button><button class="btn" onclick="linkTransfers()" ${a.owner && a.owner !== 'mario' ? '' : 'disabled'} title="Join every 'from mario' line here with the same amount leaving Mario's cash: one transfer, both sides">⇄ Link transfers with Mario</button></div>
+    ${a ? `<label>Imports</label><div class="row"><button class="btn" onclick="importOdooLines()" ${(a.odooJournals || []).length ? '' : 'disabled'}>⇄ Import Odoo now</button><button class="btn" onclick="importBudgetLines()" ${a.budgetAccountId ? '' : 'disabled'}>📊 Import Budget now</button><button class="btn" onclick="importExcelLines()" ${xs.file && isLocal() ? '' : 'disabled'} title="${xs.file && !isLocal() ? esc(LOCAL_WHY) : ''}">📗 Import Excel now</button><button class="btn" onclick="importWhatsappLines()" ${xw.chatId && isLocal() ? '' : 'disabled'} title="${xw.chatId && !isLocal() ? esc(LOCAL_WHY) : ''}">💬 Import WhatsApp now</button><button class="btn" onclick="linkTransfers()" ${a.owner && a.owner !== 'mario' ? '' : 'disabled'} title="Join every 'from mario' line here with the same amount leaving Mario's cash: one transfer, both sides">⇄ Link transfers with Mario</button></div>
        <label></label><div class="hint">${a.lastOdooImport ? 'Odoo imported ' + esc(a.lastOdooImport.slice(0, 16).replace('T', ' ')) : 'Odoo never imported'} · ${a.lastBudgetImport ? 'Budget imported ' + esc(a.lastBudgetImport.slice(0, 16).replace('T', ' ')) : 'Budget never imported'} · ${a.lastExcelImport ? 'Excel ' + esc(a.lastExcelImport.slice(0, 16).replace('T', ' ')) : 'Excel never'} · ${a.lastWhatsappImport ? 'WhatsApp ' + esc(a.lastWhatsappImport.slice(0, 16).replace('T', ' ')) : 'WhatsApp never'}</div>` : ''}
     ${a ? `<label>Archive</label><label><input type="checkbox" id="af-arch" ${a.archived ? 'checked' : ''}> hide this account from the list (lines are kept)</label>` : ''}`;
 }

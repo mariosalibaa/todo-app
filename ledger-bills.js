@@ -43,6 +43,24 @@ const distOf = (t, a) => t && Array.isArray(t.analyticSplit) && t.analyticSplit.
   ? Object.fromEntries(t.analyticSplit.map(s => [String(s.id), +s.pct]))
   : a && a.id ? { [String(a.id)]: 100 } : null;
 const PEOPLE_CASH = { mario: 'mario-cash', abed: 'abed-cash', georges: 'georges-cash', ziad: 'ziad-cash', mitri: 'mitri-cash', khodr: 'khodr-cash', khoder: 'khodr-cash' };
+// Which of our own cash accounts a transfer moves against, read off the row's own words: "from
+// Mario", "to Ziad", the sheet's bare "mario", or the Arabic the workers write on WhatsApp. Money
+// that names nobody but the worker himself came from Mario, which is how it has always been booked
+// (Mario, 2026-09-09: "this should be auto linked to mario cash").
+const CASH_NAME = { mario: /\bmario\b|ماريو/i, abed: /\babed\b|\babdo\b|عبد/i, georges: /\bgeorges?\b|جورج/i,
+  ziad: /\bziad\b|زياد/i, mitri: /\bmitri\b|\bmetre\b|متري|مطري/i, khodr: /\bkh[ou]d[eo]?r\b|\bkhudr\b|خضر/i };
+function cashAccountFor(text, owner) {
+  const s = String(text || '');
+  const self = PEOPLE_CASH[norm(owner || '')] || '';
+  const pick = w => { for (const k of Object.keys(CASH_NAME)) if (CASH_NAME[k].test(w)) return PEOPLE_CASH[k]; return ''; };
+  // the name right after "from" or "to" is the other side, whatever else the line mentions
+  const named = (s.match(/\b(?:from|to)\s+([^\s,.;:—-]+)/i) || [])[1] || '';
+  const direct = named ? pick(named) : '';
+  if (direct && direct !== self) return direct;
+  const any = pick(s);
+  return any && any !== self ? any : 'mario-cash';
+}
+
 const VENDOR_WORDS = /attal|tchag|solaris|khoury|kbm|khc|njk|\bsec\b|simon|narinco|medco|electromec|metaleo|phoenix|astro|mecano|ayoub|karam|mousawi|hamdan|armco|linkifi|pharmac|sakr|fuser|monzer|mrad|fahed/i;
 // Georges writes the goods where the others write the shop: a bag of cement, a pipe or a
 // panel is a supplier's ticket (mrad, Fahed Wood), not petty spending out of his pocket.
@@ -981,4 +999,4 @@ async function bookRow(ctx, account, txId, who) {
   return { kind, move: move && move.name, id: move && move.id, ref: move && move.ref, photos: files.length, pendingExcel: !!data.pendingExcel };
 }
 
-module.exports = { alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+module.exports = { cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
