@@ -282,13 +282,17 @@
   .xl td.ar{text-align:right;direction:rtl;font-family:'Segoe UI',Arial;}
   .xl td.fix{color:#7a5a00;}
   /* the statement is screenshotted for a phone in portrait: every column as narrow as it can be */
-  .xl.narrow{font-size:12px;table-layout:fixed;width:560px;}   /* fixed columns (colgroup below): Chrome ignores min/max-width on a td, so under a table max-width the day was squeezed under its text and ran into "what" (Mario, 2026-09-09) */
+  .xl.narrow{font-size:12px;table-layout:fixed;width:648px;}   /* fixed columns (colgroup below): Chrome ignores min/max-width on a td, so under a table max-width the day was squeezed under its text and ran into "what" (Mario, 2026-09-09) */
   .xl tr.day td{background:#ece7f1;font-weight:700;color:#3d3a42;border-color:#cfc3da;}
   .xl tr.day td .s{font-weight:400;color:#5d5a63;margin-left:6px;}
   .xl td.o{background:#f1f3f5;font-weight:700;}
+  .xl td .sp{font-size:11px;line-height:1.4;}          /* one line per share of a split row */
+  .xl td .sp b{font-weight:700;}
   .xl.narrow td{padding:2px 5px;height:auto;line-height:1.25;}
   .xl.narrow td.n{min-width:0;white-space:nowrap;}
   .xl.narrow td:first-child{white-space:nowrap;overflow:hidden;}   /* the day never squeezes into the next column (Mario, 2026-09-09) */
+  /* the name under the day is as long as the man is called: it wraps instead of being cut (Mario, 2026-09-09) */
+  .xl.narrow td .sub{white-space:normal;word-break:break-word;}
   .xl.narrow td.d{white-space:normal;word-break:break-word;}
   .xl.narrow td.n{overflow:hidden;}
   .xl.narrow td .sub{font-size:11px;color:#555;}
@@ -1486,7 +1490,7 @@ function openStmt() {
   // opens on the balance of the statement he last received and closes on the balance now
   // (Mario, 2026-09-09: "the latest statement was the 119.88, show what came after it").
   const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
-  const all = tx.filter(t => !t.excluded && (t.src !== 'excel' || t.period === 'new')).sort(dayOrder);
+  const all = tx.filter(t => !t.excluded && t.period !== 'old').sort(dayOrder);   // ✓ Sent marks every line of the period old, whatever its source
   const rows = all.filter(t => (!from || t.date >= from) && (!to || t.date <= to));
   const hidden = all.length - rows.length;
   const waiting = rows.filter(t => t.src === 'whatsapp' && t.waAccepted !== true).length;
@@ -1497,14 +1501,24 @@ function openStmt() {
   // What the day was: hours, the clock, the car and the km, read off the row's own words.
   const detail = t => {
     const d = String(t.description || '');
-    // a clock has a colon: "10.67 h" is hours, not 10:67 (Mario, 2026-09-09)
-    const clock = (d.match(/\b\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?/gi) || []).map(x => x.replace(/\s+/g, ' ').trim());
-    const km = (d.match(/(\d+(?:[.,]\d+)?)\s*km\b/i) || [])[1];
-    const car = /jeep/i.test(d) ? 'jeep' : /tacoma/i.test(d) ? 'Tacoma' : /cherokee/i.test(d) ? 'Cherokee' : /\bcar\b/i.test(d) ? 'car' : '';
-    const parts = [t.hours ? t.hours + ' h' : '', clock.length > 1 ? clock[0] + '–' + clock[1] : '', [car, km ? km + ' km' : ''].filter(Boolean).join(' ')].filter(Boolean);
-    if (parts.length) return parts.join(' · ');
-    // not a day of work: his own words, the amount already said in its own column
-    return d.replace(/\s*·\s*/g, ' · ').replace(/^\s*\d+[.,]?\d*\s*\$?\s*/, '').slice(0, 60);
+    // his own words, the amount already said in its own column
+    const words = () => d.replace(/\s*·\s*/g, ' · ').replace(/^\s*\d+[.,]?\d*\s*\$?\s*/, '').slice(0, 60);
+    if (t.nature === 'labour') {
+      // a clock has a colon: "10.67 h" is hours, not 10:67 (Mario, 2026-09-09)
+      const clock = (d.match(/\b\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?/gi) || []).map(x => x.replace(/\s+/g, ' ').trim());
+      const hours = t.hours || (d.match(/(\d+(?:[.,]\d+)?)\s*h\b/i) || [])[1];   // a typed day says its hours in its words
+      const parts = [hours ? hours + ' h' : '', clock.length > 1 ? clock[0] + '–' + clock[1] : ''].filter(Boolean);
+      return parts.length ? parts.join(' · ') : words();
+    }
+    // "received from Mario", not the quote and the time behind it
+    if (t.nature === 'transfer') return d.split(/\s+—\s+/)[0].slice(0, 60);
+    // benzine: the car and the odometer, as the fuel view reads them
+    if (t.car || isFuel(d)) {
+      const km = t.odometer || (d.match(/(\d[\d,.]*)\s*km\b/i) || [])[1];
+      const car = t.car || (/jeep/i.test(d) ? 'jeep' : /tacoma/i.test(d) ? 'Tacoma' : /cherokee|laredo/i.test(d) ? 'Laredo' : '');
+      return ['benzine', [car, km ? (+String(km).replace(/,/g, '') ? (+String(km).replace(/,/g, '')).toLocaleString('en-US') : km) + ' km' : ''].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+    }
+    return words();
   };
   // the balance as he would count it himself: the old sum, then row after row down to the new one
   // The balance column has to land on the account's own "all" sum. When the period starts after
@@ -1516,12 +1530,21 @@ function openStmt() {
   const earlier = all.filter(t => from && t.date < from);
   const opening = rows.length ? -rows[0]._bal - xlAmt(rows[0]) : a;
   let run = opening;
+  // The Odoo analytic account, not the sheet's shorthand (Mario, 2026-09-06). A row shared
+  // between projects shows every share, the way the grid draws it: on a screenshot he sees
+  // which site each part of that money went to, not only the biggest one (Mario, 2026-09-09).
+  const stmtProj = t => t.nature === 'transfer' ? ''
+    : isSplit(t) ? t.analyticSplit.map(x => `<div class="sp"><b>${fmtPct(x.pct)}%</b> ${esc(x.name)}</div>`).join('')
+    : esc(t.analyticName || t.project || '');
   // one band per day, so he reads the block day by day (Mario, 2026-09-09)
   const dayBand = t => { const d = all.filter(x => x.date === t.date && rows.includes(x));
     const out = d.reduce((s, x) => s + Math.max(0, xlAmt(x)), 0), inn = d.reduce((s, x) => s + Math.max(0, -xlAmt(x)), 0);
     return `<tr class="day"><td colspan="6">${esc(longDate(t.date))} <span class="s">${d.length} line${d.length === 1 ? '' : 's'}${out ? ' · out ' + xlFmt(out).replace('$ ', '$') : ''}${inn ? ' · in ' + xlFmt(inn).replace('$ ', '$') : ''}</span></td></tr>`; };
+  const ownPid = account.odooPartner && account.odooPartner.id;
   const line = t => { const v = xlAmt(t); const p = String(t.partnerName || '').toLowerCase(); const self = p === own || (t.nature === 'labour');
-    const who = t.nature === 'transfer' ? String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase() : (self ? '' : (t.partnerName || ''));
+    // his own Odoo partner on a row is not a "who": the row is his (the WhatsApp and typed lines carry it)
+    const mine = self || (ownPid && t.partnerId === ownPid);
+    const who = t.nature === 'transfer' ? (t.cashAccountId ? t.cashAccountId.replace(/-cash$/, '') : mine ? '' : String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase()) : (mine ? '' : (t.partnerName || ''));
     run += v;
     return `<tr><td class="${self ? 'p' : ''}">${esc(dayDate(t.date).replace(/^(\w\w) /, '$1 '))}${who ? '<div class="sub">' + esc(who) + '</div>' : ''}</td>`
       + `<td class="d">${esc(detail(t))}</td>`
@@ -1529,7 +1552,7 @@ function openStmt() {
       + `<td class="n">${v > 0 ? xlFmt(v) : ''}</td>`
       + `<td class="n ${v < 0 ? 'g' : ''}">${v < 0 ? xlFmt(-v).replace('$ ', '$ ') : ''}</td>`
       + `<td class="n b ${run < 0 ? 'g' : ''}">${xlFmt(run)}</td>`
-      + `<td class="d">${esc(t.nature === 'transfer' ? '' : (t.analyticName || t.project || ''))}</td></tr>`; };   // the Odoo analytic account, not the sheet's shorthand (Mario, 2026-09-06)
+      + `<td class="d">${stmtProj(t)}</td></tr>`; };
   // the balance runs forward through the days, but the block reads newest first, like the
   // grid: the last day on top, its rows newest first under it (Mario, 2026-09-09)
   const days = [];
@@ -1541,7 +1564,7 @@ function openStmt() {
   const open = `<tr><td class="o">starting</td><td class="d">${earlier.length ? `the statement he last received plus ${earlier.length} earlier row${earlier.length === 1 ? '' : 's'} he has not seen` : 'the statement he last received'}</td><td class="n"></td><td class="n"></td><td class="n b ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="d"></td></tr>`;
   const close = `<tr><td class="o">ending</td><td class="d">after these ${rows.length} row${rows.length === 1 ? '' : 's'}</td><td class="n"></td><td class="n"></td><td class="n b ${closed < 0 ? 'g' : ''}">${xlFmt(closed)}</td><td class="d"></td></tr>`;
   document.getElementById('stmt-body').innerHTML = `
-    <table class="xl narrow"><colgroup><col style="width:104px"><col style="width:176px"><col style="width:66px"><col style="width:66px"><col style="width:74px"><col style="width:74px"></colgroup>
+    <table class="xl narrow"><colgroup><col style="width:132px"><col style="width:186px"><col style="width:62px"><col style="width:62px"><col style="width:74px"><col style="width:132px"></colgroup>
       <tr><td>starting</td><td class="n ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="ar ${opening < 0 ? 'g' : ''}" colspan="4">${xlWord(opening)} · حساب قديم</td></tr>
       <tr><td>ending</td><td class="n ${closed < 0 ? 'g' : ''}">${xlFmt(closed)}</td><td class="ar ${closed < 0 ? 'g' : ''}" colspan="4">${xlWord(closed)} · حساب جديد</td></tr>
       ${Math.abs(closed - a) > 0.005 ? `<tr><td>account</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="4">${hidden} row(s) outside this period are not in the block</td></tr>` : ''}
@@ -1549,7 +1572,7 @@ function openStmt() {
       <tr><td class="h">date</td><td class="h">what</td><td class="h">debit</td><td class="h">credit</td><td class="h">balance</td><td class="h">project</td></tr>
       ${close}${body}${open}
     </table>
-    <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'}${from || to ? ` from ${esc(from || 'the beginning')} to ${esc(to || 'today')}${hidden ? ` — ${hidden} other new row${hidden === 1 ? '' : 's'} outside the period stay new; the ones before it are inside the opening figure, so the balance still lands on the account's own sum` : ''}` : ''} since the statement he last received.${waiting ? ` <b>${waiting} of them still waits for your ✓</b> — accept or remove it before you send.` : ''} Screenshot this block and send it to him — then press the button so the sheet's rows become old (column A) and the next statement opens on ${xlFmt(closed)}.</p>
+    <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'}${from || to ? ` from ${esc(from || 'the beginning')} to ${esc(to || 'today')}${hidden ? ` — ${hidden} other new row${hidden === 1 ? '' : 's'} outside the period stay new; the ones before it are inside the opening figure, so the balance still lands on the account's own sum` : ''}` : ''} since the statement he last received.${waiting ? ` <b>${waiting} of them still wait${waiting === 1 ? 's' : ''} for your ✓</b> — accept or remove ${waiting === 1 ? 'it' : 'them'} before you send.` : ''} Screenshot this block and send it to him — then press the button so the sheet's rows become old (column A) and the next statement opens on ${xlFmt(closed)}.</p>
     <button class="btn primary" onclick="stmtSent()" ${rows.length ? '' : 'disabled'}>✓ Sent — mark these ${rows.length} rows old</button>`;
 }
 async function stmtSent() {

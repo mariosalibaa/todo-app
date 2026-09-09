@@ -259,25 +259,41 @@ const dayStr = d => d instanceof Date ? new Date(d.getTime() - d.getTimezoneOffs
 // Close the statement here alone: the rows become old on the hub and the account remembers the
 // statement, while column A of the workbook is left marked as still to flip. Used whenever the
 // workbook is out of reach — the phone, the deployed hub (Mario, 2026-09-09).
+// The statement block carries every line he has not seen, not only the sheet's rows: the WhatsApp
+// and typed lines of the period go "old" with it, so the next statement opens after them
+// (Mario, 2026-09-09). They carry no column A in the workbook, so nothing is left pending for it.
+async function closeOtherLines(col, inPeriod, who) {
+  const snap = await col.get();
+  const mine = snap.docs.filter(d => { const t = d.data(); return t.src !== 'excel' && !t.excluded && t.period !== 'old' && inPeriod(t); });
+  const db = col.firestore;
+  for (let i = 0; i < mine.length; i += 400) {
+    const b = db.batch();
+    mine.slice(i, i + 400).forEach(d => b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '' }, { merge: true }));
+    await b.commit();
+  }
+  const counted = snap.docs.map(d => d.data()).filter(t => !t.excluded);
+  return { n: mine.length, dates: mine.map(d => d.data().date).filter(Boolean), counted };
+}
 async function closeInHub(ctx, account, who, { from, to, inPeriod, why }) {
   const col = ctx.txCol(account);
   const cur = await col.where('src', '==', 'excel').get();
   const mine = cur.docs.filter(d => { const t = d.data(); return t.period === 'new' && inPeriod(t); });
-  if (!mine.length) return { flipped: 0, rows: 0, sheetPending: true, why, file: '' };
+  const others = await closeOtherLines(col, inPeriod, who);
+  if (!mine.length && !others.n) return { flipped: 0, rows: 0, sheetPending: true, why, file: '' };
   const db = col.firestore;
   for (let i = 0; i < mine.length; i += 400) {
     const b = db.batch();
     mine.slice(i, i + 400).forEach(d => b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '', statementSheetPending: true }, { merge: true }));
     await b.commit();
   }
-  const counted = cur.docs.map(d => d.data()).filter(t => !t.excluded);
-  const closedDates = mine.map(d => d.data().date).filter(Boolean).sort();
+  const counted = others.counted;
+  const closedDates = [...mine.map(d => d.data().date).filter(Boolean), ...others.dates].sort();
   const upto = closedDates[closedDates.length - 1] || new Date().toISOString().slice(0, 10);
   const bal = counted.filter(t => !t.date || t.date <= upto).reduce((s, t) => s + (t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0)), 0);
   try {
-    await account.ref.set({ statement: { date: upto, balance: Math.round(bal * 100) / 100, sentAt: now(), by: who || '', rows: mine.length, sheetPending: true, ...(from || to ? { from: from || '', to: to || '' } : {}) } }, { merge: true });
+    await account.ref.set({ statement: { date: upto, balance: Math.round(bal * 100) / 100, sentAt: now(), by: who || '', rows: mine.length + others.n, sheetPending: !!mine.length, ...(from || to ? { from: from || '', to: to || '' } : {}) } }, { merge: true });
   } catch { /* the rows are what matter */ }
-  return { flipped: 0, rows: mine.length, sheetPending: true, why, file: '' };
+  return { flipped: 0, rows: mine.length + others.n, sheetPending: !!mine.length, why, file: '' };
 }
 
 // opts { from, to }: only the new rows of that period become old — the block can be sent
@@ -338,11 +354,13 @@ async function closeStatement(ctx, account, who, opts) {
   const db = col.firestore; let b = db.batch(), n = 0;
   for (const d of cur.docs) { const t = d.data(); if (!((t.period === 'new' && inPeriod(t)) || t.statementSheetPending)) continue; b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '', statementSheetPending: false }, { merge: true }); rows++; if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; } }
   if (n) await b.commit();
+  const others = await closeOtherLines(col, inPeriod, who);
+  rows += others.n;
   // remember what was sent and when: the Statements page reads this instead of guessing from the
   // sheet's old block, and it is the record Mario checks a month later (2026-09-08)
-  const counted = cur.docs.map(d => d.data()).filter(t => !t.excluded);
+  const counted = others.counted;
   // the day the statement reaches: the last row actually closed (a period closes only its own days)
-  const closedDates = cur.docs.map(d => d.data()).filter(t => t.period === 'new' && inPeriod(t) && t.date).map(t => t.date).sort();
+  const closedDates = [...cur.docs.map(d => d.data()).filter(t => t.period === 'new' && inPeriod(t) && t.date).map(t => t.date), ...others.dates].sort();
   const upto = closedDates[closedDates.length - 1] || counted.map(t => t.date).filter(Boolean).sort().pop() || new Date().toISOString().slice(0, 10);
   // the balance he was shown: everything counted up to that day, not the account as it stands now
   const bal = counted.filter(t => !t.date || t.date <= upto).reduce((s, t) => s + (t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0)), 0);
@@ -639,8 +657,13 @@ async function importWhatsapp(ctx, account, who) {
   }
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines, targets, { taken, maxDays: 4, loose: true });
-  let added = 0, updated = 0, linked = 0, review = 0, accepted = 0;
-  const writes = lines.map(t => {
+  let added = 0, updated = 0, linked = 0, review = 0, accepted = 0, kept = 0;
+  // A line Mario has already been through is his: reviewed, accepted, booked in Odoo, or edited
+  // by hand. A re-import never rewrites it — not its words, not its pairing, not whether it counts
+  // (Mario, 2026-09-09: "WhatsApp should not mess with my work and my review").
+  const his = t => !!(t.reviewed || t.reviewedAt || t.waAccepted === true || t.bookedMove || t.ref || t.dupSrc === 'manual'
+    || (t.updatedBy && t.updatedBy !== 'import'));
+  const writes = lines.filter(t => { if (existing[t.id] && his(existing[t.id])) { kept++; if (!existing[t.id].excluded) accepted++; return false; } return true; }).map(t => {
     const prev = existing[t.id] || {};
     const data = { ...t };
     if (!/\bfrom\b|\bto\b/i.test(t.description) || !t.kind) { delete data.kind; delete data.kindSrc; }
@@ -657,7 +680,7 @@ async function importWhatsapp(ctx, account, who) {
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
   await account.ref.set({ whatsapp: { ...cfg, name: chatName, since, first, last }, lastWhatsappImport: now(), lastWhatsappImportBy: who }, { merge: true });
-  return { messages: msgs.length, lines: lines.length, added, updated, linked, review, accepted, skipped, first, last, group: chatName };
+  return { messages: msgs.length, lines: lines.length, added, updated, kept, linked, review, accepted, skipped, first, last, group: chatName };
 }
 
 // ── Transfers between this account and the other people's ───────────────────
