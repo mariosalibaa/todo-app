@@ -36,6 +36,12 @@ const SDEV = { companyId: 10, company: 'SHIFT DEVELOPMENT', journalId: 140, jour
 const BOOK_CO = { 'S LB': SLB, 'SHIFT DEVELOPMENT': SDEV, 'S DEV': SDEV };
 const bookCo = account => BOOK_CO[(account && account.billCompany) || 'S LB'] || SLB;
 const isFuel = t => /benzin|fuel|mazout|gasoil|diesel|tank/i.test(t || '') && !/water tank/i.test(t || '');
+// A row shared between analytic accounts books the way Odoo keeps it on the line — {"69": 50,
+// "144": 50}, each account id with its percentage (what the % split on the hub row wrote);
+// a plain row is 100% on its one account (Mario, 2026-09-09).
+const distOf = (t, a) => t && Array.isArray(t.analyticSplit) && t.analyticSplit.length > 1
+  ? Object.fromEntries(t.analyticSplit.map(s => [String(s.id), +s.pct]))
+  : a && a.id ? { [String(a.id)]: 100 } : null;
 const PEOPLE_CASH = { mario: 'mario-cash', abed: 'abed-cash', georges: 'georges-cash', ziad: 'ziad-cash', mitri: 'mitri-cash', khodr: 'khodr-cash', khoder: 'khodr-cash' };
 const VENDOR_WORDS = /attal|tchag|solaris|khoury|kbm|khc|njk|\bsec\b|simon|narinco|medco|electromec|metaleo|phoenix|astro|mecano|ayoub|karam|mousawi|hamdan|armco|linkifi|pharmac|sakr|fuser|monzer|mrad|fahed/i;
 // Georges writes the goods where the others write the shop: a bag of cement, a pipe or a
@@ -229,7 +235,7 @@ async function bookMonth(ctx, account, month, part, who, opts) {
   const lines = rows.map(t => {
     const a = an[t.id];
     const accountId = t.nature === 'labour' || t.nature === 'opening' ? CO.accounts.labour : isFuel(t.partnerName + ' ' + t.description) ? CO.accounts.fuel : CO.accounts.other;
-    const line = { name: `${t.date} · ${t.description || t.nature} · ${a.project || a.name}`, quantity: 1, price_unit: money(t.debit), account_id: accountId, tax_ids: [[6, 0, []]], analytic_distribution: { [String(a.id)]: 100 } };
+    const line = { name: `${t.date} · ${t.description || t.nature} · ${a.project || a.name}`, quantity: 1, price_unit: money(t.debit), account_id: accountId, tax_ids: [[6, 0, []]], analytic_distribution: distOf(t, a) };
     return { t, line, a, accountId };
   });
 
@@ -489,7 +495,7 @@ async function postCashBox(ctx, account, who, opts) {
             : SLB.accounts.other;
           const label = t.date + ' \u00b7 ' + (t.description || 'cash expense');
           const spend = { account_id: acctId, debit: money(t.debit), credit: 0, name: label };
-          if (e && e.id) spend.analytic_distribution = { [String(e.id)]: 100 };
+          { const dist = distOf(t, e); if (dist) spend.analytic_distribution = dist; }
           const id = await odooCall('account.move', 'create', [{ move_type: 'entry', company_id: c.companyId, journal_id: c.journal, date: t.date, ref,
             narration: account.name + ': paid in cash on ' + t.date + '. Made by Shift Hub.',
             line_ids: [[0, 0, spend], [0, 0, { account_id: c.cash, debit: 0, credit: money(t.debit), name: label }]] }], { context: ctxO });
@@ -514,7 +520,7 @@ async function postCashBox(ctx, account, who, opts) {
         const an = e && e.id ? { id: e.id, name: e.name } : { id: GENERAL, name: 'GENERAL' };
         const id = await odooCall('account.move', 'create', [{ move_type: 'in_invoice', company_id: home.companyId, journal_id: home.billJournal, partner_id: v.id, invoice_date: t.date, date: t.date, ref,
           narration: account.name + ': paid in cash by ' + (account.owner || 'him') + ' on ' + t.date + ' (Excel row, no VAT invoice). Made by Shift Hub.',
-          invoice_line_ids: [[0, 0, { name: t.date + ' · ' + (t.description || v.name), quantity: 1, price_unit: money(t.debit), account_id: RAW_MATERIALS, tax_ids: [[6, 0, []]], analytic_distribution: { [String(an.id)]: 100 } }]] }], { context: ctxO });
+          invoice_line_ids: [[0, 0, { name: t.date + ' · ' + (t.description || v.name), quantity: 1, price_unit: money(t.debit), account_id: RAW_MATERIALS, tax_ids: [[6, 0, []]], analytic_distribution: distOf(t, an) }]] }], { context: ctxO });
         await odooCall('account.move', 'action_post', [[id]], { context: ctxO });
         [bill] = await odooCall('account.move', 'read', [[id], ['id', 'name', 'state', 'payment_state', 'amount_residual', 'company_id']], { context: ctxO });
         out.billsMade++;
@@ -703,7 +709,7 @@ async function postRefunds(ctx, account, who, opts) {
       else {
         const id = await odooCall('account.move', 'create', [{ move_type: 'in_refund', company_id: CO.companyId, journal_id: CO.journalId, partner_id: v[1], invoice_date: t.date, date: t.date, ref,
           narration: account.name + ': given back to ' + partner.name + ' on ' + t.date + ' (Excel row). Made by Shift Hub.',
-          invoice_line_ids: [[0, 0, { name: t.date + ' · ' + (t.description || 'refund'), quantity: 1, price_unit: money(t.credit), account_id: CO.rawMaterials, tax_ids: [[6, 0, []]], analytic_distribution: { [String(a.id)]: 100 } }]] }], { context: ctxO });
+          invoice_line_ids: [[0, 0, { name: t.date + ' · ' + (t.description || 'refund'), quantity: 1, price_unit: money(t.credit), account_id: CO.rawMaterials, tax_ids: [[6, 0, []]], analytic_distribution: distOf(t, a) }]] }], { context: ctxO });
         await odooCall('account.move', 'action_post', [[id]], { context: ctxO });
         [note] = await odooCall('account.move', 'read', [[id], ['id', 'name', 'state', 'payment_state']], { context: ctxO });
         out.posted++;
@@ -786,7 +792,7 @@ async function postVendors(ctx, account, who, opts) {
       else {
         const id = await odooCall('account.move', 'create', [{ move_type: 'in_invoice', company_id: CO.companyId, journal_id: CO.journalId, partner_id: v.id, invoice_date: t.date, date: t.date, ref,
           narration: `${account.name}: paid by ${partner.name} on ${t.date} (Excel row, no VAT invoice). Made by Shift Hub.`,
-          invoice_line_ids: [[0, 0, { name: `${t.date} · ${t.description || v.name}`, quantity: 1, price_unit: money(t.debit), account_id: CO.rawMaterials, tax_ids: [[6, 0, []]], analytic_distribution: { [String(a.id)]: 100 } }]] }], { context: ctxO });
+          invoice_line_ids: [[0, 0, { name: `${t.date} · ${t.description || v.name}`, quantity: 1, price_unit: money(t.debit), account_id: CO.rawMaterials, tax_ids: [[6, 0, []]], analytic_distribution: distOf(t, a) }]] }], { context: ctxO });
         await odooCall('account.move', 'action_post', [[id]], { context: ctxO });
         [bill] = await odooCall('account.move', 'read', [[id], ['id', 'name', 'state', 'payment_state']], { context: ctxO });
         out.posted++;

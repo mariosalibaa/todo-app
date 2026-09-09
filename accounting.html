@@ -65,6 +65,12 @@
   .fuel select:hover,.fuel input.odo-in:hover{border-color:var(--line);} .fuel input.odo-in{width:78px;text-align:right;} .fuel input.odo-in.l{width:44px;}
   .fuel select.src-auto,.fuel input.src-auto{color:var(--auto);font-style:italic;} .fuel select.ask{color:var(--odoo);font-weight:600;}
   .fuel-h{font-size:14px;margin:16px 0 4px;} .fuel-h .hint{font-weight:400;margin-left:8px;}
+  /* analytic shares, the Odoo way: tags in the cell, the picker put away */
+  .c-proj .split{display:flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:11.5px;margin-top:2px;}
+  .c-proj .split .tag{background:#eef0f4;border:1px solid var(--line);border-radius:10px;padding:0 7px;cursor:pointer;white-space:nowrap;} .c-proj .split .tag b{color:var(--odoo);}
+  .c-proj .split a{color:var(--odoo);cursor:pointer;margin-left:2px;}
+  .c-proj .splitlink{font-size:10.5px;color:var(--muted);cursor:pointer;visibility:hidden;} td.c-proj:hover .splitlink{visibility:visible;}
+  td.c-proj.split .pick,td.c-proj.split .plan{display:none;}
   td.num{white-space:nowrap;} .c-date .ref{overflow-wrap:anywhere;}
   .c-desc .svc{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-right:4px;}
   .c-desc .who{font-size:11.5px;color:var(--muted);cursor:pointer;margin-top:1px;}
@@ -368,6 +374,15 @@
       <span class="sp" style="flex:1"></span>
       <button class="btn" onclick="closeBills()">✕ Close</button></div>
     <div class="sheet-body" id="bills-body"></div>
+  </div>
+</div>
+<!-- analytic distribution: shares by percentage, the Odoo way -->
+<div class="sheet" id="splitform" hidden>
+  <div class="sheet-box" style="width:min(640px,94vw)">
+    <div class="sheet-head"><b id="split-title">Analytic distribution</b><span class="sp" style="flex:1"></span><button class="btn" onclick="document.getElementById('splitform').hidden = true">✕ Close</button></div>
+    <div class="sheet-body" id="split-body"></div>
+    <datalist id="an-split"></datalist>
+    <div class="sheet-foot"><span class="hint" style="flex:1">Booked in Odoo on the bill line exactly as Odoo keeps it: each analytic account with its percentage.</span><button class="btn" onclick="splitUnsplit()" title="Back to one analytic account — the biggest share">Un-split</button><button class="btn primary" onclick="splitSave()">Save</button></div>
   </div>
 </div>
 <!-- ⛽ benzine per car, across every account -->
@@ -1232,6 +1247,7 @@ function render() {
         : `<a onclick="toggleExcluded('${t.id}', true)" title="Do not count this line (it repeats another one)">⊘</a>`)
         + (t.kind !== 'transfer' ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>` : '')
         + (t.src === 'manual' || t.src === 'telegram' ? `<a onclick="openLineForm('${t.id}')" title="Edit">✎</a>` : '')
+        + `<a onclick="openLineForm('${t.id}', true)" title="Duplicate this line — a new line filled in like this one, for you to adjust and save">⧉</a>`
         + (['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '')
         + (t.src !== 'odoo' && !t.bookedMove ? `<a class="wantbook${t.bookWanted ? ' on' : ''}" onclick="wantBook('${t.id}', ${!t.bookWanted})" title="${t.bookWanted ? 'Waiting to be booked — click to take it off the list' : 'Ask for this line to be booked in Odoo. Nothing is written until it is approved on the laptop.'}">📗</a>` : '')
         + (t.src === 'whatsapp' && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this WhatsApp line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
@@ -1274,11 +1290,12 @@ function render() {
                 ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
                 : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : ''}
       </td>`}
-            ${isTr ? `<td class="c-proj"><span class="locked" title="A transfer has no project — change the type to give it one">—</span></td>` : `<td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : t.analyticSrc === 'manual' ? 'Chosen by hand' : t.analyticSrc === 'excel' ? esc(t.projectFrom ? 'No project on this row: taken from the ' + t.projectFrom + (t.project ? ' (' + t.project + ')' : '') : 'The project written in the sheet' + (t.project ? ': ' + t.project : '')) : ''}">
+            ${isTr ? `<td class="c-proj"><span class="locked" title="A transfer has no project — change the type to give it one">—</span></td>` : `<td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}${isSplit(t) ? ' split' : ''}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : t.analyticSrc === 'manual' ? 'Chosen by hand' : t.analyticSrc === 'excel' ? esc(t.projectFrom ? 'No project on this row: taken from the ' + t.projectFrom + (t.project ? ' (' + t.project + ')' : '') : 'The project written in the sheet' + (t.project ? ': ' + t.project : '')) : ''}">
         <div class="pick"><input type="text" id="an-${t.id}-txt" autocomplete="off" value="${esc(t.analyticName || t.analyticText || '')}" placeholder="${t.src === 'excel' ? '? which project' : 'analytic'}"
           oninput="anFilter('an-${t.id}')" onkeydown="anKey(event,'an-${t.id}')" onblur="anBlur('an-${t.id}')">
           <input type="hidden" id="an-${t.id}" value="${esc(t.analyticId || '')}" data-row="${t.id}"><div class="pick-list" id="an-${t.id}-list"></div></div>
         <div class="plan" id="an-${t.id}-plan">${esc(planOf(t.analyticId))}</div>
+        ${splitLine(t)}
         ${(() => { const pr = analyticProposal(t); return pr
           ? `<div class="sug-act typed" title="${esc('You typed "' + t.analyticText + '" — the closest Odoo analytic account is ' + pr.name)}"><span class="sug-why">typed</span> <button class="yes" onclick="takeTyped('${t.id}','analytic',true)">✓ ${esc(pr.name)}</button><button class="no" title="Leave it as you typed it" onclick="takeTyped('${t.id}','analytic',false)">✕</button></div>`
           : t.analyticText ? `<div class="sug-skip" title="Typed on the phone; nothing in Odoo looks like it">typed · no Odoo match</div>` : ''; })()}
@@ -1588,6 +1605,67 @@ async function openLog() {
     box.querySelectorAll('td').forEach(td => { td.style.borderTop = '1px solid var(--line,#eee)'; td.style.padding = '4px 6px'; td.style.verticalAlign = 'top'; });
   } catch (e) { box.innerHTML = '<b>Change log</b> — could not load: ' + esc(e.message) + ' <button class="btn" onclick="document.getElementById(\'logbox\').remove()">✕</button>'; }
 }
+// ── Analytic distribution, the Odoo way ──────────────────────────────────────
+// One line may be shared between analytic accounts by percentage. Odoo keeps it on the bill
+// line as {"69": 50, "144": 50}, and that is exactly what the booking writes. Here the row keeps
+// `analyticSplit` [{ id, name, pct }] next to its main analytic (the biggest share), so all that
+// reads one analytic still works (Mario, 2026-09-09: "50% EAR, 50% Mario Naccache").
+const isSplit = t => Array.isArray(t.analyticSplit) && t.analyticSplit.length > 1;
+const fmtPct = p => Number.isInteger(+p) ? String(+p) : (+p).toFixed(2).replace(/\.?0+$/, '');
+function splitLine(t) {
+  if (isSplit(t)) return `<div class="split" title="Shared between analytic accounts, as Odoo does it. Click to change.">${t.analyticSplit.map(s => `<span class="tag" onclick="openSplit('${t.id}')"><b>${fmtPct(s.pct)}%</b> ${esc(s.name)}</span>`).join('')}<a onclick="openSplit('${t.id}')" title="Change the split">✎</a></div>`;
+  return t.src === 'odoo' ? '' : `<a class="splitlink" onclick="openSplit('${t.id}')" title="Share this line between several analytic accounts by percentage — Odoo's analytic distribution">% split</a>`;
+}
+let splitFor = null, splitRows = [];
+function openSplit(id) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  splitFor = t;
+  splitRows = isSplit(t) ? t.analyticSplit.map(s => ({ ...s })) : t.analyticId ? [{ id: t.analyticId, name: t.analyticName, pct: 100 }] : [{ id: null, name: '', pct: 100 }];
+  document.getElementById('split-title').textContent = 'Analytic distribution — ' + t.date + ' · ' + (t.description || '').slice(0, 50);
+  document.getElementById('an-split').innerHTML = analytic.map(a => `<option value="${esc(a.name)}">`).join('');
+  splitDraw();
+  document.getElementById('splitform').hidden = false;
+}
+const splitTotal = () => Math.round(splitRows.reduce((s, r) => s + (+r.pct || 0), 0) * 100) / 100;
+function splitDraw() {
+  document.getElementById('split-body').innerHTML = `
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Analytic account</th><th class="num" style="width:120px">Percentage</th><th style="width:30px"></th></tr></thead><tbody>
+    ${splitRows.map((r, i) => `<tr><td><input list="an-split" value="${esc(r.name || '')}" placeholder="type to find the Odoo account…" style="width:100%" onchange="splitPick(${i}, this)"></td>
+      <td class="num" style="white-space:nowrap"><input type="number" step="0.01" min="0" max="100" value="${r.pct == null ? '' : r.pct}" style="width:80px;text-align:right" oninput="splitRows[${i}].pct = +this.value; splitFoot()"> %</td>
+      <td><a onclick="splitRows.splice(${i}, 1); splitDraw()" title="Remove this line">🗑</a></td></tr>`).join('')}
+    </tbody><tfoot><tr><td><a onclick="splitAdd()">＋ Add a line</a> &nbsp;·&nbsp; <a onclick="splitEven()" title="The same share for every line (two lines = 50 / 50)">⚖ Even shares</a></td><td class="num" id="split-total"></td><td></td></tr></tfoot></table>
+    <p class="hint" id="split-msg"></p>`;
+  splitFoot();
+}
+function splitFoot() {
+  const tot = splitTotal(), ok = Math.abs(tot - 100) < 0.005;
+  document.getElementById('split-total').innerHTML = `<b style="color:${ok ? 'var(--green)' : 'var(--red)'}">${fmtPct(tot)}%</b>`;
+  document.getElementById('split-msg').textContent = ok ? '' : tot < 100 ? `${fmtPct(100 - tot)}% still to give — the shares must add up to 100%, as in Odoo` : `${fmtPct(tot - 100)}% too much — the shares must add up to 100%`;
+}
+function splitPick(i, el) {
+  const a = analytic.find(x => norm(x.name) === norm(el.value.trim()));
+  if (a) { splitRows[i].id = a.id; splitRows[i].name = a.name; el.style.color = ''; }
+  else { splitRows[i].id = null; splitRows[i].name = el.value.trim(); el.style.color = 'var(--red)'; }
+}
+// a new line takes what is left to give, as Odoo's popover does
+function splitAdd() { splitRows.push({ id: null, name: '', pct: Math.max(0, Math.round((100 - splitTotal()) * 100) / 100) }); splitDraw(); setTimeout(() => { const ins = document.querySelectorAll('#split-body input[list]'); ins[ins.length - 1].focus(); }, 30); }
+function splitEven() { const n = splitRows.length || 1, each = Math.floor(10000 / n) / 100; splitRows.forEach((r, i) => r.pct = i === n - 1 ? Math.round((100 - each * (n - 1)) * 100) / 100 : each); splitDraw(); }
+function splitUnsplit() { splitRows = splitRows.slice().sort((a, b) => (+b.pct || 0) - (+a.pct || 0)).slice(0, 1); if (splitRows[0]) splitRows[0].pct = 100; splitSave(); }
+async function splitSave() {
+  const bad = splitRows.find(r => !r.id && (r.name || +r.pct > 0));
+  if (bad) return document.getElementById('split-msg').textContent = `"${bad.name || '?'}" is not an Odoo analytic account — pick one from the list`;
+  const rows = splitRows.filter(r => r.id && +r.pct > 0).map(r => ({ id: r.id, name: r.name, pct: Math.round(+r.pct * 100) / 100 }));
+  if (rows.length && Math.abs(rows.reduce((s, r) => s + r.pct, 0) - 100) >= 0.005) return splitFoot();
+  const main = rows.slice().sort((a, b) => b.pct - a.pct)[0];
+  const data = rows.length > 1 ? { analyticSplit: rows, analyticId: main.id, analyticName: main.name, analyticSrc: 'manual', analyticFrom: '', analyticText: '' }
+    : { analyticSplit: null, analyticId: main ? main.id : null, analyticName: main ? main.name : '', analyticSrc: main ? 'manual' : '', analyticFrom: '', analyticText: '' };
+  try {
+    await patch(splitFor.id, data); Object.assign(splitFor, data);
+    document.getElementById('splitform').hidden = true; render();
+    say(rows.length > 1 ? 'Split: ' + rows.map(r => fmtPct(r.pct) + '% ' + r.name).join(' · ') + (splitFor.bookedMove ? ' — already booked: press Rewrite on its month to carry it into Odoo' : '') : main ? 'Analytic: ' + main.name : 'Analytic cleared');
+  } catch (e) { document.getElementById('split-msg').textContent = 'Could not save: ' + e.message; }
+}
+
 // ── ⛽ Fuel by car ────────────────────────────────────────────────────────────
 // A benzine line says which car it went into and the odometer at the pump. Abed drives the BMW,
 // Georges the RAV4; Khoder and Ziad take the Laredo or the Tacoma, so theirs is read off the
@@ -2588,10 +2666,11 @@ async function lfUpload(txId) {
 
 // ── A typed line ────────────────────────────────────────────────────────────
 let lineEditing = null;
-function openLineForm(id) {
+// openLineForm(id, true) duplicates: the form opens as a NEW line filled in like that one
+function openLineForm(id, copy) {
   if (!account || isStatement()) return;
-  const t = id ? tx.find(x => x.id === id) : null; lineEditing = t || null;
-  document.getElementById('lineform-title').textContent = t ? 'Edit line' : 'New line in ' + account.name;
+  const t = id ? tx.find(x => x.id === id) : null; lineEditing = copy ? null : (t || null);
+  document.getElementById('lineform-title').textContent = copy && t ? `Duplicate of ${t.date} · ${(t.description || '').slice(0, 40)}` : t ? 'Edit line' : 'New line in ' + account.name;
   document.getElementById('lineform-msg').textContent = '';
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById('lineform-body').innerHTML = `
@@ -2613,7 +2692,7 @@ function openLineForm(id) {
       </div>
       <div class="lf-list" id="lf-list"></div>
     </div>`;
-  lfDocs = []; lfSaved = (t && t.docs) || [];
+  lfDocs = []; lfSaved = (t && !copy && t.docs) || [];   // a duplicate starts without the original's paper
   lfDrawDocs();
   // no scanner behind the deployed copy — only this laptop has one
   { const sc = document.getElementById('lf-scan'); const local = !!(Admin.me && Admin.me.local);

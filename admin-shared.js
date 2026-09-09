@@ -19,6 +19,11 @@
   const A = window.Admin = { user: null, me: null, session: null, disabled: false, app: null };
   let idToken = null, ready = false;
   try { A.session = localStorage.getItem('todo_session'); } catch {}
+  // The session also rides as a cookie, because an <img>, an <iframe> or a "Full size" tab
+  // cannot send the Authorization header: the server takes the cookie on GET requests only
+  // (photos and papers in the viewer — Mario, 2026-09-09: "photos are not opening").
+  const cookie = tok => { try { document.cookie = 'todo_session=' + encodeURIComponent(tok || '') + '; path=/; samesite=lax' + (tok ? '; max-age=31536000' : '; max-age=0') + (location.protocol === 'https:' ? '; secure' : ''); } catch {} };
+  if (A.session) cookie(A.session);
 
   const style = document.createElement('style');
   style.textContent = `
@@ -61,6 +66,7 @@
     if (!r.ok) return;
     const s = await r.json();
     A.session = s.token;
+    cookie(s.token);
     try {
       localStorage.setItem('todo_session', s.token);
       localStorage.setItem('todo_session_user', JSON.stringify({ email: s.email, name: s.name }));
@@ -68,6 +74,7 @@
   }
   function drop() {
     A.session = null;
+    cookie('');
     try { localStorage.removeItem('todo_session'); localStorage.removeItem('todo_session_user'); } catch {}
   }
 

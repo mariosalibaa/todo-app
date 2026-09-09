@@ -90,7 +90,9 @@ const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'company
   // ☑ Reviewed: a person looked at the line; the server stamps when and who (Mario, 2026-09-09)
   'reviewed', 'reviewedAt', 'reviewedBy',
   // ⛽ a benzine line: which car it went into, the odometer at the pump, the litres
-  'car', 'carSrc', 'odometer', 'liters'];   // `docs` is written by the upload route only, never by a PATCH
+  'car', 'carSrc', 'odometer', 'liters',
+  // the line shared between analytic accounts by percentage, the Odoo way: [{ id, name, pct }]
+  'analyticSplit'];   // `docs` is written by the upload route only, never by a PATCH
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 // what a correction can change in the workbook itself, on a row that came from it
@@ -916,6 +918,11 @@ async function handle(req, res, url, user, ctx) {
     // ⛽ the car is one of ours (or none); odometer and litres are numbers or nothing
     if ('car' in body) { data.car = CARS.includes(body.car) ? body.car : ''; data.carSrc = data.car ? (body.carSrc || 'manual') : ''; }
     for (const k of ['odometer', 'liters']) if (k in body) { const v = parseFloat(String(body[k] == null ? '' : body[k]).replace(/[^\d.]/g, '')); data[k] = isFinite(v) && v > 0 ? (k === 'odometer' ? Math.round(v) : Math.round(v * 100) / 100) : null; }
+    // analytic shares: [{ id, name, pct }] adding up to 100, or nothing — a lone share is just the analytic
+    if ('analyticSplit' in body) {
+      const rows = Array.isArray(body.analyticSplit) ? body.analyticSplit.map(s => ({ id: +s.id, name: String(s.name || ''), pct: Math.round(+s.pct * 100) / 100 })).filter(s => s.id > 0 && s.pct > 0) : [];
+      data.analyticSplit = rows.length > 1 ? rows : null;
+    }
     // hours and km live in the workbook, not on the line: they may travel alone
     if (!Object.keys(data).length && !(cur.src === 'excel' && SHEET_FIELDS.some(k => k in body))) return json(res, 400, { error: 'nothing to update' });
     data.updatedAt = now(); data.updatedBy = who;

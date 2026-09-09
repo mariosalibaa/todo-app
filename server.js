@@ -542,10 +542,16 @@ async function verifyToken(req) {
     return { uid: 'local-user', email: 'local@shift', name: 'Mario' };
   }
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  // No header: an <img>, <iframe> or a "Full size" tab asking for a photo. Those carry the
+  // session cookie the page set instead — taken for GET only, so nothing is ever written
+  // on the strength of a cookie (2026-09-09).
+  if (!token && req.method === 'GET') {
+    const c = /(?:^|;\s*)todo_session=([^;]+)/.exec(req.headers.cookie || '');
+    if (c) { try { token = decodeURIComponent(c[1]); } catch {} }
+    if (!token.startsWith('st_')) token = '';
   }
-  const token = authHeader.slice(7);
+  if (!token) return null;
   if (token.startsWith('st_')) return verifySessionToken(token);
   try {
     const decodedToken = await auth.verifyIdToken(token);
