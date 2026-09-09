@@ -433,6 +433,8 @@
       <span class="hint" id="stmt-since" title="Taken from the last statement you marked as sent"></span>
       <label class="hint" title="The block covers his new rows. It opens the day after the statement he last received; change the period here — only the rows shown are marked old when you press Sent.">from <input type="date" id="stmt-from" onchange="openStmt()"> to <input type="date" id="stmt-to" onchange="openStmt()"></label>
       <button class="btn" onclick="stmtAllDates()" title="Back to every new row since his last statement">all dates</button>
+      <button class="btn" onclick="stmtExport('png')" title="The block as a picture, ready to send on WhatsApp">🖼 Image</button>
+      <button class="btn" onclick="stmtExport('pdf')" title="The block as an A4 PDF">📄 PDF</button>
       <button class="btn" onclick="document.getElementById('stmt').hidden = true">✕ Close</button></div>
     <div class="sheet-body" id="stmt-body"></div>
   </div>
@@ -1569,11 +1571,46 @@ function openStmt() {
       <tr><td>ending</td><td class="n ${closed < 0 ? 'g' : ''}">${xlFmt(closed)}</td><td class="ar ${closed < 0 ? 'g' : ''}" colspan="4">${xlWord(closed)} · حساب جديد</td></tr>
       ${Math.abs(closed - a) > 0.005 ? `<tr><td>account</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="4">${hidden} row(s) outside this period are not in the block</td></tr>` : ''}
       <tr><td colspan="6" style="border:none;height:8px"></td></tr>
-      <tr><td class="h">date</td><td class="h">what</td><td class="h">debit</td><td class="h">credit</td><td class="h">balance</td><td class="h">project</td></tr>
+      <tr><td class="h">date</td><td class="h">what</td><td class="h">debit</td><td class="h">credit</td><td class="h">balance</td><td class="h">analytical</td></tr>
       ${close}${body}${open}
     </table>
     <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'}${from || to ? ` from ${esc(from || 'the beginning')} to ${esc(to || 'today')}${hidden ? ` — ${hidden} other new row${hidden === 1 ? '' : 's'} outside the period stay new; the ones before it are inside the opening figure, so the balance still lands on the account's own sum` : ''}` : ''} since the statement he last received.${waiting ? ` <b>${waiting} of them still wait${waiting === 1 ? 's' : ''} for your ✓</b> — accept or remove ${waiting === 1 ? 'it' : 'them'} before you send.` : ''} Screenshot this block and send it to him — then press the button so the sheet's rows become old (column A) and the next statement opens on ${xlFmt(closed)}.</p>
     <button class="btn primary" onclick="stmtSent()" ${rows.length ? '' : 'disabled'}>✓ Sent — mark these ${rows.length} rows old</button>`;
+}
+// The block leaves as a file — a picture for WhatsApp, or an A4 PDF — drawn from the table exactly
+// as it stands on screen (Mario, 2026-09-09). The two libraries load only when asked for.
+const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('could not load ' + src)); document.head.appendChild(s); });
+async function stmtExport(kind) {
+  const table = document.querySelector('#stmt-body table.xl');
+  if (!table) return;
+  const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
+  const who = (account && (account.name || account.id) || 'statement').replace(/[\/:*?"<>|]+/g, ' ').trim();
+  const base = `${who} statement ${from || 'start'} → ${to || localYmd(new Date())}`;
+  say('Drawing the statement…');
+  try {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    const canvas = await html2canvas(table, { scale: 2, backgroundColor: '#ffffff', logging: false });
+    if (kind === 'png') {
+      const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = base + '.png'; a.click();
+      say('Image saved: ' + a.download);
+      return;
+    }
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const margin = 12, pw = 210 - margin * 2, ph = 297 - margin * 2;
+    const ratio = pw / canvas.width, pageHpx = Math.floor(ph / ratio);
+    // the tall block goes over as many pages as it needs, cut at page height
+    for (let y = 0, page = 0; y < canvas.height; y += pageHpx, page++) {
+      const slice = document.createElement('canvas'); slice.width = canvas.width; slice.height = Math.min(pageHpx, canvas.height - y);
+      slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+      if (page) pdf.addPage();
+      pdf.setFontSize(9); pdf.setTextColor(120); pdf.text(`${base}${page ? ' · ' + (page + 1) : ''}`, margin, 8);
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, pw, slice.height * ratio);   // JPEG: a PNG page weighs megabytes
+    }
+    pdf.save(base + '.pdf');
+    say('PDF saved: ' + base + '.pdf');
+  } catch (e) { say('Could not export: ' + e.message, 'err'); }
 }
 async function stmtSent() {
   const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
