@@ -1288,7 +1288,11 @@ function render() {
         + (t.src === 'whatsapp' && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + ((t.docs || []).length ? `<a class="paper" onclick="openDocs('${t.id}')" title="${(t.docs || []).length} file${t.docs.length === 1 ? '' : 's'} on this line: ${esc(t.docs.map(d => d.name).join(', '))}">📎${t.docs.length > 1 ? t.docs.length : ''}</a>` : '');
     return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
-      <td class="c-date">${t.src === 'excel' ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this row falls on, in the workbook" onchange="saveSheet('${t.id}', 'date', this.value, this)">` : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
+      <td class="c-date">${t.src === 'excel' ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this row falls on, in the workbook" onchange="saveSheet('${t.id}', 'date', this.value, this)">`
+        // a line a person typed, or one read off WhatsApp, can be moved to its right day: the
+        // receipt is often photographed days after it was paid (Mario, 2026-09-09)
+        : ['manual', 'telegram', 'whatsapp', 'budget'].includes(t.src) && !t.bookedMove ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this line falls on. Change it and the line moves to that day." onchange="saveDate('${t.id}', this.value, this)">`
+        : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : esc(t.description)}</div>
         ${sheetEdit(t)}
@@ -1846,6 +1850,14 @@ async function setReviewed(id, on, el) {
     render();
     say(on ? `Reviewed ✓ ${stamp(t.reviewedAt)} by ${shortWho(t.reviewedBy)} — in the log` : 'Review removed — in the log');
   } catch (e) { el.checked = !on; el.disabled = false; say('Could not save: ' + e.message, 'err'); }
+}
+// move a typed line to another day; the balance and the day bands follow at once
+async function saveDate(id, value, el) {
+  const t = tx.find(x => x.id === id); if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return;
+  const was = t.date;
+  el.classList.add('dirty');
+  try { await patch(id, { date: value }); t.date = value; computeBalances(); render(); say(`Moved from ${was} to ${value}`); }
+  catch (e) { el.value = was; flash(el, false); say('Could not save: ' + e.message, 'err'); }
 }
 async function saveField(id, field, value, el) {
   el.classList.add('dirty');
