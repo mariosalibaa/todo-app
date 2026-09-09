@@ -178,7 +178,12 @@
   .locked{color:var(--muted);}
   td select:has(option[value=""]:checked){color:var(--auto);font-style:italic;} td input::placeholder{color:var(--auto);font-style:italic;}
   .desc-in{border:none;background:transparent;color:inherit;font:inherit;width:calc(100% - 40px);padding:0;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere;display:inline-block;vertical-align:top;} .desc-in:hover{background:#f1f3f5;} .desc-in:focus{outline:none;border-bottom:1px solid #0d6efd;background:#fff;}
-  .date-in{border:none;background:transparent;color:inherit;font:inherit;padding:0;width:112px;} .date-in:hover{background:#f1f3f5;} .date-in:focus{outline:none;border-bottom:1px solid #0d6efd;background:#fff;}
+  /* the day is always written the same way (Su 2026-09-07); on rows you may move, the native
+     picker sits invisibly on top of that text so the column never shows two date formats */
+  .date-pick{position:relative;display:inline-block;}
+  .date-pick input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;padding:0;margin:0;cursor:pointer;}
+  .date-pick:hover{background:#f1f3f5;} .date-pick:focus-within{border-bottom:1px solid #0d6efd;background:#fff;}
+  .date-pick.dirty{opacity:.55;}
   .sheetline{font-size:12px;color:#6c757d;margin-top:1px;} .sheet-in{border:none;background:transparent;color:#0d6efd;font:inherit;width:44px;padding:0;text-align:right;} .sheet-in:hover{background:#f1f3f5;} .sheet-in:focus{outline:none;border-bottom:1px solid #0d6efd;background:#fff;}
   .btn.off{opacity:.38;cursor:not-allowed;}
   .acts .paper{color:var(--odoo);}
@@ -509,6 +514,9 @@ const esc = Admin.esc;
 // 'We 2026-09-03': the weekday in front of every date, as the sheets write it
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const dayDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
+// a day you can change: it reads exactly like the days you cannot (dayDate), with the browser's
+// own date picker laid invisibly over the text so the column keeps one format
+const datePick = (t, title, onchange) => `<span class="date-pick" title="${esc(title)}">${dayDate(t.date)}<input type="date" value="${esc(t.date)}" onchange="${onchange}"></span>`;
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 // the day band spells the day out: "Wednesday 2 September 2026"
 const longDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? new Date(d.slice(0, 10) + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : (d || 'no date');
@@ -1337,10 +1345,10 @@ function render() {
         + (t.src === 'whatsapp' && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + '';   // the line's paper is listed by name in the Odoo column now, not counted here
     return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
-      <td class="c-date">${t.src === 'excel' ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this row falls on, in the workbook" onchange="saveSheet('${t.id}', 'date', this.value, this)">`
+      <td class="c-date">${t.src === 'excel' ? datePick(t, "The day this row falls on, in the workbook", `saveSheet('${t.id}', 'date', this.value, this.parentNode)`)
         // a line a person typed, or one read off WhatsApp, can be moved to its right day: the
         // receipt is often photographed days after it was paid (Mario, 2026-09-09)
-        : ['manual', 'telegram', 'whatsapp', 'budget'].includes(t.src) && !t.bookedMove ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this line falls on. Change it and the line moves to that day." onchange="saveDate('${t.id}', this.value, this)">`
+        : ['manual', 'telegram', 'whatsapp', 'budget'].includes(t.src) && !t.bookedMove ? datePick(t, "The day this line falls on. Change it and the line moves to that day.", `saveDate('${t.id}', this.value, this.parentNode)`)
         : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : esc(t.description)}</div>
