@@ -1132,6 +1132,27 @@ async function handle(req, res, url, user, ctx) {
     catch (e) { console.error('book-month', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   // one accepted line → Odoo at once, with its WhatsApp photos moved onto the document (Mario 2026-09-07)
+  // the hours behind his pay, month by month and project by project
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/timesheet$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const cfg = a.timesheet || {};
+    const file = cfg.file || (a.excel && a.excel.file);
+    if (!file) return json(res, 400, { error: 'this account has no workbook with a timesheet' });
+    try {
+      const r = await ledgers.readTimesheet(file, cfg.sheet || 'timesheet', { rate: cfg.rate, freeHours: cfg.freeHours });
+      return json(res, 200, { ...r, booked: a.timesheetBooked || {} });
+    } catch (e) { console.error('timesheet', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-timesheet$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    try { return json(res, 200, await bills.bookTimesheetMonth(ledgerCtx, a, b.month, who, { post: b.post !== false, redo: !!b.redo })); }
+    catch (e) { console.error('book-timesheet', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-row$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });

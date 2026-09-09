@@ -207,6 +207,50 @@ async function readExcel(file, layoutName, sheetName) {
   return { rows, sheet: ws.name, file: path.basename(file) };
 }
 
+// ── A timesheet: the hours behind a month's pay, project by project ─────────
+// Ziad's workbook keeps a `timesheet` sheet — one row per day (B #, C month, D day, E task,
+// F h/total) and, when a day was split between sites, one extra row per site carrying
+// G h/proj and H project. F sits on the first row of the day only (the cell is merged down),
+// so it must be counted once.
+//
+// His pay is the hours ABOVE a free allowance: `per month (NEW)` computes
+// SUMIFS(h/total for the month) − 40, times the rate. The 40 free hours are what he gives back
+// against the salary ISF already pays him as Mario's driver. The projects, though, used all of
+// his hours, so each keeps its own cost at the full rate and the allowance comes back as one
+// credit line to GENERAL — the cash out still equals his salary (Mario, 2026-09-09).
+async function readTimesheet(file, sheetName, opts) {
+  const ExcelJS = tryRequire('exceljs', EXTRA.exceljs);
+  if (!ExcelJS) throw new Error('exceljs is not installed on this machine — read the timesheet from Mario\'s laptop');
+  if (!file || !fs.existsSync(file)) throw new Error('workbook not found: ' + file);
+  const rate = +(opts && opts.rate) || 2.75;
+  const freeHours = (opts && opts.freeHours != null) ? +opts.freeHours : 40;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(file);
+  const ws = wb.getWorksheet(sheetName || 'timesheet');
+  if (!ws) throw new Error(`sheet "${sheetName || 'timesheet'}" not in ${path.basename(file)} (has: ${wb.worksheets.map(w => w.name).join(', ')})`);
+  const cell = (r, c) => { const x = ws.getRow(r).getCell(c); let v = x.value; if (v && typeof v === 'object' && 'result' in v) v = v.result; return v; };
+  // a merged cell repeats its value on every row it covers: only the master row owns it
+  const owns = (r, c) => { const x = ws.getRow(r).getCell(c); return !(x.isMerged && x.master && x.master.row !== r); };
+  const by = {};
+  for (let r = 15; r <= ws.rowCount; r++) {
+    const m = cell(r, 3);
+    if (!(m instanceof Date)) continue;
+    const key = new Date(m.getTime() - m.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
+    const M = by[key] = by[key] || { month: key, hours: 0, days: 0, projects: {}, allocated: 0, tasks: [] };
+    const day = cell(r, 4), h = +cell(r, 6) || 0, hp = +cell(r, 7) || 0, pj = String(cell(r, 8) || '').trim();
+    if (h && owns(r, 6)) { M.hours = money(M.hours + h); M.days++; if (day && !pj) M.tasks.push({ day: dayStr(day), hours: h, task: String(cell(r, 5) || '').slice(0, 60) }); }
+    if (hp && pj) { M.projects[pj] = money((M.projects[pj] || 0) + hp); M.allocated = money(M.allocated + hp); }
+  }
+  const months = Object.values(by).sort((a, b) => a.month < b.month ? -1 : 1).map(M => {
+    const loose = money(M.hours - M.allocated);            // days he wrote no split for
+    const paidHours = money(M.hours - freeHours);
+    return { ...M, loose, rate, freeHours, paidHours,
+      cost: money(M.hours * rate), refund: money(freeHours * rate), net: money(paidHours * rate) };
+  });
+  return { sheet: ws.name, file: path.basename(file), rate, freeHours, months };
+}
+const dayStr = d => d instanceof Date ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : String(d || '');
+
 // ── Statement close ─────────────────────────────────────────────────────────
 // Mario sends the worker a picture of the sheet's "new" block. Once sent, those rows are
 // marked "old" in the status column, so `old sum` stays exactly the balance the worker saw
@@ -868,4 +912,4 @@ async function writeExcelRow(ctx, account, t, patch) {
   return { wrote, file: base, row: r };
 }
 
-module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };
+module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, readTimesheet, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };

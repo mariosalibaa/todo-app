@@ -65,6 +65,10 @@
   .fuel select:hover,.fuel input.odo-in:hover{border-color:var(--line);} .fuel input.odo-in{width:78px;text-align:right;} .fuel input.odo-in.l{width:44px;}
   .fuel select.src-auto,.fuel input.src-auto{color:var(--auto);font-style:italic;} .fuel select.ask{color:var(--odoo);font-weight:600;}
   .fuel-h{font-size:14px;margin:16px 0 4px;} .fuel-h .hint{font-weight:400;margin-left:8px;}
+  /* the timesheet's project chips */
+  #ts-body .tag{display:inline-block;background:#eef0f4;border:1px solid var(--line);border-radius:10px;padding:0 7px;margin:1px 2px 1px 0;font-size:11.5px;white-space:nowrap;}
+  #ts-body .tag b{color:var(--odoo);} #ts-body .tag.warn{background:#fff4e5;border-color:#f0c98a;} #ts-body .tag.warn b{color:#a26b00;}
+  #ts-body td.g{color:var(--green);}
   /* analytic shares, the Odoo way: tags in the cell, the picker put away */
   .c-proj .split{display:flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:11.5px;margin-top:2px;}
   .c-proj .split .tag{background:#eef0f4;border:1px solid var(--line);border-radius:10px;padding:0 7px;cursor:pointer;white-space:nowrap;} .c-proj .split .tag b{color:var(--odoo);}
@@ -350,6 +354,7 @@
   <button class="btn" id="btn-xl" onclick="importExcelLines()" title="Re-read the account's Excel ledger">📘 Import Excel</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the account's Odoo journals">⇄ Check Odoo</button>
   <button class="btn" id="btn-months" onclick="openMonths()" title="One draft bill per month from this person, one line per Excel row, each with its project" style="display:none">📅 Book months</button>
+  <button class="btn" id="btn-timesheet" onclick="openTimesheet()" title="His hours month by month, costed to the projects that used them, with the free hours returned to GENERAL" style="display:none">🕐 Timesheet</button>
   <button class="btn" onclick="openFuel()" title="Benzine per car across every account: each fill with its odometer, the km between fills, $/km and L/100 km">⛽ Fuel</button>
   <button class="btn" id="btn-projects" onclick="openProjects()" title="The sheet's project names matched to Odoo's analytic accounts, with what each project cost him: days, benzine, misc, vendors" style="display:none">🗂 Projects</button>
   <button class="btn" id="btn-stmt" onclick="openStmt()" title="The statement as the Excel shows it: old sum (what he last saw), the new rows, all sum. Once sent, mark the new rows old." style="display:none">📄 Statement</button>
@@ -377,6 +382,15 @@
       <span class="sp" style="flex:1"></span>
       <button class="btn" onclick="closeBills()">✕ Close</button></div>
     <div class="sheet-body" id="bills-body"></div>
+  </div>
+</div>
+<!-- the timesheet: hours per project per month, and what each month costs -->
+<div class="sheet" id="timesheet" hidden>
+  <div class="sheet-box" style="width:min(1100px,96vw)">
+    <div class="sheet-head"><b id="ts-title">Timesheet</b> <span class="hint" id="ts-sub"></span>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn" onclick="document.getElementById('timesheet').hidden = true">✕ Close</button></div>
+    <div class="sheet-body" id="ts-body"></div>
   </div>
 </div>
 <!-- analytic distribution: shares by percentage, the Odoo way -->
@@ -653,6 +667,7 @@ async function selectAccount(a) {
   able('btn-odoo', st || hasJ, 'Nothing to check against: give the account an Odoo journal with ⚙');
   able('btn-contacts', st, 'Contacts name the phone numbers on a Whish statement — this account has none');
   able('btn-months', isExcelKept() && !!(account.odooPartner && account.odooPartner.id), 'Months are booked for a worker ledger with an Odoo partner');
+  able('btn-timesheet', !!account.timesheet && !!(account.odooPartner && account.odooPartner.id), 'Only an account whose workbook keeps a timesheet');
   able('btn-projects', isExcelKept(), 'Projects come from an Excel ledger');
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
   document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
@@ -1690,6 +1705,55 @@ async function openLog() {
     box.querySelectorAll('td').forEach(td => { td.style.borderTop = '1px solid var(--line,#eee)'; td.style.padding = '4px 6px'; td.style.verticalAlign = 'top'; });
   } catch (e) { box.innerHTML = '<b>Change log</b> — could not load: ' + esc(e.message) + ' <button class="btn" onclick="document.getElementById(\'logbox\').remove()">✕</button>'; }
 }
+// ── The timesheet: his hours, costed to the projects that used them ─────────
+// Every hour is a real cost to its site, so each project carries its own hours at the full
+// rate. He is paid only for the hours above the free allowance, because ISF already pays him
+// a salary as Mario's driver — so the allowance comes back as one credit on GENERAL and the
+// bill's total is exactly his pay (Mario, 2026-09-09).
+let tsData = null;
+async function openTimesheet() {
+  document.getElementById('timesheet').hidden = false;
+  document.getElementById('ts-title').textContent = 'Timesheet — ' + (account ? account.name : '');
+  document.getElementById('ts-body').innerHTML = '<p class="hint">Reading the workbook…</p>';
+  try { tsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/timesheet`); drawTimesheet(); }
+  catch (e) { document.getElementById('ts-body').innerHTML = `<p class="hint">Could not read it: ${esc(e.message)}</p>`; }
+}
+function drawTimesheet() {
+  const { months, rate, freeHours, booked } = tsData;
+  document.getElementById('ts-sub').textContent = `${rate} $/h · the first ${freeHours} h of each month are covered by his ISF salary`;
+  const rows = months.slice().reverse().map(m => {
+    const b = booked && booked[m.month];
+    const projects = Object.entries(m.projects).sort((a, b2) => b2[1] - a[1]).map(([p, h]) => `<span class="tag">${esc(p)} <b>${h}</b>h</span>`).join(' ')
+      + (m.loose > 0.005 ? ` <span class="tag warn" title="Days where he wrote no project: they fall on GENERAL until the day says where he was">no project <b>${m.loose}</b>h</span>` : '');
+    return `<tr>
+      <td><b>${esc(m.month)}</b><div class="hint">${m.days} day${m.days === 1 ? '' : 's'}</div></td>
+      <td class="num">${m.hours}</td>
+      <td class="num">${fmt(m.cost)}</td>
+      <td class="num g">−${fmt(m.refund)}</td>
+      <td class="num"><b>${fmt(m.net)}</b><div class="hint">${m.paidHours} h paid</div></td>
+      <td>${projects || '<span class="hint">no project on any day</span>'}</td>
+      <td style="white-space:nowrap">${b
+        ? `<a class="odoo-ok" target="_blank" href="${ODOO}${b.moveId}">✓ ${esc(b.move)}</a><br><button class="btn" onclick="bookTimesheet('${m.month}', true, this)">Rewrite</button>`
+        : `<button class="btn primary" onclick="bookTimesheet('${m.month}', false, this)">📗 Book</button>`}</td></tr>`;
+  }).join('');
+  document.getElementById('ts-body').innerHTML = `
+    <p class="hint">Each project is charged the hours it used, at ${rate} $/h. The ${freeHours} free hours come back as one credit line on GENERAL, so the bill totals exactly what he is paid — the same figure as the workbook's monthly pay row.</p>
+    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr>
+      <th>Month</th><th class="num">Hours</th><th class="num">Cost to projects</th><th class="num">Back to GENERAL</th><th class="num">His pay</th><th>Projects</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+async function bookTimesheet(month, redo, btn) {
+  const m = tsData.months.find(x => x.month === month); if (!m) return;
+  if (!confirm(`Book ${month} in Odoo?\n\n${m.hours} h costed to the projects at ${m.rate} = ${fmt(m.cost)}\nless ${m.freeHours} h back to GENERAL = −${fmt(m.refund)}\n\nBill total ${fmt(m.net)} — his pay for the month.`)) return;
+  const was = btn.textContent; btn.disabled = true; btn.textContent = 'Booking…';
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-timesheet`, { month, redo: !!redo, post: true });
+    say(`${r.move} ${r.action} — ${r.hours} h on ${r.projects.length} project${r.projects.length === 1 ? '' : 's'}, ${fmt(r.net)} net`
+      + (r.unmapped.length ? ` · ${r.unmapped.length} project name${r.unmapped.length === 1 ? '' : 's'} not mapped yet, on GENERAL: ${r.unmapped.join(', ')}` : ''));
+    await openTimesheet();
+  } catch (e) { btn.disabled = false; btn.textContent = was; say('Could not book: ' + e.message, 'err'); }
+}
+
 // ── Analytic distribution, the Odoo way ──────────────────────────────────────
 // One line may be shared between analytic accounts by percentage. Odoo keeps it on the bill
 // line as {"69": 50, "144": 50}, and that is exactly what the booking writes. Here the row keeps

@@ -142,7 +142,10 @@ async function applyMap(ctx, account) {
 const isRow = t => t.src === 'excel'
   || ((t.src === 'manual' || t.src === 'telegram') && !t.excluded && !t.review)
   || (t.src === 'whatsapp' && !t.excluded && !t.review && t.waAccepted === true);
-const bookable = t => isRow(t) && !t.excluded && t.debit > 0 && (t.nature === 'labour' || t.nature === 'expense' || t.nature === 'opening');
+// `noBook` means this row is deliberately kept out of Odoo — a bill deleted by hand, or a cost
+// booked another way (Ziad's monthly pay, which the timesheet bill carries project by project).
+// The month bills honoured it nowhere, so a Rewrite kept putting such a row back (2026-09-09).
+const bookable = t => isRow(t) && !t.excluded && !t.noBook && t.debit > 0 && (t.nature === 'labour' || t.nature === 'expense' || t.nature === 'opening');
 const onlyOne = (opts, t) => !opts || !opts.only || opts.only === t.id || (Array.isArray(opts.only) && opts.only.includes(t.id));
 async function months(ctx, account) {
   const { txCol, odooCall } = ctx;
@@ -284,6 +287,80 @@ async function bookMonth(ctx, account, month, part, who, opts) {
   const general = lines.filter(l => l.a.id === GENERAL).length, inherited = lines.filter(l => /same day|previous/.test(l.a.from)).length;
   return { month, part, action, moveId, move: moveName, ref, rows: rows.length, total, inherited, general, wrongCompany, accounts: [...new Set(lines.map(l => CO.accountNames[l.accountId]))] };
 }
+
+// ── A month of a timesheet, costed project by project ───────────────────────
+// Every hour he worked is a real cost to the site that used it, so each project carries its
+// own hours at the full rate. What he is actually paid is smaller: the first N hours of the
+// month are covered by the salary ISF pays him, so that allowance comes back as one credit
+// line on GENERAL. Bill total = hours × rate − allowance × rate = his salary, which is what
+// leaves the cash (Mario, 2026-09-09: "the project still holds the cost, my cashflow is correct").
+async function bookTimesheetMonth(ctx, account, month, who, opts) {
+  const { ws, odooCall, acc } = ctx;
+  const CO = bookCo(account);
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) throw new Error('month as yyyy-mm');
+  const partner = account.odooPartner;
+  if (!partner || !partner.id) throw new Error('set the account\'s Odoo partner first (⚙): the bill is from him');
+  const cfg = account.timesheet || {};
+  const file = cfg.file || (account.excel && account.excel.file);
+  if (!file) throw new Error('this account has no workbook with a timesheet');
+  const read = await ledgersLib().readTimesheet(file, cfg.sheet || 'timesheet', { rate: cfg.rate, freeHours: cfg.freeHours });
+  const M = read.months.find(m => m.month === month);
+  if (!M) throw new Error(`the timesheet has no hours in ${month}`);
+
+  const map = await loadMap(ws);
+  const known = await acc.analyticAccounts(odooCall).catch(() => []);
+  const byId = Object.fromEntries(known.map(x => [x.id, x]));
+  // his own project words → the Odoo analytic accounts, through the same map the bills use
+  const pick = text => {
+    const e = map[norm(text)];
+    if (e && e.id && (!byId[e.id] || !byId[e.id].company || byId[e.id].company === CO.company)) return { id: e.id, name: e.name, project: text };
+    return { id: GENERAL, name: 'GENERAL', project: text, unmapped: true };
+  };
+  const parts = Object.entries(M.projects).sort((a, b) => b[1] - a[1]).map(([text, hours]) => ({ text, hours, ...pick(text) }));
+  if (M.loose > 0.005) parts.push({ text: '', hours: M.loose, id: GENERAL, name: 'GENERAL', project: '(no project written on the day)', loose: true });
+
+  const lines = parts.map(p => ({ name: `${month} · ${p.hours} h × ${M.rate} — ${p.project || p.name}`, quantity: p.hours, price_unit: M.rate,
+    account_id: CO.accounts.labour, tax_ids: [[6, 0, []]], analytic_distribution: { [String(p.id)]: 100 } }));
+  // the allowance he gives back against the ISF salary: one credit line, on GENERAL
+  lines.push({ name: `${month} · ${M.freeHours} h covered by his ISF salary — returned to GENERAL`, quantity: -M.freeHours, price_unit: M.rate,
+    account_id: CO.accounts.labour, tax_ids: [[6, 0, []]], analytic_distribution: { [String(GENERAL)]: 100 } });
+
+  const ref = `${account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '')}-${month}-TIMESHEET`;
+  const ctxO = { allowed_company_ids: [CO.companyId], company_id: CO.companyId };
+  const dateOf = `${month}-${String(new Date(+month.slice(0, 4), +month.slice(5, 7), 0).getDate()).padStart(2, '0')}`;
+  const found = await odooCall('account.move', 'search_read', [[['ref', '=', ref], ['move_type', '=', 'in_invoice']]], { fields: ['id', 'name', 'state'], context: ctxO, limit: 1 });
+  const existing = found[0];
+  let moveId, moveName, action;
+  if (existing && existing.state !== 'draft') {
+    if (!(opts && opts.redo)) throw new Error(`${existing.name} (${ref}) is already ${existing.state} — press Rewrite to redo it`);
+    await odooCall('account.move', 'button_draft', [[existing.id]], { context: ctxO });
+  }
+  if (existing) {
+    await odooCall('account.move', 'write', [[existing.id], { ref, invoice_date: dateOf, invoice_line_ids: [[5, 0, 0], ...lines.map(l => [0, 0, l])] }], { context: ctxO });
+    moveId = existing.id; moveName = existing.name && existing.name !== '/' ? existing.name : 'Draft ' + ref; action = 'rewritten';
+  } else {
+    moveId = await odooCall('account.move', 'create', [{
+      move_type: 'in_invoice', company_id: CO.companyId, journal_id: CO.journalId, partner_id: +partner.id,
+      invoice_date: dateOf, date: dateOf, ref,
+      narration: `${account.name} — ${month}: ${M.hours} h from the timesheet at ${M.rate}/h on the projects that used them, less ${M.freeHours} h covered by his ISF salary. Net ${money(M.net)} = his pay. Made by Shift Hub.`,
+      invoice_line_ids: lines.map(l => [0, 0, l]),
+    }], { context: ctxO });
+    const [m] = await odooCall('account.move', 'read', [[moveId], ['name']], { context: ctxO });
+    moveName = m.name && m.name !== '/' ? m.name : 'Draft ' + ref; action = 'created';
+  }
+  let state = 'draft';
+  if (opts && opts.post) {
+    await odooCall('account.move', 'action_post', [[moveId]], { context: ctxO });
+    const [m2] = await odooCall('account.move', 'read', [[moveId], ['name', 'state']], { context: ctxO });
+    moveName = m2.name; state = m2.state; action += ' and posted';
+  }
+  await account.ref.set({ timesheetBooked: { ...(account.timesheetBooked || {}), [month]: { moveId, move: moveName, ref, at: now(), by: who || '', net: money(M.net) } } }, { merge: true });
+  return { month, action, moveId, move: moveName, ref, hours: M.hours, rate: M.rate, freeHours: M.freeHours,
+    cost: money(M.cost), refund: money(M.refund), net: money(M.net), state,
+    projects: parts.map(p => ({ project: p.project || p.name, hours: p.hours, cost: money(p.hours * M.rate), analytic: p.name, unmapped: !!p.unmapped, loose: !!p.loose })),
+    unmapped: parts.filter(p => p.unmapped).map(p => p.text) };
+}
+const ledgersLib = () => require('./ledgers');
 
 // ── everything else that must reach Odoo ────────────────────────────────────
 const inOdoo = t => !!(t.odoo && (t.odoo.matches || []).some(x => x.chosen));
@@ -902,4 +979,4 @@ async function bookRow(ctx, account, txId, who) {
   return { kind, move: move && move.name, id: move && move.id, ref: move && move.ref, photos: files.length, pendingExcel: !!data.pendingExcel };
 }
 
-module.exports = { alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+module.exports = { alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
