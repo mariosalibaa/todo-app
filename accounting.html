@@ -59,6 +59,12 @@
   .c-rev{width:7%;} .c-rev label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;}
   .c-rev input{width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--green);}
   .c-rev.on label{color:var(--green);font-weight:600;} .c-rev .hint{font-size:10.5px;color:var(--muted);line-height:1.25;margin-top:1px;}
+  /* ⛽ the car and the odometer under a benzine line */
+  .fuel{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .fuel select,.fuel input.odo-in{width:auto;border:1px solid transparent;background:transparent;font-size:11.5px;padding:1px 4px;border-radius:3px;font-family:inherit;color:inherit;}
+  .fuel select:hover,.fuel input.odo-in:hover{border-color:var(--line);} .fuel input.odo-in{width:78px;text-align:right;} .fuel input.odo-in.l{width:44px;}
+  .fuel select.src-auto,.fuel input.src-auto{color:var(--auto);font-style:italic;} .fuel select.ask{color:var(--odoo);font-weight:600;}
+  .fuel-h{font-size:14px;margin:16px 0 4px;} .fuel-h .hint{font-weight:400;margin-left:8px;}
   td.num{white-space:nowrap;} .c-date .ref{overflow-wrap:anywhere;}
   .c-desc .svc{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-right:4px;}
   .c-desc .who{font-size:11.5px;color:var(--muted);cursor:pointer;margin-top:1px;}
@@ -335,6 +341,7 @@
   <button class="btn" id="btn-xl" onclick="importExcelLines()" title="Re-read the account's Excel ledger">📘 Import Excel</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the account's Odoo journals">⇄ Check Odoo</button>
   <button class="btn" id="btn-months" onclick="openMonths()" title="One draft bill per month from this person, one line per Excel row, each with its project" style="display:none">📅 Book months</button>
+  <button class="btn" onclick="openFuel()" title="Benzine per car across every account: each fill with its odometer, the km between fills, $/km and L/100 km">⛽ Fuel</button>
   <button class="btn" id="btn-projects" onclick="openProjects()" title="The sheet's project names matched to Odoo's analytic accounts, with what each project cost him: days, benzine, misc, vendors" style="display:none">🗂 Projects</button>
   <button class="btn" id="btn-stmt" onclick="openStmt()" title="The statement as the Excel shows it: old sum (what he last saw), the new rows, all sum. Once sent, mark the new rows old." style="display:none">📄 Statement</button>
   <button class="btn" id="btn-queue" onclick="openQueue()" title="Lines you asked to be booked in Odoo — reviewed here before anything is written" hidden>📗 To book</button>
@@ -361,6 +368,16 @@
       <span class="sp" style="flex:1"></span>
       <button class="btn" onclick="closeBills()">✕ Close</button></div>
     <div class="sheet-body" id="bills-body"></div>
+  </div>
+</div>
+<!-- ⛽ benzine per car, across every account -->
+<div class="sheet" id="fuel" hidden>
+  <div class="sheet-box" style="width:min(1140px,96vw)">
+    <div class="sheet-head"><b>⛽ Fuel by car</b> <span class="hint">every account · Abed = BMW · Georges = RAV4 · Khoder &amp; Ziad = Laredo or Tacoma</span>
+      <span class="sp" style="flex:1"></span>
+      <label class="hint">since <input type="date" id="fuel-since" onchange="openFuel()"></label>
+      <button class="btn" onclick="document.getElementById('fuel').hidden = true">✕ Close</button></div>
+    <div class="sheet-body" id="fuel-body"></div>
   </div>
 </div>
 <div class="sheet" id="projects" hidden>
@@ -1228,6 +1245,7 @@ function render() {
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
         ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}${(t.ask.options || []).some(o => o.debit != null || o.credit != null) ? ` <button class="yes" style="width:auto;padding:0 6px" onclick="answerCustom('${t.id}')" title="Type any amount for this row">Other amount…</button>` : ''}</div>` : t.answer ? `<div class="sug-act"><span class="sug-why">Answered: ${esc(String(t.answer))}</span></div>` : ''}
+        ${fuelStrip(t)}
         ${paidFlag}${reviewFlag}${waFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       ${typeCell}
@@ -1569,6 +1587,77 @@ async function openLog() {
     box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b>Change log</b> <span style="color:var(--muted)">${(r.entries || []).length} latest edits · Ctrl+Z undo · Ctrl+Y redo</span><button class="btn" onclick="document.getElementById('logbox').remove()">✕</button></div><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr style="text-align:left;color:var(--muted)"><th>when</th><th>who</th><th>line</th><th>change</th></tr></thead><tbody>${rows || '<tr><td colspan=4>No edits logged yet.</td></tr>'}</tbody></table>`;
     box.querySelectorAll('td').forEach(td => { td.style.borderTop = '1px solid var(--line,#eee)'; td.style.padding = '4px 6px'; td.style.verticalAlign = 'top'; });
   } catch (e) { box.innerHTML = '<b>Change log</b> — could not load: ' + esc(e.message) + ' <button class="btn" onclick="document.getElementById(\'logbox\').remove()">✕</button>'; }
+}
+// ── ⛽ Fuel by car ────────────────────────────────────────────────────────────
+// A benzine line says which car it went into and the odometer at the pump. Abed drives the BMW,
+// Georges the RAV4; Khoder and Ziad take the Laredo or the Tacoma, so theirs is read off the
+// words (or the photo) and otherwise asked on the row (Mario, 2026-09-09). Same reading as the server.
+const CARS = ['BMW', 'RAV4', 'Laredo', 'Tacoma'];
+const OWN_CAR = { abed: 'BMW', georges: 'RAV4' };
+const isFuel = s => /benzin|fuel|essence|petrol|gasoline|mazout|gasoil|diesel|\btank\b|⛽/i.test(s || '') && !/water tank/i.test(s || '');
+const carIn = s => { const m = String(s || '').match(/\b(bmw|rav ?4|laredo|tacoma)\b/i); return m ? CARS.find(c => c.toLowerCase() === m[1].replace(/\s/g, '').toLowerCase()) : ''; };
+const odometerIn = s => { const m = String(s || '').match(/odomet\w*\D{0,12}(\d{1,3}(?:[,. ]\d{3})+|\d{4,7})|(\d{1,3}(?:[,. ]\d{3})+|\d{5,7})\s*km\b/i); const v = m && (m[1] || m[2]); return v ? +v.replace(/[,. ]/g, '') : null; };
+function fuelOf(t) {
+  if (!(t.car || isFuel([t.description, t.partnerName, t.note].join(' ')))) return null;
+  const words = (t.description || '') + ' ' + (t.note || '');
+  const car = t.car || carIn(words) || OWN_CAR[(account && account.owner) || ''] || '';
+  const odoSet = t.odometer != null && t.odometer !== '';
+  return { car, carSrc: t.car ? 'manual' : car ? 'auto' : '', odometer: odoSet ? +t.odometer : odometerIn(words), odoSrc: odoSet ? 'manual' : 'auto', liters: t.liters || '' };
+}
+function fuelStrip(t) {
+  const f = fuelOf(t); if (!f) return '';
+  return `<div class="fuel" title="⛽ Which car this benzine went into and the odometer at the pump — the Fuel view adds it up per car. Italic = read off the words, not yet confirmed.">⛽
+    <select class="${f.carSrc === 'auto' ? 'src-auto' : ''}${!f.car ? ' ask' : ''}" onchange="saveFuel('${t.id}', 'car', this.value, this)"><option value="">? which car</option>${CARS.map(c => `<option ${f.car === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+    <input class="odo-in${f.odoSrc === 'auto' && f.odometer ? ' src-auto' : ''}" type="text" inputmode="numeric" placeholder="odometer" value="${f.odometer || ''}" onchange="saveFuel('${t.id}', 'odometer', this.value, this)"><span>km</span>
+    <input class="odo-in l" type="text" inputmode="decimal" placeholder="L" value="${esc(String(f.liters || ''))}" onchange="saveFuel('${t.id}', 'liters', this.value, this)"><span>L</span></div>`;
+}
+async function saveFuel(id, field, value, el) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  el.classList.add('dirty');
+  const data = field === 'car' ? { car: value, carSrc: value ? 'manual' : '' } : { [field]: value === '' ? null : (+String(value).replace(/[^\d.]/g, '') || null) };
+  try { await patch(id, data); Object.assign(t, data); el.classList.remove('src-auto', 'ask'); flash(el, true); }
+  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+let fuelData = null;
+async function openFuel() {
+  document.getElementById('fuel').hidden = false;
+  const sinceEl = document.getElementById('fuel-since');
+  if (!sinceEl.value) sinceEl.value = new Date().getFullYear() + '-01-01';
+  const body = document.getElementById('fuel-body');
+  body.innerHTML = '<p class="hint">Reading every account for benzine…</p>';
+  try { fuelData = await Admin.api('GET', `/api/accounting/fuel?since=${sinceEl.value}`); drawFuel(); }
+  catch (e) { body.innerHTML = `<p class="hint">Could not load: ${esc(e.message)}</p>`; }
+}
+function drawFuel() {
+  const byCar = {};
+  for (const r of fuelData.rows) (byCar[r.car || ''] = byCar[r.car || ''] || []).push(r);
+  const order = [...CARS.filter(c => byCar[c]), ...(byCar[''] ? [''] : [])];
+  const dash = '<span class="hint">—</span>';
+  const n0 = v => v == null || v === '' ? dash : Number(v).toLocaleString('en-US');
+  const html = order.map(car => {
+    // oldest first to walk the odometer, newest on top to read
+    const list = byCar[car].slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    let prev = null; const out = [];
+    for (const r of list) {
+      const km = r.odometer && prev && r.odometer > prev ? r.odometer - prev : null;
+      out.push({ ...r, km, perKm: km && r.amount ? r.amount / km : null, l100: km && r.liters ? r.liters * 100 / km : null });
+      if (r.odometer) prev = r.odometer;
+    }
+    const spent = list.reduce((s, r) => s + (r.amount || 0), 0);
+    const liters = list.reduce((s, r) => s + (+r.liters || 0), 0);
+    const noOdo = list.filter(r => !r.odometer).length;
+    // $/km is honest only over the stretch the odometer covers: the fills after the first
+    // reading up to the last one, against the km between those two readings
+    const iFirst = list.findIndex(r => r.odometer), iLast = list.length - 1 - list.slice().reverse().findIndex(r => r.odometer);
+    const driven = iFirst >= 0 && iLast > iFirst ? list[iLast].odometer - list[iFirst].odometer : 0;
+    const between = driven > 0 ? list.slice(iFirst + 1, iLast + 1) : [];
+    const spentBetween = between.reduce((s, r) => s + (r.amount || 0), 0), litersBetween = between.reduce((s, r) => s + (+r.liters || 0), 0);
+    const trs = out.slice().reverse().map(r => `<tr><td style="white-space:nowrap">${esc(dayDate(r.date))}</td><td>${esc(r.who)}</td><td class="hint" title="${esc(r.description)}">${esc(r.description.slice(0, 64))}</td><td class="num">${fmt(r.amount)}</td><td class="num">${n0(r.liters)}</td><td class="num ${r.odoSrc === 'auto' && r.odometer ? 'src-auto' : ''}">${n0(r.odometer)}</td><td class="num">${n0(r.km)}</td><td class="num">${r.perKm ? r.perKm.toFixed(3) : dash}</td><td class="num">${r.l100 ? r.l100.toFixed(1) : dash}</td><td><a href="/accounting/accounts?id=${esc(r.accountId)}">open</a></td></tr>`).join('');
+    const head = car ? `⛽ ${esc(car)}` : '❓ which car? — pick it on the row';
+    return `<h3 class="fuel-h">${head} <span class="hint">${list.length} fill${list.length === 1 ? '' : 's'} · ${fmt(spent)} $${liters ? ` · ${liters.toLocaleString('en-US')} L` : ''}${driven > 0 ? ` · <b title="Between the first and the last odometer reading: ${between.length} fill${between.length === 1 ? '' : 's'}, ${fmt(spentBetween)} $">${driven.toLocaleString('en-US')} km on ${fmt(spentBetween)} $ = ${(spentBetween / driven).toFixed(3)} $/km${litersBetween ? ` · ${(litersBetween * 100 / driven).toFixed(1)} L/100 km` : ''}</b>` : ' · no two odometer readings yet'}${noOdo ? ` · ${noOdo} without an odometer` : ''}</span></h3>
+      <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Date</th><th>Who</th><th>Line</th><th class="num">$</th><th class="num">L</th><th class="num">Odometer</th><th class="num">km since last</th><th class="num">$/km</th><th class="num">L/100 km</th><th></th></tr></thead><tbody>${trs}</tbody></table>`;
+  }).join('');
+  document.getElementById('fuel-body').innerHTML = html || '<p class="hint">No benzine line since that date.</p>';
 }
 // ☑ Reviewed: the server stamps the time and the person; the log gets the edit like any other
 const stamp = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? String(iso) : `${DAYS[d.getDay()]} ${localYmd(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };

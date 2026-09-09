@@ -88,7 +88,9 @@ const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'company
   // asked for from the phone, booked from the laptop after you look at it
   'bookWanted', 'bookWantedAt', 'bookWantedBy',
   // ☑ Reviewed: a person looked at the line; the server stamps when and who (Mario, 2026-09-09)
-  'reviewed', 'reviewedAt', 'reviewedBy'];   // `docs` is written by the upload route only, never by a PATCH
+  'reviewed', 'reviewedAt', 'reviewedBy',
+  // ⛽ a benzine line: which car it went into, the odometer at the pump, the litres
+  'car', 'carSrc', 'odometer', 'liters'];   // `docs` is written by the upload route only, never by a PATCH
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 // what a correction can change in the workbook itself, on a row that came from it
@@ -129,6 +131,24 @@ async function resolve(ws, id) {
   return null;
 }
 const txCol = a => a.ref.collection('tx');
+
+// ── ⛽ Fuel by car ────────────────────────────────────────────────────────────
+// A benzine line carries the car it went into and the odometer at the pump, so the fuel view
+// can say what each car burns per km (Mario, 2026-09-09). Abed drives the BMW and Georges the
+// RAV4; Khoder and Ziad take the Laredo or the Tacoma, so theirs is read off the words (or the
+// photo) and otherwise asked on the row. The page reads a line the same way (fuelOf there).
+const CARS = ['BMW', 'RAV4', 'Laredo', 'Tacoma'];
+const OWN_CAR = { abed: 'BMW', georges: 'RAV4' };
+const isFuel = s => /benzin|fuel|essence|petrol|gasoline|mazout|gasoil|diesel|\btank\b|⛽/i.test(s || '') && !/water tank/i.test(s || '');
+const carIn = s => { const m = String(s || '').match(/\b(bmw|rav ?4|laredo|tacoma)\b/i); return m ? CARS.find(c => c.toLowerCase() === m[1].replace(/\s/g, '').toLowerCase()) : ''; };
+const odometerIn = s => { const m = String(s || '').match(/odomet\w*\D{0,12}(\d{1,3}(?:[,. ]\d{3})+|\d{4,7})|(\d{1,3}(?:[,. ]\d{3})+|\d{5,7})\s*km\b/i); const v = m && (m[1] || m[2]); return v ? +v.replace(/[,. ]/g, '') : null; };
+function fuelOf(t, account) {
+  if (!(t.car || isFuel([t.description, t.partnerName, t.note].join(' ')))) return null;
+  const words = (t.description || '') + ' ' + (t.note || '');
+  const car = t.car || carIn(words) || OWN_CAR[(account && account.owner) || ''] || '';
+  const odoSet = t.odometer != null && t.odometer !== '';
+  return { car, carSrc: t.car ? (t.carSrc || 'manual') : car ? 'auto' : '', odometer: odoSet ? +t.odometer : odometerIn(words), odoSrc: odoSet ? 'manual' : 'auto', liters: t.liters || null };
+}
 
 // ── Odoo helpers ─────────────────────────────────────────────────────────────
 let _journalCache = { at: 0, list: [] };
@@ -606,6 +626,25 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, { ok: true });
   }
 
+  // ⛽ Every benzine line of every account since a day, with its car and odometer, for the fuel
+  // view. Nothing is written: a car or odometer nobody typed is read off the words, as on the page.
+  if (url.startsWith('/api/accounting/fuel') && req.method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const since = /^\d{4}-\d{2}-\d{2}$/.test(q.get('since') || '') ? q.get('since') : new Date().getFullYear() + '-01-01';
+    const rows = [];
+    for (const a0 of await listAccounts(ws)) {
+      const a = await resolve(ws, a0.id); if (!a) continue;
+      const snap = await txCol(a).where('date', '>=', since).get();
+      for (const d of snap.docs) {
+        const t = d.data(); if (t.excluded || !(t.debit > 0)) continue;
+        const f = fuelOf(t, a); if (!f) continue;
+        rows.push({ accountId: a.id, who: a.name || a.id, id: d.id, date: t.date, description: String(t.description || '').slice(0, 120), amount: t.debit || 0, ...f });
+      }
+    }
+    rows.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
+    return json(res, 200, { since, cars: CARS, rows });
+  }
+
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx$/)) && req.method === 'GET') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
@@ -874,6 +913,9 @@ async function handle(req, res, url, user, ctx) {
     // ☑ Reviewed is stamped here, not by the page, so the column always says who really looked and
     // when. An undo/redo carries its own reviewedAt back and is replayed as it was.
     if ('reviewed' in body && !('reviewedAt' in body)) { data.reviewed = !!body.reviewed; data.reviewedAt = data.reviewed ? now() : ''; data.reviewedBy = data.reviewed ? who : ''; }
+    // ⛽ the car is one of ours (or none); odometer and litres are numbers or nothing
+    if ('car' in body) { data.car = CARS.includes(body.car) ? body.car : ''; data.carSrc = data.car ? (body.carSrc || 'manual') : ''; }
+    for (const k of ['odometer', 'liters']) if (k in body) { const v = parseFloat(String(body[k] == null ? '' : body[k]).replace(/[^\d.]/g, '')); data[k] = isFinite(v) && v > 0 ? (k === 'odometer' ? Math.round(v) : Math.round(v * 100) / 100) : null; }
     // hours and km live in the workbook, not on the line: they may travel alone
     if (!Object.keys(data).length && !(cur.src === 'excel' && SHEET_FIELDS.some(k => k in body))) return json(res, 400, { error: 'nothing to update' });
     data.updatedAt = now(); data.updatedBy = who;
