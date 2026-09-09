@@ -528,7 +528,9 @@ let srcOff = new Set();                       // sources hidden by clicking thei
 const isExcelKept = () => !!(account && account.excel && account.excel.file);
 // every source starts shown — clicking its name in the count is what hides it
 // on a partner ledger the Odoo entries sit behind the rows, not among them: hidden until the chip is clicked
-const resetSources = () => { srcOff = isExcelKept() ? new Set(['odoo', 'whatsapp', 'telegram', 'transfer']) : new Set(); };   // an Excel-kept account shows its Excel rows only; click a chip to see the rest
+// an Excel-kept account shows its Excel rows, plus his WhatsApp lines since the last statement
+// (those come by themselves — Mario, 2026-09-09); Odoo, Telegram and transfers wait behind their chip
+const resetSources = () => { srcOff = isExcelKept() ? new Set(['odoo', 'telegram', 'transfer']) : new Set(); };
 
 function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
 
@@ -729,6 +731,9 @@ async function loadTx() {
   else { tx = r.tx || []; before = r.before || null; }
   loadedSrc = want ? new Set(want) : null;
   computeBalances();
+  // his WhatsApp lines since the last statement come by themselves — no chip to press
+  // (Mario, 2026-09-09); the earlier ones still wait behind the chip
+  if (want && !srcOff.has('whatsapp')) await loadWaSince(Array.isArray(r) ? '' : (r.since || ''));
   // nothing older than the first pass: the account is already whole
   if (twoPass && (!before || !before.count)) return;
   if (twoPass) tailing = loadTail(want, acc);
@@ -755,6 +760,29 @@ async function loadTail(want, forAcc) {
     if (mark) delete mark.dataset.tail;
     tailing = null;
   }
+}
+// The day after his last statement — recorded on the account, else the sheet's last "old" row,
+// else a fortnight ago (the same reading as the Statements page)
+function afterStatement() {
+  const stmt = account && account.statement && account.statement.date
+    || tx.filter(t => t.period === 'old' && !t.excluded).map(t => t.date).sort().pop() || '';
+  const d = stmt ? new Date(stmt + 'T00:00:00') : new Date();
+  d.setDate(d.getDate() + (stmt ? 1 : -14));
+  return { from: localYmd(d), stmt };
+}
+let waAuto = null;
+async function loadWaSince(periodSince) {
+  const { from, stmt } = afterStatement();
+  // never before the grid's own window: the carry below already counts what is earlier
+  const since = periodSince && periodSince > from ? periodSince : from;
+  try {
+    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx?since=${since}&src=whatsapp&carry=0`);
+    const have = new Set(tx.map(t => t.id));
+    let n = 0;
+    for (const t of (Array.isArray(r) ? r : r.tx || [])) if (!have.has(t.id)) { tx.push(t); n++; }
+    waAuto = { since, stmt, n };
+    computeBalances();
+  } catch (e) { console.warn('whatsapp since the statement', e.message); }
 }
 // Make sure these sources are in `tx` (fetching the missing ones) before they are shown
 async function ensureSources(keys) {
@@ -1326,7 +1354,10 @@ function render() {
     const extra = only ? ` (${only} not in Excel)` : '';
     const tip = (off ? `Hidden. Click to show the ${n} ${k} line${n === 1 ? '' : 's'}.` : `Shown. Click to hide the ${n} ${k} line${n === 1 ? '' : 's'}.`)
       + (only ? ` ${only} of them match no row of the Excel ledger.` : '');
-    return `<a class="srctog${off ? ' off' : ''}" onclick="toggleSrc('${k}')" title="${esc(tip)}">${n} <span class="src">${k}</span>${tail}${extra}</a>`;
+    // WhatsApp came by itself from the day after his statement; the older lines wait behind a second link
+    const auto = k === 'whatsapp' && waAuto && loadedSrc && !loadedSrc.has('whatsapp')
+      ? ` <span class="hint" title="${esc(waAuto.stmt ? 'Loaded by itself: his WhatsApp lines after the statement of ' + waAuto.stmt : 'Loaded by itself: his WhatsApp lines of the last fortnight (no statement on record)')}">since ${esc(waAuto.stmt || waAuto.since)}</span> <a class="hint" onclick="ensureSources(['whatsapp']).then(render)" title="Also fetch his earlier WhatsApp lines, before the statement">earlier…</a>` : '';
+    return `<a class="srctog${off ? ' off' : ''}" onclick="toggleSrc('${k}')" title="${esc(tip)}">${n} <span class="src">${k}</span>${tail}${extra}</a>${auto}`;
   }).join(' · ');
   const earlier = before && before.count
     ? (tailing
