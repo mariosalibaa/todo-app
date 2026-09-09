@@ -716,7 +716,7 @@ async function postPayments(ctx, account, who, opts) {
   const partner = account.odooPartner; if (!partner || !partner.id) throw new Error('set the account\'s Odoo partner first');
   const col = txCol(account);
   const rows = (await col.get()).docs.map(d => d.data())
-    .filter(t => isRow(t) && onlyOne(opts, t) && !t.excluded && t.credit > 0 && t.nature === 'transfer' && t.cashAccountId === 'mario-cash' && !inOdoo(t) && !t.bookedMove && !t.noBook)
+    .filter(t => isRow(t) && onlyOne(opts, t) && !t.excluded && t.credit > 0 && t.nature === 'transfer' && (!t.cashAccountId || t.cashAccountId === 'mario-cash') && !inOdoo(t) && !t.bookedMove && !t.noBook)
     .sort((a, b) => a.date < b.date ? -1 : 1);
   const out = { rows: rows.length, posted: 0, found: 0, skipped: [], total: 0 };
   if (opts && opts.dry) return { ...out, byYear: rows.reduce((o, t) => (o[t.date.slice(0, 4)] = (o[t.date.slice(0, 4)] || 0) + 1, o), {}) };
@@ -976,6 +976,8 @@ async function bookRow(ctx, account, txId, who) {
   if (!move && dup) throw new Error('not booked: ' + dup.why + ' (' + dup.bill + ') — tie the row to it or say it is a different purchase');
   const err = (out && (out.skipped || []).find(s => s.id === txId)) || (out && (out.noPartner || []).find(s => s.id === txId));
   if (!move && err) throw new Error(err.error || 'nothing booked for this line: ' + JSON.stringify(err).slice(0, 120));
+  // no poster took the row (2026-09-09: Ziad's 100 from Mario had no cashAccountId and fell between them, silently)
+  if (!move) throw new Error('not booked: no entry was made for this line (' + kind + (t.nature === 'transfer' ? ', other side: ' + (t.cashAccountId || 'none') : '') + ')');
   return { kind, move: move && move.name, id: move && move.id, ref: move && move.ref, photos: files.length, pendingExcel: !!data.pendingExcel };
 }
 
