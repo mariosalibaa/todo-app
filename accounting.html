@@ -54,7 +54,7 @@
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:#8ab0e6;}
-  .c-date{width:9%;} .c-desc{width:18%;white-space:normal;} .c-partner{width:11%;} .c-company{width:9%;} .c-proj{width:12%;} td.num,th.num{width:6.5%;} .c-odoo{width:12%;}
+  .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:18%;white-space:normal;} .c-partner{width:11%;} .c-company{width:9%;} .c-proj{width:12%;} td.num,th.num{width:6.5%;} .c-odoo{width:12%;}
   /* ☑ Reviewed: the box, then the stamp under it */
   .c-rev{width:7%;} .c-rev label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;}
   .c-rev input{width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--green);}
@@ -304,6 +304,7 @@
   .xl.narrow td.b{background:#f2f2f2;font-weight:bold;}   /* the running balance, as he counts it himself */
   #stmtsum{font-size:12px;color:var(--muted);white-space:nowrap;}
   #stmtsum b{color:var(--ink);}
+  #stmtsum .dette{color:#7a5a00;}   /* his debt to us -- never part of the balance beside it */
   #stmtsum .g{color:#006100;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
   .c-paid{width:110px;}
@@ -532,12 +533,24 @@ const PEOPLE = ['mario', 'abed', 'georges', 'ziad', 'mitri', 'khodr', 'therese',
 const SPELT = { khodr: 'Khoder' };   // the key stays khodr (account id khodr-cash); the name is spelt Khoder (Mario, 2026-09-06)
 const cap = s => s ? (SPELT[s] || s[0].toUpperCase() + s.slice(1)) : '';
 const isStatement = () => !!(account && account.statement);          // Whish prints its own balance
+// ── "Everything": every account's lines in one grid ──────────────────────
+// Twelve accounts and a purchase can sit in any of them. Mario, 2026-09-09: one place that shows
+// them all. It is a reading view — the lines are live and editable, but the running balance is
+// left blank (a balance across twelve wallets in four currencies means nothing) and the buttons
+// that act on one account (Import, Book months, Statement…) are off.
+const ALL_ID = '__all';
+const ALL_ACCOUNT = { id: ALL_ID, name: 'Everything', currency: '', type: 'all', all: true };
+const isAll = () => acc === ALL_ID;
+const pickList = () => [ALL_ACCOUNT, ...accounts];
+// which account a line belongs to — its own in the Everything view, the open one otherwise
+const accOf = t => (t && t._acc) || acc;
 const isCash = () => !!(account && account.type === 'cash');
 
 // ── Columns: the first five are the statement as printed (or the Odoo line), then what we add ──
 // `only` limits a column to one account type: who physically paid matters for a wallet, not for a bank.
 const ALL_COLS = [
   { k: 'date',    l: 'Date / ref',            f: 'text',   v: t => t.date + ' ' + (t.ref || ''), c: 'c-date' },
+  { k: 'acct',    l: 'Account',               f: 'select', v: t => t._accName || '', c: 'c-acct', only: 'all' },
   { k: 'desc',    l: 'Description',           f: 'text',   v: t => [t.service, t.description, contactName(t).name, t.note].filter(Boolean).join(' '), c: 'c-desc' },
   { k: 'type',    l: 'Type',                  f: 'select', v: t => t.nature || '', c: 'c-type', only: 'ledger' },
   { k: 'out',     l: 'Debit',                 f: 'amount', v: t => t.debit || 0, num: true },
@@ -580,11 +593,11 @@ Admin.require('accounting', async me => {
   else openAccountForm();
 });
 
-const accLabel = a => `${a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
+const accLabel = a => a.all ? '🗂 Everything (all accounts)' : `${a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
 async function loadAccounts() {
   accounts = (await Admin.api('GET', '/api/accounting/accounts')).filter(a => !a.archived);
   const sel = document.getElementById('acc');
-  sel.innerHTML = accounts.map(a => `<option value="${esc(a.id)}">${esc(accLabel(a))}</option>`).join('')
+  sel.innerHTML = pickList().map(a => `<option value="${esc(a.id)}">${esc(accLabel(a))}</option>`).join('')
     || '<option value="">— no account yet —</option>';
   accShow();
 }
@@ -597,7 +610,7 @@ function accShow() {                                   // put the chosen account
 }
 function accMatches(q) {
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return accounts.filter(a => { const h = `${a.name} ${a.currency} ${a.type} ${a.owner || ''}`.toLowerCase(); return words.every(w => h.includes(w)); });
+  return pickList().filter(a => { const h = `${a.name} ${a.currency} ${a.type} ${a.owner || ''}${a.all ? ' all accounts everything' : ''}`.toLowerCase(); return words.every(w => h.includes(w)); });
 }
 function accOpenList(all) {
   const i = document.getElementById('acc-in');
@@ -657,7 +670,8 @@ async function loadPartners() {
 }
 async function selectAccount(a) {
   acc = a; localStorage.setItem('acct_id', a);
-  account = accounts.find(x => x.id === a) || null;
+  account = pickList().find(x => x.id === a) || null;
+  if (detteFor !== a) { detteRows = null; detteFor = null; }   // his dette is fetched once, in the background
   document.getElementById('acc').value = a;
   accShow();
   buildCols(); colF = {}; buildHeader();
@@ -677,6 +691,21 @@ async function selectAccount(a) {
     if (!b.dataset.tip) b.dataset.tip = b.title || '';
     b.title = ok ? b.dataset.tip : why;
   };
+  // the Everything view belongs to no account, so nothing that acts on one applies here
+  const ALLWHY = 'This is every account at once — open one account to do this';
+  if (isAll()) {
+    for (const id of ['btn-line', 'btn-upload', 'btn-wa', 'btn-xl', 'btn-import', 'btn-odoo',
+                      'btn-contacts', 'btn-months', 'btn-timesheet', 'btn-projects', 'btn-statement'])
+      able(id, false, ALLWHY);
+    document.getElementById('btn-edit').style.display = 'none';
+    document.getElementById('crumb').textContent = 'Everything';
+    document.getElementById('lg-src').innerHTML = '<i style="background:#fff"></i>Every account’s lines in one grid. The Account column says where each one lives — click it to open that account on its own. No running balance: twelve wallets in four currencies have no single one.';
+    document.getElementById('empty-hint').textContent = 'No lines in this period.';
+    srcOff = new Set();
+    await loadTx();
+    render();
+    return;
+  }
   able('btn-line', !st, 'Whish lines come from the statement PDF — nothing is typed into this account');
   able('btn-upload', st, 'Only the Whish account is fed by a statement PDF');
   able('btn-wa', hasWa && isLocal(), hasWa ? LOCAL_WHY : 'No WhatsApp group on this account yet — add one with ⚙');
@@ -761,6 +790,7 @@ let tailing = null;
 async function loadTx() {
   if (!acc) { tx = []; before = null; loadedSrc = null; tailing = null; return; }
   const sel = document.getElementById('period'); if (sel) sel.value = period;
+  if (isAll()) return loadEverything();
   // an Excel-kept account: only the sources shown at first; the others come with their chip
   const want = isExcelKept() ? ['excel', 'budget', 'manual'].filter(k => !srcOff.has(k)) : null;
   try { localStorage.setItem(SRC_KEY(acc), want ? want.join(',') : '*'); } catch {}
@@ -777,9 +807,27 @@ async function loadTx() {
   // his WhatsApp lines since the last statement come by themselves — no chip to press
   // (Mario, 2026-09-09); the earlier ones still wait behind the chip
   if (want && !srcOff.has('whatsapp')) await loadWaSince(Array.isArray(r) ? '' : (r.since || ''));
+  loadDette();                                   // his debt to us, fetched over the whole account
   // nothing older than the first pass: the account is already whole
   if (twoPass && (!before || !before.count)) return;
   if (twoPass) tailing = loadTail(want, acc);
+}
+// Every account at once. Each account is asked for the same period, and each line is stamped with
+// the account it came from so it can still be edited, opened on its own, and filtered by account.
+async function loadEverything() {
+  tailing = null; before = null; loadedSrc = null;
+  const mine = accounts.slice();
+  const got = await Promise.all(mine.map(a =>
+    Admin.api('GET', txUrl(null, a.id)).then(r => Array.isArray(r) ? r : (r.tx || [])).catch(e => {
+      console.warn('everything: ' + a.id, e.message); return [];
+    })));
+  tx = [];
+  got.forEach((rows, i) => {
+    const a = mine[i];
+    for (const t of rows) { t._acc = a.id; t._accName = a.name; t._accCur = a.currency; tx.push(t); }
+  });
+  computeBalances();
+  say(`${tx.length} line${tx.length === 1 ? '' : 's'} from ${mine.length} accounts`);
 }
 // The rest of the history, fetched behind the first screen and merged in.
 async function loadTail(want, forAcc) {
@@ -854,6 +902,7 @@ async function setPeriod(p) {
 // Excluded lines (duplicates) are shown but not counted.
 function computeBalances() {
   if (!account || isStatement()) return;
+  if (isAll()) { for (const t of tx) t._bal = null; return; }   // twelve wallets have no one balance
   const ord = [...tx].sort(dayOrder);
   // an Excel row moves the balance by the sheet's own figure, not by the rounded cents it is
   // booked with: the running balance and the closing then read exactly like the sheet's header
@@ -870,7 +919,7 @@ function computeBalances() {
 }
 // same date: the Excel row order (the sheet's own sequence), then the id
 const dayOrder = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : ((a.excelRow || 0) - (b.excelRow || 0)) || String(a.id).localeCompare(String(b.id));
-const closing = () => { if (!tx.length) return 0; if (isStatement()) { const o = [...tx].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (+a.ref) - (+b.ref)); return o[o.length - 1].balance; } const o = [...tx].sort(dayOrder); return o[o.length - 1]._bal; };
+const closing = () => { if (!tx.length || isAll()) return null; if (isStatement()) { const o = [...tx].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (+a.ref) - (+b.ref)); return o[o.length - 1].balance; } const o = [...tx].sort(dayOrder); return o[o.length - 1]._bal; };
 // A line matched to an Odoo payment already knows its partner and its company:
 // they are facts from the ledger, not suggestions. Write them onto the line (purple)
 // unless you chose something yourself, so nothing asks you what Odoo already said.
@@ -1350,6 +1399,7 @@ function render() {
         // receipt is often photographed days after it was paid (Mario, 2026-09-09)
         : ['manual', 'telegram', 'whatsapp', 'budget'].includes(t.src) && !t.bookedMove ? datePick(t, "The day this line falls on. Change it and the line moves to that day.", `saveDate('${t.id}', this.value, this.parentNode)`)
         : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
+      ${!isAll() ? '' : `<td class="c-acct"><a onclick="selectAccount('${esc(t._acc || '')}')" title="Open ${esc(t._accName || '')} on its own">${esc(t._accName || '')}</a>${t._accCur ? `<div class="ref">${esc(t._accCur)}</div>` : ''}</td>`}
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : esc(t.description)}</div>
         ${sheetEdit(t)}
@@ -1443,9 +1493,10 @@ function render() {
   ].join('\n\n') : '';
   const out = counted.reduce((a, t) => a + (t.debit || 0), 0), inn = counted.reduce((a, t) => a + (t.credit || 0), 0);
   const op = account && account.opening;
+  const iOut = Math.max(1, COLS.findIndex(c => c.k === 'out'));   // Debit's own column, whatever precedes it
   document.getElementById('totals').innerHTML =
-    `<td colspan="2">${all.length} line${all.length === 1 ? '' : 's'}${all.length !== tx.length ? ' of ' + tx.length : ''}${all.length !== counted.length ? ` (${all.length - counted.length} not counted)` : ''}</td>
-     <td class="num debit">${fmt(out)}</td><td class="num credit">${fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${fmt(closing())}${op ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${COLS.length - 5}"><span id="stmtsum">${stmtSummary()}</span></td>`;
+    `<td colspan="${iOut}">${all.length} line${all.length === 1 ? '' : 's'}${all.length !== tx.length ? ' of ' + tx.length : ''}${all.length !== counted.length ? ` (${all.length - counted.length} not counted)` : ''}${isAll() ? ' — no totals: these accounts are in different currencies' : ''}</td>
+     <td class="num debit">${isAll() ? '' : fmt(out)}</td><td class="num credit">${isAll() ? '' : fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${fmt(closing())}${op || isAll() ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${Math.max(1, COLS.length - iOut - 3)}"><span id="stmtsum">${stmtSummary()}</span></td>`;
   { const b = document.getElementById('btn-stmt'); const ok = isExcelKept() && tx.some(t => t.period);
     b.style.display = ''; b.classList.toggle('off', !ok); b.disabled = !ok;
     if (!b.dataset.tip) b.dataset.tip = b.title || '';
@@ -1475,11 +1526,55 @@ const xlCarry = k => k === 'new' || !before || before.xlNet == null ? 0 : -befor
 const xlSum = k => xlCarry(k) + tx.filter(t => t.src === 'excel' && !t.excluded && (k === 'all' || t.period === k)).reduce((s, t) => s + xlAmt(t), 0);
 const xlFmt = v => (v < -0.005 ? '$ (' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')' : '$ ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const xlWord = v => v < -0.005 ? 'واصل اضافي' : 'مطلوب';
+// -- The dette: money the person owes Shift, the other way round from the ledger ----------
+// It is NOT part of his balance and never nets into it (Mario, 2026-09-06). The account carries
+// what was lent (`dette` = {amount, since, what, plan}); what came back is read off his own rows,
+// so nobody has to keep a second number up to date. A row that names a dette and carries money is
+// a repayment; one with no money but "bonus" in its words was forgiven -- a cost to us, not a
+// recovery, so it is counted apart (Mario, 2026-09-09).
+// The repayments are spread over years, and the grid only holds the period on screen, so they are
+// fetched once per account through the whole-account search (Mario, 2026-09-09).
+let detteRows = null, detteFor = null;
+async function loadDette() {
+  if (!account || !account.dette || detteFor === acc) return;
+  detteFor = acc;
+  try {
+    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/search?q=dette&field=description`);
+    detteRows = (r.tx || []).filter(t => !t.excluded);
+    render();
+  } catch (e) { detteRows = null; }
+}
+function detteOf() {
+  const d = account && account.dette;
+  if (!d || !(+d.amount)) return null;
+  const src = detteRows || tx;
+  // only what came back after it was lent: an older dette of his, already closed, has rows of its own
+  const rows = src.filter(t => !t.excluded && (!d.since || t.date >= d.since) && /\bdette\b|دين/i.test([t.description, t.note].join(' ')));
+  let paid = 0, bonus = 0; const back = [];
+  // what was written off instead of repaid — it is our cost, and the sheet keeps it as a memo row
+  // with no amount, so it is named on the account itself (Mario, 2026-09-09)
+  for (const f of (d.forgiven || [])) { const v = +f.amount || 0; if (v > 0) { bonus += v; back.push({ date: f.date || '', amount: v, kind: 'bonus', why: f.why || '' }); } }
+  for (const t of rows) {
+    const v = -xlAmt(t);                                     // a credit on his ledger = money back to us
+    if (v > 0.005) { paid += v; back.push({ date: t.date, amount: v, kind: 'paid' }); continue; }
+    // a memo row: the amount lives in its words ("50$ dette ziad bonus")
+    if (Math.abs(xlAmt(t)) < 0.005 && /bonus|cadeau|offert/i.test(t.description || '')) {
+      const m = String(t.description || '').match(/(\d[\d.,]*)\s*\$/);
+      const v2 = m ? +m[1].replace(/,/g, '') : 0;
+      if (v2 > 0) { bonus += v2; back.push({ date: t.date, amount: v2, kind: 'bonus' }); }
+    }
+  }
+  paid = Math.round(paid * 100) / 100; bonus = Math.round(bonus * 100) / 100;
+  return { ...d, partial: !detteRows, amount: +d.amount, paid, bonus, left: Math.round((+d.amount - paid - bonus) * 100) / 100, rows: back.sort((a, b) => a.date < b.date ? 1 : -1) };
+}
+const detteTitle = d => `${xlFmt(d.amount)} lent${d.since ? ' on ' + d.since : ''}${d.what ? ' · ' + d.what : ''}. Paid back ${xlFmt(d.paid)}${d.bonus ? `, ${xlFmt(d.bonus)} written off as a bonus (our cost, not a repayment)` : ''}.${d.plan ? ' ' + d.plan + '.' : ''} It is his debt to us and is never part of the balance above.`;
 function stmtSummary() {
   if (!isExcelKept() || !tx.some(t => t.period)) return '';
   const o = xlSum('old'), n = xlSum('new'), a = xlSum('all');
   const cell = v => `<b class="${v < -0.005 ? 'g' : ''}">${xlFmt(v)}</b>`;
-  return `<span title="As the sheet's header: old sum = the balance on the statement he last received, new sum = the rows since, all sum = the balance now. Green = he holds money of ours.">old ${cell(o)} ${xlWord(o)} · new ${cell(n)} · all ${cell(a)} ${xlWord(a)}</span>`;
+  const d = detteOf();
+  const dette = d ? ` · <span class="dette" title="${esc(detteTitle(d))}">dette <b>${xlFmt(d.left)}</b> left of ${xlFmt(d.amount)}</span>` : '';
+  return `<span title="As the sheet's header: old sum = the balance on the statement he last received, new sum = the rows since, all sum = the balance now. Green = he holds money of ours.">old ${cell(o)} ${xlWord(o)} · new ${cell(n)} · all ${cell(a)} ${xlWord(a)}</span>${dette}`;
 }
 function stmtAllDates() { document.getElementById('stmt-from').value = ''; document.getElementById('stmt-to').value = ''; openStmt(); }
 let stmtOpened = null;
@@ -1577,6 +1672,7 @@ function openStmt() {
     <table class="xl narrow"><colgroup><col style="width:132px"><col style="width:186px"><col style="width:62px"><col style="width:62px"><col style="width:74px"><col style="width:132px"></colgroup>
       <tr><td>starting</td><td class="n ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="ar ${opening < 0 ? 'g' : ''}" colspan="4">${xlWord(opening)} · حساب قديم</td></tr>
       <tr><td>ending</td><td class="n ${closed < 0 ? 'g' : ''}">${xlFmt(closed)}</td><td class="ar ${closed < 0 ? 'g' : ''}" colspan="4">${xlWord(closed)} · حساب جديد</td></tr>
+      ${(() => { const d = detteOf(); if (!d) return ''; return `<tr><td title="${esc(detteTitle(d))}">dette</td><td class="n">${xlFmt(d.left)}</td><td class="ar" colspan="4">${xlFmt(d.amount)} · ${xlFmt(d.paid)} مدفوع${d.bonus ? ' · ' + xlFmt(d.bonus) + ' هدية' : ''} · دين على زياد</td></tr>`; })()}
       ${Math.abs(closed - a) > 0.005 ? `<tr><td>account</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="4">${hidden} row(s) outside this period are not in the block</td></tr>` : ''}
       <tr><td colspan="6" style="border:none;height:8px"></td></tr>
       <tr><td class="h">date</td><td class="h">what</td><td class="h">debit</td><td class="h">credit</td><td class="h">balance</td><td class="h">analytical</td></tr>
@@ -1810,7 +1906,8 @@ function mark(el, src) { const td = el.closest('td'); td.classList.remove('src-a
 // said before, ↷ re-applies the edit. The server keeps the same history as the account's log (🕘).
 const undoStack = [], redoStack = [];
 async function patch(id, data, opts) {
-  const r = await Admin.api('PATCH', `/api/accounting/accounts/${acc}/tx/${id}`, opts && opts.undo ? { ...data, __undo: true } : data);
+  const row = tx.find(t => t.id === id);
+  const r = await Admin.api('PATCH', `/api/accounting/accounts/${accOf(row)}/tx/${id}`, opts && opts.undo ? { ...data, __undo: true } : data);
   if (!(opts && opts.replay)) { undoStack.push({ id, before: r.before || {}, after: data }); redoStack.length = 0; if (undoStack.length > 200) undoStack.shift(); }
   updateUndoButtons();
   return r;
