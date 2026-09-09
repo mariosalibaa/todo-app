@@ -279,6 +279,8 @@
   .xl td.fix{color:#7a5a00;}
   /* the statement is screenshotted for a phone in portrait: every column as narrow as it can be */
   .xl.narrow{font-size:12px;max-width:420px;}
+  .xl tr.day td{background:#ece7f1;font-weight:700;color:#3d3a42;border-color:#cfc3da;}
+  .xl tr.day td .s{font-weight:400;color:#5d5a63;margin-left:6px;}
   .xl.narrow td{padding:2px 5px;height:auto;line-height:1.25;}
   .xl.narrow td.n{min-width:0;white-space:nowrap;}
   .xl.narrow td.d{white-space:normal;max-width:130px;word-break:break-word;}
@@ -407,6 +409,9 @@
   <div class="sheet-box">
     <div class="sheet-head"><b>Statement — the sheet's new block</b>
       <span class="sp" style="flex:1"></span>
+      <span class="hint" id="stmt-since" title="Taken from the last statement you marked as sent"></span>
+      <label class="hint" title="The block covers his new rows. It opens the day after the statement he last received; change the period here — only the rows shown are marked old when you press Sent.">from <input type="date" id="stmt-from" onchange="openStmt()"> to <input type="date" id="stmt-to" onchange="openStmt()"></label>
+      <button class="btn" onclick="stmtAllDates()" title="Back to every new row since his last statement">all dates</button>
       <button class="btn" onclick="document.getElementById('stmt').hidden = true">✕ Close</button></div>
     <div class="sheet-body" id="stmt-body"></div>
   </div>
@@ -1414,9 +1419,25 @@ function stmtSummary() {
   const cell = v => `<b class="${v < -0.005 ? 'g' : ''}">${xlFmt(v)}</b>`;
   return `<span title="As the sheet's header: old sum = the balance on the statement he last received, new sum = the rows since, all sum = the balance now. Green = he holds money of ours.">old ${cell(o)} ${xlWord(o)} · new ${cell(n)} · all ${cell(a)} ${xlWord(a)}</span>`;
 }
+function stmtAllDates() { document.getElementById('stmt-from').value = ''; document.getElementById('stmt-to').value = ''; openStmt(); }
+let stmtOpened = null;
 function openStmt() {
   document.getElementById('stmt').hidden = false;
-  const rows = tx.filter(t => t.src === 'excel' && !t.excluded && t.period === 'new').sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
+  // Opening it: the period starts the day after the statement he last received (the one recorded
+  // when ✓ Sent was pressed, else the sheet's last old row) and ends today (Mario, 2026-09-09).
+  if (stmtOpened !== acc) {
+    stmtOpened = acc;
+    const { from, stmt } = afterStatement();
+    document.getElementById('stmt-from').value = stmt ? from : '';
+    document.getElementById('stmt-to').value = localYmd(new Date());
+    const head = document.getElementById('stmt-since');
+    if (head) head.textContent = stmt ? `last statement sent: ${stmt}` : 'no statement on record yet';
+  }
+  // his new rows, narrowed to a period when one is given (Mario, 2026-09-09)
+  const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
+  const all = tx.filter(t => t.src === 'excel' && !t.excluded && t.period === 'new').sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
+  const rows = all.filter(t => (!from || t.date >= from) && (!to || t.date <= to));
+  const hidden = all.length - rows.length;
   const o = xlSum('old'), a = xlSum('all');
   const own = account.owner || '';
   // The block is screenshotted and sent over WhatsApp on a phone held upright, so it has to be
@@ -1433,11 +1454,16 @@ function openStmt() {
     return d.replace(/\s*·\s*/g, ' · ').replace(/^\s*\d+[.,]?\d*\s*\$?\s*/, '').slice(0, 60);
   };
   // the balance as he would count it himself: the old sum, then row after row down to the new one
-  let run = o;
+  let run = o, lastDay = null;
+  // one band per day, so he reads the block day by day (Mario, 2026-09-09)
+  const dayBand = t => { const d = all.filter(x => x.date === t.date && rows.includes(x));
+    const out = d.reduce((s, x) => s + Math.max(0, xlAmt(x)), 0), inn = d.reduce((s, x) => s + Math.max(0, -xlAmt(x)), 0);
+    return `<tr class="day"><td colspan="5">${esc(longDate(t.date))} <span class="s">${d.length} line${d.length === 1 ? '' : 's'}${out ? ' · out ' + xlFmt(out).replace('$ ', '$') : ''}${inn ? ' · in ' + xlFmt(inn).replace('$ ', '$') : ''}</span></td></tr>`; };
   const line = t => { const v = xlAmt(t); const p = String(t.partnerName || '').toLowerCase(); const self = p === own || (t.nature === 'labour');
     const who = t.nature === 'transfer' ? String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase() : (self ? '' : (t.partnerName || ''));
     run += v;
-    return `<tr><td class="${self ? 'p' : ''}">${esc(dayDate(t.date).replace(/^(\w\w) /, '$1 '))}${who ? '<div class="sub">' + esc(who) + '</div>' : ''}</td>`
+    const band = t.date !== lastDay ? (lastDay = t.date, dayBand(t)) : '';
+    return band + `<tr><td class="${self ? 'p' : ''}">${esc(dayDate(t.date).replace(/^(\w\w) /, '$1 '))}${who ? '<div class="sub">' + esc(who) + '</div>' : ''}</td>`
       + `<td class="d">${esc(detail(t))}</td>`
       + `<td class="n ${v < 0 ? 'g' : ''}">${xlFmt(v)}</td>`
       + `<td class="n b ${run < 0 ? 'g' : ''}">${xlFmt(run)}</td>`
@@ -1450,13 +1476,15 @@ function openStmt() {
       <tr><td class="h">date</td><td class="h">what</td><td class="h">amount</td><td class="h">balance</td><td class="h">project</td></tr>
       ${rows.map(line).join('')}
     </table>
-    <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'} since the statement he last received. Screenshot this block and send it to him — then press the button so these rows become old in the sheet (column A) and here: old sum will read ${xlFmt(a)}.</p>
+    <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'}${from || to ? ` from ${esc(from || 'the beginning')} to ${esc(to || 'today')}${hidden ? ` — ${hidden} other new row${hidden === 1 ? '' : 's'} outside the period are not shown and stay new` : ''}` : ''} since the statement he last received. Screenshot this block and send it to him — then press the button so these rows become old in the sheet (column A) and here: old sum will read ${xlFmt(a)}.</p>
     <button class="btn primary" onclick="stmtSent()" ${rows.length ? '' : 'disabled'}>✓ Sent — mark these ${rows.length} rows old</button>`;
 }
 async function stmtSent() {
-  if (!confirm('Mark every new row of the sheet as old? Do this only after the statement was sent.')) return;
+  const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
+  const what = from || to ? `the new rows from ${from || 'the beginning'} to ${to || 'today'}` : 'every new row of the sheet';
+  if (!confirm(`Mark ${what} as old? Do this only after the statement was sent.`)) return;
   try {
-    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/close-statement`, {});
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/close-statement`, { from, to });
     say(`${r.rows} rows marked old in the sheet (${r.file}) and here`);
     await reloadTx(); render();
     document.getElementById('stmt').hidden = true;
@@ -1658,8 +1686,23 @@ function openSplit(id) {
   document.getElementById('splitform').hidden = false;
 }
 const splitTotal = () => Math.round(splitRows.reduce((s, r) => s + (+r.pct || 0), 0) * 100) / 100;
+// the splits already used — on this account's lines, and the last ones saved anywhere — to take again
+const SPLITS_KEY = 'acct_splits';
+function splitPresets() {
+  const seen = new Map();
+  const add = rows => { const key = rows.map(r => r.id + ':' + fmtPct(r.pct)).sort().join('|'); if (!seen.has(key)) seen.set(key, rows.map(r => ({ id: r.id, name: r.name, pct: +r.pct }))); };
+  for (const t of tx) if (isSplit(t)) add(t.analyticSplit);
+  try { (JSON.parse(localStorage.getItem(SPLITS_KEY) || '[]')).forEach(add); } catch {}
+  return [...seen.values()];
+}
+function splitRemember(rows) {
+  try { const key = r => r.map(x => x.id + ':' + fmtPct(x.pct)).sort().join('|'); const list = (JSON.parse(localStorage.getItem(SPLITS_KEY) || '[]')).filter(r => key(r) !== key(rows)); list.unshift(rows); localStorage.setItem(SPLITS_KEY, JSON.stringify(list.slice(0, 12))); } catch {}
+}
+function splitUse(i) { const p = splitPresets()[i]; if (!p) return; splitRows = p.map(r => ({ ...r })); splitDraw(); }
 function splitDraw() {
+  const presets = splitPresets();
   document.getElementById('split-body').innerHTML = `
+    ${presets.length ? `<p class="hint" style="margin:0 0 8px">Same as another line: <select onchange="if (this.value !== '') splitUse(+this.value); this.value = ''"><option value="">— choose a split already used —</option>${presets.map((p, i) => `<option value="${i}">${esc(p.map(r => fmtPct(r.pct) + '% ' + r.name).join(' · '))}</option>`).join('')}</select></p>` : ''}
     <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th>Analytic account</th><th class="num" style="width:120px">Percentage</th><th style="width:30px"></th></tr></thead><tbody>
     ${splitRows.map((r, i) => `<tr><td><input list="an-split" value="${esc(r.name || '')}" placeholder="type to find the Odoo account…" style="width:100%" onchange="splitPick(${i}, this)"></td>
       <td class="num" style="white-space:nowrap"><input type="number" step="0.01" min="0" max="100" value="${r.pct == null ? '' : r.pct}" style="width:80px;text-align:right" oninput="splitRows[${i}].pct = +this.value; splitFoot()"> %</td>
@@ -1692,6 +1735,7 @@ async function splitSave() {
     : { analyticSplit: null, analyticId: main ? main.id : null, analyticName: main ? main.name : '', analyticSrc: main ? 'manual' : '', analyticFrom: '', analyticText: '' };
   try {
     await patch(splitFor.id, data); Object.assign(splitFor, data);
+    if (rows.length > 1) splitRemember(rows);
     document.getElementById('splitform').hidden = true; render();
     say(rows.length > 1 ? 'Split: ' + rows.map(r => fmtPct(r.pct) + '% ' + r.name).join(' · ') + (splitFor.bookedMove ? ' — already booked: press Rewrite on its month to carry it into Odoo' : '') : main ? 'Analytic: ' + main.name : 'Analytic cleared');
   } catch (e) { document.getElementById('split-msg').textContent = 'Could not save: ' + e.message; }
@@ -2424,7 +2468,7 @@ async function importExcelLines() {
   say('Reading the Excel ledger…');
   try {
     const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/import-excel`, {});
-    say(`Excel ${r.file} / ${r.sheet}: ${r.rows} rows (${r.first} → ${r.last}) — ${r.added} new, ${r.updated} known, ${r.removed} gone, ${r.linkedToOdoo} linked to Odoo lines${r.looseLinks ? ' (' + r.looseLinks + ' by a close amount)' : ''}`);
+    say(`Excel ${r.file} / ${r.sheet}: ${r.rows} rows (${r.first} → ${r.last}) — ${r.added} new, ${r.updated} known, ${r.removed} gone, ${r.linkedToOdoo} linked to Odoo lines${r.looseLinks ? ' (' + r.looseLinks + ' by a close amount)' : ''}${r.whatsappFolded ? `, ${r.whatsappFolded} WhatsApp line${r.whatsappFolded === 1 ? '' : 's'} now behind ${r.whatsappFolded === 1 ? 'its' : 'their'} row (not counted twice)` : ''}`);
     await loadAccounts(); await selectAccount(acc);
   } catch (e) { say('Import failed: ' + e.message, 'err'); }
 }
@@ -2481,11 +2525,14 @@ function openQueue() {
   document.getElementById('queue-body').innerHTML = list.length ? list.map(t => {
     const r = ruleFor(t);
     const missing = [!companyOf(t) ? 'company' : '', !(t.partnerId || t.partnerName) ? 'partner' : '', !t.analyticName && t.nature !== 'transfer' ? 'project' : ''].filter(Boolean);
-    const can = !!r && !missing.length;
+    // no rule: a typed line (transfer, labour, expense, vendor) is still booked by its type,
+    // the way ✓ accept books it (Mario, 2026-09-09: "booking to Odoo not working")
+    const byType = !r && !!t.nature && t.nature !== 'note' && account && account.odooPartner;
+    const can = (!!r || byType) && !missing.length;
     return `<div class="qrow" data-id="${t.id}">
       <div>${esc(t.date)}<div class="hint">${esc(t.src || 'manual')}</div></div>
       <div><b>${esc(t.description || '—')}</b> · ${fmt(t.debit || t.credit)} ${t.debit ? 'out' : 'in'}
-        <div class="why">${r ? esc([r.partnerName, r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · ')) : '<span class="no">no rule matches this line — it cannot be booked automatically</span>'}
+        <div class="why">${r ? esc([r.partnerName, r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · ')) : byType ? esc(`by its type — ${t.nature}${t.nature === 'transfer' ? ' from ' + (t.partnerName || 'Mario cash') + ' → cash payment' : ' · ' + (t.partnerName || '') + (t.analyticName ? ' · ' + t.analyticName : '')}`) : '<span class="no">no rule matches this line and it has no type — it cannot be booked automatically</span>'}
         ${missing.length ? `<span class="no">missing ${esc(missing.join(', '))}</span>` : ''}
         ${(t.docs || []).length ? ` · 📎 ${t.docs.length}` : ''}</div></div>
       <div>${can ? `<button class="btn primary" onclick="bookQueued('${t.id}', this)">📗 Book</button>` : `<button class="btn" disabled title="Fill what is missing on the row first">Book</button>`}</div>
@@ -2498,20 +2545,28 @@ function openQueue() {
 async function bookQueued(id, btn) {
   btn.disabled = true; btn.textContent = 'Booking…';
   try {
-    const one = await bookLine(id);
+    const one = await bookAny(id);
     await patch(id, { bookWanted: false }).catch(() => {});
     const t = tx.find(x => x.id === id); if (t) t.bookWanted = false;
     say(`${one.move} posted` + (one.payment ? ` and paid by ${one.payment.name}` : ''));
     openQueue(); render();
   } catch (e) { btn.disabled = false; btn.textContent = '📗 Book'; say('Could not book: ' + e.message, 'err'); }
 }
+// a line with a rule goes the rules way; any other typed line the way ✓ accept books it (book-row)
+async function bookAny(id) {
+  const t = tx.find(x => x.id === id);
+  if (t && ruleFor(t)) return bookLine(id);
+  const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-row`, { txId: id });
+  await reloadTx(); render();
+  return { move: r.move || '', kind: r.kind, already: r.already };
+}
 async function bookQueue() {
-  const list = queued().filter(t => ruleFor(t));
+  const list = queued().filter(t => ruleFor(t) || (t.nature && t.nature !== 'note' && account && account.odooPartner));
   if (!list.length) return say('Nothing on the list can be booked yet', 'err');
-  if (!confirm(`Book ${list.length} line${list.length === 1 ? '' : 's'} in Odoo?\n\nEach becomes a posted bill paid from its cash journal.`)) return;
+  if (!confirm(`Book ${list.length} line${list.length === 1 ? '' : 's'} in Odoo?\n\nEach becomes a posted bill paid from its cash journal, or a cash payment for a transfer.`)) return;
   let done = 0, failed = 0;
   for (const t of list) {
-    try { await bookLine(t.id); await patch(t.id, { bookWanted: false }).catch(() => {}); done++; }
+    try { await bookAny(t.id); await patch(t.id, { bookWanted: false }).catch(() => {}); done++; }
     catch (e) { failed++; console.warn('book', t.id, e.message); }
     say(`Booking… ${done + failed} of ${list.length}`);
   }

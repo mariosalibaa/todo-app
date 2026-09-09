@@ -1067,7 +1067,8 @@ async function handle(req, res, url, user, ctx) {
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/close-statement$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
-    try { return json(res, 200, await ledgers.closeStatement(ledgerCtx, a, who)); }
+    const cb = await readBody(req).catch(() => ({}));
+    try { return json(res, 200, await ledgers.closeStatement(ledgerCtx, a, who, cb || {})); }
     catch (e) { console.error('close-statement', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-whatsapp$/)) && req.method === 'POST') {

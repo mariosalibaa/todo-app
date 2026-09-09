@@ -212,7 +212,12 @@ async function readExcel(file, layoutName, sheetName) {
 // marked "old" in the status column, so `old sum` stays exactly the balance the worker saw
 // and the rows added afterwards are the next statement. The sheet XML is edited in place:
 // the pivot, the styles and the formulas stay byte-identical (a round-trip would lose them).
-async function closeStatement(ctx, account, who) {
+// opts { from, to }: only the new rows of that period become old — the block can be sent
+// period by period (Mario, 2026-09-09). No period given = every new row, as before.
+async function closeStatement(ctx, account, who, opts) {
+  const from = opts && /^\d{4}-\d{2}-\d{2}$/.test(String(opts.from || '')) ? opts.from : '';
+  const to = opts && /^\d{4}-\d{2}-\d{2}$/.test(String(opts.to || '')) ? opts.to : '';
+  const inPeriod = t => (!from || t.date >= from) && (!to || t.date <= to);
   const AdmZip = tryRequire('adm-zip', EXTRA['adm-zip']);
   if (!AdmZip) throw new Error('adm-zip is not installed on this machine — close the statement from Mario\'s laptop');
   const cfg = account.excel || {};
@@ -241,7 +246,7 @@ async function closeStatement(ctx, account, who) {
   // only the data rows the hub read as "new" — the sheet's header also says "new" (the SUMIFS label) and must stay
   const col = ctx.txCol(account);
   const cur = await col.where('src', '==', 'excel').get();
-  const newRows = new Set(cur.docs.map(d => d.data()).filter(t => t.period === 'new' && t.excelRow).map(t => String(t.excelRow)));
+  const newRows = new Set(cur.docs.map(d => d.data()).filter(t => t.period === 'new' && t.excelRow && inPeriod(t)).map(t => String(t.excelRow)));
   let flipped = 0;
   if (NEW >= 0) xml = xml.replace(new RegExp(`<c r="${colL}(\\d+)"([^>]*?) t="s"><v>${NEW}</v></c>`, 'g'), (a, r, s) => { if (!newRows.has(r)) return a; flipped++; return oldCell(r, s); });
   xml = xml.replace(new RegExp(`<c r="${colL}(\\d+)"([^>]*?) t="inlineStr"><is><t[^>]*>new</t></is></c>`, 'g'), (a, r, s) => { if (!newRows.has(r)) return a; flipped++; return oldCell(r, s); });
@@ -256,16 +261,19 @@ async function closeStatement(ctx, account, who) {
   // the hub rows follow the sheet
   let rows = 0;
   const db = col.firestore; let b = db.batch(), n = 0;
-  for (const d of cur.docs) { if (d.data().period !== 'new') continue; b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '' }, { merge: true }); rows++; if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; } }
+  for (const d of cur.docs) { if (d.data().period !== 'new' || !inPeriod(d.data())) continue; b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '' }, { merge: true }); rows++; if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; } }
   if (n) await b.commit();
   // remember what was sent and when: the Statements page reads this instead of guessing from the
   // sheet's old block, and it is the record Mario checks a month later (2026-09-08)
   const counted = cur.docs.map(d => d.data()).filter(t => !t.excluded);
-  const bal = counted.reduce((s, t) => s + (t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0)), 0);
-  const dates = counted.map(t => t.date).filter(Boolean).sort();
+  // the day the statement reaches: the last row actually closed (a period closes only its own days)
+  const closedDates = cur.docs.map(d => d.data()).filter(t => t.period === 'new' && inPeriod(t) && t.date).map(t => t.date).sort();
+  const upto = closedDates[closedDates.length - 1] || counted.map(t => t.date).filter(Boolean).sort().pop() || new Date().toISOString().slice(0, 10);
+  // the balance he was shown: everything counted up to that day, not the account as it stands now
+  const bal = counted.filter(t => !t.date || t.date <= upto).reduce((s, t) => s + (t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0)), 0);
   try {
-    await account.ref.set({ statement: { date: dates[dates.length - 1] || new Date().toISOString().slice(0, 10),
-      balance: Math.round(bal * 100) / 100, sentAt: now(), by: who || '', rows } }, { merge: true });
+    await account.ref.set({ statement: { date: upto,
+      balance: Math.round(bal * 100) / 100, sentAt: now(), by: who || '', rows, ...(from || to ? { from: from || '', to: to || '' } : {}) } }, { merge: true });
   } catch (e) { /* the flip is what matters; the record is a convenience */ }
   return { flipped, rows, file: base };
 }
@@ -425,10 +433,28 @@ async function importExcel(ctx, account, who) {
   const keep = new Set(lines.map(l => l.id));
   const gone = cur.docs.filter(d => d.data().src === 'excel' && !keep.has(d.id) && !d.data().transferId && d.data().dupSrc !== 'manual' && !d.data().note);
   for (let i = 0; i < gone.length; i += 450) { const b = account.ref.firestore.batch(); gone.slice(i, i + 450).forEach(d => b.delete(d.ref)); await b.commit(); }
+  // A WhatsApp line that counted on its own (his day read off the group before the sheet caught up)
+  // steps aside the moment the sheet's row for it arrives: paired the way the WhatsApp import pairs,
+  // marked as that row's repeat, no longer counted — nothing is counted twice (Mario, 2026-09-09).
+  // If the WhatsApp line was already booked in Odoo, the row inherits the booking, so Book months
+  // does not make a second bill line for it.
+  let waFolded = 0;
+  { const waOpen = cur.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.src === 'whatsapp' && !t.excluded && t.dupSrc !== 'manual' && !t.transferId);
+    if (waOpen.length) {
+      const tiedRows = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
+      const pairs = pairUp(waOpen, lines, { taken: tiedRows, maxDays: 4, loose: true });
+      for (const w of waOpen) {
+        const d = pairs.get(w.id); if (!d) continue;
+        writes.push({ ref: col.doc(w.id), data: { dupOf: d.id, excluded: true, dupSrc: 'auto', review: false } });
+        const rowWrite = writes.find(x => x.ref.id === d.id);
+        if (rowWrite && w.bookedMove && !rowWrite.data.bookedMove) Object.assign(rowWrite.data, { bookedMove: w.bookedMove, ref: w.ref || rowWrite.data.ref, odoo: w.odoo || rowWrite.data.odoo || null });
+        waFolded++;
+      }
+    } }
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
   await account.ref.set({ excel: { ...cfg, sheet, lastFile: file, first, last }, lastExcelImport: now(), lastExcelImportBy: who }, { merge: true });
-  return { rows: lines.length, added, updated, removed: gone.length, linkedToOdoo: linked, looseLinks: loose, first, last, file, sheet };
+  return { rows: lines.length, added, updated, removed: gone.length, linkedToOdoo: linked, looseLinks: loose, whatsappFolded: waFolded, first, last, file, sheet };
 }
 
 // ── WhatsApp ────────────────────────────────────────────────────────────────
