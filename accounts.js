@@ -86,7 +86,9 @@ const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'company
   // The laptop turns it into a real partner / analytic when you accept the proposal.
   'partnerText', 'analyticText',
   // asked for from the phone, booked from the laptop after you look at it
-  'bookWanted', 'bookWantedAt', 'bookWantedBy'];   // `docs` is written by the upload route only, never by a PATCH
+  'bookWanted', 'bookWantedAt', 'bookWantedBy',
+  // ☑ Reviewed: a person looked at the line; the server stamps when and who (Mario, 2026-09-09)
+  'reviewed', 'reviewedAt', 'reviewedBy'];   // `docs` is written by the upload route only, never by a PATCH
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 // what a correction can change in the workbook itself, on a row that came from it
@@ -869,6 +871,9 @@ async function handle(req, res, url, user, ctx) {
     if (cur.src === 'whatsapp' && (body.excluded === false || body.review === false || 'answer' in body || body.waAccepted === true)) data.waAccepted = true;
     if (cur.src === 'whatsapp' && (body.excluded === true || body.waAccepted === false)) data.waAccepted = false;
     if ('paidBy' in body) data.paidBySrc = body.paidBy ? 'manual' : '';
+    // ☑ Reviewed is stamped here, not by the page, so the column always says who really looked and
+    // when. An undo/redo carries its own reviewedAt back and is replayed as it was.
+    if ('reviewed' in body && !('reviewedAt' in body)) { data.reviewed = !!body.reviewed; data.reviewedAt = data.reviewed ? now() : ''; data.reviewedBy = data.reviewed ? who : ''; }
     // hours and km live in the workbook, not on the line: they may travel alone
     if (!Object.keys(data).length && !(cur.src === 'excel' && SHEET_FIELDS.some(k => k in body))) return json(res, 400, { error: 'nothing to update' });
     data.updatedAt = now(); data.updatedBy = who;
@@ -895,8 +900,10 @@ async function handle(req, res, url, user, ctx) {
         if (Object.keys(back).length) await ref.set(back, { merge: true });
       }
     }
-    if (!body.__silent) await a.ref.collection('log').add({ at: data.updatedAt, who, txId: m[2], line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80), before, after: Object.fromEntries(Object.entries(data).filter(([k]) => k !== 'updatedAt' && k !== 'updatedBy')), undo: !!body.__undo });
-    return json(res, 200, { ok: true, before, ...(sheet ? { sheet } : {}) });
+    const after = Object.fromEntries(Object.entries(data).filter(([k]) => k !== 'updatedAt' && k !== 'updatedBy'));
+    if (!body.__silent) await a.ref.collection('log').add({ at: data.updatedAt, who, txId: m[2], line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80), before, after, undo: !!body.__undo });
+    // `after` goes back too: it carries what the server added on its own (the review stamp)
+    return json(res, 200, { ok: true, before, after, ...(sheet ? { sheet } : {}) });
   }
 
   // the account's change log, newest first (undo/redo read it back after a reload)
