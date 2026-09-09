@@ -136,6 +136,14 @@
   .msg.err{color:var(--red);display:block;} .msg.ok{color:var(--green);display:block;}
   /* accounts: a line not counted (duplicate of another record), who really paid, the source of a line */
   tr.excluded td{color:#adb5bd;} tr.excluded td.debit,tr.excluded td.credit{text-decoration:line-through;}
+  /* one band per day when the grid is in date order: it sticks under the header while the
+     day's lines scroll past, and it carries the day's totals and closing balance (Mario, 2026-09-09) */
+  tr.day td{position:sticky;top:60px;z-index:1;background:#ece7f1;border-top:2px solid #cfc3da;border-bottom:1px solid #d9d0e2;padding:4px 10px;font-size:12px;color:#3d3a42;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  tr.day:hover td{background:#ece7f1;}
+  tr.day .dn{font-size:13px;font-weight:700;color:var(--odoo);margin-right:12px;}
+  tr.day .dn small{font-weight:400;color:var(--muted);margin-left:6px;}
+  tr.day .dsum{color:#5d5a63;} tr.day .dsum span{margin-right:12px;} tr.day .dsum b{font-variant-numeric:tabular-nums;}
+  tr.day .dsum .out b{color:var(--red);} tr.day .dsum .in b{color:var(--green);}
   .flag{display:inline-block;font-size:10.5px;color:#b26a00;background:#fff4e0;border:1px solid #f4d9a6;border-radius:3px;padding:0 5px;margin-top:2px;white-space:nowrap;}
   .flag.own{color:var(--muted);background:#f1f3f5;border-color:var(--line);}
   .srctog{cursor:pointer;text-decoration:none;color:inherit;}
@@ -201,6 +209,11 @@
     /* the running balance is a column of a table, not a fact about one line: it is on the
        totals row and in the header, so the card leaves it out */
     #rows td.c-bal{display:none;}
+    /* the day band is a heading between the cards, not a card */
+    #rows tr.day{display:block;padding:8px 4px 3px;margin:12px 0 6px;border:0;border-bottom:2px solid #cfc3da;border-radius:0;background:transparent;box-shadow:none;}
+    #rows tr.day td{position:static;background:transparent;border:0;padding:0;white-space:normal;overflow:visible;}
+    #rows tr.day .dn{display:block;font-size:14px;}
+    #rows tr.day .dsum{display:block;font-size:12px;margin-top:2px;}
     #rows input,#rows select,#rows textarea{font-size:16px;}   /* 16px = iOS does not zoom the page */
     #rows .amt-in{text-align:right;}
     #rows .pick-list{position:fixed;left:8px;right:8px;width:auto;}
@@ -431,6 +444,11 @@ const esc = Admin.esc;
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const dayDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? DAYS[new Date(d.slice(0, 10) + 'T00:00:00Z').getUTCDay()] + ' ' + d.slice(0, 10) : (d || '');
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+// the day band spells the day out: "Wednesday 2 September 2026"
+const longDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? new Date(d.slice(0, 10) + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : (d || 'no date');
+// today / yesterday, from the local calendar — never toISOString(), Beirut is UTC+3
+const localYmd = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+const dayTag = d => { const now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1); return d === localYmd(now) ? 'today' : d === localYmd(y) ? 'yesterday' : ''; };
 const ODOO = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
 const SAME_CAP = 60;   // one number's repeats may go together; a crowd may not
 let accounts = [], acc = null, account = null, tx = [], contacts = {}, partners = [], companies = [], analytic = [], rules = []
@@ -1147,7 +1165,25 @@ function render() {
   const groups = {};
   for (const o of tx) { if (sugState(o) !== 'pending' || !o.phone) continue; const k = sameKey(o); if (k) (groups[k] = groups[k] || []).push(o.id); }
   setTimeout(() => document.querySelectorAll('#rows .note-in, #rows .desc-in').forEach(growNote), 0);
-  document.getElementById('rows').innerHTML = rows.map(t => {
+  // In date order the page reads day by day: a band opens each day with what the whole day
+  // did (across every page), so the eye separates one day from the next (Mario, 2026-09-09).
+  const byDay = sort.k === 'date' ? {} : null;
+  if (byDay) for (const t of all) {
+    const d = byDay[t.date] = byDay[t.date] || { n: 0, out: 0, in: 0, bal: null };
+    d.n++;
+    if (!t.excluded) { d.out += t.debit || 0; d.in += t.credit || 0; }
+    // the day closes on its chronologically last line: first met when newest is on top, last otherwise
+    if (sort.dir < 0 ? d.bal == null : true) d.bal = isStatement() ? t.balance : t._bal;
+  }
+  let lastDay = null;
+  const dayHead = (date, first) => {
+    const d = byDay[date] || { n: 0, out: 0, in: 0, bal: null };
+    const cont = first && pageNo > 0 && all[pageNo * PAGE - 1] && all[pageNo * PAGE - 1].date === date;
+    return `<tr class="day"><td colspan="${COLS.length}"><span class="dn">${esc(longDate(date))}${dayTag(date) ? `<small>${dayTag(date)}</small>` : ''}${cont ? '<small>continues from the previous page</small>' : ''}</span>`
+      + `<span class="dsum"><span>${d.n} line${d.n === 1 ? '' : 's'}</span>${d.out ? `<span class="out">out <b>${fmt(d.out)}</b></span>` : ''}${d.in ? `<span class="in">in <b>${fmt(d.in)}</b></span>` : ''}${d.bal != null ? `<span>closing <b>${fmt(d.bal) || '0.00'}</b></span>` : ''}</span></td></tr>`;
+  };
+  document.getElementById('rows').innerHTML = rows.map((t, i) => {
+    const head = byDay && t.date !== lastDay ? (lastDay = t.date, dayHead(t.date, i === 0)) : '';
     const cn = contactName(t), sg = sugFor(t), co = companyOf(t);
     if (sg.any && !t.suggestSkip) pending++;
     const cp = t.phone ? esc(t.phone.replace(/^961/, '0')) : '';
@@ -1176,7 +1212,7 @@ function render() {
         + (t.src === 'whatsapp' && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this WhatsApp line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
         + (t.src === 'whatsapp' && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + ((t.docs || []).length ? `<a class="paper" onclick="openDocs('${t.id}')" title="${(t.docs || []).length} file${t.docs.length === 1 ? '' : 's'} on this line: ${esc(t.docs.map(d => d.name).join(', '))}">📎${t.docs.length > 1 ? t.docs.length : ''}</a>` : '');
-    return `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
+    return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
       <td class="c-date">${t.src === 'excel' ? `<input class="date-in" type="date" value="${esc(t.date)}" title="The day this row falls on, in the workbook" onchange="saveSheet('${t.id}', 'date', this.value, this)">` : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : esc(t.description)}</div>
