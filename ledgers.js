@@ -212,18 +212,46 @@ async function readExcel(file, layoutName, sheetName) {
 // marked "old" in the status column, so `old sum` stays exactly the balance the worker saw
 // and the rows added afterwards are the next statement. The sheet XML is edited in place:
 // the pivot, the styles and the formulas stay byte-identical (a round-trip would lose them).
+// Close the statement here alone: the rows become old on the hub and the account remembers the
+// statement, while column A of the workbook is left marked as still to flip. Used whenever the
+// workbook is out of reach — the phone, the deployed hub (Mario, 2026-09-09).
+async function closeInHub(ctx, account, who, { from, to, inPeriod, why }) {
+  const col = ctx.txCol(account);
+  const cur = await col.where('src', '==', 'excel').get();
+  const mine = cur.docs.filter(d => { const t = d.data(); return t.period === 'new' && inPeriod(t); });
+  if (!mine.length) return { flipped: 0, rows: 0, sheetPending: true, why, file: '' };
+  const db = col.firestore;
+  for (let i = 0; i < mine.length; i += 400) {
+    const b = db.batch();
+    mine.slice(i, i + 400).forEach(d => b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '', statementSheetPending: true }, { merge: true }));
+    await b.commit();
+  }
+  const counted = cur.docs.map(d => d.data()).filter(t => !t.excluded);
+  const closedDates = mine.map(d => d.data().date).filter(Boolean).sort();
+  const upto = closedDates[closedDates.length - 1] || new Date().toISOString().slice(0, 10);
+  const bal = counted.filter(t => !t.date || t.date <= upto).reduce((s, t) => s + (t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0)), 0);
+  try {
+    await account.ref.set({ statement: { date: upto, balance: Math.round(bal * 100) / 100, sentAt: now(), by: who || '', rows: mine.length, sheetPending: true, ...(from || to ? { from: from || '', to: to || '' } : {}) } }, { merge: true });
+  } catch { /* the rows are what matter */ }
+  return { flipped: 0, rows: mine.length, sheetPending: true, why, file: '' };
+}
+
 // opts { from, to }: only the new rows of that period become old — the block can be sent
 // period by period (Mario, 2026-09-09). No period given = every new row, as before.
 async function closeStatement(ctx, account, who, opts) {
   const from = opts && /^\d{4}-\d{2}-\d{2}$/.test(String(opts.from || '')) ? opts.from : '';
   const to = opts && /^\d{4}-\d{2}-\d{2}$/.test(String(opts.to || '')) ? opts.to : '';
   const inPeriod = t => (!from || t.date >= from) && (!to || t.date <= to);
+  // The statement is sent from the phone as often as from the laptop, and only the laptop can
+  // reach the workbook. So the hub closes the statement either way and remembers that column A
+  // still has to be flipped; the laptop does it on its next close (Mario, 2026-09-09).
   const AdmZip = tryRequire('adm-zip', EXTRA['adm-zip']);
-  if (!AdmZip) throw new Error('adm-zip is not installed on this machine — close the statement from Mario\'s laptop');
   const cfg = account.excel || {};
   const lay = LAYOUTS[cfg.layout || account.owner];
-  if (!cfg.file || !lay || !lay.status) throw new Error('this account has no Excel ledger with a status column');
-  if (!fs.existsSync(cfg.file)) throw new Error('workbook not found: ' + cfg.file);
+  const why = !AdmZip ? 'the workbook can only be written from Mario\'s laptop'
+    : !cfg.file || !lay || !lay.status ? 'this account has no Excel ledger with a status column'
+    : !fs.existsSync(cfg.file) ? 'workbook not found: ' + cfg.file : '';
+  if (why) return closeInHub(ctx, account, who, { from, to, inPeriod, why });
   const dir = path.dirname(cfg.file), base = path.basename(cfg.file), bak = path.join(dir, '_backups');
   if (!fs.existsSync(bak)) fs.mkdirSync(bak);
   fs.copyFileSync(cfg.file, path.join(bak, new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '') + ' ' + base));
@@ -246,11 +274,14 @@ async function closeStatement(ctx, account, who, opts) {
   // only the data rows the hub read as "new" — the sheet's header also says "new" (the SUMIFS label) and must stay
   const col = ctx.txCol(account);
   const cur = await col.where('src', '==', 'excel').get();
-  const newRows = new Set(cur.docs.map(d => d.data()).filter(t => t.period === 'new' && t.excelRow && inPeriod(t)).map(t => String(t.excelRow)));
+  // the rows this run closes, plus any a phone-side close already closed here and left waiting
+  const newRows = new Set(cur.docs.map(d => d.data())
+    .filter(t => t.excelRow && ((t.period === 'new' && inPeriod(t)) || t.statementSheetPending))
+    .map(t => String(t.excelRow)));
   let flipped = 0;
   if (NEW >= 0) xml = xml.replace(new RegExp(`<c r="${colL}(\\d+)"([^>]*?) t="s"><v>${NEW}</v></c>`, 'g'), (a, r, s) => { if (!newRows.has(r)) return a; flipped++; return oldCell(r, s); });
   xml = xml.replace(new RegExp(`<c r="${colL}(\\d+)"([^>]*?) t="inlineStr"><is><t[^>]*>new</t></is></c>`, 'g'), (a, r, s) => { if (!newRows.has(r)) return a; flipped++; return oldCell(r, s); });
-  if (!flipped) return { flipped: 0, rows: 0, file: base };
+  if (!flipped) return { ...(await closeInHub(ctx, account, who, { from, to, inPeriod, why: 'no "new" cell of column A matched these rows in ' + base })), file: base };
   zip.updateFile(part, Buffer.from(xml, 'utf8'));
   // Excel recomputes the old / new / all sums on open
   let wb = wbXml;
@@ -261,7 +292,7 @@ async function closeStatement(ctx, account, who, opts) {
   // the hub rows follow the sheet
   let rows = 0;
   const db = col.firestore; let b = db.batch(), n = 0;
-  for (const d of cur.docs) { if (d.data().period !== 'new' || !inPeriod(d.data())) continue; b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '' }, { merge: true }); rows++; if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; } }
+  for (const d of cur.docs) { const t = d.data(); if (!((t.period === 'new' && inPeriod(t)) || t.statementSheetPending)) continue; b.set(d.ref, { period: 'old', statementClosedAt: now(), statementClosedBy: who || '', statementSheetPending: false }, { merge: true }); rows++; if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; } }
   if (n) await b.commit();
   // remember what was sent and when: the Statements page reads this instead of guessing from the
   // sheet's old block, and it is the record Mario checks a month later (2026-09-08)
@@ -389,6 +420,9 @@ async function importExcel(ctx, account, who) {
     const data = { ...rest, project, projectFrom: t.projectFrom || '', excluded: false, dupOf: null };          // the Excel row always counts
     // an amount corrected by hand in the app stays (Mario, 2026-09-07); the workbook's own figure is kept
     // beside it as `xlAmount`, so the row shows both and the sheet can be fixed later
+    // a statement closed from the phone: the sheet still says "new", the hub already says "old".
+    // The import must not put "new" back, or the row would be sent to him twice (2026-09-09).
+    if (prev.statementSheetPending && prev.period === 'old') { data.period = 'old'; data.statementSheetPending = true; }
     if (prev.amountSrc === 'manual') { data.debit = prev.debit || 0; data.credit = prev.credit || 0; data.amountSrc = 'manual'; }
     // what the sheet itself says about the row
     if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerName: partnerName || '', partnerId: null, partnerSrc: partnerName ? 'excel' : '' });

@@ -1466,13 +1466,15 @@ function openStmt() {
   // one band per day, so he reads the block day by day (Mario, 2026-09-09)
   const dayBand = t => { const d = all.filter(x => x.date === t.date && rows.includes(x));
     const out = d.reduce((s, x) => s + Math.max(0, xlAmt(x)), 0), inn = d.reduce((s, x) => s + Math.max(0, -xlAmt(x)), 0);
-    return `<tr class="day"><td colspan="5">${esc(longDate(t.date))} <span class="s">${d.length} line${d.length === 1 ? '' : 's'}${out ? ' · out ' + xlFmt(out).replace('$ ', '$') : ''}${inn ? ' · in ' + xlFmt(inn).replace('$ ', '$') : ''}</span></td></tr>`; };
+    return `<tr class="day"><td colspan="6">${esc(longDate(t.date))} <span class="s">${d.length} line${d.length === 1 ? '' : 's'}${out ? ' · out ' + xlFmt(out).replace('$ ', '$') : ''}${inn ? ' · in ' + xlFmt(inn).replace('$ ', '$') : ''}</span></td></tr>`; };
   const line = t => { const v = xlAmt(t); const p = String(t.partnerName || '').toLowerCase(); const self = p === own || (t.nature === 'labour');
     const who = t.nature === 'transfer' ? String(t.partnerName || '').replace(/ cash$/i, '').toLowerCase() : (self ? '' : (t.partnerName || ''));
     run += v;
     return `<tr><td class="${self ? 'p' : ''}">${esc(dayDate(t.date).replace(/^(\w\w) /, '$1 '))}${who ? '<div class="sub">' + esc(who) + '</div>' : ''}</td>`
       + `<td class="d">${esc(detail(t))}</td>`
-      + `<td class="n ${v < 0 ? 'g' : ''}">${xlFmt(v)}</td>`
+      // what he spent and what he was handed stand in their own columns (Mario, 2026-09-09)
+      + `<td class="n">${v > 0 ? xlFmt(v) : ''}</td>`
+      + `<td class="n ${v < 0 ? 'g' : ''}">${v < 0 ? xlFmt(-v).replace('$ ', '$ ') : ''}</td>`
       + `<td class="n b ${run < 0 ? 'g' : ''}">${xlFmt(run)}</td>`
       + `<td class="d">${esc(t.nature === 'transfer' ? '' : (t.analyticName || t.project || ''))}</td></tr>`; };   // the Odoo analytic account, not the sheet's shorthand (Mario, 2026-09-06)
   // the balance runs forward through the days, but the block reads newest first, like the
@@ -1483,15 +1485,15 @@ function openStmt() {
   const closing = run;                                   // every row is drawn: `run` has landed
   // newest first, so the opening line sits at the bottom, where the reading starts, and the
   // closing figure — the one he is asked for — is the first thing he sees
-  const open = `<tr><td class="o">starting</td><td class="d">${earlier.length ? `the statement he last received plus ${earlier.length} earlier new row${earlier.length === 1 ? '' : 's'} (${xlFmt(earlierSum)})` : 'the statement he last received'}</td><td class="n"></td><td class="n b ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="d"></td></tr>`;
-  const close = `<tr><td class="o">ending</td><td class="d">after these ${rows.length} row${rows.length === 1 ? '' : 's'}</td><td class="n"></td><td class="n b ${closing < 0 ? 'g' : ''}">${xlFmt(closing)}</td><td class="d"></td></tr>`;
+  const open = `<tr><td class="o">starting</td><td class="d">${earlier.length ? `the statement he last received plus ${earlier.length} earlier new row${earlier.length === 1 ? '' : 's'} (${xlFmt(earlierSum)})` : 'the statement he last received'}</td><td class="n"></td><td class="n"></td><td class="n b ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="d"></td></tr>`;
+  const close = `<tr><td class="o">ending</td><td class="d">after these ${rows.length} row${rows.length === 1 ? '' : 's'}</td><td class="n"></td><td class="n"></td><td class="n b ${closing < 0 ? 'g' : ''}">${xlFmt(closing)}</td><td class="d"></td></tr>`;
   document.getElementById('stmt-body').innerHTML = `
     <table class="xl narrow">
-      <tr><td>starting</td><td class="n ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="ar ${opening < 0 ? 'g' : ''}" colspan="3">${xlWord(opening)} · حساب قديم</td></tr>
-      <tr><td>ending</td><td class="n ${closing < 0 ? 'g' : ''}">${xlFmt(closing)}</td><td class="ar ${closing < 0 ? 'g' : ''}" colspan="3">${xlWord(closing)} · حساب جديد</td></tr>
-      ${Math.abs(closing - a) > 0.005 ? `<tr><td>account</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="3">${hidden} row(s) after this period are not in the block</td></tr>` : ''}
-      <tr><td colspan="5" style="border:none;height:8px"></td></tr>
-      <tr><td class="h">date</td><td class="h">what</td><td class="h">amount</td><td class="h">balance</td><td class="h">project</td></tr>
+      <tr><td>starting</td><td class="n ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="ar ${opening < 0 ? 'g' : ''}" colspan="4">${xlWord(opening)} · حساب قديم</td></tr>
+      <tr><td>ending</td><td class="n ${closing < 0 ? 'g' : ''}">${xlFmt(closing)}</td><td class="ar ${closing < 0 ? 'g' : ''}" colspan="4">${xlWord(closing)} · حساب جديد</td></tr>
+      ${Math.abs(closing - a) > 0.005 ? `<tr><td>account</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="4">${hidden} row(s) after this period are not in the block</td></tr>` : ''}
+      <tr><td colspan="6" style="border:none;height:8px"></td></tr>
+      <tr><td class="h">date</td><td class="h">what</td><td class="h">debit</td><td class="h">credit</td><td class="h">balance</td><td class="h">project</td></tr>
       ${close}${body}${open}
     </table>
     <p class="hint">${rows.length} new row${rows.length === 1 ? '' : 's'}${from || to ? ` from ${esc(from || 'the beginning')} to ${esc(to || 'today')}${hidden ? ` — ${hidden} other new row${hidden === 1 ? '' : 's'} outside the period stay new; the ones before it are inside the opening figure, so the balance still lands on the account's own sum` : ''}` : ''} since the statement he last received. Screenshot this block and send it to him — then press the button so these rows become old in the sheet (column A) and here: old sum will read ${xlFmt(a)}.</p>
@@ -1503,7 +1505,9 @@ async function stmtSent() {
   if (!confirm(`Mark ${what} as old? Do this only after the statement was sent.`)) return;
   try {
     const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/close-statement`, { from, to });
-    say(`${r.rows} rows marked old in the sheet (${r.file}) and here`);
+    say(r.sheetPending
+      ? `${r.rows} rows closed here — the workbook still says "new" on them (${r.why}). Press ✓ Sent again on the laptop and column A follows.`
+      : `${r.rows} rows marked old in the sheet (${r.file}) and here`);
     await reloadTx(); render();
     document.getElementById('stmt').hidden = true;
   } catch (e) { say('Could not close the statement: ' + e.message, 'err'); }
