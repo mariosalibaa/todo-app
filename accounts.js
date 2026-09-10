@@ -223,7 +223,8 @@ const shortCompany = s => String(s || '').replace(/SHIFT GROUP SARL \(USD\)/, 'S
 // not the account's owner: Cash Mario in Odoo was used as a general cash book.
 async function importOdoo(odooCall, account, who) {
   const all = await odooJournals(odooCall);
-  const out = { journals: [], lines: 0, added: 0, updated: 0, paidByOthers: 0 };
+  const out = { journals: [], lines: 0, added: 0, updated: 0, paidByOthers: 0, split: 0 };
+  const splitBases = new Set();   // 'odoo-<lineId>' rows now replaced by one row per bill
   const col = txCol(account);
   const existing = {};
   (await col.where('src', '==', 'odoo').get()).docs.forEach(d => { existing[d.id] = d.data(); });
@@ -290,49 +291,83 @@ async function importOdoo(odooCall, account, who) {
       // one entry per bill: the reconciled name "BILL/… (ref)" wins over the bare bill name
       const docs = [...new Set([...rec.docs, ...bills.map(b => b.name).filter(n => !rec.docs.some(d => d.startsWith(n)))])].filter(d => d && d !== m.name);
       const docIds = { ...(rec.docIds || {}), ...Object.fromEntries(bills.map(b => [b.name, b.id])), ...(p && p.name && p.move_id ? { [p.name]: p.move_id[0] } : {}) };
-      const an = rec.analytics[0];
       const paidBy = paidByIn([...files, p && p.memo, m.ref, m.narration]);
       const counterparty = j.isPartner ? (other && other.partner_id ? other.partner_id : null) : l.partner_id;
-      const id = 'odoo-' + l.id;
-      const prev = existing[id] || {};
-      const t = {
-        id, src: 'odoo', date: l.date, ref: m.name || '', service: shortCompany(j.company),
-        description, name: counterparty ? counterparty[1] : '', phone: '',
-        // Odoo debit on the cash account = money came in = statement credit.
-        // On a payable it reads the same way: a credit is money he advanced, a debit is money he was paid.
-        debit: money(l.credit), credit: money(l.debit), amountCurrency: l.amount_currency || 0,
-        state: l.parent_state, files, fileIds, importedAt: now(),
-        odoo: { checkedAt: now(), matches: [{
-          chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: l.debit || l.credit,
-          partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
-          company: j.company, journal: j.name, state: l.parent_state, docs, docIds, odooRef: (p && p.memo) || m.ref || '', analytics: rec.analytics, score: 10, why: ['imported from Odoo'],
-        }] },
-      };
-      // a question put to Mario on this Odoo entry, and his answer, live on the line across imports
-      if (prev.ask) t.ask = prev.ask;
-      if (prev.answer) t.answer = prev.answer;
-      if (prev.note && !t.note) t.note = prev.note;
-      if (counterparty && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: counterparty[0], partnerName: counterparty[1], partnerSrc: 'odoo' });
-      if (prev.companySrc !== 'manual') Object.assign(t, { company: j.company, companySrc: 'odoo', kind: 'work', kindSrc: 'odoo' });
-      if (an && prev.analyticSrc !== 'manual') Object.assign(t, { analyticId: an.id, analyticName: an.name, analyticSrc: 'odoo', analyticFrom: an.from });
-      if (paidBy && prev.paidBySrc !== 'manual') Object.assign(t, { paidBy, paidBySrc: 'odoo' });
-      // An account kept in an Excel ledger IS that ledger: Odoo is matched onto its rows,
-      // never counted as lines of its own. The Odoo line stays, hidden, as the evidence.
-      if (account.excel && account.excel.file) {
-        t.excluded = true;
-        // the settlement's own entry names the row it settles ("… - ABEDCASH-xl-…")
-        const byRef = String([m.ref, m.narration, p && p.memo, lineName].join(' ')).match(new RegExp(account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '') + '-(xl-[\\w-]+)'));
-        // a payment of a bill a row is booked to (his own cash paying an Attal invoice the row was tied to) belongs to that row as well
-        const fromRow = madeFrom[m.id] || bills.map(b => madeFrom[b.id]).find(Boolean) || (byRef && byRef[1].replace(/-(sarl|slb)$/, ''));   // a payment split between the companies carries a suffix
-        t.tiedBy = '';
-        if (fromRow) { t.dupOf = fromRow; t.dupSrc = 'auto'; t.odooOnly = false; t.tiedBy = madeFrom[m.id] ? 'made' : 'ref'; }
-        else if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; if (prev.dupSrc === 'manual') t.tiedBy = prev.tiedBy || 'manual'; }
-        // a cents adjustment between the sheet and the supplier's invoice lives in Odoo only — never a line here (Mario, 2026-09-06)
-        else if (/-ROUNDING-/i.test(String(m.ref || ''))) { t.odooOnly = false; t.dupOf = null; t.tiedBy = 'rounding'; }
-        else { t.odooOnly = true; t.dupOf = null; }
-      } else if (paidBy && owner && paidBy !== owner) out.paidByOthers++;
-      if (existing[id]) out.updated++; else out.added++;
-      writes.push({ ref: col.doc(id), data: t });
+      // One payment settling several bills is several facts, never one grouped line: the
+      // partial reconciliations say how much of it went to each bill, so the line is split
+      // into one row per bill, each with its own amount, its own scan and its own project.
+      const total = money(l.debit || l.credit);
+      const sign = l.amount_currency < 0 ? -1 : 1;
+      const payDoc = p && p.name && p.move_id ? { [p.name]: p.move_id[0] } : {};
+      let parts = [{ bill: null, amount: total, cur: l.amount_currency || 0, analytics: rec.analytics, fileIds, docs, docIds }];
+      const allocs = (rec.alloc || []).filter(a => bills.some(b => b.id === a.docId) && money(a.amount) > 0);
+      if (allocs.length > 1) {
+        parts = allocs.map(a => {
+          const b = bills.find(x => x.id === a.docId);
+          return { bill: b, amount: money(a.amount), cur: l.amount_currency ? sign * money(a.cur || a.amount) : 0,
+            analytics: a.analytics.length ? a.analytics : rec.analytics,
+            fileIds: (b.attachment_ids || []).filter(id => attName[id]).map(id => ({ id, name: attName[id] })),
+            docs: [a.doc], docIds: { [a.doc]: a.docId, ...payDoc } };
+        });
+        // the payment's own scans stay on the first row; what the bills do not account for
+        // (an advance paid beyond them) is a row of its own, never folded into a bill
+        const mine = fileIds.filter(f => (m.attachment_ids || []).includes(f.id));
+        parts[0].fileIds = [...mine, ...parts[0].fileIds.filter(f => !mine.some(x => x.id === f.id))];
+        const rest = money(total - parts.reduce((s, x) => s + x.amount, 0));
+        if (Math.abs(rest) > 0.005) parts.push({ bill: null, amount: rest,
+          cur: l.amount_currency ? money(l.amount_currency - parts.reduce((s, x) => s + x.cur, 0)) : 0,
+          analytics: rec.analytics, fileIds: [], docs: [], docIds: { ...payDoc } });
+      }
+      const split = parts.length > 1;
+      if (split) splitBases.add('odoo-' + l.id);
+      parts.forEach((part, pi) => {
+        const id = 'odoo-' + l.id + (split ? '-b' + (part.bill ? part.bill.id : 'x' + pi) : '');
+        const prev = existing[id] || (split && pi === 0 ? existing['odoo-' + l.id] : null) || {};
+        const an = part.analytics[0];
+        const pFiles = part.fileIds.map(x => x.name);
+        const pDesc = part.bill ? (part.bill.ref || part.bill.name || description) : description;
+        const t = {
+          id, src: 'odoo', date: l.date, ref: m.name || '', service: shortCompany(j.company),
+          description: pDesc, name: counterparty ? counterparty[1] : '', phone: '',
+          // Odoo debit on the cash account = money came in = statement credit.
+          // On a payable it reads the same way: a credit is money he advanced, a debit is money he was paid.
+          debit: l.credit ? part.amount : 0, credit: l.debit ? part.amount : 0, amountCurrency: part.cur || 0,
+          state: l.parent_state, files: pFiles, fileIds: part.fileIds, importedAt: now(),
+          odoo: { checkedAt: now(), matches: [{
+            chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: part.amount,
+            billId: part.bill ? part.bill.id : null, partOf: split ? parts.length : 0,
+            partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
+            company: j.company, journal: j.name, state: l.parent_state, docs: part.docs, docIds: part.docIds, odooRef: pDesc || (p && p.memo) || m.ref || '', analytics: part.analytics, score: 10, why: ['imported from Odoo'],
+          }] },
+        };
+        // a question put to Mario on this Odoo entry, and his answer, live on the line across imports
+        if (prev.ask) t.ask = prev.ask;
+        if (prev.answer) t.answer = prev.answer;
+        if (prev.note && !t.note) t.note = prev.note;
+        if (counterparty && prev.partnerSrc !== 'manual') Object.assign(t, { partnerId: counterparty[0], partnerName: counterparty[1], partnerSrc: 'odoo' });
+        if (prev.companySrc !== 'manual') Object.assign(t, { company: j.company, companySrc: 'odoo', kind: 'work', kindSrc: 'odoo' });
+        if (an && prev.analyticSrc !== 'manual') Object.assign(t, { analyticId: an.id, analyticName: an.name, analyticSrc: 'odoo', analyticFrom: an.from });
+        if (paidBy && prev.paidBySrc !== 'manual') Object.assign(t, { paidBy, paidBySrc: 'odoo' });
+        // An account kept in an Excel ledger IS that ledger: Odoo is matched onto its rows,
+        // never counted as lines of its own. The Odoo line stays, hidden, as the evidence.
+        if (account.excel && account.excel.file) {
+          t.excluded = true;
+          // the settlement's own entry names the row it settles ("… - ABEDCASH-xl-…")
+          const byRef = String([m.ref, m.narration, p && p.memo, lineName].join(' ')).match(new RegExp(account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '') + '-(xl-[\\w-]+)'));
+          // a payment of a bill a row is booked to (his own cash paying an Attal invoice the row was tied to) belongs to that row as well
+          const ownBills = part.bill ? [part.bill] : bills;
+          const fromRow = madeFrom[m.id] || ownBills.map(b => madeFrom[b.id]).find(Boolean) || (byRef && byRef[1].replace(/-(sarl|slb)$/, ''));   // a payment split between the companies carries a suffix
+          t.tiedBy = '';
+          if (fromRow) { t.dupOf = fromRow; t.dupSrc = 'auto'; t.odooOnly = false; t.tiedBy = madeFrom[m.id] ? 'made' : 'ref'; }
+          else if (prev.dupOf) { t.dupOf = prev.dupOf; t.dupSrc = prev.dupSrc || 'auto'; t.odooOnly = false; if (prev.dupSrc === 'manual') t.tiedBy = prev.tiedBy || 'manual'; }
+          // a cents adjustment between the sheet and the supplier's invoice lives in Odoo only — never a line here (Mario, 2026-09-06)
+          else if (/-ROUNDING-/i.test(String(m.ref || ''))) { t.odooOnly = false; t.dupOf = null; t.tiedBy = 'rounding'; }
+          else { t.odooOnly = true; t.dupOf = null; }
+        } else if (paidBy && owner && paidBy !== owner && pi === 0) out.paidByOthers++;
+        if (existing[id]) out.updated++; else out.added++;
+        if (split) out.split++;
+        writes.push({ ref: col.doc(id), data: t });
+      });
     }
     out.journals.push({ id: j.id, name: j.name, company: j.company, lines: L.length });
     out.lines += L.length;
@@ -340,7 +375,7 @@ async function importOdoo(odooCall, account, who) {
   await acc.batchSet(account.ref.firestore, writes);
   // an Odoo line that is gone (cancelled, deleted) leaves here too, unless a person tied something to it by hand
   const seen = new Set(writes.map(w => w.ref.id));
-  const gone = Object.keys(existing).filter(id => !seen.has(id) && existing[id].dupSrc !== 'manual');
+  const gone = Object.keys(existing).filter(id => !seen.has(id) && (splitBases.has(id) || existing[id].dupSrc !== 'manual'));
   for (let i = 0; i < gone.length; i += 450) { const bt = account.ref.firestore.batch(); gone.slice(i, i + 450).forEach(id => bt.delete(col.doc(id))); await bt.commit(); }
   out.removed = gone.length;
   await account.ref.set({ lastOdooImport: now(), lastOdooImportBy: who }, { merge: true });

@@ -273,7 +273,7 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
     { fields: ['id', 'move_id', 'analytic_distribution', 'matched_debit_ids', 'matched_credit_ids'], context: ctx, limit: 5000 });
   const partialIds = [...new Set(L.flatMap(l => [...(l.matched_debit_ids || []), ...(l.matched_credit_ids || [])]))];
   const P = partialIds.length ? await odooCall('account.partial.reconcile', 'search_read', [[['id', 'in', partialIds]]],
-    { fields: ['id', 'debit_move_id', 'credit_move_id'], context: ctx, limit: 5000 }) : [];
+    { fields: ['id', 'debit_move_id', 'credit_move_id', 'amount', 'debit_amount_currency', 'credit_amount_currency'], context: ctx, limit: 5000 }) : [];
   const own = new Set(L.map(l => l.id));
   const cpIds = [...new Set(P.flatMap(p => [p.debit_move_id[0], p.credit_move_id[0]]))].filter(id => !own.has(id));
   const CP = cpIds.length ? await odooCall('account.move.line', 'search_read', [[['id', 'in', cpIds]]],
@@ -292,7 +292,7 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
 
   for (const l of L) {
     const mv = l.move_id[0];
-    const rec = out[mv] = out[mv] || { analytics: [], docs: [], docIds: {} };
+    const rec = out[mv] = out[mv] || { analytics: [], docs: [], docIds: {}, alloc: [] };
     // analytic straight on the payment (rare, but honour it)
     for (const k of Object.keys(l.analytic_distribution || {})) for (const p of k.split(',')) {
       const a = byId[+p]; if (a && !rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: 'payment' });
@@ -302,8 +302,17 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
       for (const li of [pr.debit_move_id[0], pr.credit_move_id[0]]) {
         const doc = docOfLine[li]; if (!doc) continue;
         if (!rec.docs.includes(doc[1])) { rec.docs.push(doc[1]); rec.docIds[doc[1]] = doc[0]; }
+        // how much of this payment went to THAT document: one payment settling two bills
+        // is two facts, and the partial carries the amount of each.
+        const cur = pr.debit_move_id[0] === l.id ? pr.debit_amount_currency : pr.credit_amount_currency;
+        const a0 = rec.alloc.find(x => x.docId === doc[0]);
+        if (a0) { a0.amount += pr.amount || 0; a0.cur += Math.abs(cur || 0); }
+        else rec.alloc.push({ docId: doc[0], doc: doc[1], amount: pr.amount || 0, cur: Math.abs(cur || 0), analytics: [] });
         for (const p of (anOfDoc[doc[0]] || [])) {
-          const a = byId[p]; if (a && !rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: doc[1] });
+          const a = byId[p]; if (!a) continue;
+          if (!rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: doc[1] });
+          const al = rec.alloc.find(x => x.docId === doc[0]);
+          if (al && !al.analytics.some(x => x.id === a.id)) al.analytics.push({ id: a.id, name: a.name, from: doc[1] });
         }
       }
     }
