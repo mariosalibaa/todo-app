@@ -97,6 +97,12 @@
   .rule.off{opacity:.55;}
   .btn.book{padding:1px 7px;height:22px;font-size:11.5px;color:var(--odoo);border-color:#d9c9d4;} .btn.book:hover{background:#f5f2f7;}
   .odoo-doc{color:var(--muted);font-size:11px;margin-top:1px;white-space:normal;word-break:break-word;}
+  .odoo-doc a.doc{display:flex;align-items:center;gap:6px;margin-top:3px;text-decoration:none;}
+  .odoo-doc a.doc:hover .doc-name{text-decoration:underline;}
+  .doc-thumb{width:34px;height:34px;flex:none;object-fit:cover;border:1px solid var(--line);border-radius:3px;background:#fff;}
+  .doc-thumb.none{display:inline-flex;align-items:center;justify-content:center;font-size:15px;color:var(--muted);}
+  .odoo-doc a.doc:hover .doc-thumb{border-color:var(--odoo);}
+  .doc-name{min-width:0;overflow-wrap:anywhere;}
   /* the paper behind a line, full size: ‹ › or the arrow keys walk the day's photos */
   #pv{position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:200;display:none;align-items:center;justify-content:center;}
   #pv.on{display:flex;}
@@ -304,7 +310,7 @@
   .xl.narrow td.b{background:#f2f2f2;font-weight:bold;}   /* the running balance, as he counts it himself */
   #stmtsum{font-size:12px;color:var(--muted);white-space:nowrap;}
   #stmtsum b{color:var(--ink);}
-  #stmtsum .dette{color:#7a5a00;}   /* his debt to us -- never part of the balance beside it */
+  #stmtsum .dette{color:#7a5a00;}   /* his debt to us -- taken off the balance beside it */
   #stmtsum .g{color:#006100;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
   .c-paid{width:110px;}
@@ -1211,9 +1217,18 @@ const fileLinks = t => {
   if (!F.length && !D.length) return '';
   const why = n => /^wa /.test(n) ? ' — a WhatsApp photo of that day: the day’s paper sits on every spending row of the day, so it does not necessarily belong to this amount' : '';
   const cut = n => esc(n.length > 42 ? n.slice(0, 40) + '…' : n);
-  const one = (name, i, href) => `<a ${href ? `href="${href}" ` : ''}onclick="event.preventDefault();openViewer('${t.id}',${i})" title="${esc(name + why(name))}">📎 ${cut(name)}</a>`;
-  return `<div class="odoo-doc">${[...F.map((f, i) => one(f.name, i, '/api/accounting/odoo-file/' + f.id)),
-    ...D.map((d, i) => one(d.name, F.length + i, ''))].join('<br>')}</div>`;
+  // a stamp-sized look at the paper, so the receipt is recognisable without opening it
+  // (Mario, 2026-09-09). It loads only when the row is scrolled into view, and a PDF — which
+  // has no picture to show — keeps its sheet mark. Click either one for the full-size viewer.
+  const thumb = (name, href, mime) => {
+    const isImg = href && (mime ? /^image\//.test(mime) : !/\.pdf$/i.test(name));
+    return isImg ? `<img class="doc-thumb" loading="lazy" src="${href}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'doc-thumb none',textContent:'📎'}))">`
+      : `<span class="doc-thumb none" title="PDF">📄</span>`;
+  };
+  const one = (name, i, href, mime) => `<a class="doc" ${href ? `href="${href}" ` : ''}onclick="event.preventDefault();openViewer('${t.id}',${i})" title="${esc(name + why(name))}">`
+    + `${thumb(name, href, mime)}<span class="doc-name">${cut(name)}</span></a>`;
+  return `<div class="odoo-doc">${[...F.map((f, i) => one(f.name, i, '/api/accounting/odoo-file/' + f.id, '')),
+    ...D.map((d, i) => one(d.name, F.length + i, `/api/accounting/accounts/${accOf(t)}/tx/${t.id}/docs/${d.id}`, d.mime || ''))].join('')}</div>`;
 };
 function odooCell(t) {
   const btn = bookButton(t);
@@ -1527,7 +1542,10 @@ const xlSum = k => xlCarry(k) + tx.filter(t => t.src === 'excel' && !t.excluded 
 const xlFmt = v => (v < -0.005 ? '$ (' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')' : '$ ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const xlWord = v => v < -0.005 ? 'واصل اضافي' : 'مطلوب';
 // -- The dette: money the person owes Shift, the other way round from the ledger ----------
-// It is NOT part of his balance and never nets into it (Mario, 2026-09-06). The account carries
+// It comes OFF his balance (Mario, 2026-09-10: "ziad dette is 500$, add it to his balance" —
+// reversing the 2026-09-06 rule that kept it apart). It still shows on a line of its own, so he
+// can see where the figure went, but the sum he is asked for is the ledger less the dette.
+// The account carries
 // what was lent (`dette` = {amount, since, what, plan}); what came back is read off his own rows,
 // so nobody has to keep a second number up to date. A row that names a dette and carries money is
 // a repayment; one with no money but "bonus" in its words was forgiven -- a cost to us, not a
@@ -1565,16 +1583,29 @@ function detteOf() {
     }
   }
   paid = Math.round(paid * 100) / 100; bonus = Math.round(bonus * 100) / 100;
-  return { ...d, partial: !detteRows, amount: +d.amount, paid, bonus, left: Math.round((+d.amount - paid - bonus) * 100) / 100, rows: back.sort((a, b) => a.date < b.date ? 1 : -1) };
+  // What he owes is what HIS SHEET says, in its own Dette cell — the hub does not net the rows
+  // that mention the word down to a remainder (Mario, 2026-09-10: "ziad dette is 500 $ as per
+  // excel, this is the correct dette, not 100 $"). The repayments are still gathered, but they
+  // explain the figure in the tooltip instead of changing it. The old arithmetic survives as
+  // `computed` for an account whose dette was typed here rather than read from a workbook.
+  const computed = Math.round((+d.amount - paid - bonus) * 100) / 100;
+  const left = d.fromSheet ? +d.amount : computed;
+  return { ...d, partial: !detteRows, amount: +d.amount, paid, bonus, computed, left,
+    rows: back.sort((a, b) => a.date < b.date ? 1 : -1) };
 }
-const detteTitle = d => `${xlFmt(d.amount)} lent${d.since ? ' on ' + d.since : ''}${d.what ? ' · ' + d.what : ''}. Paid back ${xlFmt(d.paid)}${d.bonus ? `, ${xlFmt(d.bonus)} written off as a bonus (our cost, not a repayment)` : ''}.${d.plan ? ' ' + d.plan + '.' : ''} It is his debt to us and is never part of the balance above.`;
+const detteTitle = d => `${xlFmt(d.amount)}${d.fromSheet ? ' — his sheet’s own Dette cell' + (d.sheetCell ? ' (' + d.sheetCell + ')' : '') : ' lent'}${d.since ? ', since ' + d.since : ''}${d.what ? ' · ' + d.what : ''}.`
+  + ` Rows naming the dette since then come to ${xlFmt(d.paid)}${d.bonus ? `, and ${xlFmt(d.bonus)} was written off as a bonus (our cost, not a repayment)` : ''}`
+  + `${d.fromSheet ? ` — they are not taken off: the sheet's figure is the debt` : `, leaving ${xlFmt(d.computed)}`}.`
+  + `${d.plan ? ' ' + d.plan + '.' : ''} It is his debt to us, and it is taken off the balance above.`;
 function stmtSummary() {
   if (!isExcelKept() || !tx.some(t => t.period)) return '';
   const o = xlSum('old'), n = xlSum('new'), a = xlSum('all');
   const cell = v => `<b class="${v < -0.005 ? 'g' : ''}">${xlFmt(v)}</b>`;
   const d = detteOf();
-  const dette = d ? ` · <span class="dette" title="${esc(detteTitle(d))}">dette <b>${xlFmt(d.left)}</b> left of ${xlFmt(d.amount)}</span>` : '';
-  return `<span title="As the sheet's header: old sum = the balance on the statement he last received, new sum = the rows since, all sum = the balance now. Green = he holds money of ours.">old ${cell(o)} ${xlWord(o)} · new ${cell(n)} · all ${cell(a)} ${xlWord(a)}</span>${dette}`;
+  // what he owes us comes off what we owe him: the "all" figure is the ledger net of the dette
+  const net = d ? Math.round((a - d.left) * 100) / 100 : a;
+  const dette = d ? ` · <span class="dette" title="${esc(detteTitle(d))}">less dette <b>${xlFmt(d.left)}</b>${d.fromSheet ? '' : ' left of ' + xlFmt(d.amount)}</span>` : '';
+  return `<span title="As the sheet's header: old sum = the balance on the statement he last received, new sum = the rows since, all sum = the balance now${d ? ', with his dette taken off' : ''}. Green = he holds money of ours.">old ${cell(o)} ${xlWord(o)} · new ${cell(n)} · all ${cell(net)} ${xlWord(net)}</span>${dette}`;
 }
 function stmtAllDates() { document.getElementById('stmt-from').value = ''; document.getElementById('stmt-to').value = ''; openStmt(); }
 let stmtOpened = null;
@@ -1672,8 +1703,15 @@ function openStmt() {
     <table class="xl narrow"><colgroup><col style="width:132px"><col style="width:186px"><col style="width:62px"><col style="width:62px"><col style="width:74px"><col style="width:132px"></colgroup>
       <tr><td>starting</td><td class="n ${opening < 0 ? 'g' : ''}">${xlFmt(opening)}</td><td class="ar ${opening < 0 ? 'g' : ''}" colspan="4">${xlWord(opening)} · حساب قديم</td></tr>
       <tr><td>ending</td><td class="n ${closed < 0 ? 'g' : ''}">${xlFmt(closed)}</td><td class="ar ${closed < 0 ? 'g' : ''}" colspan="4">${xlWord(closed)} · حساب جديد</td></tr>
-      ${(() => { const d = detteOf(); if (!d) return ''; return `<tr><td title="${esc(detteTitle(d))}">dette</td><td class="n">${xlFmt(d.left)}</td><td class="ar" colspan="4">${xlFmt(d.amount)} · ${xlFmt(d.paid)} مدفوع${d.bonus ? ' · ' + xlFmt(d.bonus) + ' هدية' : ''} · دين على زياد</td></tr>`; })()}
       ${Math.abs(closed - a) > 0.005 ? `<tr><td>account</td><td class="n ${a < 0 ? 'g' : ''}">${xlFmt(a)}</td><td class="ar" colspan="4">${hidden} row(s) outside this period are not in the block</td></tr>` : ''}
+      ${(() => { const d = detteOf(); if (!d) return ''; const AR = { ziad: 'زياد', khodr: 'خضر', abed: 'عبد', georges: 'جورج', mitri: 'متري', mario: 'ماريو' };
+        const who = AR[(account && account.owner) || ''] || (account ? account.name : '');
+        // the dette is taken off the sum he is asked for, and the two lines show the subtraction
+        // so he can follow it (Mario, 2026-09-10: "add it to his balance")
+        const base = Math.abs(closed - a) > 0.005 ? a : closed;
+        const net = Math.round((base - d.left) * 100) / 100;
+        return `<tr><td title="${esc(detteTitle(d))}">less dette</td><td class="n">${xlFmt(-d.left)}</td><td class="ar" colspan="4">${d.fromSheet ? '' : xlFmt(d.amount) + ' · ' + xlFmt(d.paid) + ' مدفوع' + (d.bonus ? ' · ' + xlFmt(d.bonus) + ' هدية' : '') + ' · '}دين على ${esc(who)}</td></tr>`
+          + `<tr><td class="b">total</td><td class="n b ${net < 0 ? 'g' : ''}">${xlFmt(net)}</td><td class="ar b ${net < 0 ? 'g' : ''}" colspan="4">${xlWord(net)} · بعد حسم الدين</td></tr>`; })()}
       <tr><td colspan="6" style="border:none;height:8px"></td></tr>
       <tr><td class="h">date</td><td class="h">what</td><td class="h">debit</td><td class="h">credit</td><td class="h">balance</td><td class="h">analytical</td></tr>
       ${close}${body}${open}
@@ -2074,12 +2112,12 @@ async function splitSave() {
   const data = rows.length > 1 ? { analyticSplit: rows, analyticId: main.id, analyticName: main.name, analyticSrc: 'manual', analyticFrom: '', analyticText: '' }
     : { analyticSplit: null, analyticId: main ? main.id : null, analyticName: main ? main.name : '', analyticSrc: main ? 'manual' : '', analyticFrom: '', analyticText: '' };
   try {
-    await patch(splitFor.id, data); Object.assign(splitFor, data);
+    const res = await patch(splitFor.id, data); Object.assign(splitFor, data);
     if (rows.length > 1) splitRemember(rows);
     document.getElementById('splitform').hidden = true;
-    const n = await transportFollowsLabour(splitFor, data);
     render();
-    say((rows.length > 1 ? 'Split: ' + rows.map(r => fmtPct(r.pct) + '% ' + r.name).join(' · ') + (splitFor.bookedMove ? ' — already booked: press Rewrite on its month to carry it into Odoo' : '') : main ? 'Analytic: ' + main.name : 'Analytic cleared') + followSay(n));
+    say((rows.length > 1 ? 'Split: ' + rows.map(r => fmtPct(r.pct) + '% ' + r.name).join(' · ') : main ? 'Analytic: ' + main.name : 'Analytic cleared')
+      + odooSay(res), res && res.odooAnalytic && res.odooAnalytic.error ? 'err' : 'ok');
   } catch (e) { document.getElementById('split-msg').textContent = 'Could not save: ' + e.message; }
 }
 
@@ -2226,31 +2264,32 @@ async function confirmAnalytic(id, keep) {
 // ⛽ Transport follows the day (Mario, 2026-09-09): the benzine he burns on a day belongs to the
 // same project — and to the same split — as the work of that day, so the analytic given to the
 // labour row is carried onto that day's fuel lines by itself. Anything else he bought stays alone.
-async function transportFollowsLabour(t, data) {
-  if (!t || t.nature !== 'labour') return 0;
-  const fuel = tx.filter(x => x.id !== t.id && x.date === t.date && !x.excluded && x.nature === 'expense'
-    && (x.car || isFuel([x.description, x.partnerName, x.note].join(' '))));
-  let n = 0;
-  for (const f of fuel) {
-    const same = f.analyticId === data.analyticId && JSON.stringify(f.analyticSplit || null) === JSON.stringify(data.analyticSplit || null);
-    if (same) continue;
-    try { await patch(f.id, data); Object.assign(f, data); n++; } catch {}
-  }
-  return n;
-}
-const followSay = n => n ? ` — the day's ${n} transport line${n === 1 ? '' : 's'} followed${tx.some(x => x.bookedMove) ? ' (press Rewrite on the month to carry it into Odoo)' : ''}` : '';
+// Every line keeps its own project. The day's transport used to be dragged along behind the
+// day's labour; Mario, 2026-09-10: "analytical account of each line is separated from the other,
+// no replication — just update Odoo when I update the hub". So changing a project touches that
+// one row, and the only thing that follows it is its own Odoo bill line.
 
+// What the server did with the project in Odoo. Editing it on a booked row now writes straight
+// onto the bill line (Mario, 2026-09-10) — this says so, and says why when it could not.
+function odooSay(r) {
+  const o = r && r.odooAnalytic;
+  if (!o) return '';
+  if (o.error) return ` — but Odoo was not updated: ${o.error}`;
+  if (o.skipped) return ` — not carried into Odoo: ${o.skipped}`;
+  if (o.already) return ` — ${o.move} already said that`;
+  if (o.ok) return ` — written onto ${o.move} in Odoo`;
+  return '';
+}
 async function saveAnalytic(id, a, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
-  const data = a ? { analyticId: a.id, analyticName: a.name, analyticSrc: 'manual', analyticFrom: '' }
-                 : { analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '' };
+  const data = a ? { analyticId: a.id, analyticName: a.name, analyticSrc: 'manual', analyticFrom: '', analyticSplit: null }
+                 : { analyticId: null, analyticName: '', analyticSrc: '', analyticFrom: '', analyticSplit: null };
   Object.assign(t, data);
   if (el) mark(el, a ? 'manual' : '');
   try {
-    await patch(id, data); if (el) flash(el, true);
-    const n = await transportFollowsLabour(t, { ...data, analyticSplit: null });
-    if (n) render();
-    say((a ? `Analytic: ${a.name}${a.plan ? ' · ' + a.plan : ''}` : 'Analytic cleared') + followSay(n));
+    const r = await patch(id, data); if (el) flash(el, true);
+    say((a ? `Analytic: ${a.name}${a.plan ? ' · ' + a.plan : ''}` : 'Analytic cleared') + odooSay(r),
+      r && r.odooAnalytic && r.odooAnalytic.error ? 'err' : 'ok');
   }
   catch (e) { if (el) flash(el, false); say('Could not save: ' + e.message, 'err'); }
 }
@@ -2966,7 +3005,7 @@ function filesOf(t) {
   return [
     ...(t.fileIds || []).map(f => ({ name: f.name, url: `/api/accounting/odoo-file/${f.id}`,
       odoo: `https://shift2.odoo.com/web/content/${f.id}`, img: !/\.pdf$/i.test(f.name) })),
-    ...(t.docs || []).map(d => ({ name: d.name, url: `/api/accounting/accounts/${acc}/tx/${t.id}/docs/${d.id}`,
+    ...(t.docs || []).map(d => ({ name: d.name, url: `/api/accounting/accounts/${accOf(t)}/tx/${t.id}/docs/${d.id}`,
       img: /^image\//.test(d.mime || '') })),
   ];
 }
