@@ -58,6 +58,7 @@
 <div class="bar">
   <span class="muted" id="asof"></span>
   <span style="flex:1"></span>
+  <span id="hh-host"></span>
   <button class="btn" onclick="load()" title="Recompute every balance">↻ Refresh</button>
   <button class="btn" onclick="readWorkbook()" title="Read the gold + silver workbook from this machine (works on Mario's laptop only)">🪙 Read gold workbook</button>
 </div>
@@ -82,6 +83,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
+<script src="/hub-history.js"></script>
 <script>
 const esc = Admin.esc;
 // 'We 2026-09-03': the weekday in front of every date, as the sheets write it
@@ -95,6 +97,7 @@ function say(text, c) { const m = document.getElementById('msg'); m.textContent 
 let balances = [], gold = { holdings: [], prices: {} };
 
 Admin.require('accounting', async me => {
+  HubHistory.mount({ into: '#hh-host', area: 'gold', reload: load });
   document.getElementById('who').textContent = me.name || me.email;
   await load();
 });
@@ -154,9 +157,16 @@ function render() {
 }
 
 async function savePrice(metal, v) {
+  const was = (gold.prices || {})[metal];
+  const asOf = new Date().toISOString().slice(0, 10);
   try {
-    await Admin.api('PATCH', '/api/accounting/gold', { prices: { [metal]: +v || 0, asOf: new Date().toISOString().slice(0, 10) } });
-    gold.prices = { ...(gold.prices || {}), [metal]: +v || 0, asOf: new Date().toISOString().slice(0, 10) };
+    await HubHistory.run({
+      label: `${metal} price ${fmt(+v || 0)}`,
+      do: () => Admin.api('PATCH', '/api/accounting/gold', { prices: { [metal]: +v || 0, asOf } }),
+      // put the old price back — the server sends what it said before, but this one field is enough
+      undo: () => Admin.api('PATCH', '/api/accounting/gold', { prices: { [metal]: +was || 0, asOf }, __undo: true }),
+    });
+    gold.prices = { ...(gold.prices || {}), [metal]: +v || 0, asOf };
     say(`${cap(metal)} price saved`); render();
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }

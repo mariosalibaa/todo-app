@@ -86,6 +86,7 @@
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner, company or project suggestion waiting">⚡ Review suggestions</button>
   <span class="hint" id="sync-status"></span>
   <span class="sp" style="flex:1"></span>
+  <span id="hh-host"></span>
   <select id="acc" onchange="loadTx(this.value)"></select>
 </div>
 <div class="msg" id="msg"></div>
@@ -97,6 +98,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
+<script src="/hub-history.js"></script>
 <script>
 const esc = Admin.esc;
 const API = '/api/accounting/wise/';
@@ -239,8 +241,15 @@ function itemFor(t) {
 }
 async function saveItems(items, msg) {
   if (!items.length) return;
+  const key = currentKey;
   try {
-    await Admin.api('POST', API + 'tx-save', { key: currentKey, items });
+    await HubHistory.run({
+      label: items.length === 1 ? 'a Wise line' : items.length + ' Wise lines',
+      do: () => Admin.api('POST', API + 'tx-save', { key, items }),
+      // the server hands back what each line said before; writing those back is the way out
+      undo: (_, out) => Admin.api('POST', API + 'tx-save', { key, __undo: true,
+        items: ((out && out.changes) || []).map(c => ({ id: c.id, ...c.before })) }),
+    });
     for (const it of items) { const t = rowOf(it.id); if (t) Object.assign(t, it); }
     renderGrid(); say(msg, 'ok');
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
@@ -299,7 +308,16 @@ async function editCell(id, field, value) {
       kind: value === 'Personal' ? 'personal' : value ? 'work' : '' });
   } else data[field] = value;
   Object.assign(t, data);
-  try { await Admin.api('POST', API + 'tx-save', { key: currentKey, items: [data] }); renderGrid(); say('Saved', 'ok'); }
+  const key = currentKey;
+  try {
+    await HubHistory.run({
+      label: field + ' on ' + (t.counterparty || t.description || 'a line'),
+      do: () => Admin.api('POST', API + 'tx-save', { key, items: [data] }),
+      undo: (_, out) => Admin.api('POST', API + 'tx-save', { key, __undo: true,
+        items: ((out && out.changes) || []).map(c => ({ id: c.id, ...c.before })) }),
+    });
+    renderGrid(); say('Saved', 'ok');
+  }
   catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 
@@ -482,6 +500,7 @@ async function saveAnalytic(id, el) {
 
 Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.email;
+  HubHistory.mount({ into: '#hh-host', area: 'wise', reload: () => loadTx(currentKey) });
   await Promise.all([loadAccounts(), loadStatus(), loadPartners()]);
   if (accounts.length) loadTx(document.getElementById('acc').value); else render();
 });

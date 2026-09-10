@@ -321,9 +321,14 @@ async function bookTimesheetMonth(ctx, account, month, who, opts) {
   const cfg = account.timesheet || {};
   const file = cfg.file || (account.excel && account.excel.file);
   if (!file) throw new Error('this account has no workbook with a timesheet');
-  const read = await ledgersLib().readTimesheet(file, cfg.sheet || 'timesheet', { rate: cfg.rate, freeHours: cfg.freeHours });
+  const read = (opts && opts.read) || await ledgersLib().readTimesheet(file, cfg.sheet || 'timesheet',
+    { rate: cfg.rate, rates: cfg.rates, freeHours: cfg.freeHours });
   const M = read.months.find(m => m.month === month);
   if (!M) throw new Error(`the timesheet has no hours in ${month}`);
+  // The allowance comes off at the end of the month (Mario, 2026-09-10). While the month is still
+  // running the bill carries the projects' hours alone, so their cost is right from day one; the
+  // credit line joins it once the month is over and the bill becomes what he is actually paid.
+  const closing = month < new Date().toISOString().slice(0, 7);
 
   const map = await loadMap(ws);
   const known = await acc.analyticAccounts(odooCall).catch(() => []);
@@ -339,13 +344,16 @@ async function bookTimesheetMonth(ctx, account, month, who, opts) {
 
   const lines = parts.map(p => ({ name: `${month} · ${p.hours} h × ${M.rate} — ${p.project || p.name}`, quantity: p.hours, price_unit: M.rate,
     account_id: CO.accounts.labour, tax_ids: [[6, 0, []]], analytic_distribution: { [String(p.id)]: 100 } }));
-  // the allowance he gives back against the ISF salary: one credit line, on GENERAL
-  lines.push({ name: `${month} · ${M.freeHours} h covered by his ISF salary — returned to GENERAL`, quantity: -M.freeHours, price_unit: M.rate,
+  // the allowance he gives back against the ISF salary: one credit line, on GENERAL, added when
+  // the month is over so that what is left standing is exactly his pay
+  if (closing) lines.push({ name: `${month} · ${M.freeHours} h covered by his ISF salary — returned to GENERAL`, quantity: -M.freeHours, price_unit: M.rate,
     account_id: CO.accounts.labour, tax_ids: [[6, 0, []]], analytic_distribution: { [String(GENERAL)]: 100 } });
 
   const ref = `${account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '')}-${month}-TIMESHEET`;
   const ctxO = { allowed_company_ids: [CO.companyId], company_id: CO.companyId };
-  const dateOf = `${month}-${String(new Date(+month.slice(0, 4), +month.slice(5, 7), 0).getDate()).padStart(2, '0')}`;
+  // a month still running is dated today, so it never sits in the future; a closed one on its last day
+  const lastDay = `${month}-${String(new Date(+month.slice(0, 4), +month.slice(5, 7), 0).getDate()).padStart(2, '0')}`;
+  const dateOf = closing ? lastDay : new Date().toISOString().slice(0, 10);
   const found = await odooCall('account.move', 'search_read', [[['ref', '=', ref], ['move_type', '=', 'in_invoice']]], { fields: ['id', 'name', 'state'], context: ctxO, limit: 1 });
   const existing = found[0];
   let moveId, moveName, action;
@@ -353,14 +361,17 @@ async function bookTimesheetMonth(ctx, account, month, who, opts) {
     if (!(opts && opts.redo)) throw new Error(`${existing.name} (${ref}) is already ${existing.state} — press Rewrite to redo it`);
     await odooCall('account.move', 'button_draft', [[existing.id]], { context: ctxO });
   }
+  const narration = `${account.name} — ${month}: ${M.hours} h from the timesheet at ${M.rate}/h on the projects that used them`
+    + (closing ? `, less ${M.freeHours} h covered by his ISF salary. Net ${money(M.net)} = his pay.`
+      : `. The month is still running, so the ${M.freeHours} h covered by his ISF salary come off when it closes; the projects already carry their cost.`)
+    + ' Made by Shift Hub.';
   if (existing) {
-    await odooCall('account.move', 'write', [[existing.id], { ref, invoice_date: dateOf, invoice_line_ids: [[5, 0, 0], ...lines.map(l => [0, 0, l])] }], { context: ctxO });
+    await odooCall('account.move', 'write', [[existing.id], { ref, invoice_date: dateOf, narration, invoice_line_ids: [[5, 0, 0], ...lines.map(l => [0, 0, l])] }], { context: ctxO });
     moveId = existing.id; moveName = existing.name && existing.name !== '/' ? existing.name : 'Draft ' + ref; action = 'rewritten';
   } else {
     moveId = await odooCall('account.move', 'create', [{
       move_type: 'in_invoice', company_id: CO.companyId, journal_id: CO.journalId, partner_id: +partner.id,
-      invoice_date: dateOf, date: dateOf, ref,
-      narration: `${account.name} — ${month}: ${M.hours} h from the timesheet at ${M.rate}/h on the projects that used them, less ${M.freeHours} h covered by his ISF salary. Net ${money(M.net)} = his pay. Made by Shift Hub.`,
+      invoice_date: dateOf, date: dateOf, ref, narration,
       invoice_line_ids: lines.map(l => [0, 0, l]),
     }], { context: ctxO });
     const [m] = await odooCall('account.move', 'read', [[moveId], ['name']], { context: ctxO });
@@ -372,11 +383,46 @@ async function bookTimesheetMonth(ctx, account, month, who, opts) {
     const [m2] = await odooCall('account.move', 'read', [[moveId], ['name', 'state']], { context: ctxO });
     moveName = m2.name; state = m2.state; action += ' and posted';
   }
-  await account.ref.set({ timesheetBooked: { ...(account.timesheetBooked || {}), [month]: { moveId, move: moveName, ref, at: now(), by: who || '', net: money(M.net) } } }, { merge: true });
-  return { month, action, moveId, move: moveName, ref, hours: M.hours, rate: M.rate, freeHours: M.freeHours,
+  const total = money(closing ? M.net : M.cost);
+  // kept on the in-memory account as well: two months in a row are refreshed on one import, and a
+  // stale copy here would drop the first one's record when the second is written
+  account.timesheetBooked = { ...(account.timesheetBooked || {}),
+    [month]: { moveId, move: moveName, ref, at: now(), by: who || '', net: money(M.net), closing, total } };
+  await account.ref.set({ timesheetBooked: account.timesheetBooked }, { merge: true });
+  return { month, action, moveId, move: moveName, ref, hours: M.hours, rate: M.rate, freeHours: M.freeHours, closing, total,
     cost: money(M.cost), refund: money(M.refund), net: money(M.net), state,
     projects: parts.map(p => ({ project: p.project || p.name, hours: p.hours, cost: money(p.hours * M.rate), analytic: p.name, unmapped: !!p.unmapped, loose: !!p.loose })),
     unmapped: parts.filter(p => p.unmapped).map(p => p.text) };
+}
+// ── Keeping the open month's cost live in Odoo ──────────────────────────────
+// Mario, 2026-09-10: "the timesheet 2.5$/h + analytical should directly appear on Odoo, so my cost
+// data is live, not waiting the end of the month". Every import rewrites the month in progress —
+// and the one before it while it is still unpaid, so a late correction still lands. A bill that has
+// been paid is never touched: what he was paid on is history.
+async function refreshOpenTimesheet(ctx, account, who, read) {
+  const { odooCall } = ctx;
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const prev = new Date(); prev.setDate(0);
+  const lastMonth = prev.toISOString().slice(0, 7);
+  const booked = account.timesheetBooked || {};
+  const out = [];
+  for (const month of [lastMonth, thisMonth]) {
+    const M = (read.months || []).find(x => x.month === month);
+    if (!M || !M.hours) { out.push({ month, skipped: 'no hours in the timesheet yet' }); continue; }
+    const b = booked[month];
+    // the month before is only refreshed if it is already booked — booking a closed month is
+    // Mario's own decision, taken from the 🕐 screen
+    if (month !== thisMonth && !b) { out.push({ month, skipped: 'not booked yet — book it from 🕐 Timesheet' }); continue; }
+    if (b && b.moveId) {
+      const [mv] = await odooCall('account.move', 'read', [[b.moveId], ['state', 'payment_state', 'name']],
+        { context: { allowed_company_ids: [2, 4, 7, 8, 9, 10] } }).catch(() => []);
+      if (!mv) { out.push({ month, skipped: 'the bill it named is gone — book it again from 🕐 Timesheet' }); continue; }
+      if (mv.payment_state && mv.payment_state !== 'not_paid') { out.push({ month, move: mv.name, skipped: `already ${mv.payment_state}` }); continue; }
+    }
+    try { out.push(await bookTimesheetMonth(ctx, account, month, who || 'timesheet-live', { post: true, redo: true, read })); }
+    catch (e) { out.push({ month, error: String(e.message || e).slice(0, 200) }); }
+  }
+  return out;
 }
 const ledgersLib = () => require('./ledgers');
 
@@ -757,7 +803,7 @@ async function postPayments(ctx, account, who, opts) {
       await col.doc(t.id).set({ bookedMove: { id: moveId, name, ref: memo, kind: 'payment', at: now(), state: p.state, parts: made.map(m => ({ name: m.p.name, amount: m.amount, company: m.company })) }, ref: name, service: made.length === 1 ? first.company : 'split',
         company: made.length === 1 ? first.company : made[0].company, companySrc: 'odoo',
         odoo: { checkedAt: now(), matches: [{ chosen: true, moveId, move: name, date: t.date, amount: money(t.credit), partner: partner.name, partnerId: +partner.id, label: 'paid to ' + partner.name + ' from Cash Mario',
-          company: t.company || CO.company, journal: 'Cash Mario USD', state: p.state, docs: [], analytics: [], score: 10, why: ['payment made from this row'] }] } }, { merge: true });
+          company: made.length === 1 ? first.company : made[0].company, journal: 'Cash Mario USD', state: p.state, docs: [], analytics: [], score: 10, why: ['payment made from this row'] }] } }, { merge: true });
     } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount: t.credit, error: String(e.message || e).slice(0, 160) }); if (out.skipped.length > 5) break; }
   }
   return out;
@@ -999,4 +1045,51 @@ async function bookRow(ctx, account, txId, who) {
   return { kind, move: move && move.name, id: move && move.id, ref: move && move.ref, photos: files.length, pendingExcel: !!data.pendingExcel };
 }
 
-module.exports = { cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+// ── the project on a row, pushed onto the Odoo line it was booked as ───────
+// Changing the analytic on the hub used to stop at the hub: the bill in Odoo kept whatever the
+// Book run had written, so the two drifted apart (Mario, 2026-09-10: "updating analytical account
+// on hub is not updating odoo"). A posted bill line's analytic_distribution can be written
+// straight out — no button_draft / action_post cycle, so a paid bill keeps its reconciliation
+// (the same trick that reclassified the SANNINE lines on 2026-08-30).
+//
+// Returns { ok, move, line, distribution } — or { skipped: why } when there is nothing to push.
+async function pushAnalytic(ctx, account, t) {
+  const { odooCall } = ctx;
+  const dist = distOf(t, { id: t.analyticId, name: t.analyticName });
+  if (!dist) return { skipped: 'the row has no project' };
+  const chosen = t.odoo && (t.odoo.matches || []).find(x => x.chosen);
+  // A project belongs on the expense line of a BILL. A row tied to its settlement (PSETT, TRANS)
+  // names an entry whose only lines are the payable and the clearing account — writing a project
+  // there would be wrong — so follow that match's documents to the bill behind it.
+  const candidates = [
+    (t.bookedMove && t.bookedMove.id) || null,
+    (chosen && chosen.moveId) || null,
+    ...Object.values((chosen && chosen.docIds) || {}),
+  ].filter(Number.isInteger);
+  if (!candidates.length) return { skipped: 'the row is not booked in Odoo' };
+
+  const ctxO = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
+  const found = await odooCall('account.move', 'read', [[...new Set(candidates)], ['name', 'state', 'move_type', 'company_id', 'invoice_line_ids']], { context: ctxO });
+  const bills = found.filter(x => ['in_invoice', 'in_refund'].includes(x.move_type) && x.state !== 'cancel' && (x.invoice_line_ids || []).length);
+  if (!bills.length) {
+    if (!found.length) return { skipped: 'the entry it names no longer exists in Odoo' };
+    return { skipped: `${found.map(x => x.name).join(', ')} carries no bill line — a project lives on the bill, not on its settlement` };
+  }
+  const mv = bills[0];
+
+  const lines = await odooCall('account.move.line', 'read', [mv.invoice_line_ids, ['name', 'price_subtotal', 'analytic_distribution']], { context: ctxO });
+  // the line this row became: the label the Book run wrote, else the one line of the same amount
+  const label = (chosen && chosen.label) || '';
+  const amount = money(t.debit || t.credit);
+  const same = v => Math.abs(v - amount) < 0.02;
+  let line = label ? lines.find(l => String(l.name || '').startsWith(String(label).slice(0, 40))) : null;
+  if (!line) { const near = lines.filter(l => same(l.price_subtotal)); if (near.length === 1) line = near[0]; }
+  if (!line) return { skipped: `could not tell which line of ${mv.name} this row is (${lines.length} lines, ${lines.filter(l => same(l.price_subtotal)).length} of the same amount)` };
+
+  if (JSON.stringify(line.analytic_distribution || null) === JSON.stringify(dist)) return { ok: true, move: mv.name, line: line.id, distribution: dist, already: true };
+  await odooCall('account.move.line', 'write', [[line.id], { analytic_distribution: dist }],
+    { context: { ...ctxO, company_id: mv.company_id[0] } });
+  return { ok: true, move: mv.name, line: line.id, distribution: dist, was: line.analytic_distribution || null };
+}
+
+module.exports = { pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };

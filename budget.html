@@ -187,6 +187,7 @@
   <div class="band">
     <span id="band-left"></span>
     <div class="center" id="band-center"></div>
+    <span id="hh-host"></span>
     <button class="add" id="btn-add" onclick="addCurrent()" title="Add">+</button>
   </div>
   <div class="wrap" id="wrap"></div>
@@ -221,6 +222,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
+<script src="/hub-history.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const esc = Admin.esc;
@@ -869,8 +871,28 @@ const v = id => { const el = document.getElementById(id); return el ? (el.type =
 const acts = (del, saveLbl = 'Save') => `${del ? `<button class="btn danger" onclick="${del}">Delete</button>` : ''}<span style="flex:1"></span><button class="btn" onclick="closeDlg()">Cancel</button><button class="btn primary" id="btn-save" onclick="saveDlg()">${saveLbl}</button>`;
 let onSave = null;
 async function saveDlg() { const b = document.getElementById('btn-save'); b.disabled = true; try { await onSave(); closeDlg(); } catch (e) { say('Error: ' + e.message); } b.disabled = false; }
-async function post(kind, body) { return Admin.api('POST', API + kind, body); }
-async function del(kind, id) { return Admin.api('DELETE', API + kind + '/' + id); }
+async function post(kind, body) {
+  const isNew = !body.id;
+  const out = await HubHistory.run({
+    label: kind + (body.name ? ' ' + body.name : body.amount != null ? ' ' + body.amount : ''),
+    do: () => Admin.api('POST', API + kind, body),
+    // an edit is undone by writing the old fields back; a brand new record, by deleting it
+    put: isNew ? null : prev => Admin.api('POST', API + kind, { ...prev, id: body.id, __undo: true }),
+  });
+  if (isNew && out && out.id) {
+    const st = HubHistory.stacks().undoStack, top = st[st.length - 1];
+    if (top) top.undo = () => Admin.api('DELETE', API + kind + '/' + out.id);
+  }
+  return out;
+}
+async function del(kind, id) {
+  const out = await HubHistory.run({
+    label: kind + ' deleted',
+    do: () => Admin.api('DELETE', API + kind + '/' + id),
+    undo: prev => Admin.api('POST', API + kind, { ...(prev || {}), id, __undo: true }),
+  });
+  return out;
+}
 function upsert(list, id, data) { const i = list.findIndex(x => x.id === id); if (i >= 0) list[i] = { ...list[i], ...data }; else list.push({ id, ...data }); }
 function remove(list, id) { const i = list.findIndex(x => x.id === id); if (i >= 0) list.splice(i, 1); }
 
@@ -1045,6 +1067,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDlg()
 
 // ── boot ──
 Admin.require('accounting', async () => {
+  HubHistory.mount({ into: '#hh-host', area: 'budget', reload: null });
   if (MOBILE) { document.body.classList.add('mob'); document.getElementById('m-body').innerHTML = '<div class="m-empty">Loading…</div>'; }
   document.getElementById('wrap').innerHTML = '<div class="empty">Loading…</div>';
   try { D = await Admin.api('GET', API + 'all'); }

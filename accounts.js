@@ -57,6 +57,9 @@
 const SCAN_DIR = process.env.SCAN_DIR
   || require('path').join(require('os').homedir(), 'OneDrive', 'Desktop', 'to arrange', 'shift group usd');
 
+// which fields on a row mean its project changed, and so must reach the Odoo line it was booked as
+const ANALYTIC_FIELDS = ['analyticId', 'analyticName', 'analyticSplit', 'analyticSrc'];
+
 const acc = require('./accounting');
 const ledgers = require('./ledgers');   // the workers' Excel ledgers, WhatsApp groups, transfer linking
 const bills = require('./ledger-bills');
@@ -134,11 +137,44 @@ async function resolve(ws, id) {
 }
 const txCol = a => a.ref.collection('tx');
 
+const { LOG_AREAS, logCol, diffOf, hubLog } = require('./hub-log');
+
 // ── ⛽ Fuel by car ────────────────────────────────────────────────────────────
 // A benzine line carries the car it went into and the odometer at the pump, so the fuel view
 // can say what each car burns per km (Mario, 2026-09-09). Abed drives the BMW and Georges the
 // RAV4; Khoder and Ziad take the Laredo or the Tacoma, so theirs is read off the words (or the
 // photo) and otherwise asked on the row. The page reads a line the same way (fuelOf there).
+// ── The timesheet, and the copy of it the hub keeps ─────────────────────────
+// His workbook lives on Mario's laptop, so only the laptop can read it. Everything else — the
+// phone, the deployed hub — reads a mirror of the days, one document per month under the account
+// (Mario, 2026-09-10: the hours and their projects belong on his ledger and on a sheet of their
+// own). The mirror is refreshed on every import and every time the 🕐 screen is opened locally;
+// it is never written back to the workbook, which stays the record.
+const hasTimesheet = a => !!(a && a.timesheet && (a.timesheet.file || (a.excel && a.excel.file)));
+async function readTimesheetOf(a) {
+  const cfg = a.timesheet || {};
+  const file = cfg.file || (a.excel && a.excel.file);
+  if (!file) throw new Error('this account has no workbook with a timesheet');
+  return ledgers.readTimesheet(file, cfg.sheet || 'timesheet', { rate: cfg.rate, rates: cfg.rates, freeHours: cfg.freeHours });
+}
+async function mirrorTimesheet(a, read) {
+  const col = a.ref.collection('timesheet');
+  const byMonth = {};
+  for (const d of read.days || []) (byMonth[d.month] = byMonth[d.month] || []).push(d);
+  const db = a.ref.firestore;
+  const at = now();
+  for (let i = 0; i < read.months.length; i += 200) {
+    const b = db.batch();
+    for (const M of read.months.slice(i, i + 200)) {
+      const { tasks, ...rest } = M;                       // `tasks` is the 🕐 screen's own note, not the mirror's
+      b.set(col.doc(M.month), { ...rest, days: byMonth[M.month] || [], readAt: at,
+        file: read.file, sheet: read.sheet, freeHours: read.freeHours }, { merge: false });
+    }
+    await b.commit();
+  }
+  return { months: read.months.length, days: (read.days || []).length, at };
+}
+
 const CARS = ['BMW', 'RAV4', 'Laredo', 'Tacoma'];
 const OWN_CAR = { abed: 'BMW', georges: 'RAV4' };
 const isFuel = s => /benzin|fuel|essence|petrol|gasoline|mazout|gasoil|diesel|\btank\b|⛽/i.test(s || '') && !/water tank/i.test(s || '');
@@ -553,9 +589,18 @@ async function handle(req, res, url, user, ctx) {
       // is kept, but never booked until the amount is filled in.
       if (!debit && !credit) { t.noBook = true; t.ask = 'no amount yet — price this day before booking'; }
       await txCol(acc).doc(id).set(t);
-      out.push({ ok: true, id, accountId: acc.id });
+      // on the person's own account, so it shows in his 🕘 beside every other edit …
+      await acc.ref.collection('log').add({ at: now(), who, txId: id,
+        line: [date, t.description].filter(Boolean).join(' · ').slice(0, 80),
+        before: {}, after: { date, description: t.description, debit, credit, nature: t.nature }, undo: false });
+      out.push({ ok: true, id, accountId: acc.id, name: acc.name || acc.id });
     }
-    return json(res, 200, { saved: out.filter(o => o.ok).length, lines: out });
+    const made = out.filter(o => o.ok);
+    // … and once for the day itself, so the Daily page has a log of its own
+    if (made.length) await hubLog(ws, 'daily', { who, txId: String(b.date || made[0].id),
+      line: `${b.date || ''} · ${made.length} line${made.length === 1 ? '' : 's'} written`.trim(),
+      before: {}, after: { lines: made.map(o => `${o.name}: ${o.id}`) } });
+    return json(res, 200, { saved: made.length, lines: out });
   }
 
   if (url === '/api/accounting/accounts' && req.method === 'GET') return json(res, 200, await listAccounts(ws));
@@ -962,10 +1007,20 @@ async function handle(req, res, url, user, ctx) {
         if (Object.keys(back).length) await ref.set(back, { merge: true });
       }
     }
+    // The project follows the row into Odoo. Changing it on the hub used to stop here, so the bill
+    // kept whatever the Book run had written and the two drifted (Mario, 2026-09-10).
+    let odooAnalytic = null;
+    if (ANALYTIC_FIELDS.some(k => k in body)) {
+      const now2 = { ...cur, ...data, id: m[2] };
+      if ((now2.bookedMove && now2.bookedMove.id) || (now2.odoo && (now2.odoo.matches || []).some(x => x.chosen))) {
+        try { odooAnalytic = await bills.pushAnalytic({ acc, txCol, ws, resolve, listAccounts, odooCall }, a, now2); }
+        catch (e) { odooAnalytic = { error: String(e.message || e).slice(0, 200) }; }
+      }
+    }
     const after = Object.fromEntries(Object.entries(data).filter(([k]) => k !== 'updatedAt' && k !== 'updatedBy'));
     if (!body.__silent) await a.ref.collection('log').add({ at: data.updatedAt, who, txId: m[2], line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80), before, after, undo: !!body.__undo });
     // `after` goes back too: it carries what the server added on its own (the review stamp)
-    return json(res, 200, { ok: true, before, after, ...(sheet ? { sheet } : {}) });
+    return json(res, 200, { ok: true, before, after, ...(sheet ? { sheet } : {}), ...(odooAnalytic ? { odooAnalytic } : {}) });
   }
 
   // the account's change log, newest first (undo/redo read it back after a reload)
@@ -983,7 +1038,23 @@ async function handle(req, res, url, user, ctx) {
     const ref = txCol(a).doc(m[2]);
     const cur = (await ref.get()).data();
     if (!cur) return json(res, 404, { error: 'no such line' });
-    if (!['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(cur.src)) return json(res, 400, { error: 'only typed or imported ledger lines can be deleted; Odoo and statement lines are facts' });
+    // An Odoo row is a fact and cannot be deleted — as long as the entry behind it is still there.
+    // When that entry has been deleted in Odoo (a purchase rebooked in another company leaves the
+    // old chain behind), the row mirrors nothing and is just an orphan, so it may go.
+    // Mario, 2026-09-10, on Khoder's two 4-Aug SEC rows. Note `read` must ask for a REAL field:
+    // with only ['id'] Odoo hands back a stub for every id, deleted ones included.
+    if (cur.src === 'odoo') {
+      const chosen = cur.odoo && (cur.odoo.matches || []).find(x => x.chosen);
+      const moveId = (cur.staleOdoo && cur.staleOdoo.moveId) || (chosen && chosen.moveId)
+        || (cur.bookedMove && cur.bookedMove.id) || null;
+      if (!Number.isInteger(moveId)) return json(res, 400, { error: 'this Odoo line names no entry — check Odoo on it first' });
+      let live = [];
+      try { live = await odooCall('account.move', 'read', [[moveId], ['name']], {}); }
+      catch (e) { return json(res, 400, { error: 'could not ask Odoo whether that entry still exists: ' + String(e.message || e) }); }
+      if (live.length) return json(res, 400, { error: `this line mirrors ${live[0].name} in Odoo, which still exists — Odoo lines are facts` });
+    } else if (!['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(cur.src)) {
+      return json(res, 400, { error: 'only typed or imported ledger lines can be deleted; statement lines are facts' });
+    }
     if (cur.transferId) return json(res, 400, { error: 'this line belongs to a transfer — delete the transfer' });
     // the paper goes with the line, wherever it was kept
     for (const d of cur.docs || []) {
@@ -993,7 +1064,11 @@ async function handle(req, res, url, user, ctx) {
       } catch (e) { console.warn('doc delete with line', e.message); }
     }
     await ref.delete();
-    return json(res, 200, { ok: true });
+    await a.ref.collection('log').add({ at: now(), who, txId: m[2],
+      line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80),
+      before: { date: cur.date, description: cur.description || '', debit: cur.debit || 0, credit: cur.credit || 0, src: cur.src },
+      after: {}, undo: false });
+    return json(res, 200, { ok: true, before: cur, after: {} });
   }
 
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx-bulk$/)) && req.method === 'POST') {
@@ -1074,6 +1149,16 @@ async function handle(req, res, url, user, ctx) {
       const r = await ledgers.importExcel(ledgerCtx, a, who);
       // a row naming a supplier Odoo knows is that supplier's own bill, not a line of the month (Mario, 2026-09-06)
       if (!a.cashBox) { try { r.vendorized = await bills.vendorize(ledgerCtx, a, who, {}); } catch (e) { r.vendorized = { error: String(e.message || e).slice(0, 160) }; } }
+      // the same workbook holds his timesheet: bring the mirror up to date and put the open
+      // month's cost into Odoo, so project cost is live instead of waiting for month end
+      // (Mario, 2026-09-10: "my cost data is live, not waiting the end of the month")
+      if (hasTimesheet(a)) {
+        try {
+          const read = await readTimesheetOf(a);
+          r.timesheet = await mirrorTimesheet(a, read);
+          r.timesheet.odoo = await bills.refreshOpenTimesheet(ledgerCtx, a, who, read);
+        } catch (e) { r.timesheet = { error: String(e.message || e).slice(0, 200) }; }
+      }
       return json(res, 200, r);
     }
     catch (e) { console.error('import-excel', e); return json(res, 400, { error: String(e.message || e) }); }
@@ -1152,13 +1237,39 @@ async function handle(req, res, url, user, ctx) {
     if (!local) return json(res, 400, { error: LOCAL_ONLY });
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
-    const cfg = a.timesheet || {};
-    const file = cfg.file || (a.excel && a.excel.file);
-    if (!file) return json(res, 400, { error: 'this account has no workbook with a timesheet' });
     try {
-      const r = await ledgers.readTimesheet(file, cfg.sheet || 'timesheet', { rate: cfg.rate, freeHours: cfg.freeHours });
+      const r = await readTimesheetOf(a);
+      await mirrorTimesheet(a, r);
       return json(res, 200, { ...r, booked: a.timesheetBooked || {} });
     } catch (e) { console.error('timesheet', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+
+  // The days as the hub last read them. The workbook only exists on Mario's laptop, so the phone
+  // and the deployed hub read this mirror instead — refreshed on every import and every time the
+  // 🕐 screen is opened from the laptop (Mario, 2026-09-10).
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/timesheet-days$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const q = new URL(req.url, 'http://x').searchParams;
+    const snap = await a.ref.collection('timesheet').get();
+    const months = snap.docs.map(d => d.data())
+      .filter(M => (!q.get('from') || M.month >= q.get('from').slice(0, 7)) && (!q.get('to') || M.month <= q.get('to').slice(0, 7)))
+      .sort((x, y) => x.month < y.month ? -1 : 1);
+    return json(res, 200, { months, booked: a.timesheetBooked || {}, timesheet: a.timesheet || null,
+      days: months.flatMap(M => (M.days || []).map(d => ({ ...d, month: M.month, rate: M.rate }))) });
+  }
+
+  // read the workbook again and put the open month's cost straight into Odoo — the same thing an
+  // import does, without waiting for one (Mario, 2026-09-10: cost data live, not at month end)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/timesheet-refresh$/)) && req.method === 'POST') {
+    if (!local) return json(res, 400, { error: LOCAL_ONLY });
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    try {
+      const read = await readTimesheetOf(a);
+      const mirror = await mirrorTimesheet(a, read);
+      return json(res, 200, { mirror, odoo: await bills.refreshOpenTimesheet(ledgerCtx, a, who, read) });
+    } catch (e) { console.error('timesheet-refresh', e); return json(res, 400, { error: String(e.message || e) }); }
   }
 
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-timesheet$/)) && req.method === 'POST') {
@@ -1228,7 +1339,12 @@ async function handle(req, res, url, user, ctx) {
   // read, and how much he has written since his last statement
   if (url.startsWith('/api/accounting/statements/scan') && req.method === 'POST') {
     if (!local) return json(res, 400, { error: 'the groups can only be read from the laptop' });
-    try { return json(res, 200, await statements.scanGroups({ db, admin, TEAM_ID, odooCall, local })); }
+    try {
+      const r = await statements.scanGroups({ db, admin, TEAM_ID, odooCall, local });
+      await hubLog(ws, 'statements', { who, txId: 'scan', line: `read ${r && r.read ? r.read : 0} group(s)`,
+        before: {}, after: r && typeof r === 'object' ? r : { result: r } });
+      return json(res, 200, r);
+    }
     catch (e) { console.error('statements scan', e); return json(res, 400, { error: String(e.message || e) }); }
   }
 
@@ -1277,8 +1393,12 @@ async function handle(req, res, url, user, ctx) {
       for (const k of ['gold', 'silver']) if (k in b.prices) data.prices[k] = money(b.prices[k]);
       data.prices.asOf = String(b.prices.asOf || now().slice(0, 10));
     }
+    const prev = (await goldRef.get()).data() || {};
     await goldRef.set(data, { merge: true });
-    return json(res, 200, { ok: true });
+    const d = diffOf(prev, data, ['prices']);
+    if (Object.keys(d.after).length) await hubLog(ws, 'gold', { who, txId: 'gold', line: 'gold / silver price',
+      before: d.before, after: d.after, undo: !!b.__undo });
+    return json(res, 200, { ok: true, ...d });
   }
   if (url === '/api/accounting/gold/import' && req.method === 'POST') {
     const b = await readBody(req);
@@ -1293,6 +1413,14 @@ async function handle(req, res, url, user, ctx) {
   }
 
   // ── transfers ──
+  // the change log of one area, newest first — the same shape an account's /log returns
+  if ((m = url.match(/^\/api\/accounting\/log\/([\w-]+)$/)) && req.method === 'GET') {
+    if (!LOG_AREAS.includes(m[1])) return json(res, 404, { error: 'no such log' });
+    const lim = Math.min(500, +(new URL(url, 'http://x').searchParams.get('limit') || 100));
+    const snap = await logCol(ws, m[1]).orderBy('at', 'desc').limit(lim).get();
+    return json(res, 200, { entries: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
+  }
+
   if (url === '/api/accounting/transfers' && req.method === 'GET') {
     const [snap, accounts] = await Promise.all([ws.collection('transfers').get(), listAccounts(ws)]);
     const nm = Object.fromEntries(accounts.map(a => [a.id, a.name]));
@@ -1313,7 +1441,9 @@ async function handle(req, res, url, user, ctx) {
     try {
       const { from, to } = await writeTransferLines(ws, tr);
       await ws.collection('transfers').doc(id).set(tr);
-      return json(res, 200, { ...tr, fromName: from.name, toName: to.name });
+      await hubLog(ws, 'transfers', { who, txId: id, line: `${tr.date} · ${from.name} → ${to.name} ${tr.amount} ${tr.currency}`,
+        before: {}, after: { date: tr.date, amount: tr.amount, note: tr.note, fromId: tr.fromId, toId: tr.toId } });
+      return json(res, 200, { ...tr, fromName: from.name, toName: to.name, before: {}, after: tr });
     } catch (e) { return json(res, 400, { error: String(e.message || e) }); }
   }
 
@@ -1329,7 +1459,11 @@ async function handle(req, res, url, user, ctx) {
     tr.updatedAt = now(); tr.updatedBy = who;
     await writeTransferLines(ws, tr);
     await ref.set(tr);
-    return json(res, 200, tr);
+    const d = diffOf(cur, tr, ['date', 'amount', 'note']);
+    if (Object.keys(d.after).length) await hubLog(ws, 'transfers', { who, txId: m[1],
+      line: `${tr.date} · ${tr.amount} ${tr.currency}${tr.note ? ' · ' + tr.note : ''}`.slice(0, 80),
+      before: d.before, after: d.after, undo: !!b.__undo });
+    return json(res, 200, { ...tr, ...d });
   }
 
   if ((m = url.match(/^\/api\/accounting\/transfers\/([\w-]+)$/)) && req.method === 'DELETE') {
@@ -1338,7 +1472,9 @@ async function handle(req, res, url, user, ctx) {
     if (!cur) return json(res, 404, { error: 'no such transfer' });
     await removeTransferLines(ws, { id: m[1], ...cur }, admin.firestore.FieldValue);
     await ref.delete();
-    return json(res, 200, { ok: true });
+    await hubLog(ws, 'transfers', { who, txId: m[1], line: `${cur.date} · ${cur.amount} ${cur.currency || ''} deleted`.slice(0, 80),
+      before: { date: cur.date, amount: cur.amount, note: cur.note || '', fromId: cur.fromId, toId: cur.toId }, after: {} });
+    return json(res, 200, { ok: true, before: cur, after: {} });
   }
 
   return false;

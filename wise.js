@@ -1,3 +1,4 @@
+const { diffOf, hubLog } = require('./hub-log');
 // Wise section of the accounting app — multi-currency balance statements.
 // Mounted by server.js under /api/accounting/wise/*; needs ctx = { db, admin, TEAM_ID }.
 // Firestore layout (all under workspaces/<team>):
@@ -308,7 +309,11 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, { configured: !!cfg.token, hasKey: !!cfg.key, lastSync: meta.exists ? meta.data() : null }), true;
   }
   if (rest === 'sync' && req.method === 'POST') {
-    try { return json(res, 200, await syncFromApi(ctx, { by: who })), true; }
+    try {
+      const r = await syncFromApi(ctx, { by: who });
+      await hubLog(ws, 'wise', { who, txId: 'sync', line: 'synced from the Wise API', before: {}, after: { synced: r && r.result ? r.result : r } });
+      return json(res, 200, r), true;
+    }
     catch (e) { return json(res, 502, { error: String(e.message || e) }), true; }
   }
 
@@ -361,14 +366,28 @@ async function handle(req, res, url, user, ctx) {
     if (!b.key) return json(res, 400, { error: 'balance required' }), true;
     const col = ws.collection('wiseAccounts').doc(String(b.key)).collection('tx');
     const at = now();
-    const writes = (b.items || []).filter(i => i && i.id).map(i => {
+    const items = (b.items || []).filter(i => i && i.id);
+    if (!items.length) return json(res, 400, { error: 'nothing to update' }), true;
+    // what each line says now, so the change can be shown and put back (Mario, 2026-09-09)
+    const cur = {};
+    (await Promise.all(items.map(i => col.doc(String(i.id)).get()))).forEach(d => { cur[d.id] = d.data() || {}; });
+    const writes = items.map(i => {
       const data = { updatedAt: at, updatedBy: who };
       for (const k of ANNOT) if (k in i) data[k] = i[k];
-      return { ref: col.doc(String(i.id)), data };
+      return { ref: col.doc(String(i.id)), data, id: String(i.id) };
     });
-    if (!writes.length) return json(res, 400, { error: 'nothing to update' }), true;
     await batchSet(db, writes);
-    return json(res, 200, { ok: true, saved: writes.length }), true;
+    const changes = [];
+    for (const w of writes) {
+      const d = diffOf(cur[w.id], w.data, ANNOT);
+      if (!Object.keys(d.after).length) continue;
+      const t = cur[w.id] || {};
+      changes.push({ id: w.id, ...d });
+      await hubLog(ws, 'wise', { who, txId: w.id,
+        line: `${t.date || ''} · ${t.counterparty || t.description || ''}`.slice(0, 80).trim(),
+        before: d.before, after: d.after, undo: !!b.__undo });
+    }
+    return json(res, 200, { ok: true, saved: writes.length, key: String(b.key), changes }), true;
   }
 
   // Look for these lines in the Odoo Wise journals (Bank Wise USD/EUR/GBP - S_LB).
@@ -439,6 +458,9 @@ async function handle(req, res, url, user, ctx) {
       result.push({ key, currency: cur, lines: list.length, added, updated: list.length - added,
         from: dates[0], till: dates[dates.length - 1], closing: last && last.balance != null ? last.balance : null });
     }
+    for (const r of result) await hubLog(ws, 'wise', { who, txId: r.key,
+      line: `statement ${b.filename || ''} ${r.from} → ${r.till}`.slice(0, 80),
+      before: {}, after: { balance: r.key, lines: r.lines, added: r.added, updated: r.updated } });
     return json(res, 200, { ok: true, accounts: result, warnings: p.warnings.slice(0, 20) }), true;
   }
 

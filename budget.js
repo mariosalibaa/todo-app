@@ -1,3 +1,4 @@
+const { diffOf, hubLog } = require('./hub-log');
 // Budget section of the accounting app — replica of the HomeBudget desktop app.
 // Mounted by server.js under /api/accounting/budget/* (accounting app gate applies).
 // Firestore layout (all under workspaces/<team>):
@@ -132,16 +133,25 @@ async function handle(req, res, url, user, ctx) {
     if (kind === 'accounts') { if ('include' in data) data.include = !!data.include; if ('archived' in data) data.archived = !!data.archived; }
     data.updatedAt = new Date().toISOString(); data.updatedBy = who;
     const id = b.id ? String(b.id) : 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const prev = b.id ? ((await coll.doc(id).get()).data() || null) : null;
     await coll.doc(id).set(data, { merge: true });
-    return json(res, 200, { id }), true;
+    const d = diffOf(prev, data, FIELDS[kind]);
+    if (Object.keys(d.after).length) await hubLog(ws, 'budget', { who, txId: id,
+      line: `${kind} · ${[data.date, data.name, data.amount].filter(v => v != null && v !== '').join(' · ')}`.slice(0, 80),
+      before: d.before, after: d.after, undo: !!b.__undo });
+    return json(res, 200, { id, ...d }), true;
   }
   if (req.method === 'DELETE' && m[2]) {
     if (kind === 'categories') {   // a category takes its subcategories with it
       const subs = await ws.collection(COLL.subCategories).where('catId', '==', m[2]).get();
       await Promise.all(subs.docs.map(d => d.ref.delete()));
     }
+    const gone = (await coll.doc(m[2]).get()).data() || {};
     await coll.doc(m[2]).delete();
-    return json(res, 200, { ok: true }), true;
+    await hubLog(ws, 'budget', { who, txId: m[2],
+      line: `${kind} deleted · ${[gone.date, gone.name, gone.amount].filter(v => v != null && v !== '').join(' · ')}`.slice(0, 80),
+      before: gone, after: {} });
+    return json(res, 200, { ok: true, before: gone, after: {} }), true;
   }
   return false;
 }

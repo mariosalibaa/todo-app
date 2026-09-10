@@ -65,6 +65,7 @@
   <input type="date" id="to" onchange="render()" title="To">
   <input type="search" id="q" placeholder="Search…" oninput="render()" style="min-width:180px">
   <span style="flex:1"></span>
+  <span id="hh-host"></span>
   <button class="btn primary" onclick="openForm()">＋ Transfer</button>
 </div>
 <div class="msg" id="msg"></div>
@@ -88,6 +89,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
+<script src="/hub-history.js"></script>
 <script>
 const esc = Admin.esc;
 // 'We 2026-09-03': the weekday in front of every date, as the sheets write it
@@ -99,6 +101,7 @@ function say(text, cls) { const m = document.getElementById('msg'); m.textConten
 
 Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.name || me.email;
+  HubHistory.mount({ into: '#hh-host', area: 'transfers', reload: load });
   await load();
   const q = new URLSearchParams(location.search);
   if (q.get('new')) openForm();
@@ -158,8 +161,24 @@ async function save() {
   }
   const btn = document.getElementById('form-save'); btn.disabled = true;
   try {
-    if (editing) await Admin.api('PATCH', `/api/accounting/transfers/${editing.id}`, body);
-    else await Admin.api('POST', '/api/accounting/transfers', body);
+    if (editing) {
+      const id = editing.id;
+      await HubHistory.run({
+        label: `transfer ${fmt(body.amount)}`,
+        do: () => Admin.api('PATCH', `/api/accounting/transfers/${id}`, body),
+        put: prev => Admin.api('PATCH', `/api/accounting/transfers/${id}`, { ...prev, __undo: true }),
+      });
+    } else {
+      // a transfer that did not exist is undone by deleting the one just made
+      await HubHistory.run({
+        label: `transfer ${fmt(body.amount)}`,
+        do: () => Admin.api('POST', '/api/accounting/transfers', body),
+        undo: null,
+      }).then(made => {
+        const st = HubHistory.stacks().undoStack, top = st[st.length - 1];
+        if (top && made && made.id) top.undo = () => Admin.api('DELETE', `/api/accounting/transfers/${made.id}`);
+      });
+    }
     closeForm(); await load();
     say(editing ? 'Transfer updated' : `Transfer saved: ${fmt(body.amount)}`);
   } catch (e) { document.getElementById('form-msg').textContent = 'Could not save: ' + e.message; }
@@ -168,7 +187,14 @@ async function save() {
 async function remove(id) {
   const t = list.find(x => x.id === id); if (!t) return;
   if (!confirm(`Delete this transfer?\n${t.date} · ${fmt(t.amount)} · ${t.fromName} → ${t.toName}\n\nIts two lines are removed (linked lines are unlinked, not deleted).`)) return;
-  try { await Admin.api('DELETE', `/api/accounting/transfers/${id}`); await load(); say('Transfer deleted'); }
+  try {
+    await HubHistory.run({
+      label: `transfer ${fmt(t.amount)} deleted`,
+      do: () => Admin.api('DELETE', `/api/accounting/transfers/${id}`),
+      undo: () => Admin.api('POST', '/api/accounting/transfers', { date: t.date, fromId: t.fromId, toId: t.toId, amount: t.amount, currency: t.currency, note: t.note || '' }),
+    });
+    await load(); say('Transfer deleted');
+  }
   catch (e) { say('Could not delete: ' + e.message, 'err'); }
 }
 </script>

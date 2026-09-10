@@ -95,6 +95,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'ledgers.js'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
   fs.readFileSync(path.join(__dirname, 'phone-preview.js'));
+  fs.readFileSync(path.join(__dirname, 'hub-history.js'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
@@ -625,7 +626,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/hub-history.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {

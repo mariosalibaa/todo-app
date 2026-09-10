@@ -58,6 +58,7 @@
   <div class="bar">
     <button id="refresh" onclick="load(true)">↻ Refresh</button>
     <button id="scan" onclick="scan()">💬 Read the groups</button>
+    <span id="hh-host"></span>
     <span class="note" id="at"></span>
   </div>
   <table>
@@ -87,6 +88,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
+<script src="/hub-history.js"></script>
 <script>
 const el = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -138,7 +140,10 @@ async function load(force) {
 // Reading the groups needs the browser on this laptop — the same Playwright session the Day report uses
 async function scan() {
   el('scan').disabled = true; say('Reading the WhatsApp groups… this takes a minute');
-  try { const r = await Admin.api('POST', '/api/accounting/statements/scan', {}); say(r.read ? 'Read ' + r.read + ' group(s)' : 'Nothing read'); await load(true); }
+  try {
+    const r = await HubHistory.run({ label: 'read the groups', do: () => Admin.api('POST', '/api/accounting/statements/scan', {}) });
+    say(r.read ? 'Read ' + r.read + ' group(s)' : 'Nothing read'); await load(true);
+  }
   catch (e) { say('Could not read: ' + e.message, true); }
   el('scan').disabled = false;
 }
@@ -161,6 +166,7 @@ async function prep(id) {
 
 Admin.require('accounting', async me => {
   el('who').innerHTML = esc(me.email) + ' <a href="#" onclick="Admin.signOut();return false;">Sign out</a>';
+  HubHistory.mount({ into: '#hh-host', area: 'statements', reload: () => load(true) });
   await load();
 });
 </script>

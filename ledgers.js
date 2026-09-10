@@ -204,7 +204,20 @@ async function readExcel(file, layoutName, sheetName) {
       rows.push({ ...mv, date, period: status === 'old' || status === 'new' ? status : '', row: i, ...(signed != null ? { raw: signed } : {}) });
     }
   });
-  return { rows, sheet: ws.name, file: path.basename(file) };
+  // The worker's sheet keeps his debt to us in its own header cell — Ziad's `accounting` has
+  // "Dette | Dette | 500" on row 5, a number Mario maintains by hand. His sheet is the truth
+  // (Mario, 2026-09-10: "ziad dette is 500$ as per excel, this is the correct dette"), so the hub
+  // reads it rather than working a balance out of the rows that mention the word.
+  let dette = null;
+  for (let i = 1; i <= 12 && dette === null; i++) {
+    const r = ws.getRow(i).values || [];
+    if (!/^\s*dette\s*$/i.test(str(r[1]))) continue;
+    for (let c = 2; c <= 6; c++) {
+      const v = cell(r[c]);
+      if (typeof v === 'number' && isFinite(v) && v > 0) { dette = { amount: v, cell: ws.getRow(i).getCell(c).address, label: str(r[4]) || '' }; break; }
+    }
+  }
+  return { rows, sheet: ws.name, file: path.basename(file), dette };
 }
 
 // ── A timesheet: the hours behind a month's pay, project by project ─────────
@@ -222,6 +235,7 @@ async function readTimesheet(file, sheetName, opts) {
   const ExcelJS = tryRequire('exceljs', EXTRA.exceljs);
   if (!ExcelJS) throw new Error('exceljs is not installed on this machine — read the timesheet from Mario\'s laptop');
   if (!file || !fs.existsSync(file)) throw new Error('workbook not found: ' + file);
+  const rates = (opts && opts.rates) || null;
   const rate = +(opts && opts.rate) || 2.75;
   const freeHours = (opts && opts.freeHours != null) ? +opts.freeHours : 40;
   const wb = new ExcelJS.Workbook();
@@ -231,23 +245,67 @@ async function readTimesheet(file, sheetName, opts) {
   const cell = (r, c) => { const x = ws.getRow(r).getCell(c); let v = x.value; if (v && typeof v === 'object' && 'result' in v) v = v.result; return v; };
   // a merged cell repeats its value on every row it covers: only the master row owns it
   const owns = (r, c) => { const x = ws.getRow(r).getCell(c); return !(x.isMerged && x.master && x.master.row !== r); };
-  const by = {};
+  const by = {}, days = [];
+  let cur = null;
   for (let r = 15; r <= ws.rowCount; r++) {
     const m = cell(r, 3);
     if (!(m instanceof Date)) continue;
     const key = new Date(m.getTime() - m.getTimezoneOffset() * 60000).toISOString().slice(0, 7);
     const M = by[key] = by[key] || { month: key, hours: 0, days: 0, projects: {}, allocated: 0, tasks: [] };
     const day = cell(r, 4), h = +cell(r, 6) || 0, hp = +cell(r, 7) || 0, pj = String(cell(r, 8) || '').trim();
-    if (h && owns(r, 6)) { M.hours = money(M.hours + h); M.days++; if (day && !pj) M.tasks.push({ day: dayStr(day), hours: h, task: String(cell(r, 5) || '').slice(0, 60) }); }
-    if (hp && pj) { M.projects[pj] = money((M.projects[pj] || 0) + hp); M.allocated = money(M.allocated + hp); }
+    const task = String(cell(r, 5) || '').trim();
+    if (h && owns(r, 6)) { M.hours = money(M.hours + h); M.days++; if (day && !pj) M.tasks.push({ day: dayStr(day), hours: h, task: task.slice(0, 60) }); }
+    // A day owns its own cells; the extra rows of a split day repeat them merged, so the day
+    // starts where column D is its own again. The hub shows one line per worked day (Mario,
+    // 2026-09-10), so the OFF days — every cell empty but the word — are left out.
+    if (owns(r, 4) && day && h) { cur = { date: dayStr(day), month: key, task, hours: h, span: timeSpan(task, h), projects: [] }; days.push(cur); }
+    if (hp && pj) {
+      M.projects[pj] = money((M.projects[pj] || 0) + hp); M.allocated = money(M.allocated + hp);
+      if (cur && cur.month === key) cur.projects.push({ project: pj, hours: hp });
+    }
   }
   const months = Object.values(by).sort((a, b) => a.month < b.month ? -1 : 1).map(M => {
+    const r = rateAt(M.month, rates, rate);
     const loose = money(M.hours - M.allocated);            // days he wrote no split for
     const paidHours = money(M.hours - freeHours);
-    return { ...M, loose, rate, freeHours, paidHours,
-      cost: money(M.hours * rate), refund: money(freeHours * rate), net: money(paidHours * rate) };
+    return { ...M, loose, rate: r, freeHours, paidHours,
+      cost: money(M.hours * r), refund: money(freeHours * r), net: money(paidHours * r) };
   });
-  return { sheet: ws.name, file: path.basename(file), rate, freeHours, months };
+  days.forEach(d => { d.rate = rateAt(d.month, rates, rate); d.cost = money(d.hours * d.rate); });
+  return { sheet: ws.name, file: path.basename(file), rate, rates: rates || null, freeHours, months, days };
+}
+// What Shift pays him an hour, month by month. He was on 2.50 until Dec 2025, 2.75 through
+// August 2026, and back to 2.50 from September (Mario, 2026-09-10), so one figure on the account
+// can no longer answer for the whole workbook.
+function rateAt(month, rates, fallback) {
+  let v = +fallback || 2.75;
+  for (const r of (rates || []).filter(x => x && x.from && +x.rate).sort((a, b) => a.from < b.from ? -1 : 1))
+    if (String(month) >= String(r.from)) v = +r.rate;
+  return v;
+}
+// The task cell holds the day in his own words, and it usually opens with the hour he started and
+// the hour he stopped: "9:00 - 4:00 naccach / ajaltoun", "tu 16 jul : 8am-7pm", "Tue 13 aug: 7.30
+// - 7.00". Mario, 2026-09-10, wants those two times on the hub line. They are read off the text and
+// kept only when the span they describe agrees with the hours he wrote in F — the figure that is
+// actually paid. "We 28 Aug: 8 - 11 dora  11-7 wael" describes two stints, so its first range (3 h)
+// disagrees with the 11 h beside it and no range is shown at all; the words stay on the line.
+const HHMM = /(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\s*[-–—]\s*(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?/i;
+function timeSpan(text, hours) {
+  const m = HHMM.exec(String(text || '').replace(/\s+/g, ' '));
+  if (!m) return null;
+  const at = (h, mm, ap) => {
+    h = +h; mm = +(mm || 0);
+    if (/pm/i.test(ap || '') && h < 12) h += 12;
+    if (/am/i.test(ap || '') && h === 12) h = 0;
+    return h * 60 + mm;
+  };
+  let a = at(m[1], m[2], m[3]), b = at(m[4], m[5], m[6]);
+  if (b <= a) b += 12 * 60;                                // "8:00 - 7:00" is a working day, not a night
+  if (b - a > 18 * 60) return null;
+  const span = money((b - a) / 60);
+  if (hours && Math.abs(span - hours) > 0.75) return null;
+  const hhmm = v => String(Math.floor(v / 60) % 24).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0');
+  return { from: hhmm(a), to: hhmm(b), hours: span };
 }
 const dayStr = d => d instanceof Date ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : String(d || '');
 
@@ -403,7 +461,7 @@ async function importExcel(ctx, account, who) {
   const { acc, txCol } = ctx;
   const cfg = account.excel || {};
   if (!cfg.file) throw new Error('no workbook set on this account (⚙ → Excel ledger)');
-  const { rows, sheet, file } = await readExcel(cfg.file, cfg.layout || account.owner, cfg.sheet);
+  const { rows, sheet, file, dette: sheetDette } = await readExcel(cfg.file, cfg.layout || account.owner, cfg.sheet);
   const lay = LAYOUTS[cfg.layout || account.owner] || {};
   const amap = ctx.ws ? await bills.loadMapPublic(ctx.ws) : {};
   const col = txCol(account);
@@ -549,8 +607,12 @@ async function importExcel(ctx, account, who) {
     } }
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
-  await account.ref.set({ excel: { ...cfg, sheet, lastFile: file, first, last }, lastExcelImport: now(), lastExcelImportBy: who }, { merge: true });
-  return { rows: lines.length, added, updated, removed: gone.length, linkedToOdoo: linked, looseLinks: loose, whatsappFolded: waFolded, first, last, file, sheet };
+  const accData = { excel: { ...cfg, sheet, lastFile: file, first, last }, lastExcelImport: now(), lastExcelImportBy: who };
+  // his debt to us follows the sheet's own Dette cell — never a figure the hub works out
+  if (sheetDette) accData.dette = { ...(account.dette || {}), amount: sheetDette.amount, fromSheet: true,
+    sheetCell: sheetDette.cell, readAt: now() };
+  await account.ref.set(accData, { merge: true });
+  return { rows: lines.length, added, updated, removed: gone.length, linkedToOdoo: linked, looseLinks: loose, whatsappFolded: waFolded, first, last, file, sheet, dette: sheetDette };
 }
 
 // ── WhatsApp ────────────────────────────────────────────────────────────────
@@ -935,4 +997,4 @@ async function writeExcelRow(ctx, account, t, patch) {
   return { wrote, file: base, row: r };
 }
 
-module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, readTimesheet, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };
+module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, readTimesheet, rateAt, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };

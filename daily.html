@@ -110,6 +110,7 @@
       <span id="wabox" hidden><select id="wa-who" style="width:auto"></select>
         <button id="wabtn" onclick="pullWa()" title="Read his arrival, his finish and the project out of his WhatsApp group">⟳ Read his WhatsApp day</button></span>
       <button class="go" id="savebtn" onclick="saveDrafts()">Save the day</button>
+      <span id="hh-host"></span>
       <span class="msg" id="msg"></span>
     </div>
   </div>
@@ -128,6 +129,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
+<script src="/hub-history.js"></script>
 <script>
 const esc = Admin.esc;
 let people = [], lines = [], analytic = [], drafts = [], span = 1;
@@ -191,7 +193,12 @@ function saveDrafts() {
       analyticId: a ? a.id : null, analyticName: a ? a.name : '', analyticText: a ? '' : d.project.trim() };
   });
   el('savebtn').disabled = true; say('Saving…');
-  Admin.api('POST', '/api/accounting/daily', { date, lines: payload })
+  HubHistory.run({
+    label: `the day ${date}`,
+    do: () => Admin.api('POST', '/api/accounting/daily', { date, lines: payload }),
+    undo: (_, out) => Promise.all(((out && out.lines) || []).filter(x => x.ok)
+      .map(x => Admin.api('DELETE', `/api/accounting/accounts/${x.accountId}/tx/${x.id}`))),
+  })
     .then(r => {
       const bad = (r.lines || []).filter(x => x.error);
       drafts = [];
@@ -327,6 +334,7 @@ async function load() {
 }
 Admin.require('accounting', async me => {
   el('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  HubHistory.mount({ into: '#hh-host', area: 'daily', reload: load });
   el('day').value = ymd(new Date());
   try { analytic = await Admin.api('GET', '/api/accounting/analytic'); } catch (e) { analytic = []; }
   el('ans').innerHTML = analytic.map(a => `<option value="${esc(a.name)}">`).join('');

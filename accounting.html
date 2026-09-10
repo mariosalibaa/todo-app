@@ -310,6 +310,14 @@
   .xl.narrow td.b{background:#f2f2f2;font-weight:bold;}   /* the running balance, as he counts it himself */
   #stmtsum{font-size:12px;color:var(--muted);white-space:nowrap;}
   #stmtsum b{color:var(--ink);}
+  /* a day off his timesheet, sitting among his expense lines: hours and projects, never money */
+  tr.ts-row td{background:#fbfaf6;color:#4a4636;border-top:1px dashed #e2ddcc;}
+  tr.ts-row .ts-when{color:var(--muted);font-size:11.5px;}
+  tr.ts-row .src.ts{background:#efe7cf;color:#6b5b2a;}
+  tr.ts-row .ts-task{font-size:12px;}
+  tr.ts-row .ts-proj{display:inline-block;background:#eef3ea;border:1px solid #dbe5d4;border-radius:9px;padding:0 6px;margin:0 3px 2px 0;font-size:11px;}
+  tr.ts-row .ts-none{color:#a08b3c;font-size:11px;font-style:italic;}
+  .closes-ts{display:block;font-size:11px;color:#2c5d8a;}
   #stmtsum .dette{color:#7a5a00;}   /* his debt to us -- taken off the balance beside it */
   #stmtsum .g{color:#006100;}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
@@ -525,6 +533,8 @@ const dayDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? DAYS[new Date(d.slice(
 // own date picker laid invisibly over the text so the column keeps one format
 const datePick = (t, title, onchange) => `<span class="date-pick" title="${esc(title)}">${dayDate(t.date)}<input type="date" value="${esc(t.date)}" onchange="${onchange}"></span>`;
 const fmt = n => n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+const money = n => Math.round((+n || 0) * 100) / 100;
+const fmt0 = n => fmt(n) || '0.00';        // a total of nothing is still a figure, not a blank
 // the day band spells the day out: "Wednesday 2 September 2026"
 const longDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? new Date(d.slice(0, 10) + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : (d || 'no date');
 // today / yesterday, from the local calendar — never toISOString(), Beirut is UTC+3
@@ -547,7 +557,16 @@ const isStatement = () => !!(account && account.statement);          // Whish pr
 const ALL_ID = '__all';
 const ALL_ACCOUNT = { id: ALL_ID, name: 'Everything', currency: '', type: 'all', all: true };
 const isAll = () => acc === ALL_ID;
-const pickList = () => [ALL_ACCOUNT, ...accounts];
+// A worker whose workbook keeps a timesheet gets a second sheet of his own in the same picker:
+// his expenses on one, his hours and what they are worth on the other (Mario, 2026-09-10: "a new
+// table called ziad timesheet, in addition to ziad expenses — he is the only one whose salary is
+// issued at the end of the month"). Picking it opens the timesheet over his account.
+const TS_PREFIX = 'ts:';
+const tsSheets = () => accounts.filter(a => a.timesheet).map(a => ({
+  id: TS_PREFIX + a.id, of: a.id, sheet: 'timesheet', currency: a.currency || 'USD',
+  name: String(a.name || '').replace(/\s*cash\s*(\(.*\))?$/i, '').trim() + ' timesheet',
+}));
+const pickList = () => [ALL_ACCOUNT, ...accounts, ...tsSheets()];
 // which account a line belongs to — its own in the Everything view, the open one otherwise
 const accOf = t => (t && t._acc) || acc;
 const isCash = () => !!(account && account.type === 'cash');
@@ -599,7 +618,9 @@ Admin.require('accounting', async me => {
   else openAccountForm();
 });
 
-const accLabel = a => a.all ? '🗂 Everything (all accounts)' : `${a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
+const accLabel = a => a.all ? '🗂 Everything (all accounts)'
+  : a.sheet === 'timesheet' ? `🕐 ${a.name} (${a.currency})`
+    : `${a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
 async function loadAccounts() {
   accounts = (await Admin.api('GET', '/api/accounting/accounts')).filter(a => !a.archived);
   const sel = document.getElementById('acc');
@@ -675,6 +696,13 @@ async function loadPartners() {
   } catch (e) { say('Odoo partners not available: ' + e.message, 'err'); }
 }
 async function selectAccount(a) {
+  // his timesheet is a sheet OF his account, not an account: open his ledger, then the sheet over it
+  if (String(a).startsWith(TS_PREFIX)) {
+    const base = a.slice(TS_PREFIX.length);
+    if (acc !== base) await selectAccount(base);
+    accShow();
+    return openTimesheet();
+  }
   acc = a; localStorage.setItem('acct_id', a);
   account = pickList().find(x => x.id === a) || null;
   if (detteFor !== a) { detteRows = null; detteFor = null; }   // his dette is fetched once, in the background
@@ -720,7 +748,9 @@ async function selectAccount(a) {
   able('btn-odoo', st || hasJ, 'Nothing to check against: give the account an Odoo journal with ⚙');
   able('btn-contacts', st, 'Contacts name the phone numbers on a Whish statement — this account has none');
   able('btn-months', isExcelKept() && !!(account.odooPartner && account.odooPartner.id), 'Months are booked for a worker ledger with an Odoo partner');
-  able('btn-timesheet', !!account.timesheet && !!(account.odooPartner && account.odooPartner.id) && isLocal(), account.timesheet ? LOCAL_WHY : 'Only an account whose workbook keeps a timesheet');
+  // the sheet reads the hub's own copy of the workbook when the workbook is out of reach, so it
+  // opens on the phone too; only ↻ Refresh and Book need the laptop, and they say so themselves
+  able('btn-timesheet', !!account.timesheet, 'Only an account whose workbook keeps a timesheet');
   able('btn-projects', isExcelKept(), 'Projects come from an Excel ledger');
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
   document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
@@ -814,6 +844,8 @@ async function loadTx() {
   // (Mario, 2026-09-09); the earlier ones still wait behind the chip
   if (want && !srcOff.has('whatsapp')) await loadWaSince(Array.isArray(r) ? '' : (r.since || ''));
   loadDette();                                   // his debt to us, fetched over the whole account
+  injectTimesheet();                             // his hours, on the days he worked them
+  loadTimesheetDays();
   // nothing older than the first pass: the account is already whole
   if (twoPass && (!before || !before.count)) return;
   if (twoPass) tailing = loadTail(want, acc);
@@ -1368,7 +1400,8 @@ function render() {
     d.n++;
     if (!t.excluded) { d.out += t.debit || 0; d.in += t.credit || 0; }
     // the day closes on its chronologically last line: first met when newest is on top, last otherwise
-    if (sort.dir < 0 ? d.bal == null : true) d.bal = isStatement() ? t.balance : t._bal;
+    // — a timesheet line is not one of them: it moves nothing, and a day made only of hours closes on nothing
+    if (!t._ts && (sort.dir < 0 ? d.bal == null : true)) d.bal = isStatement() ? t.balance : t._bal;
   }
   let lastDay = null;
   const dayHead = (date, first) => {
@@ -1379,6 +1412,8 @@ function render() {
   };
   document.getElementById('rows').innerHTML = rows.map((t, i) => {
     const head = byDay && t.date !== lastDay ? (lastDay = t.date, dayHead(t.date, i === 0)) : '';
+    // a day off his timesheet: the hours and the projects, nothing to edit and no figure anywhere
+    if (t._ts) return head + tsRowHtml(t);
     const cn = contactName(t), sg = sugFor(t), co = companyOf(t);
     if (sg.any && !t.suggestSkip) pending++;
     const cp = t.phone ? esc(t.phone.replace(/^961/, '0')) : '';
@@ -1421,7 +1456,7 @@ function render() {
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
         ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}${(t.ask.options || []).some(o => o.debit != null || o.credit != null) ? ` <button class="yes" style="width:auto;padding:0 6px" onclick="answerCustom('${t.id}')" title="Type any amount for this row">Other amount…</button>` : ''}</div>` : t.answer ? `<div class="sug-act"><span class="sug-why">Answered: ${esc(String(t.answer))}</span></div>` : ''}
-        ${fuelStrip(t)}
+        ${fuelStrip(t)}${tsCloseNote(t)}
         ${paidFlag}${reviewFlag}${waFlag}${onlyFlag}${false && t.files && t.files.length ? `<div class="odoo-doc" title="${esc(t.files.join(String.fromCharCode(10)))}">📎 ${esc(t.files[0])}${t.files.length > 1 ? ' +' + (t.files.length - 1) : ''}</div>` : ''}
       </td>
       ${typeCell}
@@ -1541,6 +1576,83 @@ const xlCarry = k => k === 'new' || !before || before.xlNet == null ? 0 : -befor
 const xlSum = k => xlCarry(k) + tx.filter(t => t.src === 'excel' && !t.excluded && (k === 'all' || t.period === k)).reduce((s, t) => s + xlAmt(t), 0);
 const xlFmt = v => (v < -0.005 ? '$ (' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')' : '$ ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const xlWord = v => v < -0.005 ? 'واصل اضافي' : 'مطلوب';
+// -- His timesheet, on his own ledger -----------------------------------------------------
+// Mario, 2026-09-10: "ziad current sheet: need to show hours and analytical without money". So the
+// days he worked sit among his expense lines, in date order, carrying the hours he started and
+// stopped and the project each hour went to -- and no figure at all. What the hours are worth is
+// on the Ziad timesheet sheet beside it, and in Odoo. These lines live only in this page: they are
+// never written, never sent, never part of a balance; the workbook is where they come from and it
+// is left exactly as it is.
+let tsDays = null, tsFor = null;
+const hasTimesheet = () => !!(account && account.timesheet);
+async function loadTimesheetDays() {
+  if (!hasTimesheet() || tsFor === acc) return;
+  tsFor = acc;
+  try {
+    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/timesheet-days`);
+    tsDays = r; injectTimesheet(); render();
+  } catch (e) { tsDays = null; console.warn('timesheet days', e.message); }
+}
+const tsText = d => {
+  const when = d.span ? `${d.span.from}–${d.span.to}` : '';
+  const what = String(d.task || '').replace(/\s+/g, ' ').trim();
+  return [when, `${d.hours} h`, what].filter(Boolean).join(' · ');
+};
+// One line per worked day, built from the mirror and dropped into the grid beside the sheet's rows.
+// Rebuilt on every load, because loadTx replaces `tx` wholesale.
+function injectTimesheet() {
+  if (!hasTimesheet() || !tsDays) return;
+  tx = tx.filter(t => !t._ts);
+  for (const d of (tsDays.days || [])) tx.push({
+    id: 'ts:' + d.date, _ts: true, src: 'timesheet', date: d.date,
+    description: tsText(d), hours: d.hours, rate: d.rate, cost: d.cost,
+    projects: d.projects || [], analyticName: (d.projects || []).map(p => p.project).join(' · '),
+    debit: 0, credit: 0,
+  });
+}
+// The line at the head of the month that closes the previous month's timesheet: his workbook writes
+// it itself ("Z40 - Ziad Payment August", $15 on 1 Sep). The hub does not create it -- it recognises
+// it, so the two sheets can be told they belong together (Mario, 2026-09-10).
+// One row of the grid, drawn by hand: the columns the page happens to be showing, with the hours
+// in the Description and the projects in Analytic, and every money cell left empty.
+function tsRowHtml(t) {
+  const cell = c => {
+    if (c.k === 'date') return `<td class="c-date"><span class="ts-when">${esc(t.date)}</span><span class="src ts">timesheet</span></td>`;
+    if (c.k === 'desc') return `<td class="c-desc"><span class="ts-task">🕐 ${esc(t.description)}</span></td>`;
+    if (c.k === 'proj') return `<td class="c-proj">${(t.projects || []).length
+      ? t.projects.map(p => `<span class="ts-proj" title="${esc(p.hours + ' h of the day on ' + p.project)}">${esc(p.project)} <b>${p.hours}h</b></span>`).join(' ')
+      : '<span class="ts-none" title="He wrote no project against these hours — in Odoo they fall on GENERAL until the day is filled in">no project written</span>'}</td>`;
+    if (c.k === 'acct') return `<td class="c-acct">${esc(t._accName || '')}</td>`;
+    return `<td class="${c.c || ''}${c.num ? ' num' : ''}"></td>`;
+  };
+  return `<tr class="ts-row" title="From his timesheet, ${esc(t.hours + ' h on ' + t.date)}. It carries no money here — its value is on the timesheet sheet and in Odoo.">${COLS.map(cell).join('')}</tr>`;
+}
+
+function tsCloseNote(t) {
+  const month = closesTimesheet(t);
+  if (!month) return '';
+  const M = tsDays && (tsDays.months || []).find(x => x.month === month);
+  const b = tsDays && (tsDays.booked || {})[month];
+  const due = M ? Math.round((M.hours - M.freeHours) * M.rate * 100) / 100 : null;
+  const gap = due == null ? null : Math.round(((t.debit || 0) - due) * 100) / 100;
+  const why = M ? `${month}: ${M.hours} h at ${M.rate}/h less the ${M.freeHours} h his ISF salary covers = ${fmt(due)}`
+    + (gap ? ` — the sheet says ${fmt(t.debit || 0)}, ${fmt(Math.abs(gap))} ${gap > 0 ? 'more' : 'less'}` : '')
+    + (b ? ` · booked as ${b.move}` : '') : `closes the timesheet month ${month}`;
+  return `<span class="closes-ts" title="${esc(why)}">↔ closes the timesheet for ${esc(month)}${gap ? ' · ' + fmt(Math.abs(gap)) + ' apart' : ''}</span>`;
+}
+
+const MONTHS_EN = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+function closesTimesheet(t) {
+  if (!hasTimesheet() || t._ts || !(t.debit || t.credit)) return null;
+  const m = /payment\s+([a-z]+)/i.exec(String(t.description || ''));
+  if (!m) return null;
+  const i = MONTHS_EN.indexOf(m[1].toLowerCase());
+  if (i < 0) return null;
+  // the row sits at the head of the month AFTER the one it pays for, so its own year answers for it
+  const y = +t.date.slice(0, 4) - (i === 11 && t.date.slice(5, 7) === '01' ? 1 : 0);
+  return `${y}-${String(i + 1).padStart(2, '0')}`;
+}
+
 // -- The dette: money the person owes Shift, the other way round from the ledger ----------
 // It comes OFF his balance (Mario, 2026-09-10: "ziad dette is 500$, add it to his balance" —
 // reversing the 2026-09-06 rule that kept it apart). It still shows on a line of its own, so he
@@ -1626,7 +1738,9 @@ function openStmt() {
   // opens on the balance of the statement he last received and closes on the balance now
   // (Mario, 2026-09-09: "the latest statement was the 119.88, show what came after it").
   const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
-  const all = tx.filter(t => !t.excluded && t.period !== 'old').sort(dayOrder);   // ✓ Sent marks every line of the period old, whatever its source
+  // ✓ Sent marks every line of the period old, whatever its source. The timesheet days are not
+  // lines of this account: his hours go to him on the timesheet sheet, with what they are worth.
+  const all = tx.filter(t => !t.excluded && !t._ts && t.period !== 'old').sort(dayOrder);
   const rows = all.filter(t => (!from || t.date >= from) && (!to || t.date <= to));
   const hidden = all.length - rows.length;
   const waiting = rows.filter(t => t.src === 'whatsapp' && t.waAccepted !== true).length;
@@ -1736,12 +1850,13 @@ function saveFile(blob, name) {
   document.body.appendChild(a); a.click();
   setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
 }
-async function stmtExport(kind) {
-  const table = document.querySelector('#stmt-body table.xl');
+// `sel` and `name`: the timesheet sheet leaves as a picture the same way the statement does
+async function stmtExport(kind, sel, name) {
+  const table = document.querySelector(sel || '#stmt-body table.xl');
   if (!table) return;
   const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
   const who = (account && (account.name || account.id) || 'statement').replace(/[\/:*?"<>|]+/g, ' ').trim();
-  const base = `${who} statement ${from || 'start'} → ${to || localYmd(new Date())}`;
+  const base = (name || `${who} statement ${from || 'start'} → ${to || localYmd(new Date())}`).replace(/[\/:*?"<>|]+/g, ' ').trim();
   say('Drawing the statement…');
   try {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
@@ -1998,37 +2113,113 @@ async function openLog() {
 // rate. He is paid only for the hours above the free allowance, because ISF already pays him
 // a salary as Mario's driver — so the allowance comes back as one credit on GENERAL and the
 // bill's total is exactly his pay (Mario, 2026-09-09).
-let tsData = null;
+let tsData = null, tsMonth = null;
 async function openTimesheet() {
   document.getElementById('timesheet').hidden = false;
-  document.getElementById('ts-title').textContent = 'Timesheet — ' + (account ? account.name : '');
+  const who = account ? String(account.name || '').replace(/\s*cash\s*(\(.*\))?$/i, '').trim() : '';
+  document.getElementById('ts-title').textContent = who + ' timesheet';
   document.getElementById('ts-body').innerHTML = '<p class="hint">Reading the workbook…</p>';
-  try { tsData = await Admin.api('GET', `/api/accounting/accounts/${acc}/timesheet`); drawTimesheet(); }
-  catch (e) { document.getElementById('ts-body').innerHTML = `<p class="hint">Could not read it: ${esc(e.message)}</p>`; }
+  try {
+    // the workbook lives on Mario's laptop; everywhere else the hub reads the copy it keeps of it
+    let r = null;
+    try { r = await Admin.api('GET', `/api/accounting/accounts/${acc}/timesheet`); }
+    catch (e) { r = await Admin.api('GET', `/api/accounting/accounts/${acc}/timesheet-days`); r.mirror = true; }
+    const cfg = r.timesheet || (account && account.timesheet) || {};
+    tsData = { ...r, rate: r.rate || cfg.rate || (r.months[r.months.length - 1] || {}).rate || 0,
+      freeHours: r.freeHours != null ? r.freeHours : (cfg.freeHours != null ? cfg.freeHours : 40) };
+    const last = tsData.months.filter(m => m.hours).map(m => m.month).pop();
+    if (!tsMonth || !tsData.months.some(m => m.month === tsMonth)) tsMonth = last || null;
+    drawTimesheet();
+  } catch (e) { document.getElementById('ts-body').innerHTML = `<p class="hint">Could not read it: ${esc(e.message)}</p>`; }
 }
+const tsPick = v => { tsMonth = v; drawTimesheet(); };
+// The days of one month, each with the hours he worked, where he worked them and what they cost;
+// then the allowance his ISF salary covers going back to GENERAL, what he is due, and the line on
+// his cash sheet that closes it. This is the block Mario sends him at the end of the month.
 function drawTimesheet() {
-  const { months, rate, freeHours, booked } = tsData;
-  document.getElementById('ts-sub').textContent = `${rate} $/h · the first ${freeHours} h of each month are covered by his ISF salary`;
-  const rows = months.slice().reverse().map(m => {
-    const b = booked && booked[m.month];
-    const projects = Object.entries(m.projects).sort((a, b2) => b2[1] - a[1]).map(([p, h]) => `<span class="tag">${esc(p)} <b>${h}</b>h</span>`).join(' ')
-      + (m.loose > 0.005 ? ` <span class="tag warn" title="Days where he wrote no project: they fall on GENERAL until the day says where he was">no project <b>${m.loose}</b>h</span>` : '');
-    return `<tr>
-      <td><b>${esc(m.month)}</b><div class="hint">${m.days} day${m.days === 1 ? '' : 's'}</div></td>
-      <td class="num">${m.hours}</td>
-      <td class="num">${fmt(m.cost)}</td>
-      <td class="num g">−${fmt(m.refund)}</td>
+  const { months, freeHours, booked } = tsData;
+  const M = months.find(m => m.month === tsMonth) || months[months.length - 1] || null;
+  document.getElementById('ts-sub').textContent = M
+    ? `${M.rate} $/h · the first ${freeHours} h of each month are covered by his ISF salary`
+    : 'no hours in this workbook';
+  if (!M) return document.getElementById('ts-body').innerHTML = '<p class="hint">This workbook has no hours yet.</p>';
+  const days = (tsData.days || []).filter(d => d.month === M.month);
+  const b = booked && booked[M.month];
+  const open = M.month >= new Date().toISOString().slice(0, 7);   // still running: nothing comes off yet
+  const due = money(M.hours * M.rate - (open ? 0 : freeHours * M.rate));
+  // the line on his cash sheet that pays it — his workbook writes it itself, the hub only finds it
+  const paid = tx.find(t => closesTimesheet(t) === M.month);
+  const left = paid ? money(due - (paid.debit || 0)) : null;
+
+  const dayRow = d => `<tr>
+    <td>${esc(dayDate(d.date))}${d.span ? `<div class="sub">${esc(d.span.from)}–${esc(d.span.to)}</div>` : ''}</td>
+    <td class="d">${esc(String(d.task || '').replace(/\s+/g, ' ').slice(0, 70))}</td>
+    <td class="n">${d.hours}</td>
+    <td class="d">${(d.projects || []).length
+      ? d.projects.map(p => `${esc(p.project)} <b>${p.hours}h</b>`).join('<br>')
+      : '<i>no project written</i>'}</td>
+    <td class="n">${fmt(money(d.hours * M.rate))}</td></tr>`;
+  const totalRow = `<tr><td class="o">total</td><td class="d">${days.length} day${days.length === 1 ? '' : 's'} at ${M.rate} $/h</td>`
+    + `<td class="n b">${M.hours}</td><td class="d"></td><td class="n b">${fmt0(M.cost)}</td></tr>`;
+  const freeRow = open
+    ? `<tr><td class="o">ISF</td><td class="d">the ${freeHours} h his ISF salary covers come off when the month closes</td><td class="n">−${freeHours}</td><td class="d">GENERAL</td><td class="n">—</td></tr>`
+    : `<tr><td class="o">ISF</td><td class="d">${freeHours} h covered by his ISF salary — returned to GENERAL</td><td class="n">−${freeHours}</td><td class="d">GENERAL</td><td class="n g">−${fmt(M.refund)}</td></tr>`;
+  const dueRow = `<tr><td class="o b">his due</td><td class="d">(${M.hours} − ${open ? 0 : freeHours}) h × ${M.rate}</td>`
+    + `<td class="n b">${open ? M.hours : M.paidHours}</td><td class="d"><i>no project — it is his pay</i></td><td class="n b">${fmt0(due)}</td></tr>`;
+  const paidRow = paid
+    ? `<tr><td class="o">paid</td><td class="d">${esc(paid.description || '')} · ${esc(paid.date)} — from his cash sheet</td><td class="n"></td><td class="d"></td><td class="n g">−${fmt(paid.debit || 0)}</td></tr>`
+      + (Math.abs(left) > 0.005 ? `<tr><td class="o">left</td><td class="d">the sheet's figure and the timesheet's are ${fmt(Math.abs(left))} apart</td><td class="n"></td><td class="d"></td><td class="n b">${fmt0(left)}</td></tr>` : '')
+    : `<tr><td class="o">open</td><td class="d">${open ? 'the month is still running' : 'not yet on his cash sheet — it is closed by the payment row you write there'}</td><td class="n"></td><td class="d"></td><td class="n b">${fmt0(due)}</td></tr>`;
+
+  const others = months.slice().reverse().map(m => {
+    const ob = booked && booked[m.month];
+    return `<tr><td><a onclick="tsPick('${m.month}')"><b>${esc(m.month)}</b></a><div class="hint">${m.days} day${m.days === 1 ? '' : 's'}</div></td>
+      <td class="num">${m.hours}</td><td class="num">${fmt(m.cost)}</td><td class="num g">−${fmt(m.refund)}</td>
       <td class="num"><b>${fmt(m.net)}</b><div class="hint">${m.paidHours} h paid</div></td>
-      <td>${projects || '<span class="hint">no project on any day</span>'}</td>
-      <td style="white-space:nowrap">${b
-        ? `<a class="odoo-ok" target="_blank" href="${ODOO}${b.moveId}">✓ ${esc(b.move)}</a><br><button class="btn" onclick="bookTimesheet('${m.month}', true, this)">Rewrite</button>`
+      <td>${Object.entries(m.projects || {}).sort((a, b2) => b2[1] - a[1]).map(([p, h]) => `<span class="tag">${esc(p)} <b>${h}</b>h</span>`).join(' ')
+        + (m.loose > 0.005 ? ` <span class="tag warn" title="Days where he wrote no project: they fall on GENERAL until the day says where he was">no project <b>${m.loose}</b>h</span>` : '') || '<span class="hint">no project on any day</span>'}</td>
+      <td style="white-space:nowrap">${ob
+        ? `<a class="odoo-ok" target="_blank" href="${ODOO}${ob.moveId}">✓ ${esc(ob.move)}</a><br><button class="btn" onclick="bookTimesheet('${m.month}', true, this)">Rewrite</button>`
         : `<button class="btn primary" onclick="bookTimesheet('${m.month}', false, this)">📗 Book</button>`}</td></tr>`;
   }).join('');
+
   document.getElementById('ts-body').innerHTML = `
-    <p class="hint">Each project is charged the hours it used, at ${rate} $/h. The ${freeHours} free hours come back as one credit line on GENERAL, so the bill totals exactly what he is paid — the same figure as the workbook's monthly pay row.</p>
-    <table class="months" style="width:100%;border-collapse:collapse"><thead><tr>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <select onchange="tsPick(this.value)">${months.slice().reverse().map(m =>
+        `<option value="${m.month}" ${m.month === M.month ? 'selected' : ''}>${m.month} · ${m.hours} h</option>`).join('')}</select>
+      ${b ? `<a class="odoo-ok" target="_blank" href="${ODOO}${b.moveId}">✓ ${esc(b.move)} in Odoo</a>
+             <button class="btn" onclick="bookTimesheet('${M.month}', true, this)">↻ Rewrite</button>`
+    : `<button class="btn primary" onclick="bookTimesheet('${M.month}', false, this)">📗 Book in Odoo</button>`}
+      <button class="btn" onclick="tsRefresh(this)" title="Read the workbook again and put the open month's cost into Odoo now">↻ Refresh Odoo</button>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn" onclick="tsExport('png')">🖼 PNG</button>
+      <button class="btn" onclick="tsExport('pdf')">📄 PDF</button>
+    </div>
+    <table class="xl narrow" id="ts-table"><colgroup><col style="width:104px"><col style="width:230px"><col style="width:52px"><col style="width:150px"><col style="width:74px"></colgroup>
+      <tr><td class="h">day</td><td class="h">what</td><td class="h">hours</td><td class="h">analytical</td><td class="h">amount</td></tr>
+      ${days.map(dayRow).join('')}
+      ${totalRow}${freeRow}${dueRow}${paidRow}
+    </table>
+    <p class="hint">Every hour is charged to the site that used it at ${M.rate} $/h, so the project carries its real cost.
+      ${open ? `The month is still running: the ${freeHours} h his ISF salary covers come off when it closes.`
+    : `The ${freeHours} h his ISF salary covers come back on GENERAL, so what is left — ${fmt(M.net)} — is exactly his pay.`}
+      It is closed by the payment row on his cash sheet, which carries no project: the projects are already charged here.
+      ${tsData.mirror ? ' <b>Read from the hub\'s copy of the workbook</b> — open it on Mario\'s laptop to refresh it.' : ''}</p>
+    <table class="months" style="width:100%;border-collapse:collapse;margin-top:14px"><thead><tr>
       <th>Month</th><th class="num">Hours</th><th class="num">Cost to projects</th><th class="num">Back to GENERAL</th><th class="num">His pay</th><th>Projects</th><th></th>
-    </tr></thead><tbody>${rows}</tbody></table>`;
+    </tr></thead><tbody>${others}</tbody></table>`;
+}
+const tsExport = kind => stmtExport(kind, '#ts-table', `${account ? account.name : 'timesheet'} timesheet ${tsMonth || ''}`);
+async function tsRefresh(btn) {
+  const was = btn.textContent; btn.disabled = true; btn.textContent = 'Reading…';
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/timesheet-refresh`, {});
+    const said = (r.odoo || []).map(o => o.error ? `${o.month}: ${o.error}` : o.skipped ? `${o.month}: ${o.skipped}` : `${o.month}: ${o.move} ${o.action}, ${fmt(o.total)}`).join(' · ');
+    say(`${r.mirror.days} days read from the workbook — ${said || 'nothing to put in Odoo'}`);
+    tsFor = null; tsDays = null; loadTimesheetDays();
+    await openTimesheet();
+  } catch (e) { say('Could not refresh: ' + e.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = was; }
 }
 async function bookTimesheet(month, redo, btn) {
   const m = tsData.months.find(x => x.month === month); if (!m) return;
