@@ -22,19 +22,36 @@
 // Prefab and scaffolding are EQUIPMENT: bought once, reusable on the next project, so they are shown
 // apart and left out of the cost the partners share (Mario, 2026-09-12).
 
+const plan = require('./ajaltoun-plan');   // budget (BOQ) + cashflow plan
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const now = () => new Date().toISOString();
 const CTX = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
 const SDEV = 10;
 const VILLAS = { 69: 'Common', 59: 'U1', 60: 'U2', 61: 'U3', 62: 'D1', 63: 'D2', 64: 'D3' };
+// sections = the BOQ trades (so budget / spent / remaining line up) + the project-level ones
 const SECTIONS = [
   { id: 'excavation', name: 'Excavation' },
   { id: 'stone', name: 'Stone walls' },
+  { id: 'concrete', name: 'Concrete & steel' },
+  { id: 'blockwork', name: 'Block work' },
+  { id: 'waterproofing', name: 'Waterproofing' },
+  { id: 'joinery', name: 'Doors, kitchen & vanities' },
+  { id: 'aluminium', name: 'Metal & aluminium' },
+  { id: 'plaster', name: 'Plaster' },
+  { id: 'tiling', name: 'Tiling, cladding & roof' },
+  { id: 'painting', name: 'Painting' },
+  { id: 'ceilings', name: 'Suspended ceilings' },
+  { id: 'plumbing', name: 'Plumbing & sanitary' },
+  { id: 'electrical', name: 'Electricity' },
+  { id: 'hvac', name: 'Heating & ventilation' },
+  { id: 'landscape', name: 'Terraces, green & fencing' },
+  { id: 'lift', name: 'Lift' },
+  { id: 'pool', name: 'Pool' },
   { id: 'prefab', name: 'Prefab', equipment: true },
   { id: 'scaffolding', name: 'Scaffolding', equipment: true },
-  { id: 'general', name: 'Site & general' },
   { id: 'topo', name: 'Topo & survey' },
   { id: 'design', name: 'Design & permits' },
+  { id: 'general', name: 'Site & general' },
 ];
 // first rules, by supplier; Mario refines them on the page
 const DEFAULT_RULES = [
@@ -127,6 +144,8 @@ function sectionOf(l, m) {
 async function handle(req, res, url, user, ctx) {
   const { db, TEAM_ID, odooCall, access } = ctx;
   let m;
+
+  if (url.startsWith('/api/ajaltoun/plan')) return plan.handle(req, res, url, user, ctx);
 
   if (url === '/api/ajaltoun/data' && req.method === 'GET') {
     const fresh = /[?&]fresh=1/.test(req.url || '') && access.admin;

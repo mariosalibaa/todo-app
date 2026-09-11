@@ -58,6 +58,18 @@
   .vbar .vbtn{color:var(--sub);text-decoration:none;font-size:.78rem;border:1px solid var(--surface0);border-radius:6px;padding:5px 10px;white-space:nowrap;}
   .vbody{flex:1;overflow:auto;padding:12px;} .vbody canvas,.vbody img{display:block;margin:0 auto 12px;max-width:100%;height:auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.5);}
   .vstatus{color:var(--overlay0);font-size:.85rem;text-align:center;padding:40px 0;}
+  /* tabs, plan table, edit dialog */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--surface0);margin:0 0 18px;}
+  .tabs a{padding:9px 16px;color:var(--sub);text-decoration:none;font-size:.9rem;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tabs a.on{color:var(--amber);border-bottom-color:var(--amber);font-weight:600;} .tabs a:hover{color:var(--text);}
+  .lang button{background:none;border:1px solid var(--surface0);color:var(--sub);font-size:.75rem;padding:4px 11px;cursor:pointer;}
+  .lang button:first-child{border-radius:6px 0 0 6px;} .lang button:last-child{border-radius:0 6px 6px 0;margin-left:-1px;} .lang button.on{background:var(--amber);border-color:var(--amber);color:var(--base);font-weight:600;}
+  table.plan td:first-child{min-width:260px;} table.plan tr.grp td{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);padding-top:14px;border-bottom:0;}
+  table.plan tr.sub td{font-weight:600;border-top:1px solid var(--surface1);} table.plan tr.act td{color:var(--sub);font-style:italic;} th.now{color:var(--amber);}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:600;}
+  .dlg{background:var(--mantle);border:1px solid var(--surface1);border-radius:14px;padding:20px 22px;width:min(640px,94vw);max-height:90vh;overflow:auto;}
+  .frm{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;} .frm label{display:flex;flex-direction:column;gap:4px;font-size:.74rem;color:var(--sub);} .frm label.row{flex-direction:row;align-items:center;grid-column:1/-1;}
+  .frm input,.frm select{width:100%;}
 </style>
 </head>
 <body>
@@ -82,6 +94,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
+<script src="/ajaltoun-plan-ui.js"></script>
 <script src="/phone-preview.js"></script>
 <script>
 const esc = Admin.esc;
@@ -90,6 +103,7 @@ const usd2 = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US
 const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : '—';
 const VILLA_ORDER = ['Common', 'U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
 let D = null, ME = null, F = { section: '', villa: '', q: '', review: '' };
+let TAB = (location.hash || '').replace('#', '') || 'accounts';   // accounts · budget · plan
 // the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
 const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
 const SEL = new Set();   // ticked lines, for bulk approval
@@ -103,7 +117,7 @@ Admin.require('ajaltoun', async me => {
   await load();
 });
 async function load(fresh) {
-  try { D = await Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')); if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved'; render(); }   // the partner opens on what waits for him
+  try { [D] = await Promise.all([Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')), Plan.load()]); window.D = D; if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved'; render(); }   // the partner opens on what waits for him
   catch (e) { document.getElementById('app').innerHTML = `<p style="color:var(--red)">Could not read Odoo: ${esc(e.message)}</p>`; }
 }
 
@@ -137,8 +151,17 @@ function compute() {
 }
 
 function render() {
+  const root = document.getElementById('app');
+  root.innerHTML = `<div class="tabs">${[['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('')}</div><div id="tab"></div>`;
+  history.replaceState(null, '', '#' + TAB);
+  const app = document.getElementById('tab');
+  if (TAB === 'budget') return Plan.renderBudget(app);
+  if (TAB === 'plan') return Plan.renderPlan(app);
+  renderAccounts(app);
+}
+window.renderTab = render;
+function renderAccounts(app) {
   const c = compute();
-  const app = document.getElementById('app');
   const inv = c.inv;
   const remaining = c.received - c.paidOut;
   app.innerHTML = `
@@ -220,6 +243,7 @@ function cashflowRows(c) {
 }
 
 function renderDetail() {
+  if (!document.getElementById('detail')) return;
   const q = F.q.toLowerCase();
   const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
     .sort((a, b) => b.date.localeCompare(a.date));
