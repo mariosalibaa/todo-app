@@ -20,8 +20,8 @@ const GROUPS = [
   { name: 'Villa D3 agreement', test: n => /villa d3 agreement/i.test(n) },
   { name: 'Partnership & development fees', test: n => /partnership|development fee/i.test(n) },
   { name: 'Professional services', test: n => /professional services/i.test(n) },
-  { name: 'OEA references', test: n => /^OEA/i.test(n) },
   { name: 'History (2020)', test: n => /^20\d{6} char\+mario/i.test(n) },
+  { name: 'OEA references (for reference only)', test: n => /^OEA/i.test(n) },   // Mario: references stay at the back
   { name: 'Other documents', test: () => true },
 ];
 const MIME = { '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
