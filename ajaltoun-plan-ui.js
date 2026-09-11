@@ -130,18 +130,32 @@
       </div>
       <h2>BOQ lines <span class="r"><span class="lang"><button class="${tab === 'U' ? 'on' : ''}" onclick="Plan.setTab('U')">Villa U — up 333</button><button class="${tab === 'D' ? 'on' : ''}" onclick="Plan.setTab('D')">Villa D — down</button></span>${P.admin ? ` &nbsp; <button class="btn ap" onclick="Plan.edit(null)">+ Add a line</button>` : ''}</span></h2>
       <div class="card"><div class="wrap"><table>
-        <thead><tr><th>Bill</th><th>Item</th><th>Trade</th><th>Phase</th><th>Unit</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Total</th><th></th></tr></thead>
+        <thead><tr><th>Bill</th><th>Item</th><th>Trade</th><th>Phase</th><th>Unit</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Jul 2026 ref</th><th class="n">Total</th><th></th></tr></thead>
         <tbody>${items.map(i => `<tr ${P.admin ? `style="cursor:pointer" onclick="Plan.edit('${i.id}')"` : ''}>
           <td class="muted small">${i.bill ?? ''}</td>
           <td>${esc(i.name)}${i.review ? ' <span class="pill" title="Imported from the 2022–2024 BOQ — to review">2022 prices</span>' : ''}${i.note ? `<div class="small muted">${esc(i.note)}</div>` : ''}${(i.history || []).length ? `<div class="small muted" title="${esc(i.history.map(h => h.at.slice(0, 10) + ' ' + h.by + ': ' + h.changes.map(c => c.f + ' ' + c.from + ' → ' + c.to).join(', ')).join('\n'))}">🕘 ${i.history.length} change${i.history.length > 1 ? 's' : ''} · last ${esc(i.history[i.history.length - 1].at.slice(0, 10))} by ${esc(i.history[i.history.length - 1].by)}</div>` : ''}</td>
           <td><span class="pill">${esc(secName(i.trade))}</span></td><td class="small muted">${PHASES[i.phase] || ''}</td>
-          <td class="small muted">${esc(i.unit || '')}</td><td class="n">${i.qty ?? ''}</td><td class="n">${i.price != null ? usd(i.price) : ''}</td><td class="n">${usd(i.total || 0)}</td>
+          <td class="small muted">${esc(i.unit || '')}</td><td class="n">${i.qty ?? ''}</td><td class="n">${i.price != null ? usd(i.price) : ''}</td><td class="n">${refCell(i)}</td><td class="n">${usd(i.total || 0)}</td>
           <td class="small muted" title="${esc(i.source || '')}">${i.source ? '📄' : ''}</td></tr>`).join('')}
-        <tr class="tot"><td></td><td>Total per villa ${tab}</td><td colspan="5"></td><td class="n">${usd(B.perVilla[tab])}</td><td></td></tr></tbody></table></div>
+        <tr class="tot"><td></td><td>Total per villa ${tab}</td><td colspan="6"></td><td class="n">${usd(B.perVilla[tab])}</td><td></td></tr></tbody></table></div>
         <div class="note">Quantities come from the take-off sheets in <i>0. EXCEL boq</i> (Dropbox); this is the summary that becomes the budget. Click a line to change its quantity, price, trade or phase — every change is kept with who and when.</div>
       </div>
       <div id="plan-edit"></div>`;
     if (editing !== null) renderEdit();
+  }
+
+  // Fanar 212 (Sayed Saadeh, Jul 2026) rate next to ours; "use" adopts it, stamped in the line's history
+  function refCell(i) {
+    const f = i.ref; if (!f || f.rate == null) return f && f.note ? `<span class="small muted" title="${esc(f.src || '')}">${esc(f.note)}</span>` : '';
+    const same = i.price != null && Math.abs(i.price - f.rate) < 0.005;
+    const canUse = P.admin && i.qty != null && !same;
+    return `<span class="${same ? 'ok' : (i.price != null && f.rate < i.price ? 'ok' : 'flag')}" title="${esc((f.note ? f.note + ' · ' : '') + (f.src || ''))}">${f.rate ? usd(f.rate) : '$0'}${f.unit ? '<span class="small muted">/' + esc(f.unit) + '</span>' : ''}</span>${canUse ? ` <button class="btn ap" onclick="event.stopPropagation();Plan.useRef('${i.id}')" title="Set our unit price to this rate">use</button>` : ''}`;
+  }
+  async function useRef(id) {
+    const i = P.items.find(x => x.id === id); if (!i || !i.ref) return;
+    const item = { ...i, price: i.ref.rate, review: false, note: [i.note, 'rate from ' + (i.ref.src || 'Fanar 2026')].filter(Boolean).join(' · ') };
+    delete item.history; delete item.total;
+    try { const r = await Admin.api('POST', '/api/ajaltoun/plan/item', { item }); const k = P.items.findIndex(x => x.id === r.item.id); P.items[k] = r.item; window.renderTab && renderTab(); } catch (e) { alert('Could not save: ' + e.message); }
   }
 
   function renderEdit() {
@@ -252,5 +266,5 @@
 
   window.Plan = { load, renderBudget, renderPlan, get P() { return P; },
     setTab: t => { tab = t; window.renderTab && renderTab(); }, setScenario: s => { scenario = s; window.renderTab && renderTab(); },
-    edit: id => { editing = id || ''; renderEdit(); }, closeEdit: () => { editing = null; const el = document.getElementById('plan-edit'); if (el) el.innerHTML = ''; }, save, remove, saveSettings };
+    edit: id => { editing = id || ''; renderEdit(); }, useRef, closeEdit: () => { editing = null; const el = document.getElementById('plan-edit'); if (el) el.innerHTML = ''; }, save, remove, saveSettings };
 })();

@@ -41,7 +41,7 @@ const DEFAULT_SETTINGS = {
   },
 };
 
-const FIELDS = ['type', 'bill', 'trade', 'name', 'unit', 'qty', 'price', 'amount', 'phase', 'note', 'source', 'review'];
+const FIELDS = ['type', 'bill', 'trade', 'name', 'unit', 'qty', 'price', 'amount', 'phase', 'note', 'source', 'review', 'ref'];   // ref = the 2026 reference rate (Fanar), kept across edits
 
 async function handle(req, res, url, user, ctx) {
   const { db, TEAM_ID, access } = ctx;

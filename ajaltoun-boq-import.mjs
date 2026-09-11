@@ -6,12 +6,17 @@
 // every imported item is flagged review=true until Mario looks at it on the hub. Re-running without --replace only
 // adds items that are not there yet (matched on type + bill + name).
 import admin from 'firebase-admin';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const DRY = process.argv.includes('--dry'), REPLACE = process.argv.includes('--replace');
 const BOQ = 'D:/Dropbox/0. SHIFT/00. DEVELOPMENT/AJALTOUN 4193/0. BOQ+SPECS+PRESENTATION/0. EXCEL boq';
-const FILES = { U: `${BOQ}/20220908 BOQ TRS - villa up 333/0. Summary Villa U.xls`, D: `${BOQ}/20220908 BOQ TRS - villa down/0. Summary Villa down 2023-from sayed.xlsx` };
+// the summaries were retired to old/ on 2026-09-12 (the hub is the source now); read them wherever they are
+const pick = (...c) => c.find(p => existsSync(p)) || c[0];
+const FILES = {
+  U: pick(`${BOQ}/20220908 BOQ TRS - villa up 333/old/0. Summary Villa U (superseded by hub 2026-09-12).xls`, `${BOQ}/20220908 BOQ TRS - villa up 333/0. Summary Villa U.xls`),
+  D: pick(`${BOQ}/20220908 BOQ TRS - villa down/old/0. Summary Villa down 2023-from sayed (superseded by hub 2026-09-12).xlsx`, `${BOQ}/20220908 BOQ TRS - villa down/0. Summary Villa down 2023-from sayed.xlsx`),
+};
 
 // bill number → trade (section id) and phase
 const TRADE = { 1: ['excavation', 'site'], 2: ['concrete', 'structure'], 3: ['blockwork', 'structure'], 4: ['waterproofing', 'structure'],
