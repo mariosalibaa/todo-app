@@ -43,6 +43,8 @@
   .ok{color:var(--green);} .flag{color:var(--red);}
   .btn{background:none;border:1px solid var(--surface1);color:var(--text);border-radius:6px;padding:3px 9px;font-size:.74rem;cursor:pointer;white-space:nowrap;} .btn:hover{border-color:var(--amber);color:var(--amber);}
   .btn.ok:hover{border-color:var(--green);color:var(--green);} .btn.flag:hover{border-color:var(--red);color:var(--red);}
+  .pager{margin-left:auto;display:flex;align-items:center;gap:2px;font-size:.76rem;color:var(--sub);white-space:nowrap;}
+  .pager .btn{padding:1px 8px;line-height:1.3;}
   .stamp{font-size:.7rem;color:var(--overlay0);line-height:1.35;}
   .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -87,6 +89,9 @@ const usd2 = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US
 const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : '—';
 const VILLA_ORDER = ['Common', 'U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
 let D = null, ME = null, F = { section: '', villa: '', q: '', review: '' };
+// Odoo style: 80 lines a page, "1-80 / 279" with ‹ › — as on the accounting grid
+const PAGE = 80; let pageNo = 0;
+function pageBy(d) { pageNo += d; renderDetail(); }
 
 Admin.require('ajaltoun', async me => {
   ME = me;
@@ -182,11 +187,12 @@ function render() {
 
     <h2>Detail <span class="r muted">${c.lines.length} lines · Odoo pulled ${esc((D.cachedAt || '').replace('T', ' ').slice(0, 16))}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">re-pull</a>` : ''}</span></h2>
     <div class="filters">
-      <select onchange="F.section=this.value;renderDetail()"><option value="">All sections</option>${D.sections.map(s => `<option value="${s.id}" ${F.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
-      <select onchange="F.villa=this.value;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <select onchange="F.review=this.value;renderDetail()"><option value="">All lines</option><option value="pending" ${F.review === 'pending' ? 'selected' : ''}>Pending review</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
-      <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;renderDetail()" style="min-width:200px">
+      <select onchange="F.section=this.value;pageNo=0;renderDetail()"><option value="">All sections</option>${D.sections.map(s => `<option value="${s.id}" ${F.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+      <select onchange="F.villa=this.value;pageNo=0;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <select onchange="F.review=this.value;pageNo=0;renderDetail()"><option value="">All lines</option><option value="pending" ${F.review === 'pending' ? 'selected' : ''}>Pending review</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
+      <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;pageNo=0;renderDetail()" style="min-width:200px">
       ${D.admin ? '<span class="small muted">You can change a line\'s section here; "whole supplier" applies it to every line of that supplier.</span>' : ''}
+      <span class="pager" id="pager"><span id="pg-range"></span><button class="btn" onclick="pageBy(-1)" id="pg-prev" title="Previous page">‹</button><button class="btn" onclick="pageBy(1)" id="pg-next" title="Next page">›</button></span>
     </div>
     <div class="card"><div class="wrap" id="detail"></div></div>
     ${(D.owed || []).length ? `<div class="note">Still owed to suppliers (net, from the payables ledger): ${D.owed.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ')}.${(D.prepaid || []).length ? ' Paid ahead of the bill: ' + D.prepaid.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ') + '.' : ''}</div>` : ''}
@@ -213,9 +219,14 @@ function renderDetail() {
   const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
     .sort((a, b) => b.date.localeCompare(a.date));
   const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
+  const last = Math.max(0, Math.ceil(rows.length / PAGE) - 1);
+  pageNo = Math.min(Math.max(0, pageNo), last);
+  const page = rows.slice(pageNo * PAGE, pageNo * PAGE + PAGE);
+  document.getElementById('pg-range').textContent = rows.length ? `${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)} / ${rows.length}` : '0 / 0';
+  document.getElementById('pg-prev').disabled = pageNo === 0; document.getElementById('pg-next').disabled = pageNo >= last;
   document.getElementById('detail').innerHTML = `<table>
     <thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Review</th></tr></thead>
-    <tbody>${rows.map(l => `<tr>
+    <tbody>${page.map(l => `<tr>
       <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
       <td>${esc(l.partner || '—')}</td>
       <td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}<div class="small muted">${esc(l.account)} · ${esc(l.company.replace(/SHIFT /i, ''))}</div></td>
@@ -225,7 +236,7 @@ function renderDetail() {
       <td class="small">${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
       <td class="n">${usd2(l.amount)}</td>
       <td>${reviewCell(l)}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Nothing matches.</td></tr>'}
-    <tr class="tot"><td colspan="6">${rows.length} lines</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td></tr></tbody></table>`;
+    <tr class="tot"><td colspan="6">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td></tr></tbody></table>`;
 }
 
 // a worker's month-bill carries every receipt of the month: show two, fold the rest behind "+N"
