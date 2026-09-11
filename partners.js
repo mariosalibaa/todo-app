@@ -53,7 +53,7 @@ async function handle(req, res, url, user, ctx) {
     const dl = /[?&]dl=1/.test(req.url || '');
     res.writeHead(200, { 'Content-Type': d.mime || 'application/octet-stream',
       'Content-Disposition': `${dl ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(d.name)}`,
-      'Cache-Control': 'private, max-age=600' });
+      'Cache-Control': 'private, max-age=31536000, immutable' });   // the URL carries the checksum
     res.end(Buffer.from(d.b64, 'base64'));
     return true;
   }

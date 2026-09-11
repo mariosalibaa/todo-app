@@ -150,7 +150,7 @@ Admin.require('partners', async me => {
             <div class="meta">${esc(f.name.split('.').pop().toUpperCase())} · ${kb(f.size)} · ${esc(dateOf(f))}</div>
           </div>
         </a>
-        <a class="dl" href="/api/partners/files/${esc(f.id)}?dl=1" title="Download">↓</a>
+        <a class="dl" href="/api/partners/files/${esc(f.id)}?v=${esc((f.sha1 || '').slice(0, 8))}&dl=1" title="Download">↓</a>
       </div>`).join('')}
     </div>`).join('');
   // a shared link or a reload lands straight in the document
@@ -194,10 +194,11 @@ async function openViewer(id, fromHash) {
   if (!f) return;
   if (!fromHash) history.pushState(null, '', '#' + id);   // so the browser's own back button closes it too
   const v = document.getElementById('viewer'), body = document.getElementById('vbody');
-  const url = '/api/partners/files/' + encodeURIComponent(id);
-  document.getElementById('vtitle').textContent = f.name;
+  // the checksum in the URL makes every new version a new address — the browser can never show a stale copy
+  const url = '/api/partners/files/' + encodeURIComponent(id) + '?v=' + (f.sha1 || '').slice(0, 8);
+  document.getElementById('vtitle').textContent = titleOf(f.name);
   document.getElementById('vtab').href = url;
-  document.getElementById('vdl').href = url + '?dl=1';
+  document.getElementById('vdl').href = url + '&dl=1';
   v.classList.add('on'); document.body.style.overflow = 'hidden';
   body.innerHTML = '<div class="vstatus">Loading…</div>';
   const fallback = e => { body.innerHTML = `<div class="vcard"><div class="big">${ICON(f.mime)}</div><div style="font-weight:600">${esc(f.name)}</div>
