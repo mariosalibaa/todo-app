@@ -23,13 +23,14 @@ const SECTIONS = [
   { id: 'prefab', name: 'Prefab', equipment: true },
   { id: 'scaffolding', name: 'Scaffolding', equipment: true },
   { id: 'general', name: 'Site & general' },
+  { id: 'topo', name: 'Topo & survey' },
   { id: 'design', name: 'Design & permits' },
 ];
 // first rules, by supplier; Mario refines them on the page
 const DEFAULT_RULES = [
   { partner: 'georges el hajj', section: 'excavation' }, { partner: 'patrick hokayem', section: 'excavation' },
   { partner: 'monzer', section: 'stone' }, { partner: 'tchaghlassian', section: 'prefab' },
-  { partner: 'singular', section: 'design' }, { partner: 'hamoush', section: 'design' }, { partner: 'peter moubarak', section: 'design' },
+  { partner: 'singular', section: 'topo' }, { partner: 'hamoush', section: 'topo' }, { partner: 'peter moubarak', section: 'topo' },   // Mario 2026-09-12: these are topography, not design
 ];
 
 function readBody(req, limit = 1e6) {
