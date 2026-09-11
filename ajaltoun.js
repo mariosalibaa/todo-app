@@ -4,11 +4,16 @@
 //   GET  /api/ajaltoun/data[?fresh=1]   everything the page shows (cached 10 min; fresh = admin re-pull)
 //   GET  /api/ajaltoun/file/<attId>      an Odoo attachment (the bill scan), streamed for the viewer
 //   POST /api/ajaltoun/section           { lineId, section, forPartner? }  admin: classify a line (or its whole supplier)
-//   POST /api/ajaltoun/verify            { lineId, state: 'verified'|'flagged'|null, note? }
+//   POST /api/ajaltoun/approve           { lineIds: [], on: true|false }        admin (Mario): step 2
+//   POST /api/ajaltoun/verify            { lineId, state: 'verified'|'flagged'|null, note? }   partner: step 3
 //
-// Four-eyes rule (Mario, 2026-09-12): Mario books the expenses as project manager, so he cannot verify them —
-// only a member of the app who is NOT an admin (Antoine) can mark a line verified or flag it with a note.
-// The stamp (who, when) lives in Firestore ajaltounVerify/<lineId>; an admin may only clear a flag once answered.
+// Review chain (Mario, 2026-09-12), built so an accountant fits in later without a redesign:
+//   1. booked   — whoever enters the expense in Odoo (Mario today, the accountant later)
+//   2. approved — Mario, as project manager, confirms it (bulk, from the filtered list)
+//   3. verified — the partner (Antoine) sees only approved lines and verifies, or flags with a note; the flag
+//                 goes back to Mario, whose answer clears it for a re-check.
+// One doc per line in Firestore ajaltounVerify/<lineId>: { approved: {by,email,at}|null, verified: {...}|null, flag: {...,note}|null }.
+// Admins approve and answer flags; they can never verify. Non-admins verify and flag; they can never approve.
 //
 // Odoo holds the villa dimension (analytic 69 = common works, 59-61 = U1-U3, 62-64 = D1-D3) across
 // S DEV (co 10), SARL (co 2) and S LB (co 7). The WORK SECTION (excavation, stone walls, prefab,
@@ -128,7 +133,7 @@ async function handle(req, res, url, user, ctx) {
     if (fresh || !cache.data || Date.now() - cache.at > 10 * 60e3) { cache = { at: Date.now(), data: await pull(odooCall) }; }
     const mt = await meta(db, TEAM_ID);
     const vsnap = await db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get();
-    const ver = {}; for (const d of vsnap.docs) ver[d.id] = d.data();
+    const ver = {}; for (const d of vsnap.docs) { const x = d.data(); ver[d.id] = x.state ? { approved: null, verified: x.state === 'verified' ? x : null, flag: x.state === 'flagged' ? x : null } : x; }   // (old one-field shape)
     const lines = cache.data.lines.map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
     return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), admin: !!access.admin, canVerify: !access.admin });
   }
@@ -160,22 +165,47 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, { ok: true });
   }
 
+  const stamp = () => ({ by: user.name || user.displayName || user.email || '', email: user.email || '', at: now() });
+  const vcol = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify');
+
+  // step 2 — Mario approves (or withdraws approval, which also drops any verification on the line)
+  if (url === '/api/ajaltoun/approve' && req.method === 'POST') {
+    if (!access.admin) return json(res, 403, { error: 'only the project manager approves' });
+    const b = await readBody(req);
+    const ids = (Array.isArray(b.lineIds) ? b.lineIds : []).map(String).slice(0, 500);
+    if (!ids.length) return json(res, 400, { error: 'lineIds required' });
+    const batch = db.batch(); const out = {};
+    for (const id of ids) {
+      const cur = (await vcol.doc(id).get()).data() || { approved: null, verified: null, flag: null };
+      const next = b.on ? { ...cur, approved: cur.approved || stamp() } : { approved: null, verified: null, flag: cur.flag || null };
+      if (!next.approved && !next.verified && !next.flag) batch.delete(vcol.doc(id)); else batch.set(vcol.doc(id), next);
+      out[id] = (!next.approved && !next.verified && !next.flag) ? null : next;
+    }
+    await batch.commit();
+    return json(res, 200, { reviews: out });
+  }
+
+  // step 3 — the partner verifies or flags; the writer may only clear a flag he has answered
   if (url === '/api/ajaltoun/verify' && req.method === 'POST') {
     const b = await readBody(req);
     if (!b.lineId) return json(res, 400, { error: 'lineId required' });
-    const ref = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').doc(String(b.lineId));
-    const cur = (await ref.get()).data() || null;
+    const ref = vcol.doc(String(b.lineId));
+    const cur = (await ref.get()).data() || { approved: null, verified: null, flag: null };
+    let next;
     if (access.admin) {
-      // the writer cannot verify his own lines; he may only clear a flag he has answered
-      if (!(b.state === null && cur && cur.state === 'flagged')) return json(res, 403, { error: 'the project manager cannot verify his own expenses — a partner must' });
-      await ref.delete();
-      return json(res, 200, { review: null });
-    }
-    if (b.state === null) { await ref.delete(); return json(res, 200, { review: null }); }
-    if (!['verified', 'flagged'].includes(b.state)) return json(res, 400, { error: 'state must be verified, flagged or null' });
-    const review = { state: b.state, by: user.name || user.displayName || user.email || '', email: user.email || '', at: now(), note: String(b.note || '').slice(0, 500) };
-    await ref.set(review);
-    return json(res, 200, { review });
+      if (!(b.state === null && cur.flag)) return json(res, 403, { error: 'the project manager cannot verify his own expenses — a partner must' });
+      next = { ...cur, flag: null };
+    } else if (b.state === 'verified') {
+      if (!cur.approved) return json(res, 400, { error: 'not approved by the project manager yet' });
+      next = { ...cur, verified: stamp(), flag: null };
+    } else if (b.state === 'flagged') {
+      next = { ...cur, verified: null, flag: { ...stamp(), note: String(b.note || '').slice(0, 500) } };
+    } else if (b.state === null) {
+      next = { ...cur, verified: null, flag: null };
+    } else return json(res, 400, { error: 'state must be verified, flagged or null' });
+    if (!next.approved && !next.verified && !next.flag) { await ref.delete(); return json(res, 200, { review: null }); }
+    await ref.set(next);
+    return json(res, 200, { review: next });
   }
 
   return false;

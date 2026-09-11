@@ -45,6 +45,7 @@
   .btn.ok:hover{border-color:var(--green);color:var(--green);} .btn.flag:hover{border-color:var(--red);color:var(--red);}
   .pager{margin-left:auto;display:flex;align-items:center;gap:2px;font-size:.76rem;color:var(--sub);white-space:nowrap;}
   .pager .btn{padding:1px 8px;line-height:1.3;}
+  .ap{color:var(--blue);} td.ck,th.ck{width:26px;padding-right:0;} .bulk{display:flex;gap:6px;align-items:center;font-size:.78rem;color:var(--sub);}
   .stamp{font-size:.7rem;color:var(--overlay0);line-height:1.35;}
   .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -89,6 +90,9 @@ const usd2 = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US
 const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : '—';
 const VILLA_ORDER = ['Common', 'U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
 let D = null, ME = null, F = { section: '', villa: '', q: '', review: '' };
+// the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
+const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
+const SEL = new Set();   // ticked lines, for bulk approval
 // Odoo style: 80 lines a page, "1-80 / 279" with ‹ › — as on the accounting grid
 const PAGE = 80; let pageNo = 0;
 function pageBy(d) { pageNo += d; renderDetail(); }
@@ -99,7 +103,7 @@ Admin.require('ajaltoun', async me => {
   await load();
 });
 async function load(fresh) {
-  try { D = await Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')); render(); }
+  try { D = await Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')); if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved'; render(); }   // the partner opens on what waits for him
   catch (e) { document.getElementById('app').innerHTML = `<p style="color:var(--red)">Could not read Odoo: ${esc(e.message)}</p>`; }
 }
 
@@ -114,9 +118,10 @@ function compute() {
   // Mario pays every Ajaltoun bill from the project cash he holds, so money out = every cost booked
   const paidOut = sum(lines);
   const owed = (D.owed || []).reduce((x, o) => x + o.amount, 0);
-  const st = s => lines.filter(l => (l.review && l.review.state) === s);
-  const verified = sum(st('verified')), flaggedN = st('flagged').length;
-  const pendingL = lines.filter(l => !l.review || l.review.state !== 'verified'); const pending = sum(pendingL), pendingN = pendingL.length;
+  const st = s => lines.filter(l => stOf(l) === s);
+  const approved = sum(lines.filter(l => l.review && l.review.approved)), approvedN = lines.filter(l => l.review && l.review.approved).length;
+  const verified = sum(st('verified')), verifiedN = st('verified').length, flaggedN = st('flagged').length;
+  const bookedN = st('booked').length, booked = sum(st('booked')), waitN = st('approved').length, wait = sum(st('approved'));
   const inv = D.income[0];
   const received = inv ? inv.received.reduce((x, p) => x + p.amount, 0) : 0;
   const nextDue = inv ? inv.schedule.find(s => s.residual > 0.005) : null;
@@ -128,7 +133,7 @@ function compute() {
   // the partners: D3 100% Mario, the other five 50/50 (agreement art. 4)
   let mario = 0, antoine = 0;
   for (const x of villas) { if (x.v === 'D3') mario += x.total; else { mario += x.total / 2; antoine += x.total / 2; } }
-  return { lines, cost, equip, sum, paidOut, owed, verified, flaggedN, pending, pendingN, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
+  return { lines, cost, equip, sum, paidOut, owed, approved, approvedN, verified, verifiedN, flaggedN, bookedN, booked, waitN, wait, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
 }
 
 function render() {
@@ -142,7 +147,8 @@ function render() {
       <div class="kpi out"><div class="v">${usd(c.paidOut)}</div><div class="l">paid for Ajaltoun to date${c.owed > 0.5 ? ` · still owed to suppliers ${usd(c.owed)}` : ''}</div></div>
       <div class="kpi cash"><div class="v">${usd(remaining)}</div><div class="l">remaining project cash — held by Mario</div></div>
       <div class="kpi"><div class="v">${inv ? usd(inv.residual) : '—'}</div><div class="l">still to come from the sale${c.nextDue ? ` · next ${usd(c.nextDue.amount)} on ${esc(c.nextDue.due)}` : ''}</div></div>
-      <div class="kpi"><div class="v"><span class="ok">${usd(c.verified)}</span> <span class="small muted">/ ${usd(c.paidOut)}</span></div><div class="l">verified by the partner · ${c.pendingN} lines (${usd(c.pending)}) pending${c.flaggedN ? ` · <span class="flag">${c.flaggedN} flagged</span>` : ''}</div></div>
+      <div class="kpi"><div class="v"><span class="ap">${usd(c.approved)}</span> <span class="small muted">/ ${usd(c.paidOut)}</span></div><div class="l">approved by Mario · ${c.bookedN} lines (${usd(c.booked)}) still to approve</div></div>
+      <div class="kpi"><div class="v"><span class="ok">${usd(c.verified)}</span> <span class="small muted">/ ${usd(c.approved)}</span></div><div class="l">verified by the partner · ${c.waitN} lines (${usd(c.wait)}) waiting for him${c.flaggedN ? ` · <span class="flag">${c.flaggedN} flagged</span>` : ''}</div></div>
       <div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>
     </div>
 
@@ -189,9 +195,9 @@ function render() {
     <div class="filters">
       <select onchange="F.section=this.value;pageNo=0;renderDetail()"><option value="">All sections</option>${D.sections.map(s => `<option value="${s.id}" ${F.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
       <select onchange="F.villa=this.value;pageNo=0;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <select onchange="F.review=this.value;pageNo=0;renderDetail()"><option value="">All lines</option><option value="pending" ${F.review === 'pending' ? 'selected' : ''}>Pending review</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
+      <select onchange="F.review=this.value;F._touched=1;pageNo=0;renderDetail()"><option value="">All lines</option><option value="booked" ${F.review === 'booked' ? 'selected' : ''}>Booked — to approve (Mario)</option><option value="approved" ${F.review === 'approved' ? 'selected' : ''}>Approved — waiting for the partner</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
       <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;pageNo=0;renderDetail()" style="min-width:200px">
-      ${D.admin ? '<span class="small muted">You can change a line\'s section here; "whole supplier" applies it to every line of that supplier.</span>' : ''}
+      ${D.admin ? '<span class="bulk" id="bulk"></span>' : ''}
       <span class="pager" id="pager"><span id="pg-range"></span><button class="btn" onclick="pageBy(-1)" id="pg-prev" title="Previous page">‹</button><button class="btn" onclick="pageBy(1)" id="pg-next" title="Next page">›</button></span>
     </div>
     <div class="card"><div class="wrap" id="detail"></div></div>
@@ -215,7 +221,6 @@ function cashflowRows(c) {
 
 function renderDetail() {
   const q = F.q.toLowerCase();
-  const stOf = l => (l.review && l.review.state) || 'pending';
   const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
     .sort((a, b) => b.date.localeCompare(a.date));
   const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
@@ -224,9 +229,11 @@ function renderDetail() {
   const page = rows.slice(pageNo * PAGE, pageNo * PAGE + PAGE);
   document.getElementById('pg-range').textContent = rows.length ? `${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)} / ${rows.length}` : '0 / 0';
   document.getElementById('pg-prev').disabled = pageNo === 0; document.getElementById('pg-next').disabled = pageNo >= last;
+  if (D.admin) bulkBar(rows);
   document.getElementById('detail').innerHTML = `<table>
-    <thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Review</th></tr></thead>
+    <thead><tr>${D.admin ? `<th class="ck"><input type="checkbox" onchange="tickAll(this.checked)" ${page.length && page.every(l => SEL.has(l.id)) ? 'checked' : ''}></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Review</th></tr></thead>
     <tbody>${page.map(l => `<tr>
+      ${D.admin ? `<td class="ck"><input type="checkbox" ${SEL.has(l.id) ? 'checked' : ''} onchange="tick(${l.id}, this.checked)"></td>` : ''}
       <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
       <td>${esc(l.partner || '—')}</td>
       <td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}<div class="small muted">${esc(l.account)} · ${esc(l.company.replace(/SHIFT /i, ''))}</div></td>
@@ -235,8 +242,8 @@ function renderDetail() {
         <div class="small"><a href="#" class="muted" onclick="setSection(${l.id}, null, true);return false;">whole supplier →</a></div>` : `<span class="pill ${(D.sections.find(s => s.id === l.section) || {}).equipment ? 'eq' : ''}">${esc(secName(l.section))}</span>`}</td>
       <td class="small">${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
       <td class="n">${usd2(l.amount)}</td>
-      <td>${reviewCell(l)}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Nothing matches.</td></tr>'}
-    <tr class="tot"><td colspan="6">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td></tr></tbody></table>`;
+      <td>${reviewCell(l)}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Nothing matches.</td></tr>'}
+    <tr class="tot"><td colspan="${D.admin ? 7 : 6}">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td></tr></tbody></table>`;
 }
 
 // a worker's month-bill carries every receipt of the month: show two, fold the rest behind "+N"
@@ -248,11 +255,38 @@ function fileLinks(l, all) {
 }
 // the four-eyes column: the partner verifies or flags; the writer only sees the stamp (and may clear an answered flag)
 function reviewCell(l) {
-  const r = l.review;
-  const when = r ? r.at.replace('T', ' ').slice(0, 16) : '';
-  if (r && r.state === 'verified') return `<div class="ok">✓ Verified</div><div class="stamp">${esc(r.by)}<br>${esc(when)}</div>${D.canVerify ? `<button class="btn" onclick="review(${l.id}, null)">undo</button>` : ''}`;
-  if (r && r.state === 'flagged') return `<div class="flag">⚑ Flagged</div><div class="stamp">${esc(r.by)} · ${esc(when)}${r.note ? '<br>' + esc(r.note) : ''}</div>${D.canVerify ? `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> <button class="btn" onclick="review(${l.id}, null)">clear</button>` : `<button class="btn" onclick="review(${l.id}, null)" title="Clear the flag once you have answered it">answered</button>`}`;
-  return D.canVerify ? `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> <button class="btn flag" onclick="review(${l.id}, 'flagged')">⚑ Flag</button>` : '<span class="stamp">pending</span>';
+  const r = l.review || {}; const when = s => s ? s.at.replace('T', ' ').slice(0, 16) : '';
+  const line = (cls, label, s) => `<div class="${cls}">${label}</div><div class="stamp">${esc(s.by)} · ${esc(when(s))}</div>`;
+  let html = '';
+  if (r.approved) html += line('ap', '✓ Approved', r.approved);
+  if (r.verified) html += line('ok', '✓✓ Verified', r.verified);
+  if (r.flag) html += line('flag', '⚑ Flagged', r.flag) + (r.flag.note ? `<div class="stamp" style="color:var(--text)">“${esc(r.flag.note)}”</div>` : '');
+  if (D.admin) {
+    if (r.flag) html += `<button class="btn" onclick="review(${l.id}, null)" title="Clear the flag once you have answered it">answered</button> `;
+    html += r.approved ? `<button class="btn" onclick="approve([${l.id}], false)">withdraw</button>` : `<button class="btn ap" onclick="approve([${l.id}], true)">✓ Approve</button>`;
+  } else if (D.canVerify) {
+    if (r.approved && !r.verified) html += `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> `;
+    if (r.approved && !r.flag) html += `<button class="btn flag" onclick="review(${l.id}, 'flagged')">⚑ Flag</button>`;
+    if (r.verified || r.flag) html += ` <button class="btn" onclick="review(${l.id}, null)">undo</button>`;
+    if (!r.approved) html += '<span class="stamp">not yet approved by Mario</span>';
+  }
+  return html || '<span class="stamp">booked</span>';
+}
+function tick(id, on) { if (on) SEL.add(id); else SEL.delete(id); bulkBar(); }
+function tickAll(on) { const q = F.q.toLowerCase(); for (const l of D.lines) { if (visible(l, q)) { if (on) SEL.add(l.id); else SEL.delete(l.id); } } renderDetail(); }
+function visible(l, q) { return (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)); }
+function bulkBar() {
+  const el = document.getElementById('bulk'); if (!el) return;
+  const ids = [...SEL]; const amt = ids.reduce((x, id) => { const l = D.lines.find(y => y.id === id); return x + (l ? l.amount : 0); }, 0);
+  el.innerHTML = ids.length ? `${ids.length} ticked · ${usd2(amt)} <button class="btn ap" onclick="approve([...SEL], true)">✓ Approve ${ids.length}</button> <button class="btn" onclick="approve([...SEL], false)">withdraw</button> <button class="btn" onclick="SEL.clear();renderDetail()">clear</button>`
+    : '<span class="muted">Tick lines (or the header box for the whole filtered list) to approve them in one go.</span>';
+}
+async function approve(ids, on) {
+  try {
+    const r = await Admin.api('POST', '/api/ajaltoun/approve', { lineIds: ids, on });
+    for (const id of ids) { const l = D.lines.find(x => x.id === id); if (l) l.review = r.reviews[String(id)] || null; }
+    SEL.clear(); render();
+  } catch (e) { alert('Could not save: ' + e.message); }
 }
 async function review(lineId, state) {
   let note = '';
