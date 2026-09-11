@@ -4,6 +4,11 @@
 //   GET  /api/ajaltoun/data[?fresh=1]   everything the page shows (cached 10 min; fresh = admin re-pull)
 //   GET  /api/ajaltoun/file/<attId>      an Odoo attachment (the bill scan), streamed for the viewer
 //   POST /api/ajaltoun/section           { lineId, section, forPartner? }  admin: classify a line (or its whole supplier)
+//   POST /api/ajaltoun/verify            { lineId, state: 'verified'|'flagged'|null, note? }
+//
+// Four-eyes rule (Mario, 2026-09-12): Mario books the expenses as project manager, so he cannot verify them —
+// only a member of the app who is NOT an admin (Antoine) can mark a line verified or flag it with a note.
+// The stamp (who, when) lives in Firestore ajaltounVerify/<lineId>; an admin may only clear a flag once answered.
 //
 // Odoo holds the villa dimension (analytic 69 = common works, 59-61 = U1-U3, 62-64 = D1-D3) across
 // S DEV (co 10), SARL (co 2) and S LB (co 7). The WORK SECTION (excavation, stone walls, prefab,
@@ -122,8 +127,10 @@ async function handle(req, res, url, user, ctx) {
     const fresh = /[?&]fresh=1/.test(req.url || '') && access.admin;
     if (fresh || !cache.data || Date.now() - cache.at > 10 * 60e3) { cache = { at: Date.now(), data: await pull(odooCall) }; }
     const mt = await meta(db, TEAM_ID);
-    const lines = cache.data.lines.map(l => ({ ...l, section: sectionOf(l, mt) }));
-    return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), admin: !!access.admin });
+    const vsnap = await db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get();
+    const ver = {}; for (const d of vsnap.docs) ver[d.id] = d.data();
+    const lines = cache.data.lines.map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
+    return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), admin: !!access.admin, canVerify: !access.admin });
   }
 
   if ((m = url.match(/^\/api\/ajaltoun\/file\/(\d+)$/)) && req.method === 'GET') {
@@ -151,6 +158,24 @@ async function handle(req, res, url, user, ctx) {
     } else return json(res, 400, { error: 'lineId or forPartner required' });
     await metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, updatedAt: now(), updatedBy: user.email || '' });
     return json(res, 200, { ok: true });
+  }
+
+  if (url === '/api/ajaltoun/verify' && req.method === 'POST') {
+    const b = await readBody(req);
+    if (!b.lineId) return json(res, 400, { error: 'lineId required' });
+    const ref = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').doc(String(b.lineId));
+    const cur = (await ref.get()).data() || null;
+    if (access.admin) {
+      // the writer cannot verify his own lines; he may only clear a flag he has answered
+      if (!(b.state === null && cur && cur.state === 'flagged')) return json(res, 403, { error: 'the project manager cannot verify his own expenses — a partner must' });
+      await ref.delete();
+      return json(res, 200, { review: null });
+    }
+    if (b.state === null) { await ref.delete(); return json(res, 200, { review: null }); }
+    if (!['verified', 'flagged'].includes(b.state)) return json(res, 400, { error: 'state must be verified, flagged or null' });
+    const review = { state: b.state, by: user.name || user.displayName || user.email || '', email: user.email || '', at: now(), note: String(b.note || '').slice(0, 500) };
+    await ref.set(review);
+    return json(res, 200, { review });
   }
 
   return false;

@@ -40,6 +40,10 @@
   select,input{background:var(--base);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 8px;font-size:.8rem;}
   .pill{font-size:.66rem;padding:2px 7px;border-radius:5px;background:var(--surface0);color:var(--sub);white-space:nowrap;}
   .pill.eq{background:rgba(137,180,250,.15);color:var(--blue);}
+  .ok{color:var(--green);} .flag{color:var(--red);}
+  .btn{background:none;border:1px solid var(--surface1);color:var(--text);border-radius:6px;padding:3px 9px;font-size:.74rem;cursor:pointer;white-space:nowrap;} .btn:hover{border-color:var(--amber);color:var(--amber);}
+  .btn.ok:hover{border-color:var(--green);color:var(--green);} .btn.flag:hover{border-color:var(--red);color:var(--red);}
+  .stamp{font-size:.7rem;color:var(--overlay0);line-height:1.35;}
   .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   @media (max-width:800px){.grid2{grid-template-columns:1fr;} header{padding:12px 14px;} main{padding:18px 12px;} .wrap{overflow-x:auto;}}
@@ -82,7 +86,7 @@ const usd = n => (n < 0 ? '−' : '') + '$' + Math.abs(Math.round(n)).toLocaleSt
 const usd2 = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : '—';
 const VILLA_ORDER = ['Common', 'U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
-let D = null, ME = null, F = { section: '', villa: '', q: '' };
+let D = null, ME = null, F = { section: '', villa: '', q: '', review: '' };
 
 Admin.require('ajaltoun', async me => {
   ME = me;
@@ -105,6 +109,9 @@ function compute() {
   // Mario pays every Ajaltoun bill from the project cash he holds, so money out = every cost booked
   const paidOut = sum(lines);
   const owed = (D.owed || []).reduce((x, o) => x + o.amount, 0);
+  const st = s => lines.filter(l => (l.review && l.review.state) === s);
+  const verified = sum(st('verified')), flaggedN = st('flagged').length;
+  const pendingL = lines.filter(l => !l.review || l.review.state !== 'verified'); const pending = sum(pendingL), pendingN = pendingL.length;
   const inv = D.income[0];
   const received = inv ? inv.received.reduce((x, p) => x + p.amount, 0) : 0;
   const nextDue = inv ? inv.schedule.find(s => s.residual > 0.005) : null;
@@ -116,7 +123,7 @@ function compute() {
   // the partners: D3 100% Mario, the other five 50/50 (agreement art. 4)
   let mario = 0, antoine = 0;
   for (const x of villas) { if (x.v === 'D3') mario += x.total; else { mario += x.total / 2; antoine += x.total / 2; } }
-  return { lines, cost, equip, sum, paidOut, owed, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
+  return { lines, cost, equip, sum, paidOut, owed, verified, flaggedN, pending, pendingN, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
 }
 
 function render() {
@@ -130,6 +137,7 @@ function render() {
       <div class="kpi out"><div class="v">${usd(c.paidOut)}</div><div class="l">paid for Ajaltoun to date${c.owed > 0.5 ? ` · still owed to suppliers ${usd(c.owed)}` : ''}</div></div>
       <div class="kpi cash"><div class="v">${usd(remaining)}</div><div class="l">remaining project cash — held by Mario</div></div>
       <div class="kpi"><div class="v">${inv ? usd(inv.residual) : '—'}</div><div class="l">still to come from the sale${c.nextDue ? ` · next ${usd(c.nextDue.amount)} on ${esc(c.nextDue.due)}` : ''}</div></div>
+      <div class="kpi"><div class="v"><span class="ok">${usd(c.verified)}</span> <span class="small muted">/ ${usd(c.paidOut)}</span></div><div class="l">verified by the partner · ${c.pendingN} lines (${usd(c.pending)}) pending${c.flaggedN ? ` · <span class="flag">${c.flaggedN} flagged</span>` : ''}</div></div>
       <div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>
     </div>
 
@@ -176,6 +184,7 @@ function render() {
     <div class="filters">
       <select onchange="F.section=this.value;renderDetail()"><option value="">All sections</option>${D.sections.map(s => `<option value="${s.id}" ${F.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
       <select onchange="F.villa=this.value;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <select onchange="F.review=this.value;renderDetail()"><option value="">All lines</option><option value="pending" ${F.review === 'pending' ? 'selected' : ''}>Pending review</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
       <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;renderDetail()" style="min-width:200px">
       ${D.admin ? '<span class="small muted">You can change a line\'s section here; "whole supplier" applies it to every line of that supplier.</span>' : ''}
     </div>
@@ -200,11 +209,12 @@ function cashflowRows(c) {
 
 function renderDetail() {
   const q = F.q.toLowerCase();
-  const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
+  const stOf = l => (l.review && l.review.state) || 'pending';
+  const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
     .sort((a, b) => b.date.localeCompare(a.date));
   const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
   document.getElementById('detail').innerHTML = `<table>
-    <thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th></tr></thead>
+    <thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Review</th></tr></thead>
     <tbody>${rows.map(l => `<tr>
       <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
       <td>${esc(l.partner || '—')}</td>
@@ -213,8 +223,9 @@ function renderDetail() {
       <td>${D.admin ? `<select onchange="setSection(${l.id}, this.value, false)">${D.sections.map(s => `<option value="${s.id}" ${s.id === l.section ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
         <div class="small"><a href="#" class="muted" onclick="setSection(${l.id}, null, true);return false;">whole supplier →</a></div>` : `<span class="pill ${(D.sections.find(s => s.id === l.section) || {}).equipment ? 'eq' : ''}">${esc(secName(l.section))}</span>`}</td>
       <td class="small">${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
-      <td class="n">${usd2(l.amount)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Nothing matches.</td></tr>'}
-    <tr class="tot"><td colspan="6">${rows.length} lines</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td></tr></tbody></table>`;
+      <td class="n">${usd2(l.amount)}</td>
+      <td>${reviewCell(l)}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Nothing matches.</td></tr>'}
+    <tr class="tot"><td colspan="6">${rows.length} lines</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td></tr></tbody></table>`;
 }
 
 // a worker's month-bill carries every receipt of the month: show two, fold the rest behind "+N"
@@ -223,6 +234,22 @@ function fileLinks(l, all) {
   const fs = l.files || [];
   if (all || fs.length <= 3) return fs.map(link).join('');
   return fs.slice(0, 2).map(link).join('') + `<a class="file muted" href="#" onclick="this.parentElement.innerHTML = fileLinks(D.lines.find(x => x.id === ${l.id}), true);return false;">+${fs.length - 2} more</a>`;
+}
+// the four-eyes column: the partner verifies or flags; the writer only sees the stamp (and may clear an answered flag)
+function reviewCell(l) {
+  const r = l.review;
+  const when = r ? r.at.replace('T', ' ').slice(0, 16) : '';
+  if (r && r.state === 'verified') return `<div class="ok">✓ Verified</div><div class="stamp">${esc(r.by)}<br>${esc(when)}</div>${D.canVerify ? `<button class="btn" onclick="review(${l.id}, null)">undo</button>` : ''}`;
+  if (r && r.state === 'flagged') return `<div class="flag">⚑ Flagged</div><div class="stamp">${esc(r.by)} · ${esc(when)}${r.note ? '<br>' + esc(r.note) : ''}</div>${D.canVerify ? `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> <button class="btn" onclick="review(${l.id}, null)">clear</button>` : `<button class="btn" onclick="review(${l.id}, null)" title="Clear the flag once you have answered it">answered</button>`}`;
+  return D.canVerify ? `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> <button class="btn flag" onclick="review(${l.id}, 'flagged')">⚑ Flag</button>` : '<span class="stamp">pending</span>';
+}
+async function review(lineId, state) {
+  let note = '';
+  if (state === 'flagged') { note = prompt('What is wrong with this line? (a short note for Mario)'); if (note === null) return; }
+  try {
+    const r = await Admin.api('POST', '/api/ajaltoun/verify', { lineId, state, note });
+    const l = D.lines.find(x => x.id === lineId); l.review = r.review; render();
+  } catch (e) { alert('Could not save: ' + e.message); }
 }
 async function setSection(lineId, section, forPartner) {
   const l = D.lines.find(x => x.id === lineId);
