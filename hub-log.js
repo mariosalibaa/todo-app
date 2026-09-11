@@ -4,7 +4,7 @@
 // area writes into its own collection, `logs/<area>/entries`, in the same shape the account log
 // uses — { at, who, txId, line, before, after, undo } — so one reader and one client module
 // serve them all.
-const LOG_AREAS = ['transfers', 'gold', 'wise', 'budget', 'statements', 'daily'];
+const LOG_AREAS = ['transfers', 'gold', 'wise', 'budget', 'statements', 'daily', 'whatsapp'];
 const logCol = (ws, area) => ws.collection('logs').doc(area).collection('entries');
 
 // what changed, as two flat objects: only the keys whose value actually moved

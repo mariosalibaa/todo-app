@@ -696,27 +696,62 @@ async function importWhatsapp(ctx, account, who) {
   let msgs, chatName = '';
   try {
     chatName = (db.prepare('select subject from chat where _id = ?').get(+cfg.chatId) || {}).subject || '';
-    msgs = db.prepare(`select m._id id, m.timestamp ts, m.from_me me, m.text_data text, j.raw_string sender from message m
+    msgs = db.prepare(`select m._id id, m.key_id key, m.timestamp ts, m.from_me me, m.text_data text, j.raw_string sender from message m
       left join jid j on j._id = m.sender_jid_row_id where m.chat_row_id = ? and m.text_data is not null and m.timestamp >= ? order by m.timestamp`)
       .all(+cfg.chatId, Date.parse(since + 'T00:00:00Z'));
   } finally { db.close(); }
 
+  // rows imported before the live read existed are `wa-<archive _id>` — keep those ids
+  const have = new Set((await ctx.txCol(account).select().get()).docs.map(d => d.id));
+  const lines = [], skipped = {};
+  for (const m of msgs) {
+    const id = have.has('wa-' + m.id) || !m.key ? 'wa-' + m.id : 'wal-' + m.key;
+    const l = waLine(id, m, owner, cfg.lbpRate, skipped);
+    if (l) lines.push(l);
+  }
+  const r = await absorbWaLines(ctx, account, who, lines);
+  await account.ref.set({ whatsapp: { ...cfg, name: chatName, since, first: r.first, last: r.last }, lastWhatsappImport: now(), lastWhatsappImportBy: who }, { merge: true });
+  return { messages: msgs.length, ...r, skipped, group: chatName };
+}
+
+// One message (archive row or live-read row: { id|key, ts, me, text }) → a hub line, or null.
+// The doc id is `wal-<WhatsApp key_id>` whichever way the message arrived, so the archive
+// re-import and the nightly live read land on the same row instead of doubling it.
+function waLine(id, m, owner, lbpRate, skipped) {
+  const p = parseMoney(m.text, owner, !!m.me, lbpRate);
+  if (!p) return null;
+  if (p.skip) { skipped[p.skip] = (skipped[p.skip] || 0) + 1; return null; }
+  const text = String(m.text).replace(/\s+/g, ' ').trim();
+  return { id, src: 'whatsapp', date: beirutDay(m.ts), ref: '', service: 'WhatsApp', phone: '',
+    description: text.slice(0, 160), debit: p.side === 'debit' ? p.amount : 0, credit: p.side === 'credit' ? p.amount : 0,
+    waFrom: m.me ? 'mario' : 'them', waCurrency: p.currency, waAt: new Date(m.ts).toISOString(),
+    kind: /from|to/i.test(text) && p.side ? 'transfer' : '', kindSrc: 'whatsapp', importedAt: now() };
+}
+
+// The nightly read: `wa-contacts/range-read.mjs` messages ({ id, date, time, fromMe, text, type })
+// pushed by the laptop. Same proposals, same ✓ gate, no archive needed.
+async function importWhatsappLive(ctx, account, who, messages, since) {
+  const owner = account.owner || '';
+  const cfg = account.whatsapp || {};
+  const lines = [], skipped = {};
+  for (const m of messages || []) {
+    if (!m.id || !m.text || !m.date) continue;
+    const ts = Date.parse(m.date + 'T' + (m.time || '12:00') + ':00+03:00');
+    const l = waLine('wal-' + m.id, { ts, me: !!m.fromMe, text: m.text }, owner, cfg.lbpRate, skipped);
+    if (l) lines.push(l);
+  }
+  const r = await absorbWaLines(ctx, account, who, lines);
+  const last = (messages || []).reduce((mx, m) => m.date > mx ? m.date : mx, '');
+  await account.ref.set({ waLive: { at: now(), since, messages: (messages || []).length, last, ...r } }, { merge: true });
+  return { messages: (messages || []).length, ...r, skipped };
+}
+
+async function absorbWaLines(ctx, account, who, lines) {
+  const { acc, txCol } = ctx;
   const col = txCol(account);
   const cur = await col.get();
   const existing = {}; cur.docs.forEach(d => { existing[d.id] = d.data(); });
   const targets = cur.docs.map(d => d.data()).filter(t => (t.src === 'odoo' || t.src === 'excel' || t.src === 'manual' || t.src === 'telegram') && !t.excluded);
-
-  const lines = [], skipped = {};
-  for (const m of msgs) {
-    const p = parseMoney(m.text, owner, !!m.me, cfg.lbpRate);
-    if (!p) continue;
-    if (p.skip) { skipped[p.skip] = (skipped[p.skip] || 0) + 1; continue; }
-    const text = String(m.text).replace(/\s+/g, ' ').trim();
-    lines.push({ id: 'wa-' + m.id, src: 'whatsapp', date: beirutDay(m.ts), ref: '', service: 'WhatsApp', phone: '',
-      description: text.slice(0, 160), debit: p.side === 'debit' ? p.amount : 0, credit: p.side === 'credit' ? p.amount : 0,
-      waFrom: m.me ? 'mario' : 'them', waCurrency: p.currency, waAt: new Date(m.ts).toISOString(),
-      kind: /\bfrom\b|\bto\b/i.test(text) && p.side ? 'transfer' : '', kindSrc: 'whatsapp', importedAt: now() });
-  }
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines, targets, { taken, maxDays: 4, loose: true });
   let added = 0, updated = 0, linked = 0, review = 0, accepted = 0, kept = 0;
@@ -741,8 +776,7 @@ async function importWhatsapp(ctx, account, who) {
   });
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
-  await account.ref.set({ whatsapp: { ...cfg, name: chatName, since, first, last }, lastWhatsappImport: now(), lastWhatsappImportBy: who }, { merge: true });
-  return { messages: msgs.length, lines: lines.length, added, updated, kept, linked, review, accepted, skipped, first, last, group: chatName };
+  return { lines: lines.length, added, updated, kept, linked, review, accepted, first, last };
 }
 
 // ── Transfers between this account and the other people's ───────────────────
@@ -997,4 +1031,4 @@ async function writeExcelRow(ctx, account, t, patch) {
   return { wrote, file: base, row: r };
 }
 
-module.exports = { importExcel, importWhatsapp, linkTransfers, listGroups, readExcel, readTimesheet, rateAt, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };
+module.exports = { importExcel, importWhatsapp, importWhatsappLive, linkTransfers, listGroups, readExcel, readTimesheet, rateAt, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };

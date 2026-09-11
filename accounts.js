@@ -42,6 +42,7 @@
 //   POST   /api/accounting/accounts/<id>/import-budget   { budgetAccountId } pull the HomeBudget history
 //   POST   /api/accounting/accounts/<id>/import-excel    read the account's Excel ledger (local machine only)
 //   POST   /api/accounting/accounts/<id>/import-whatsapp read the account's WhatsApp group (local machine only)
+//   POST   /api/accounting/accounts/<id>/whatsapp-live   { messages, since } from the laptop's nightly browser read → proposals
 //   POST   /api/accounting/accounts/<id>/close-statement the statement was sent: every "new" row of the Excel becomes "old" (local machine only)
 //   POST   /api/accounting/accounts/<id>/link-transfers  { loose? } join "from mario" lines with Mario's cash as transfers
 //   POST   /api/accounting/scan/launch                   open HP Smart on this laptop
@@ -1213,6 +1214,19 @@ async function handle(req, res, url, user, ctx) {
     if (whatsappIn(b.whatsapp)) { a.whatsapp = { ...(a.whatsapp || {}), ...whatsappIn(b.whatsapp) }; await a.ref.set({ whatsapp: a.whatsapp }, { merge: true }); }
     try { return json(res, 200, await ledgers.importWhatsapp(ledgerCtx, a, who)); }
     catch (e) { console.error('import-whatsapp', e); return json(res, 400, { error: String(e.message || e) }); }
+  }
+  // the nightly live read (wa-contacts/nightly.mjs) pushes what range-read.mjs saw in his group;
+  // the lines land as proposals behind the ✓ gate exactly like the archive import
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/whatsapp-live$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    if (!Array.isArray(b.messages)) return json(res, 400, { error: 'messages[] required' });
+    try {
+      const r = await ledgers.importWhatsappLive(ledgerCtx, a, who, b.messages, String(b.since || ''));
+      await hubLog(ws, 'whatsapp', { who, txId: 'live', line: `${a.id}: ${r.messages} msgs → ${r.added} new, ${r.updated} updated, ${r.kept} kept`, before: {}, after: r });
+      return json(res, 200, r);
+    } catch (e) { console.error('whatsapp-live', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/link-transfers$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
