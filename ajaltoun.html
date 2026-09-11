@@ -50,6 +50,7 @@
   .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0 4px;} .fact{font-size:.8rem;color:var(--sub);line-height:1.45;} .fact b{display:block;font-size:1.05rem;color:var(--text);font-weight:600;}
   tr.mrow{cursor:pointer;} tr.mrow:hover td{background:rgba(255,255,255,.03);} tr.mdet td{background:rgba(0,0,0,.18);padding:4px 8px 4px 28px;font-size:.78rem;color:var(--sub);}
   td.qin input{width:90px;} td.qin{white-space:nowrap;}
+  .warn{color:var(--amber);} tr.logw td{background:rgba(242,169,59,.07);}
   .stamp{font-size:.7rem;color:var(--overlay0);line-height:1.35;}
   .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -110,6 +111,7 @@ let D = null, ME = null, F = { section: '', villa: '', q: '', review: '' };
 let TAB = (location.hash || '').replace('#', '') || 'accounts';   // accounts · budget · plan
 // the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
 const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
+let LOG = null, logAll = false;
 const SEL = new Set();   // ticked lines, for bulk approval
 // Odoo style: 80 lines a page, "1-80 / 279" with ‹ › — as on the accounting grid
 const PAGE = 80; let pageNo = 0;
@@ -230,9 +232,30 @@ function renderAccounts(app) {
       <span class="pager" id="pager"><span id="pg-range"></span><button class="btn" onclick="pageBy(-1)" id="pg-prev" title="Previous page">‹</button><button class="btn" onclick="pageBy(1)" id="pg-next" title="Next page">›</button></span>
     </div>
     <div class="card"><div class="wrap" id="detail"></div></div>
+
+    <h2>Review log <span class="r muted" id="log-sub"></span></h2>
+    <div class="card"><div class="wrap" id="log"><p class="muted small">Loading…</p></div></div>
     ${(D.owed || []).length ? `<div class="note">Still owed to suppliers (net, from the payables ledger): ${D.owed.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ')}.${(D.prepaid || []).length ? ' Paid ahead of the bill: ' + D.prepaid.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ') + '.' : ''}</div>` : ''}
     <div class="note">What this shows: the bills and cash lines tagged to Ajaltoun 4193 in Odoo (S DEV, SARL, S LB). Not yet in it: worker hours before August 2026, design fees, land and permits — so this is the gross build cost to date, not the full cost of the project.</div>`;
   renderDetail();
+  loadLog();
+}
+
+// ── the audit trail: every review action, newest first; withdrawn verifications stand out ──
+async function loadLog() {
+  try { LOG = await Admin.api('GET', '/api/ajaltoun/log'); } catch (e) { LOG = []; }
+  renderLog();
+}
+function renderLog() {
+  const el = document.getElementById('log'); if (!el || !LOG) return;
+  const bad = LOG.filter(e => /withdrawn|was verified/.test(e.action));
+  document.getElementById('log-sub').innerHTML = `${LOG.length} events${bad.length ? ` · <span class="warn">${bad.length} verification${bad.length > 1 ? 's' : ''} taken back</span>` : ''}${LOG.length > 30 ? ` · <a href="#" style="color:var(--amber)" onclick="logAll=!logAll;renderLog();return false;">${logAll ? 'show last 30' : 'show all'}</a>` : ''}`;
+  const rows = (logAll ? LOG : LOG.slice(0, 30));
+  el.innerHTML = rows.length ? `<table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Line</th><th class="n">Amount</th></tr></thead><tbody>${rows.map(e => `<tr class="${/withdrawn|was verified/.test(e.action) ? 'logw' : ''}">
+    <td class="muted small" style="white-space:nowrap">${esc((e.at || '').replace('T', ' ').slice(0, 16))}</td><td>${esc(e.by || e.email || '')}</td>
+    <td class="${/withdrawn|was verified/.test(e.action) ? 'warn' : /^verified/.test(e.action) ? 'ok' : /^approved/.test(e.action) ? 'ap' : /flag/.test(e.action) ? 'flag' : ''}">${esc(e.action)}${e.undid ? `<div class="stamp">undid the verification by ${esc(e.undid.by)} of ${esc((e.undid.at || '').replace('T', ' ').slice(0, 16))}</div>` : ''}${e.note ? `<div class="stamp">“${esc(e.note)}”</div>` : ''}</td>
+    <td class="small">${esc(e.date || '')} · ${esc(e.partner || '')}<div class="muted">${esc((e.name || '').replace(/^Ajaltoun 4193\s*/i, '').slice(0, 60))}</div></td><td class="n">${usd2(e.amount || 0)}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="muted small">No review actions yet.</p>';
 }
 
 // ── the cash-flow block: one picture, four facts, one row per month ──────────
@@ -353,6 +376,7 @@ function reviewCell(l) {
   if (r.approved) html += line('ap', '✓ Approved', r.approved);
   if (r.verified) html += line('ok', '✓✓ Verified', r.verified);
   if (r.flag) html += line('flag', '⚑ Flagged', r.flag) + (r.flag.note ? `<div class="stamp" style="color:var(--text)">“${esc(r.flag.note)}”</div>` : '');
+  for (const w of (r.withdrawn || [])) html += `<div class="stamp warn" title="A verification that was taken back">↩ verification by ${esc(w.by)} (${esc(when(w))}) withdrawn ${esc((w.undoneAt || '').replace('T', ' ').slice(0, 16))}</div>`;
   if (D.admin) {
     if (r.flag) html += `<button class="btn" onclick="review(${l.id}, null)" title="Clear the flag once you have answered it">answered</button> `;
     html += r.approved ? `<button class="btn" onclick="approve([${l.id}], false)">withdraw</button>` : `<button class="btn ap" onclick="approve([${l.id}], true)">✓ Approve</button>`;

@@ -5,6 +5,7 @@
 //   GET  /api/ajaltoun/file/<attId>      an Odoo attachment (the bill scan), streamed for the viewer
 //   POST /api/ajaltoun/section           { lineId, section, forPartner? }  admin: classify a line (or its whole supplier)
 //   POST /api/ajaltoun/qty                { section, qty, unit }   admin: quantity done so far in a section (for $/unit)
+//   GET  /api/ajaltoun/log                 the review audit trail (every approve / withdraw / verify / flag / undo)
 //   POST /api/ajaltoun/approve           { lineIds: [], on: true|false }        admin (Mario): step 2
 //   POST /api/ajaltoun/verify            { lineId, state: 'verified'|'flagged'|null, note? }   partner: step 3
 //
@@ -199,6 +200,20 @@ async function handle(req, res, url, user, ctx) {
 
   const stamp = () => ({ by: user.name || user.displayName || user.email || '', email: user.email || '', at: now() });
   const vcol = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify');
+  const lcol = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounLog');
+  // the audit trail: who did what to which line — Mario, 2026-09-12: "so I can know if he pulled back a previous approval"
+  const lineOf = id => (cache.data ? cache.data.lines : []).find(l => String(l.id) === String(id));
+  const logEvent = (batch, lineId, action, extra) => {
+    const l = lineOf(lineId) || {};
+    const ev = { at: now(), ...stamp(), lineId: String(lineId), action, date: l.date || '', partner: l.partner || '', amount: l.amount || 0, name: (l.name || '').slice(0, 120), ...(extra || {}) };
+    const ref = lcol.doc(Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+    if (batch) batch.set(ref, ev); else return ref.set(ev);
+  };
+
+  if (url === '/api/ajaltoun/log' && req.method === 'GET') {
+    const snap = await lcol.orderBy('at', 'desc').limit(500).get();
+    return json(res, 200, snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
 
   // step 2 — Mario approves (or withdraws approval, which also drops any verification on the line)
   if (url === '/api/ajaltoun/approve' && req.method === 'POST') {
@@ -212,6 +227,8 @@ async function handle(req, res, url, user, ctx) {
       const next = b.on ? { ...cur, approved: cur.approved || stamp() } : { approved: null, verified: null, flag: cur.flag || null };
       if (!next.approved && !next.verified && !next.flag) batch.delete(vcol.doc(id)); else batch.set(vcol.doc(id), next);
       out[id] = (!next.approved && !next.verified && !next.flag) ? null : next;
+      if (b.on && !cur.approved) logEvent(batch, id, 'approved');
+      if (!b.on && cur.approved) logEvent(batch, id, cur.verified ? 'approval withdrawn (was verified)' : 'approval withdrawn', cur.verified ? { undid: cur.verified } : null);
     }
     await batch.commit();
     return json(res, 200, { reviews: out });
@@ -223,19 +240,22 @@ async function handle(req, res, url, user, ctx) {
     if (!b.lineId) return json(res, 400, { error: 'lineId required' });
     const ref = vcol.doc(String(b.lineId));
     const cur = (await ref.get()).data() || { approved: null, verified: null, flag: null };
-    let next;
+    let next, action, extra = null;
     if (access.admin) {
       if (!(b.state === null && cur.flag)) return json(res, 403, { error: 'the project manager cannot verify his own expenses — a partner must' });
-      next = { ...cur, flag: null };
+      next = { ...cur, flag: null }; action = 'flag answered'; extra = { note: cur.flag.note || '' };
     } else if (b.state === 'verified') {
       if (!cur.approved) return json(res, 400, { error: 'not approved by the project manager yet' });
-      next = { ...cur, verified: stamp(), flag: null };
+      next = { ...cur, verified: stamp(), flag: null }; action = cur.flag ? 'verified (flag lifted)' : 'verified';
     } else if (b.state === 'flagged') {
-      next = { ...cur, verified: null, flag: { ...stamp(), note: String(b.note || '').slice(0, 500) } };
+      next = { ...cur, verified: null, flag: { ...stamp(), note: String(b.note || '').slice(0, 500) } }; action = cur.verified ? 'flagged (was verified)' : 'flagged'; extra = { note: next.flag.note };
+      if (cur.verified) { next.withdrawn = [...(cur.withdrawn || []), { ...cur.verified, undoneAt: now() }]; extra.undid = cur.verified; }
     } else if (b.state === null) {
-      next = { ...cur, verified: null, flag: null };
+      next = { ...cur, verified: null, flag: null }; action = cur.verified ? 'verification withdrawn' : 'flag cleared';
+      if (cur.verified) { next.withdrawn = [...(cur.withdrawn || []), { ...cur.verified, undoneAt: now() }]; extra = { undid: cur.verified }; }
     } else return json(res, 400, { error: 'state must be verified, flagged or null' });
-    if (!next.approved && !next.verified && !next.flag) { await ref.delete(); return json(res, 200, { review: null }); }
+    await logEvent(null, b.lineId, action, extra);
+    if (!next.approved && !next.verified && !next.flag && !(next.withdrawn || []).length) { await ref.delete(); return json(res, 200, { review: null }); }
     await ref.set(next);
     return json(res, 200, { review: next });
   }
