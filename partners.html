@@ -116,6 +116,10 @@ const esc = Admin.esc;
 const ICON = m => /pdf/.test(m) ? '📄' : /word|officedocument/.test(m) ? '📝' : /sheet|excel/.test(m) ? '📊' : /image/.test(m) ? '🖼️' : '📎';
 const kb = n => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB';
 const isAr = s => /[؀-ۿ]/.test(s);
+// "20260830-3 Villa D3 Agreement (Mario Saliba).docx" → title "Villa D3 Agreement (Mario Saliba)", date 2026-08-30:
+// the date under the file comes from Mario's yyyymmdd prefix when there is one, else from the file's own date
+const titleOf = n => n.replace(/\.[a-z0-9]+$/i, '').replace(/^\d{8}(-\d+)?\s+/, '');
+const dateOf = f => { const m = /^(\d{4})(\d{2})(\d{2})/.exec(f.name); return m ? `${m[1]}-${m[2]}-${m[3]}` : (f.mtime || '').slice(0, 10); };
 
 Admin.require('partners', async me => {
   document.getElementById('who').innerHTML =
@@ -142,8 +146,8 @@ Admin.require('partners', async me => {
         <a class="open" href="#${esc(f.id)}" onclick="openViewer('${esc(f.id)}');return false;">
           <div class="ico">${ICON(f.mime)}</div>
           <div style="flex:1;min-width:0">
-            <div class="name ${isAr(f.name) ? 'rtl' : ''}">${esc(f.name.replace(/\.[a-z0-9]+$/i, ''))}</div>
-            <div class="meta">${esc(f.name.split('.').pop().toUpperCase())} · ${kb(f.size)}${f.mtime ? ' · ' + esc(f.mtime.slice(0, 10)) : ''}</div>
+            <div class="name ${isAr(f.name) ? 'rtl' : ''}">${esc(titleOf(f.name))}</div>
+            <div class="meta">${esc(f.name.split('.').pop().toUpperCase())} · ${kb(f.size)} · ${esc(dateOf(f))}</div>
           </div>
         </a>
         <a class="dl" href="/api/partners/files/${esc(f.id)}?dl=1" title="Download">↓</a>
