@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Partners · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--red:#f38ba8;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:860px;margin:0 auto;padding:32px 20px 60px;}
+  h1{font-size:1.35rem;font-weight:600;margin:0 0 6px;}
+  .lead{color:var(--sub);font-size:.88rem;line-height:1.5;margin:0 0 30px;}
+  h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:28px 0 10px;font-weight:600;}
+  .files{display:flex;flex-direction:column;gap:8px;}
+  .file{display:flex;align-items:center;gap:14px;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px 16px;transition:border-color .15s;}
+  .file .open{display:flex;align-items:center;gap:14px;flex:1;min-width:0;text-decoration:none;color:var(--text);}
+  .file:hover{border-color:var(--amber);}
+  .file .ico{font-size:1.35rem;width:30px;text-align:center;flex:none;}
+  .file .name{font-weight:500;font-size:.95rem;line-height:1.3;word-break:break-word;}
+  .file .meta{font-size:.72rem;color:var(--overlay0);margin-top:3px;}
+  .file .dl{flex:none;font-size:.72rem;color:var(--overlay0);border:1px solid var(--surface0);border-radius:6px;padding:4px 9px;text-decoration:none;}
+  .file .dl:hover{color:var(--text);border-color:var(--surface1);}
+  .back{font-size:.78rem;color:var(--overlay0);text-decoration:none;display:inline-block;margin-bottom:18px;}
+  .back:hover{color:var(--text);}
+  .empty{color:var(--overlay0);font-size:.88rem;}
+  .rtl{direction:rtl;text-align:right;}
+  @media (max-width:600px){header{padding:14px 16px;}main{padding:22px 14px;}.file{padding:12px 12px;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>PARTNERS</small></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <a class="back" href="/admin?stay" id="back" style="display:none">&lsaquo; Shift Hub</a>
+  <h1>Ajaltoun 4193 · Villa D3</h1>
+  <p class="lead">The agreements, fee frameworks and proposals between Mario Saliba and Antoine Char. Click a document to open it; the arrow downloads it.</p>
+  <div id="groups"><p class="empty">Loading…</p></div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+const ICON = m => /pdf/.test(m) ? '📄' : /word|officedocument/.test(m) ? '📝' : /sheet|excel/.test(m) ? '📊' : /image/.test(m) ? '🖼️' : '📎';
+const kb = n => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB';
+const isAr = s => /[؀-ۿ]/.test(s);
+
+Admin.require('partners', async me => {
+  document.getElementById('who').innerHTML =
+    `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  // the hub link only for those who have more than this one app
+  if (me.admin || (me.apps || []).length > 1) document.getElementById('back').style.display = '';
+  const box = document.getElementById('groups');
+  let files;
+  try { files = await Admin.api('GET', '/api/partners/files'); }
+  catch (e) { box.innerHTML = `<p class="empty" style="color:var(--red)">Could not load the documents: ${esc(e.message)}</p>`; return; }
+  if (!files.length) { box.innerHTML = '<p class="empty">No documents yet.</p>'; return; }
+  const groups = [];
+  for (const f of files) {
+    let g = groups.find(x => x.name === f.group);
+    if (!g) { g = { name: f.group, files: [] }; groups.push(g); }
+    g.files.push(f);
+  }
+  box.innerHTML = groups.map(g => `
+    <h2>${esc(g.name)}</h2>
+    <div class="files">${g.files.map(f => `
+      <div class="file">
+        <a class="open" href="/api/partners/files/${esc(f.id)}" target="_blank" rel="noopener">
+          <div class="ico">${ICON(f.mime)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="name ${isAr(f.name) ? 'rtl' : ''}">${esc(f.name.replace(/\.[a-z0-9]+$/i, ''))}</div>
+            <div class="meta">${esc(f.name.split('.').pop().toUpperCase())} · ${kb(f.size)}${f.mtime ? ' · ' + esc(f.mtime.slice(0, 10)) : ''}</div>
+          </div>
+        </a>
+        <a class="dl" href="/api/partners/files/${esc(f.id)}?dl=1" title="Download">↓</a>
+      </div>`).join('')}
+    </div>`).join('');
+});
+</script>
+</body>
+</html>

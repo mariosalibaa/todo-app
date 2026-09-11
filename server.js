@@ -7,6 +7,7 @@ const budget = require('./budget');           // /api/accounting/budget/* (HomeB
 const wise = require('./wise');               // /api/accounting/wise/* (Wise statements)
 const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
 const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
+const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -366,7 +367,7 @@ async function executeSyncPlan(direction, odoo, app) {
 // Each approved email carries the list of apps it may open (`apps`, default
 // ['todo']); the admin hub shows only those tiles and the API refuses the rest.
 // Admins always have every app and are the only ones who may edit the list.
-const APPS = ['todo', 'accounting'];
+const APPS = ['todo', 'accounting', 'partners'];
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
@@ -607,11 +608,13 @@ const handler = async (req, res) => {
     'wise.html': path.join(__dirname, 'wise.html'),
     'budget.html': path.join(__dirname, 'budget.html'),
     'dashboard.html': path.join(__dirname, 'dashboard.html'),
+    'partners.html': path.join(__dirname, 'partners.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
-    '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html' };
+    '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
+    '/partners': 'partners.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
@@ -750,6 +753,18 @@ const handler = async (req, res) => {
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {
       console.error('accounting error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(e && e.message || e) }));
+    }
+    return;
+  }
+  if (url.startsWith('/api/partners/')) {
+    if (!access.apps.includes('partners')) return noApp('partners');
+    try {
+      const handled = await partners.handle(req, res, url, user, { db, TEAM_ID, access });
+      if (handled === false) { res.writeHead(404); res.end('not found'); }
+    } catch (e) {
+      console.error('partners error:', e);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(e && e.message || e) }));
     }

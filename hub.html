@@ -54,13 +54,14 @@
   <section id="members" style="display:none;">
     <h2>Members &amp; access</h2>
     <table>
-      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th style="width:40px"></th></tr></thead>
+      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th style="width:40px"></th></tr></thead>
       <tbody id="member-rows"></tbody>
     </table>
     <div class="addrow">
       <input type="email" id="new-email" placeholder="name@gmail.com" style="max-width:280px" onkeydown="if(event.key==='Enter')addMember()">
       <label><input type="checkbox" id="new-todo" checked> To-Do</label>
       <label><input type="checkbox" id="new-acc"> Accounting</label>
+      <label><input type="checkbox" id="new-partners"> Partners</label>
       <button onclick="addMember()">Add</button>
     </div>
     <div class="note">Each app has its own list: a member sees only the tiles ticked here, and the server refuses the others. Changes apply within a minute. Admins (Mario) always have every app.</div>
@@ -75,6 +76,7 @@
 const APPS = [
   { id: 'todo', ico: '✓', name: 'To-Do', desc: 'Team tasks, projects and follow-ups', href: '/todo' },
   { id: 'accounting', ico: '🧾', name: 'Accounting', desc: 'Whish · Wise · Budget — statements, accounts, expenses and income', href: '/accounting' },
+  { id: 'partners', ico: '🤝', name: 'Partners', desc: 'Agreements, fee frameworks and proposals shared with a partner', href: '/partners' },
 ];
 const esc = Admin.esc;
 
@@ -102,10 +104,11 @@ async function loadMembers() {
         <td>${esc(m.email)}${m.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</td>
         <td class="c"><input type="checkbox" data-app="todo" ${apps.includes('todo') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
         <td class="c"><input type="checkbox" data-app="accounting" ${apps.includes('accounting') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
+        <td class="c"><input type="checkbox" data-app="partners" ${apps.includes('partners') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
         <td>${m.admin ? '' : `<button class="ghost" title="Remove" onclick="removeMember('${esc(m.email)}')">✕</button>`}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="4" style="color:var(--overlay0)">Nobody yet</td></tr>';
-  } catch (e) { rows.innerHTML = `<tr><td colspan="4" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
+    }).join('') || '<tr><td colspan="5" style="color:var(--overlay0)">Nobody yet</td></tr>';
+  } catch (e) { rows.innerHTML = `<tr><td colspan="5" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
 }
 async function toggleApp(cb) {
   const tr = cb.closest('tr');
@@ -120,7 +123,8 @@ async function addMember() {
   const apps = [];
   if (document.getElementById('new-todo').checked) apps.push('todo');
   if (document.getElementById('new-acc').checked) apps.push('accounting');
-  try { await Admin.api('POST', '/api/allowlist', { email, apps }); inp.value = ''; document.getElementById('new-acc').checked = false; loadMembers(); }
+  if (document.getElementById('new-partners').checked) apps.push('partners');
+  try { await Admin.api('POST', '/api/allowlist', { email, apps }); inp.value = ''; document.getElementById('new-acc').checked = false; document.getElementById('new-partners').checked = false; loadMembers(); }
   catch (e) { alert('Could not add: ' + e.message); }
 }
 async function removeMember(email) {
