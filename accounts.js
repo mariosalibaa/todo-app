@@ -472,7 +472,10 @@ const journalsIn = list => (Array.isArray(list) ? list : []).map(j => ({ id: +j.
 const openingIn = o => o && o.date ? { date: String(o.date), amount: money(o.amount), note: String(o.note || '') } : null;
 const odooPartnerIn = x => x && x.id ? { id: +x.id, name: String(x.name || '') } : null;
 const excelIn = x => x && x.file ? { file: String(x.file).trim(), sheet: String(x.sheet || '').trim(), layout: String(x.layout || '').toLowerCase().trim() } : null;
-const whatsappIn = x => x && x.chatId ? { chatId: +x.chatId, since: /^\d{4}-\d{2}-\d{2}$/.test(String(x.since || '')) ? String(x.since) : '', lbpRate: +x.lbpRate || 0 } : null;
+// `name` is the chat title as WhatsApp Web shows it — the archive fills it for groups, but a
+// one-to-one chat (Anthony, Kamal) has no subject there, so it is set by hand
+const whatsappIn = x => x && x.chatId ? { chatId: +x.chatId, since: /^\d{4}-\d{2}-\d{2}$/.test(String(x.since || '')) ? String(x.since) : '', lbpRate: +x.lbpRate || 0,
+  ...(x.name ? { name: String(x.name).trim() } : {}) } : null;
 
 // ── Router ───────────────────────────────────────────────────────────────────
 // ── A worker's day, read out of his WhatsApp group ───────────────────────────

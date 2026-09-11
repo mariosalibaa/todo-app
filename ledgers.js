@@ -710,7 +710,7 @@ async function importWhatsapp(ctx, account, who) {
     if (l) lines.push(l);
   }
   const r = await absorbWaLines(ctx, account, who, lines);
-  await account.ref.set({ whatsapp: { ...cfg, name: chatName, since, first: r.first, last: r.last }, lastWhatsappImport: now(), lastWhatsappImportBy: who }, { merge: true });
+  await account.ref.set({ whatsapp: { ...cfg, name: chatName || cfg.name || '', since, first: r.first, last: r.last }, lastWhatsappImport: now(), lastWhatsappImportBy: who }, { merge: true });
   return { messages: msgs.length, ...r, skipped, group: chatName };
 }
 
