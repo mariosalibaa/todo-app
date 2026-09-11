@@ -53,8 +53,9 @@
   .trows .k{color:var(--overlay0);} .trows .v{color:var(--text);}
   .ttable{width:100%;border-collapse:collapse;font-size:.83rem;margin:4px 0 14px;}
   .ttable th{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);}
-  .ttable td{padding:7px 8px;border-bottom:1px solid var(--surface0);} .ttable td:nth-child(2),.ttable td:nth-child(4),.ttable th:nth-child(2),.ttable th:nth-child(4){text-align:right;white-space:nowrap;}
-  #terms.rtl .ttable th,#terms.rtl .ttable td{text-align:right;} #terms.rtl .ttable td:nth-child(2),#terms.rtl .ttable td:nth-child(4),#terms.rtl .ttable th:nth-child(2),#terms.rtl .ttable th:nth-child(4){text-align:left;}
+  .ttable td{padding:7px 8px;border-bottom:1px solid var(--surface0);} .ttable td:not(:first-child),.ttable th:not(:first-child){text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .ttable tr.hi td{background:rgba(242,169,59,.12);color:var(--amber);font-weight:600;}
+  #terms.rtl .ttable th,#terms.rtl .ttable td{text-align:right;} #terms.rtl .ttable td:not(:first-child),#terms.rtl .ttable th:not(:first-child){text-align:left;}
   #terms.rtl{font-family:"Segoe UI",Tahoma,system-ui,sans-serif;}
   @media (max-width:600px){.trows{grid-template-columns:1fr;gap:2px 0;} .trows .k{margin-top:8px;font-size:.72rem;} .tsec{padding:14px;} .ttable{display:block;overflow-x:auto;}}
   /* the viewer: same tab, its own top bar, so there is always a way back */
@@ -178,7 +179,7 @@ function renderTerms() {
       ${s.sub ? `<p class="tsub">${esc(t(s.sub))}</p>` : ''}
       ${s.kpis ? `<div class="kpis">${s.kpis.map(k => `<div class="kpi"><div class="v">${esc(t(k.v))}</div><div class="l">${esc(t(k.l))}</div></div>`).join('')}</div>` : ''}
       ${s.table ? `<table class="ttable"><thead><tr>${s.table.head.map(h => `<th>${esc(t(h))}</th>`).join('')}</tr></thead>
-        <tbody>${s.table.rows.map(r => `<tr>${r.map(c => `<td>${esc(t(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}
+        <tbody>${s.table.rows.map(r => { const cells = Array.isArray(r) ? r : r.cells; return `<tr${!Array.isArray(r) && r.hi ? ' class="hi"' : ''}>${cells.map(c => `<td>${esc(t(c))}</td>`).join('')}</tr>`; }).join('')}</tbody></table>` : ''}
       ${s.rows ? `<div class="trows">${s.rows.map(r => `<div class="k">${esc(t(r.k))}</div><div class="v">${esc(t(r.v))}</div>`).join('')}</div>` : ''}
     </section>`).join('');
 }
