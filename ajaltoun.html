@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Ajaltoun 4193 · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1100px;margin:0 auto;padding:26px 20px 60px;}
+  h1{font-size:1.35rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.86rem;margin:0 0 22px;line-height:1.5;}
+  h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:30px 0 10px;font-weight:600;display:flex;align-items:center;gap:10px;}
+  h2 .r{margin-left:auto;font-weight:400;letter-spacing:0;text-transform:none;font-size:.74rem;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px 14px;}
+  .kpi .v{font-size:1.35rem;font-weight:600;letter-spacing:-.01em;} .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;}
+  .kpi.in .v{color:var(--green);} .kpi.out .v{color:var(--red);} .kpi.cash .v{color:var(--amber);} .kpi.eq .v{color:var(--blue);}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:16px 18px;}
+  table{width:100%;border-collapse:collapse;font-size:.84rem;}
+  th{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  td{padding:7px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;}
+  td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  tr.tot td{font-weight:600;background:rgba(242,169,59,.10);color:var(--amber);}
+  tr.eq td{color:var(--blue);}
+  .bar{height:6px;background:var(--surface0);border-radius:3px;overflow:hidden;min-width:120px;} .bar i{display:block;height:100%;background:var(--amber);}
+  .muted{color:var(--overlay0);} .small{font-size:.74rem;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.8rem;color:var(--sub);line-height:1.5;margin-top:14px;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  select,input{background:var(--base);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 8px;font-size:.8rem;}
+  .pill{font-size:.66rem;padding:2px 7px;border-radius:5px;background:var(--surface0);color:var(--sub);white-space:nowrap;}
+  .pill.eq{background:rgba(137,180,250,.15);color:var(--blue);}
+  .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr;} header{padding:12px 14px;} main{padding:18px 12px;} .wrap{overflow-x:auto;}}
+  /* the viewer, as on the Partners page */
+  #viewer{position:fixed;inset:0;background:#0f0f17;z-index:500;display:none;flex-direction:column;} #viewer.on{display:flex;}
+  .vbar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--mantle);border-bottom:1px solid var(--surface0);flex:none;}
+  .vbar .vback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:6px 8px;border-radius:8px;} .vbar .vback:hover{background:var(--surface0);}
+  .vbar .vtitle{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .vbar .vbtn{color:var(--sub);text-decoration:none;font-size:.78rem;border:1px solid var(--surface0);border-radius:6px;padding:5px 10px;white-space:nowrap;}
+  .vbody{flex:1;overflow:auto;padding:12px;} .vbody canvas,.vbody img{display:block;margin:0 auto 12px;max-width:100%;height:auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.5);}
+  .vstatus{color:var(--overlay0);font-size:.85rem;text-align:center;padding:40px 0;}
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft">
+    <a class="hback" href="/admin?stay">&lsaquo; Back</a>
+    <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
+  </div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1>Ajaltoun 4193 · Accounts</h1>
+  <p class="lead">Money in from the sale of Villa U2, money out for the works, and what remains — read live from Odoo. Costs are grouped by work section and by villa, then shared between the partners the way the D3 agreement says.</p>
+  <div id="app"><p class="muted">Loading from Odoo…</p></div>
+</main>
+<div id="viewer">
+  <div class="vbar"><a class="vback" href="#" onclick="closeViewer();return false;">&lsaquo; Back</a><div class="vtitle" id="vtitle"></div><a class="vbtn" id="vtab" href="#" target="_blank" rel="noopener">Open in new tab</a></div>
+  <div class="vbody" id="vbody"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+const usd = n => (n < 0 ? '−' : '') + '$' + Math.abs(Math.round(n)).toLocaleString('en-US');
+const usd2 = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : '—';
+const VILLA_ORDER = ['Common', 'U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
+let D = null, ME = null, F = { section: '', villa: '', q: '' };
+
+Admin.require('ajaltoun', async me => {
+  ME = me;
+  document.getElementById('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  await load();
+});
+async function load(fresh) {
+  try { D = await Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')); render(); }
+  catch (e) { document.getElementById('app').innerHTML = `<p style="color:var(--red)">Could not read Odoo: ${esc(e.message)}</p>`; }
+}
+
+// ── the numbers ────────────────────────────────────────────────────────────
+function compute() {
+  const secOf = id => D.sections.find(s => s.id === id) || { id, name: id };
+  const isEq = l => !!secOf(l.section).equipment;
+  const lines = D.lines;
+  const cost = lines.filter(l => !isEq(l));          // what the partners share
+  const equip = lines.filter(isEq);                  // reusable: prefab, scaffolding
+  const sum = a => a.reduce((x, l) => x + l.amount, 0);
+  // Mario pays every Ajaltoun bill from the project cash he holds, so money out = every cost booked
+  const paidOut = sum(lines);
+  const owed = (D.owed || []).reduce((x, o) => x + o.amount, 0);
+  const inv = D.income[0];
+  const received = inv ? inv.received.reduce((x, p) => x + p.amount, 0) : 0;
+  const nextDue = inv ? inv.schedule.find(s => s.residual > 0.005) : null;
+  // by section
+  const bySec = D.sections.map(s => ({ ...s, amount: sum(lines.filter(l => l.section === s.id)), n: lines.filter(l => l.section === s.id).length })).filter(s => s.n);
+  // by villa (shared cost only): common ÷ 6 lands on every villa
+  const common = sum(cost.filter(l => l.villa === 'Common'));
+  const villas = VILLA_ORDER.filter(v => v !== 'Common').map(v => { const own = sum(cost.filter(l => l.villa === v)); return { v, own, common: common / 6, total: own + common / 6 }; });
+  // the partners: D3 100% Mario, the other five 50/50 (agreement art. 4)
+  let mario = 0, antoine = 0;
+  for (const x of villas) { if (x.v === 'D3') mario += x.total; else { mario += x.total / 2; antoine += x.total / 2; } }
+  return { lines, cost, equip, sum, paidOut, owed, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
+}
+
+function render() {
+  const c = compute();
+  const app = document.getElementById('app');
+  const inv = c.inv;
+  const remaining = c.received - c.paidOut;
+  app.innerHTML = `
+    <div class="kpis">
+      <div class="kpi in"><div class="v">${usd(c.received)}</div><div class="l">received from ${inv ? esc(inv.partner) : 'the buyer'} · ${inv ? inv.received.length : 0} instalments of ${inv ? usd(inv.total) : ''}</div></div>
+      <div class="kpi out"><div class="v">${usd(c.paidOut)}</div><div class="l">paid for Ajaltoun to date${c.owed > 0.5 ? ` · still owed to suppliers ${usd(c.owed)}` : ''}</div></div>
+      <div class="kpi cash"><div class="v">${usd(remaining)}</div><div class="l">remaining project cash — held by Mario</div></div>
+      <div class="kpi"><div class="v">${inv ? usd(inv.residual) : '—'}</div><div class="l">still to come from the sale${c.nextDue ? ` · next ${usd(c.nextDue.amount)} on ${esc(c.nextDue.due)}` : ''}</div></div>
+      <div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>
+    </div>
+
+    <h2>Cash flow <span class="r muted">in − out = remaining</span></h2>
+    <div class="card"><div class="wrap"><table>
+      <thead><tr><th>Date</th><th>What</th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th></tr></thead>
+      <tbody>${cashflowRows(c)}</tbody>
+    </table></div></div>
+
+    <h2>Costs by work section</h2>
+    <div class="card"><div class="wrap"><table>
+      <thead><tr><th>Section</th><th class="n">Lines</th><th class="n">Amount</th><th>Share</th><th class="n">% of cost</th></tr></thead>
+      <tbody>${c.bySec.map(s => `<tr class="${s.equipment ? 'eq' : ''}"><td>${esc(s.name)}${s.equipment ? ' <span class="pill eq">equipment</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${usd2(s.amount)}</td>
+        <td><div class="bar"><i style="width:${Math.min(100, 100 * s.amount / Math.max(1, c.costTotal))}%"></i></div></td><td class="n">${s.equipment ? '—' : pct(s.amount, c.costTotal)}</td></tr>`).join('')}
+      <tr class="tot"><td>Project cost to date (without equipment)</td><td class="n">${c.cost.length}</td><td class="n">${usd2(c.costTotal)}</td><td></td><td class="n">100%</td></tr>
+      </tbody></table></div>
+      <div class="note">Prefab and scaffolding are bought once and can serve the next project, so they are shown as equipment and left out of the cost the partners share. Whether Ajaltoun should bear a usage charge for them is still to be agreed.</div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <h2>Costs by villa</h2>
+        <div class="card"><div class="wrap"><table>
+          <thead><tr><th>Villa</th><th class="n">Own works</th><th class="n">1/6 of common</th><th class="n">Total</th></tr></thead>
+          <tbody>${c.villas.map(x => `<tr><td>${x.v}${x.v === 'D3' ? ' <span class="pill">Mario 100%</span>' : ''}</td><td class="n">${usd2(x.own)}</td><td class="n">${usd2(x.common)}</td><td class="n">${usd2(x.total)}</td></tr>`).join('')}
+          <tr class="tot"><td>Total</td><td class="n">${usd2(c.costTotal - c.common)}</td><td class="n">${usd2(c.common)}</td><td class="n">${usd2(c.costTotal)}</td></tr></tbody>
+        </table></div><p class="small muted" style="margin:8px 0 0">Common works ${usd2(c.common)} — roads, walls, networks, site — split equally over the six villas (agreement art. 4, step 1).</p></div>
+      </div>
+      <div>
+        <h2>Each partner's share</h2>
+        <div class="card"><div class="wrap"><table>
+          <thead><tr><th>Partner</th><th class="n">Share of cost</th><th class="n">%</th></tr></thead>
+          <tbody>
+            <tr><td>Mario Saliba <span class="small muted">D3 in full + half of the five</span></td><td class="n">${usd2(c.mario)}</td><td class="n">${pct(c.mario, c.costTotal)}</td></tr>
+            <tr><td>Antoine Char <span class="small muted">half of the five</span></td><td class="n">${usd2(c.antoine)}</td><td class="n">${pct(c.antoine, c.costTotal)}</td></tr>
+            <tr class="tot"><td>Total</td><td class="n">${usd2(c.costTotal)}</td><td class="n">100%</td></tr>
+          </tbody></table></div>
+          <p class="small muted" style="margin:8px 0 0">Everything so far was paid out of the project cash (Jean's instalments), which belongs to both partners equally — so no balance is due between them on these costs yet. The balance appears once a partner pays from his own pocket, or when D3's costs start.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>Detail <span class="r muted">${c.lines.length} lines · Odoo pulled ${esc((D.cachedAt || '').replace('T', ' ').slice(0, 16))}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">re-pull</a>` : ''}</span></h2>
+    <div class="filters">
+      <select onchange="F.section=this.value;renderDetail()"><option value="">All sections</option>${D.sections.map(s => `<option value="${s.id}" ${F.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+      <select onchange="F.villa=this.value;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;renderDetail()" style="min-width:200px">
+      ${D.admin ? '<span class="small muted">You can change a line\'s section here; "whole supplier" applies it to every line of that supplier.</span>' : ''}
+    </div>
+    <div class="card"><div class="wrap" id="detail"></div></div>
+    ${(D.owed || []).length ? `<div class="note">Still owed to suppliers (net, from the payables ledger): ${D.owed.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ')}.${(D.prepaid || []).length ? ' Paid ahead of the bill: ' + D.prepaid.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ') + '.' : ''}</div>` : ''}
+    <div class="note">What this shows: the bills and cash lines tagged to Ajaltoun 4193 in Odoo (S DEV, SARL, S LB). Not yet in it: worker hours before August 2026, design fees, land and permits — so this is the gross build cost to date, not the full cost of the project.</div>`;
+  renderDetail();
+}
+
+function cashflowRows(c) {
+  const ev = [];
+  for (const p of (c.inv ? c.inv.received : [])) ev.push({ date: p.date, what: `Instalment from ${c.inv.partner} · ${p.journal}`, inn: p.amount, out: 0 });
+  // payments out, grouped by month and section so the table stays readable
+  const g = {};
+  for (const l of c.lines) { const k = l.date.slice(0, 7) + '|' + l.section; g[k] = g[k] || { date: l.date.slice(0, 7) + '-28', what: `${l.date.slice(0, 7)} · ${(D.sections.find(s => s.id === l.section) || {}).name || l.section}`, inn: 0, out: 0, n: 0 }; g[k].out += l.amount; g[k].n++; }
+  ev.push(...Object.values(g).map(x => ({ ...x, what: x.what + ` (${x.n} lines)` })));
+  ev.sort((a, b) => a.date.localeCompare(b.date));
+  let bal = 0;
+  return ev.map(e => { bal += e.inn - e.out; return `<tr><td class="muted small">${esc(e.date.slice(0, 7))}</td><td>${esc(e.what)}</td><td class="n" style="color:var(--green)">${e.inn ? usd2(e.inn) : ''}</td><td class="n" style="color:var(--red)">${e.out ? usd2(e.out) : ''}</td><td class="n">${usd2(bal)}</td></tr>`; }).join('')
+    + `<tr class="tot"><td></td><td>Remaining project cash</td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(c.received - c.paidOut)}</td></tr>`;
+}
+
+function renderDetail() {
+  const q = F.q.toLowerCase();
+  const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
+  document.getElementById('detail').innerHTML = `<table>
+    <thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th></tr></thead>
+    <tbody>${rows.map(l => `<tr>
+      <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
+      <td>${esc(l.partner || '—')}</td>
+      <td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}<div class="small muted">${esc(l.account)} · ${esc(l.company.replace(/SHIFT /i, ''))}</div></td>
+      <td><span class="pill">${esc(l.villa)}</span></td>
+      <td>${D.admin ? `<select onchange="setSection(${l.id}, this.value, false)">${D.sections.map(s => `<option value="${s.id}" ${s.id === l.section ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+        <div class="small"><a href="#" class="muted" onclick="setSection(${l.id}, null, true);return false;">whole supplier →</a></div>` : `<span class="pill ${(D.sections.find(s => s.id === l.section) || {}).equipment ? 'eq' : ''}">${esc(secName(l.section))}</span>`}</td>
+      <td class="small">${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
+      <td class="n">${usd2(l.amount)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Nothing matches.</td></tr>'}
+    <tr class="tot"><td colspan="6">${rows.length} lines</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td></tr></tbody></table>`;
+}
+
+// a worker's month-bill carries every receipt of the month: show two, fold the rest behind "+N"
+function fileLinks(l, all) {
+  const link = f => `<a class="file" href="#" onclick="openFile(${f.id}, '${esc(f.name).replace(/'/g, '')}', '${esc(f.mime)}');return false;">📎 ${esc(f.name.length > 28 ? f.name.slice(0, 26) + '…' : f.name)}</a>`;
+  const fs = l.files || [];
+  if (all || fs.length <= 3) return fs.map(link).join('');
+  return fs.slice(0, 2).map(link).join('') + `<a class="file muted" href="#" onclick="this.parentElement.innerHTML = fileLinks(D.lines.find(x => x.id === ${l.id}), true);return false;">+${fs.length - 2} more</a>`;
+}
+async function setSection(lineId, section, forPartner) {
+  const l = D.lines.find(x => x.id === lineId);
+  const sel = event.target.closest('td').querySelector('select');
+  const sec = section || sel.value;
+  try {
+    await Admin.api('POST', '/api/ajaltoun/section', forPartner ? { section: sec, forPartner: l.partner } : { lineId, section: sec });
+    if (forPartner) for (const x of D.lines) { if (x.partner === l.partner) x.section = sec; } else l.section = sec;
+    render();
+  } catch (e) { alert('Could not save: ' + e.message); }
+}
+
+// ── the bill scan, in the page ─────────────────────────────────────────────
+async function openFile(id, name, mime) {
+  const url = '/api/ajaltoun/file/' + id;
+  const v = document.getElementById('viewer'), body = document.getElementById('vbody');
+  document.getElementById('vtitle').textContent = name; document.getElementById('vtab').href = url;
+  v.classList.add('on'); document.body.style.overflow = 'hidden'; body.innerHTML = '<div class="vstatus">Loading…</div>';
+  try {
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + (Admin.session || '') } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const buf = await r.arrayBuffer();
+    body.innerHTML = '';
+    if (/pdf/.test(mime)) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const width = Math.min(body.clientWidth - 24, 900);
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i); const scale = width / page.getViewport({ scale: 1 }).width; const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const vp = page.getViewport({ scale: scale * dpr }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.style.width = width + 'px';
+        body.appendChild(c); await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      }
+    } else if (/image/.test(mime)) { const img = document.createElement('img'); img.src = URL.createObjectURL(new Blob([buf], { type: mime })); body.appendChild(img); }
+    else body.innerHTML = `<div class="vstatus">This file type cannot be shown here — <a href="${url}" target="_blank" style="color:var(--amber)">open it in a new tab</a>.</div>`;
+  } catch (e) { body.innerHTML = `<div class="vstatus">Could not load the file (${esc(e.message)}).</div>`; }
+}
+function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
+</script>
+</body>
+</html>

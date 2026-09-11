@@ -112,7 +112,7 @@
       const cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
       if (cfg.authDisabled) {   // local machine: no sign-in, everything open
         A.disabled = true;
-        A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners'], admin: true, local: true };
+        A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners', 'ajaltoun'], admin: true, local: true };
         ready = true; overlay(''); onReady(A.me); return;
       }
       overlay(card('Checking session…'));

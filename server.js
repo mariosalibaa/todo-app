@@ -8,6 +8,7 @@ const wise = require('./wise');               // /api/accounting/wise/* (Wise st
 const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
 const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
+const ajaltoun = require('./ajaltoun');        // /api/ajaltoun/* (the project's accounts, from Odoo)
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -367,7 +368,7 @@ async function executeSyncPlan(direction, odoo, app) {
 // Each approved email carries the list of apps it may open (`apps`, default
 // ['todo']); the admin hub shows only those tiles and the API refuses the rest.
 // Admins always have every app and are the only ones who may edit the list.
-const APPS = ['todo', 'accounting', 'partners'];
+const APPS = ['todo', 'accounting', 'partners', 'ajaltoun'];
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
@@ -609,12 +610,13 @@ const handler = async (req, res) => {
     'budget.html': path.join(__dirname, 'budget.html'),
     'dashboard.html': path.join(__dirname, 'dashboard.html'),
     'partners.html': path.join(__dirname, 'partners.html'),
+    'ajaltoun.html': path.join(__dirname, 'ajaltoun.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
-    '/partners': 'partners.html' };
+    '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
@@ -753,6 +755,18 @@ const handler = async (req, res) => {
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {
       console.error('accounting error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(e && e.message || e) }));
+    }
+    return;
+  }
+  if (url.startsWith('/api/ajaltoun/')) {
+    if (!access.apps.includes('ajaltoun')) return noApp('ajaltoun');
+    try {
+      const handled = await ajaltoun.handle(req, res, url, user, { db, TEAM_ID, odooCall, access });
+      if (handled === false) { res.writeHead(404); res.end('not found'); }
+    } catch (e) {
+      console.error('ajaltoun error:', e);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(e && e.message || e) }));
     }
