@@ -264,7 +264,9 @@
     try { await Admin.api('POST', '/api/ajaltoun/plan/settings', { settings }); await load(); window.renderTab && renderTab(); } catch (e) { alert('Could not save: ' + e.message); }
   }
 
-  window.Plan = { load, renderBudget, renderPlan, get P() { return P; },
+  // planned money out per year in the current scenario (the Accounts tab's cash-flow facts use it)
+  function yearOut() { if (!P) return null; const R = plan(); const o = {}; for (const y of R.years) o[y] = R.tot(R.out, y); return o; }
+  window.Plan = { load, renderBudget, renderPlan, yearOut, get P() { return P; },
     setTab: t => { tab = t; window.renderTab && renderTab(); }, setScenario: s => { scenario = s; window.renderTab && renderTab(); },
     edit: id => { editing = id || ''; renderEdit(); }, useRef, closeEdit: () => { editing = null; const el = document.getElementById('plan-edit'); if (el) el.innerHTML = ''; }, save, remove, saveSettings };
 })();

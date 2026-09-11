@@ -4,6 +4,7 @@
 //   GET  /api/ajaltoun/data[?fresh=1]   everything the page shows (cached 10 min; fresh = admin re-pull)
 //   GET  /api/ajaltoun/file/<attId>      an Odoo attachment (the bill scan), streamed for the viewer
 //   POST /api/ajaltoun/section           { lineId, section, forPartner? }  admin: classify a line (or its whole supplier)
+//   POST /api/ajaltoun/qty                { section, qty, unit }   admin: quantity done so far in a section (for $/unit)
 //   POST /api/ajaltoun/approve           { lineIds: [], on: true|false }        admin (Mario): step 2
 //   POST /api/ajaltoun/verify            { lineId, state: 'verified'|'flagged'|null, note? }   partner: step 3
 //
@@ -131,7 +132,7 @@ async function pull(odooCall) {
 const metaRef = (db, TEAM_ID) => db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('sections');
 async function meta(db, TEAM_ID) {
   const d = (await metaRef(db, TEAM_ID).get()).data();
-  return { rules: (d && d.rules) || DEFAULT_RULES, overrides: (d && d.overrides) || {} };
+  return { rules: (d && d.rules) || DEFAULT_RULES, overrides: (d && d.overrides) || {}, qty: (d && d.qty) || {} };
 }
 // section of a line: an explicit override, else the first supplier rule that matches, else general
 function sectionOf(l, m) {
@@ -154,7 +155,7 @@ async function handle(req, res, url, user, ctx) {
     const vsnap = await db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get();
     const ver = {}; for (const d of vsnap.docs) { const x = d.data(); ver[d.id] = x.state ? { approved: null, verified: x.state === 'verified' ? x : null, flag: x.state === 'flagged' ? x : null } : x; }   // (old one-field shape)
     const lines = cache.data.lines.map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
-    return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), admin: !!access.admin, canVerify: !access.admin });
+    return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
   }
 
   if ((m = url.match(/^\/api\/ajaltoun\/file\/(\d+)$/)) && req.method === 'GET') {
@@ -180,8 +181,20 @@ async function handle(req, res, url, user, ctx) {
     } else if (b.lineId) {
       mt.overrides[b.lineId] = b.section;
     } else return json(res, 400, { error: 'lineId or forPartner required' });
-    await metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, updatedAt: now(), updatedBy: user.email || '' });
+    await metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, qty: mt.qty, updatedAt: now(), updatedBy: user.email || '' });
     return json(res, 200, { ok: true });
+  }
+
+  // quantity executed so far in a section (m³ excavated, m² of wall…) — typed by Mario, gives the $/unit next to the BOQ rate
+  if (url === '/api/ajaltoun/qty' && req.method === 'POST') {
+    if (!access.admin) return json(res, 403, { error: 'admin only' });
+    const b = await readBody(req);
+    if (!SECTIONS.some(s => s.id === b.section)) return json(res, 400, { error: 'unknown section' });
+    const mt = await meta(db, TEAM_ID);
+    if (b.qty == null || b.qty === '') delete mt.qty[b.section];
+    else mt.qty[b.section] = { qty: +b.qty, unit: String(b.unit || '').slice(0, 12), at: now(), by: user.email || '' };
+    await metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, qty: mt.qty, updatedAt: now(), updatedBy: user.email || '' });
+    return json(res, 200, { qtyDone: mt.qty });
   }
 
   const stamp = () => ({ by: user.name || user.displayName || user.email || '', email: user.email || '', at: now() });
