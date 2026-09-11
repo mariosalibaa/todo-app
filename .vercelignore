@@ -12,3 +12,4 @@ migrate-json-to-firestore.js
 update-statuses.js
 start-todo*.bat
 render.yaml
+partners-terms.json

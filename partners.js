@@ -40,6 +40,12 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, list);
   }
 
+  // The key figures shown above the documents (written by partners-sync.mjs)
+  if (url === '/api/partners/terms' && req.method === 'GET') {
+    const d = (await db.collection('workspaces').doc(TEAM_ID).collection('partnersMeta').doc('terms').get()).data();
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end((d && d.json) || 'null'); return true;
+  }
+
   // One file, streamed inline so a PDF opens in the tab (the cookie authenticates a GET)
   if ((m = url.match(/^\/api\/partners\/files\/([\w-]+)$/)) && req.method === 'GET') {
     const d = (await col.doc(m[1]).get()).data();

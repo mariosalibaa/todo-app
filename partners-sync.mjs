@@ -60,5 +60,11 @@ for (const [id, r] of remote) {   // on the hub but no longer in the folder → 
   console.log(`DEL   ${r.name}`); changed++;
   if (!DRY) await col.doc(id).delete();
 }
-console.log(`${DRY ? 'would change' : 'changed'} ${changed} file(s); ${local.length} on the hub`);
+// "Terms at a glance" — the key figures, kept next to this script (git-ignored, like the files) and pushed whole
+const terms = JSON.parse(readFileSync(new URL('./partners-terms.json', import.meta.url), 'utf8'));
+const meta = admin.firestore().collection('workspaces').doc(process.env.TEAM_ID || 'team').collection('partnersMeta').doc('terms');
+const cur = (await meta.get()).data();
+if (cur && cur.json === JSON.stringify(terms)) console.log('ok    terms at a glance');
+else { console.log('UPD   terms at a glance'); changed++; if (!DRY) await meta.set({ json: JSON.stringify(terms), updatedAt: new Date().toISOString(), updatedBy: 'partners-sync' }); }
+console.log(`${DRY ? 'would change' : 'changed'} ${changed} item(s); ${local.length} file(s) on the hub`);
 process.exit(0);

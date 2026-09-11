@@ -34,6 +34,29 @@
   .back:hover{color:var(--text);}
   .empty{color:var(--overlay0);font-size:.88rem;}
   .rtl{direction:rtl;text-align:right;}
+  /* terms at a glance */
+  .termsbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+  .lang button{background:none;border:1px solid var(--surface0);color:var(--sub);font-size:.75rem;padding:4px 11px;cursor:pointer;}
+  .lang button:first-child{border-radius:6px 0 0 6px;} .lang button:last-child{border-radius:0 6px 6px 0;margin-left:-1px;}
+  .lang button.on{background:var(--amber);border-color:var(--amber);color:var(--base);font-weight:600;}
+  .tnote{font-size:.78rem;color:var(--overlay0);margin:0 0 14px;line-height:1.5;}
+  .tsec{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:18px 20px;margin-bottom:12px;}
+  .tsec .thead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
+  .tsec h3{margin:0;font-size:1.02rem;font-weight:600;}
+  .tsec .tsub{font-size:.78rem;color:var(--sub);margin:0 0 14px;}
+  .tstatus{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--base);background:var(--amber);border-radius:4px;padding:2px 6px;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--base);border:1px solid var(--surface0);border-radius:10px;padding:12px 12px;}
+  .kpi .v{font-size:1.25rem;font-weight:600;color:var(--amber);letter-spacing:-.01em;}
+  .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;}
+  .trows{display:grid;grid-template-columns:minmax(140px,220px) 1fr;gap:6px 16px;font-size:.85rem;line-height:1.45;}
+  .trows .k{color:var(--overlay0);} .trows .v{color:var(--text);}
+  .ttable{width:100%;border-collapse:collapse;font-size:.83rem;margin:4px 0 14px;}
+  .ttable th{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);}
+  .ttable td{padding:7px 8px;border-bottom:1px solid var(--surface0);} .ttable td:nth-child(2),.ttable td:nth-child(4),.ttable th:nth-child(2),.ttable th:nth-child(4){text-align:right;white-space:nowrap;}
+  #terms.rtl .ttable th,#terms.rtl .ttable td{text-align:right;} #terms.rtl .ttable td:nth-child(2),#terms.rtl .ttable td:nth-child(4),#terms.rtl .ttable th:nth-child(2),#terms.rtl .ttable th:nth-child(4){text-align:left;}
+  #terms.rtl{font-family:"Segoe UI",Tahoma,system-ui,sans-serif;}
+  @media (max-width:600px){.trows{grid-template-columns:1fr;gap:2px 0;} .trows .k{margin-top:8px;font-size:.72rem;} .tsec{padding:14px;} .ttable{display:block;overflow-x:auto;}}
   /* the viewer: same tab, its own top bar, so there is always a way back */
   #viewer{position:fixed;inset:0;background:#0f0f17;z-index:500;display:none;flex-direction:column;}
   #viewer.on{display:flex;}
@@ -65,6 +88,12 @@
   <a class="back" href="/admin?stay" id="back" style="display:none">&lsaquo; Shift Hub</a>
   <h1>Ajaltoun 4193 · Villa D3</h1>
   <p class="lead">The agreements, fee frameworks and proposals between Mario Saliba and Antoine Char. Click a document to open it; the arrow downloads it.</p>
+  <div class="termsbar">
+    <h2 style="margin:0">Terms at a glance</h2>
+    <div class="lang"><button id="lang-en" class="on" onclick="setLang('en')">English</button><button id="lang-ar" onclick="setLang('ar')">عربي</button></div>
+  </div>
+  <div id="terms"></div>
+  <h2 style="margin-top:36px">Documents</h2>
   <div id="groups"><p class="empty">Loading…</p></div>
 </main>
 <div id="viewer">
@@ -93,6 +122,7 @@ Admin.require('partners', async me => {
     `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   // the hub link only for those who have more than this one app
   if (me.admin || (me.apps || []).length > 1) document.getElementById('back').style.display = '';
+  Admin.api('GET', '/api/partners/terms').then(x => { TERMS = x; renderTerms(); }).catch(() => {});   // after sign-in, alongside the list
   const box = document.getElementById('groups');
   let files;
   try { files = await Admin.api('GET', '/api/partners/files'); }
@@ -122,6 +152,33 @@ Admin.require('partners', async me => {
   // a shared link or a reload lands straight in the document
   if (location.hash.length > 1) openViewer(location.hash.slice(1), true);
 });
+
+// ── Terms at a glance ───────────────────────────────────────────────────────
+// {en, ar} pairs from partners-terms.json (uploaded by partners-sync.mjs); one toggle flips the whole block
+let TERMS = null, LANG = 'en';
+try { LANG = localStorage.getItem('partners_lang') === 'ar' ? 'ar' : 'en'; } catch {}
+const t = x => x == null ? '' : typeof x === 'string' ? x : (x[LANG] || x.en || '');
+function setLang(l) {
+  LANG = l; try { localStorage.setItem('partners_lang', l); } catch {}
+  document.getElementById('lang-en').classList.toggle('on', l === 'en');
+  document.getElementById('lang-ar').classList.toggle('on', l === 'ar');
+  renderTerms();
+}
+function renderTerms() {
+  const box = document.getElementById('terms');
+  if (!TERMS) { box.innerHTML = ''; return; }
+  box.className = LANG === 'ar' ? 'rtl' : '';
+  box.innerHTML = `<p class="tnote">${esc(t(TERMS.note))}${TERMS.updated ? ' · ' + esc(TERMS.updated) : ''}</p>` + (TERMS.sections || []).map(s => `
+    <section class="tsec">
+      <div class="thead"><h3>${esc(t(s.title))}</h3>${s.status ? `<span class="tstatus">${esc(t(s.status))}</span>` : ''}</div>
+      ${s.sub ? `<p class="tsub">${esc(t(s.sub))}</p>` : ''}
+      ${s.kpis ? `<div class="kpis">${s.kpis.map(k => `<div class="kpi"><div class="v">${esc(t(k.v))}</div><div class="l">${esc(t(k.l))}</div></div>`).join('')}</div>` : ''}
+      ${s.table ? `<table class="ttable"><thead><tr>${s.table.head.map(h => `<th>${esc(t(h))}</th>`).join('')}</tr></thead>
+        <tbody>${s.table.rows.map(r => `<tr>${r.map(c => `<td>${esc(t(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}
+      ${s.rows ? `<div class="trows">${s.rows.map(r => `<div class="k">${esc(t(r.k))}</div><div class="v">${esc(t(r.v))}</div>`).join('')}</div>` : ''}
+    </section>`).join('');
+}
+setLang(LANG);
 
 let FILES = [];
 window.addEventListener('hashchange', () => { if (location.hash.length > 1) openViewer(location.hash.slice(1), true); else closeViewer(true); });
