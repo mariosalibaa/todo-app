@@ -46,7 +46,6 @@
   .pager{margin-left:auto;display:flex;align-items:center;gap:2px;font-size:.76rem;color:var(--sub);white-space:nowrap;}
   .pager .btn{padding:1px 8px;line-height:1.3;}
   .ap{color:var(--blue);} td.ck,th.ck{width:26px;padding-right:0;} .bulk{display:flex;gap:6px;align-items:center;font-size:.78rem;color:var(--sub);}
-  .chart{width:100%;height:220px;display:block;} .chart text{fill:var(--overlay0);font-size:10px;font-family:system-ui,sans-serif;}
   .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0 4px;} .fact{font-size:.8rem;color:var(--sub);line-height:1.45;} .fact b{display:block;font-size:1.05rem;color:var(--text);font-weight:600;}
   tr.mrow{cursor:pointer;} tr.mrow:hover td{background:rgba(255,255,255,.03);} tr.mdet td{background:rgba(0,0,0,.18);padding:4px 8px 4px 28px;font-size:.78rem;color:var(--sub);}
   td.qin input{width:90px;} td.qin{white-space:nowrap;}
@@ -297,7 +296,7 @@ function renderLog() {
     : '<p class="muted small">No review actions yet.</p>';
 }
 
-// ── the cash-flow block: one picture, four facts, one row per month ──────────
+// ── the cash-flow block: four facts, one row per month (chart dropped — Mario, 2026-09-12) ──────────
 function months(c) {
   const m = {};
   const at = k => (m[k] = m[k] || { k, inn: 0, out: 0, ins: [], secs: {} });
@@ -309,18 +308,6 @@ function months(c) {
 }
 function cashflowBlock(c) {
   const M = months(c); if (!M.length) return '<p class="muted">Nothing yet.</p>';
-  // the picture: bars in (up) / out (down) per month around one baseline, the balance as a line on its own scale
-  const W = 900, H = 220, L = 54, R = 10, T = 12, B = 26, pw = W - L - R, ph = H - T - B;
-  const maxBal = Math.max(...M.map(x => x.bal), 1);
-  const bw = Math.max(4, Math.min(28, pw / M.length * 0.6)), step = pw / M.length;
-  const xm = i => L + i * step + step / 2, yBal = v => T + ph - ph * (v / maxBal);
-  const mid = T + ph * 0.62;
-  const scale = Math.min((mid - T) / Math.max(...M.map(x => x.inn), 1), (T + ph - mid) / Math.max(...M.map(x => x.out), 1));
-  const bars = M.map((x, i) => `${x.inn ? `<rect x="${xm(i) - bw / 2}" y="${mid - x.inn * scale}" width="${bw}" height="${x.inn * scale}" fill="var(--green)" opacity=".85"/>` : ''}${x.out ? `<rect x="${xm(i) - bw / 2}" y="${mid}" width="${bw}" height="${Math.max(1, x.out * scale)}" fill="var(--red)" opacity=".85"/>` : ''}`).join('');
-  const line = M.map((x, i) => `${i ? 'L' : 'M'}${xm(i).toFixed(1)},${yBal(x.bal).toFixed(1)}`).join(' ');
-  const labels = M.map((x, i) => (M.length <= 12 || i % Math.ceil(M.length / 12) === 0) ? `<text x="${xm(i)}" y="${H - 8}" text-anchor="middle">${x.k.slice(2).replace('-', '/')}</text>` : '').join('');
-  const gridY = [0, 0.5, 1].map(f => `<line x1="${L}" x2="${W - R}" y1="${yBal(maxBal * f)}" y2="${yBal(maxBal * f)}" stroke="var(--surface0)" stroke-dasharray="3 4"/><text x="${L - 6}" y="${yBal(maxBal * f) + 3}" text-anchor="end">${usd(maxBal * f)}</text>`).join('');
-  const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${gridY}<line x1="${L}" x2="${W - R}" y1="${mid}" y2="${mid}" stroke="var(--surface1)"/>${bars}<path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2.5"/>${M.map((x, i) => `<circle cx="${xm(i)}" cy="${yBal(x.bal)}" r="3" fill="var(--amber)"><title>${x.k}: in ${usd(x.inn)} · out ${usd(x.out)} · balance ${usd(x.bal)}</title></circle>`).join('')}${labels}</svg>`;
   // the facts
   const last3 = M.slice(-3), burn = last3.reduce((s, x) => s + x.out, 0) / Math.max(1, last3.length);
   const remaining = c.received - c.paidOut, runway = burn > 0 ? remaining / burn : Infinity;
@@ -339,7 +326,7 @@ function cashflowBlock(c) {
   const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
   const rows = [...M].reverse().map(x => `<tr class="mrow" onclick="toggleMonth('${x.k}')"><td class="muted small">${esc(x.k)}</td><td>${x.ins.map(p => `<span class="ok">▲ ${esc(c.inv.partner)} · ${esc(p.journal)}</span> `).join('')}${x.out ? `<span class="muted small">${Object.keys(x.secs).length} section${Object.keys(x.secs).length > 1 ? 's' : ''} · ${c.lines.filter(l => l.date.startsWith(x.k)).length} lines</span>` : ''}</td><td class="n ok">${x.inn ? usd2(x.inn) : ''}</td><td class="n flag">${x.out ? usd2(x.out) : ''}</td><td class="n">${usd2(x.bal)}</td></tr>
     <tr class="mdet" id="mdet-${x.k}" hidden><td colspan="5">${Object.entries(x.secs).sort((a, b) => b[1] - a[1]).map(([s, a]) => `<div><b>${esc(secName(s))}</b> ${usd2(a)} — ${c.lines.filter(l => l.date.startsWith(x.k) && l.section === s).sort((a, b) => b.amount - a.amount).slice(0, 6).map(l => `${esc(l.partner || l.name.slice(0, 30))} ${usd(l.amount)}`).join(' · ')}${c.lines.filter(l => l.date.startsWith(x.k) && l.section === s).length > 6 ? ' · …' : ''}</div>`).join('')}</td></tr>`).join('');
-  return `${chart}${facts}<div class="wrap" style="margin-top:10px"><table><thead><tr><th>Month</th><th></th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th></tr></thead><tbody>${rows}
+  return `${facts}<div class="wrap" style="margin-top:10px"><table><thead><tr><th>Month</th><th></th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th></tr></thead><tbody>${rows}
     <tr class="tot"><td></td><td>Remaining project cash</td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(remaining)}</td></tr></tbody></table></div>`;
 }
 // the BOQ's average rate for a trade (Σ total / Σ qty over the priced lines, six villas), and its unit
