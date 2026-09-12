@@ -11,7 +11,7 @@
   :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
-  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
   .hleft{display:flex;align-items:center;gap:16px;}
   .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
   .hback:hover{background:var(--surface0);}
@@ -62,6 +62,18 @@
   #secpop .it:hover,#secpop .it.hit{background:var(--surface0);} #secpop .it.cur{border-color:var(--amber);color:var(--amber);} #secpop .it.eq{color:var(--blue);} #secpop .it.cur.eq{color:var(--amber);}
   #secpop .it small{color:var(--overlay0);font-size:.66rem;} #secpop .none{grid-column:1/-1;color:var(--overlay0);font-size:.78rem;padding:6px 9px;}
   #secpop .hint{color:var(--overlay0);font-size:.68rem;margin-top:8px;}
+  /* the preview pane: table left, the bill scan right, Odoo-style */
+  .dsplit{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;} .dsplit.on{grid-template-columns:minmax(0,58fr) minmax(0,42fr);width:calc(100vw - 40px);max-width:1900px;margin-left:calc(50% - min(50vw - 20px, 950px));}
+  .dsplit.on #detail table{min-width:1000px;}
+  .dsplit .card{min-width:0;} .dsplit.on .wrap{overflow-x:auto;}
+  #prev{display:none;position:sticky;top:12px;max-height:calc(100vh - 24px);flex-direction:column;padding:0;overflow:hidden;} .dsplit.on #prev{display:flex;}
+  .pbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--surface0);font-size:.8rem;flex:none;flex-wrap:wrap;}
+  .pbar .pt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .pbar .pt b{color:var(--amber);font-weight:600;} .pbar .pt small{color:var(--overlay0);display:block;font-size:.7rem;overflow:hidden;text-overflow:ellipsis;}
+  .pbody{flex:1;overflow:auto;padding:12px;background:#0f0f17;} .pbody canvas,.pbody img{display:block;max-width:100%;margin:0 auto 10px;border-radius:4px;}
+  .pempty{color:var(--overlay0);font-size:.82rem;text-align:center;padding:60px 20px;line-height:1.6;}
+  tr.selectable{cursor:pointer;} tr.selectable:hover td{background:rgba(255,255,255,.03);} tr.sel td{background:rgba(242,169,59,.10)!important;} tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--amber);}
+  .btn.on{border-color:var(--amber);color:var(--amber);}
+  @media (max-width:1300px){.dsplit.on{grid-template-columns:1fr;} .dsplit.on #prev{display:none;}}
   .stamp{font-size:.7rem;color:var(--overlay0);line-height:1.35;}
   .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -250,9 +262,10 @@ function renderAccounts(app) {
       <select onchange="F.review=this.value;F._touched=1;pageNo=0;renderDetail()"><option value="">All lines</option><option value="booked" ${F.review === 'booked' ? 'selected' : ''}>Booked — to approve (Mario)</option><option value="approved" ${F.review === 'approved' ? 'selected' : ''}>Approved — waiting for the partner</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
       <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;pageNo=0;renderDetail()" style="min-width:200px">
       ${D.admin ? '<span class="bulk" id="bulk"></span>' : ''}
+      <button class="btn ${PV.on ? 'on' : ''}" onclick="togglePreview()" title="Show the bill scan next to the list when you click a line">🖼 Preview</button>
       <span class="pager" id="pager">${D.admin ? `<input type="number" min="10" max="500" step="10" value="${PAGE_SIZE()}" title="Lines per page — saved for every user" style="width:56px;padding:1px 6px;margin-right:6px" onchange="setPageSize(this.value)">` : ''}<span id="pg-range"></span><button class="btn" onclick="pageBy(-1)" id="pg-prev" title="Previous page">‹</button><button class="btn" onclick="pageBy(1)" id="pg-next" title="Next page">›</button></span>
     </div>
-    <div class="card"><div class="wrap" id="detail"></div></div>
+    <div class="dsplit ${PV.on ? 'on' : ''}"><div class="card"><div class="wrap" id="detail"></div></div><aside class="card" id="prev"></aside></div>
 
     <h2>Review log <span class="r muted" id="log-sub"></span></h2>
     <div class="card"><div class="wrap" id="log"><p class="muted small">Loading…</p></div></div>
@@ -367,9 +380,10 @@ function renderDetail() {
   document.getElementById('pg-range').textContent = rows.length ? `${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)} / ${rows.length}` : '0 / 0';
   document.getElementById('pg-prev').disabled = pageNo === 0; document.getElementById('pg-next').disabled = pageNo >= last;
   if (D.admin) bulkBar(rows);
+  PV.rows = page.map(l => l.id);
   document.getElementById('detail').innerHTML = `<table>
     <thead><tr>${D.admin ? `<th class="ck"><input type="checkbox" onchange="tickAll(this.checked)" ${page.length && page.every(l => SEL.has(l.id)) ? 'checked' : ''}></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Mario</th><th>Antoine</th></tr></thead>
-    <tbody>${page.map(l => `<tr>
+    <tbody>${page.map(l => `<tr class="${PV.on ? 'selectable' : ''} ${PV.line === l.id ? 'sel' : ''}" data-line="${l.id}" onclick="rowClick(event, ${l.id})">
       ${D.admin ? `<td class="ck"><input type="checkbox" ${SEL.has(l.id) ? 'checked' : ''} onchange="tick(${l.id}, this.checked)"></td>` : ''}
       <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
       <td>${esc(l.partner || '—')}</td>
@@ -381,6 +395,7 @@ function renderDetail() {
       <td class="n">${usd2(l.amount)}</td>
       <td>${marioCell(l)}</td><td>${antoineCell(l)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">Nothing matches.</td></tr>'}
     <tr class="tot"><td colspan="${D.admin ? 7 : 6}">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td><td></td></tr></tbody></table>`;
+  showPreview();
 }
 
 // a worker's month-bill carries every receipt of the month: show two, fold the rest behind "+N"
@@ -492,21 +507,26 @@ async function setSection(lineId, section, forPartner) {
 }
 
 // ── the bill scan, in the page ─────────────────────────────────────────────
-async function openFile(id, name, mime) {
+// one fetch per attachment, kept in memory for the session (the preview pane hops between lines of the same bill)
+const FILES = new Map();
+async function fetchFile(id) {
+  if (FILES.has(id)) return FILES.get(id);
+  const pr = fetch('/api/ajaltoun/file/' + id, { headers: { Authorization: 'Bearer ' + (Admin.session || '') } }).then(async r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  pr.catch(() => FILES.delete(id)); FILES.set(id, pr); return pr;
+}
+// draw an attachment (pdf pages or an image) into a container at the given width
+async function renderFile(body, id, mime, width) {
   const url = '/api/ajaltoun/file/' + id;
-  const v = document.getElementById('viewer'), body = document.getElementById('vbody');
-  document.getElementById('vtitle').textContent = name; document.getElementById('vtab').href = url;
-  v.classList.add('on'); document.body.style.overflow = 'hidden'; body.innerHTML = '<div class="vstatus">Loading…</div>';
+  body.innerHTML = '<div class="vstatus">Loading…</div>';
   try {
-    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + (Admin.session || '') } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const buf = await r.arrayBuffer();
+    const buf = await fetchFile(id);
+    if (body.dataset.file !== String(id)) return;   // the user moved on while this one loaded
     body.innerHTML = '';
     if (/pdf/.test(mime)) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-      const width = Math.min(body.clientWidth - 24, 900);
+      const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
       for (let i = 1; i <= pdf.numPages; i++) {
+        if (body.dataset.file !== String(id)) return;
         const page = await pdf.getPage(i); const scale = width / page.getViewport({ scale: 1 }).width; const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const vp = page.getViewport({ scale: scale * dpr }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.style.width = width + 'px';
         body.appendChild(c); await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
@@ -515,6 +535,51 @@ async function openFile(id, name, mime) {
     else body.innerHTML = `<div class="vstatus">This file type cannot be shown here — <a href="${url}" target="_blank" style="color:var(--amber)">open it in a new tab</a>.</div>`;
   } catch (e) { body.innerHTML = `<div class="vstatus">Could not load the file (${esc(e.message)}).</div>`; }
 }
+async function openFile(id, name, mime) {
+  const v = document.getElementById('viewer'), body = document.getElementById('vbody');
+  document.getElementById('vtitle').textContent = name; document.getElementById('vtab').href = '/api/ajaltoun/file/' + id;
+  v.classList.add('on'); document.body.style.overflow = 'hidden'; body.dataset.file = id;
+  await renderFile(body, id, mime, Math.min(body.clientWidth - 24, 900));
+}
+
+// ── the preview pane (Mario, 2026-09-12): click a line, its scan shows on the right; ↑↓ walk the list, A approves, V verifies ──
+const PV = { on: (() => { try { return localStorage.getItem('ajPreview') === '1'; } catch { return false; } })(), line: null, idx: 0, rows: [] };
+function togglePreview() { PV.on = !PV.on; try { localStorage.setItem('ajPreview', PV.on ? '1' : '0'); } catch {} render(); }
+function rowClick(e, id) {
+  if (!PV.on || e.target.closest('button, a, input, select, .secbtn, #secpop')) return;
+  selectLine(id);
+}
+function selectLine(id) {
+  PV.line = id; PV.idx = 0;
+  document.querySelectorAll('#detail tr.sel').forEach(tr => tr.classList.remove('sel'));
+  const tr = document.querySelector(`#detail tr[data-line="${id}"]`); if (tr) { tr.classList.add('sel'); tr.scrollIntoView({ block: 'nearest' }); }
+  if (window.innerWidth <= 1300) { const l = D.lines.find(x => x.id === id), f = l && (l.files || [])[0]; if (f) openFile(f.id, f.name, f.mime); return; }   // no room for a pane: the full viewer instead
+  showPreview();
+}
+function showPreview() {
+  const pane = document.getElementById('prev'); if (!pane || !PV.on) return;
+  const l = D.lines.find(x => x.id === PV.line);
+  if (!l || !PV.rows.includes(l.id)) { pane.innerHTML = '<div class="pempty">Click a line to see its bill scan here.<br><span class="small">↑ ↓ move between lines' + (D.admin ? ' · A approves' : D.canVerify ? ' · V verifies' : '') + '</span></div>'; return; }
+  const files = l.files || []; PV.idx = Math.min(PV.idx, Math.max(0, files.length - 1)); const f = files[PV.idx];
+  pane.innerHTML = `<div class="pbar"><div class="pt"><b>${esc(l.moveName)}</b> · ${usd2(l.amount)} · ${esc(l.partner || '—')}<small>${f ? esc(f.name) : 'no attachment on this bill'}</small></div>
+    ${files.length > 1 ? `<span class="small muted" style="white-space:nowrap">${PV.idx + 1} / ${files.length}</span><button class="btn" onclick="PV.idx=(PV.idx+${files.length}-1)%${files.length};showPreview()" title="Previous attachment">‹</button><button class="btn" onclick="PV.idx=(PV.idx+1)%${files.length};showPreview()" title="Next attachment">›</button>` : ''}
+    ${f ? `<button class="btn" onclick="openFile(${f.id}, '${esc(f.name).replace(/'/g, '')}', '${esc(f.mime)}')" title="Full screen">⤢ open full</button>` : ''}</div><div class="pbody"></div>`;
+  const body = pane.querySelector('.pbody');
+  if (!f) { body.innerHTML = `<div class="pempty">No attachment on ${esc(l.moveName)}.</div>`; return; }
+  body.dataset.file = f.id;
+  renderFile(body, f.id, f.mime, Math.max(200, body.clientWidth - 24));
+}
+document.addEventListener('keydown', e => {
+  if (!PV.on || !D || document.getElementById('secpop') || document.getElementById('viewer').classList.contains('on')) return;
+  if (e.target.closest('input, select, textarea')) return;
+  const n = PV.rows.length; if (!n) return;
+  const i = PV.rows.indexOf(PV.line);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); selectLine(PV.rows[i < 0 ? 0 : (i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n]); return; }
+  if (i < 0) return;
+  const l = D.lines.find(x => x.id === PV.line), r = l.review || {};
+  if (e.key === 'a' || e.key === 'A') { if (D.admin && !r.approved) approve([l.id], true); }
+  if (e.key === 'v' || e.key === 'V') { if (D.canVerify && r.approved && !r.verified) review(l.id, 'verified'); }
+});
 function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
 </script>
 </body>
