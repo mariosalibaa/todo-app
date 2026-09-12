@@ -380,8 +380,8 @@
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
   <button class="btn" id="btn-import" onclick="importOdooLines()" title="Pull every line of this account's Odoo journals (re-running updates, never duplicates)">⇄ Import Odoo</button>
   <button class="btn" id="btn-contacts" onclick="importContacts()" title="Read phone numbers from your Google Contacts to name the counterparties">👤 Google contacts</button>
-  <button class="btn" id="btn-wa" onclick="importWhatsappLines()" title="Read this account's WhatsApp group and turn the money messages into lines (this machine only)">💬 Import WhatsApp</button>
-  <button class="btn" id="btn-xl" onclick="importExcelLines()" title="Re-read the account's Excel ledger">📘 Import Excel</button>
+  <button class="btn" id="btn-wa" onclick="importWhatsappLines(this)" title="Read this account's WhatsApp group and turn the money messages into lines (this machine only)">💬 Import WhatsApp</button>
+  <button class="btn" id="btn-xl" onclick="importExcelLines(this)" title="Re-read the account's Excel ledger">📘 Import Excel</button>
   <button class="btn" id="btn-odoo" onclick="checkOdoo()" title="Look for these amounts in the account's Odoo journals">⇄ Check Odoo</button>
   <button class="btn" id="btn-months" onclick="openMonths()" title="One draft bill per month from this person, one line per Excel row, each with its project" style="display:none">📅 Book months</button>
   <button class="btn" id="btn-timesheet" onclick="openTimesheet()" title="His hours month by month, costed to the projects that used them, with the free hours returned to GENERAL" style="display:none">🕐 Timesheet</button>
@@ -3118,9 +3118,9 @@ async function importBudgetLines() {
   } catch (e) { say('Import failed: ' + e.message, 'err'); }
 }
 
-async function importExcelLines() {
+async function importExcelLines(btn) {
   if (!account || !(account.excel || {}).file) return;
-  if (!isLocal()) return laptopJob('excel', 'read the Excel ledger');
+  if (!isLocal()) return laptopJob('excel', 'read the Excel ledger', btn);
   say('Reading the Excel ledger…');
   try {
     const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/import-excel`, {});
@@ -3129,23 +3129,26 @@ async function importExcelLines() {
   } catch (e) { say('Import failed: ' + e.message, 'err'); }
 }
 // From the website: drop the request, then watch the account until the laptop reports back
-async function laptopJob(kind, label) {
+async function laptopJob(kind, label, btn) {
   const asked = new Date().toISOString();
+  const lbl = btn && btn.textContent; if (btn) { btn.disabled = true; btn.textContent = '⏳ Asking laptop…'; }
+  const done = m => { if (btn) { btn.disabled = false; btn.textContent = lbl; } };
   try { await Admin.api('POST', `/api/accounting/accounts/${acc}/laptop-job`, { kind }); }
-  catch (e) { say('Could not ask the laptop: ' + e.message, 'err'); return; }
-  say(`Asked the laptop to ${label} — it checks every 30 s; the lines land here when it is done…`);
+  catch (e) { say('Could not ask the laptop: ' + e.message, 'err'); done(); return; }
+  say(`Asked the laptop to ${label}. It answers within a minute — waiting…`);
   const t0 = Date.now();
   while (Date.now() - t0 < 4 * 60e3) {
-    await new Promise(r => setTimeout(r, 8000));
+    await new Promise(r => setTimeout(r, 5000));
     let a; try { a = await Admin.api('GET', `/api/accounting/accounts/${acc}`); } catch { continue; }
     const r = a && (a.account || a).laptopJobResult;
-    if (r && r.at > asked) { say((r.ok ? '' : 'Laptop: ') + r.summary, r.ok ? 'ok' : 'err'); await loadAccounts(); await selectAccount(acc); return; }
+    if (r && r.at > asked) { say((r.ok ? '✅ ' : '⚠️ Laptop: ') + r.summary, r.ok ? 'ok' : 'err'); done(); await loadAccounts(); await selectAccount(acc); return; }
+    if (btn) btn.textContent = '⏳ ' + Math.round((Date.now() - t0) / 1000) + 's…';
   }
-  say('The laptop has not answered in 4 minutes — is it on, with the WhatsApp daemon running?', 'err');
+  say('The laptop has not answered in 4 minutes. Is the laptop on, with the WhatsApp daemon running?', 'err'); done();
 }
-async function importWhatsappLines() {
+async function importWhatsappLines(btn) {
   if (!account || !(account.whatsapp || {}).chatId && !(account.whatsapp || {}).name) return;
-  if (!isLocal()) return laptopJob('whatsapp', 'read the WhatsApp group');
+  if (!isLocal()) return laptopJob('whatsapp', 'read the WhatsApp group', btn);
   say('Reading the WhatsApp group…');
   try {
     const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/import-whatsapp`, {});
