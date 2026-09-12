@@ -751,8 +751,9 @@ async function selectAccount(a) {
   }
   able('btn-line', !st, 'Whish lines come from the statement PDF — nothing is typed into this account');
   able('btn-upload', st, 'Only the Whish account is fed by a statement PDF');
-  able('btn-wa', hasWa && isLocal(), hasWa ? LOCAL_WHY : 'No WhatsApp group on this account yet — add one with ⚙');
-  able('btn-xl', hasXl && isLocal(), hasXl ? LOCAL_WHY : 'No Excel ledger on this account — add one with ⚙');
+  // WhatsApp and the workbook are read on the laptop; from the website the button asks the laptop (laptop job)
+  able('btn-wa', hasWa, 'No WhatsApp group on this account yet — add one with ⚙');
+  able('btn-xl', hasXl, 'No Excel ledger on this account — add one with ⚙');
   able('btn-import', hasJ, 'No Odoo journal or partner on this account yet — add one with ⚙');
   able('btn-odoo', st || hasJ, 'Nothing to check against: give the account an Odoo journal with ⚙');
   able('btn-contacts', st, 'Contacts name the phone numbers on a Whish statement — this account has none');
@@ -3119,6 +3120,7 @@ async function importBudgetLines() {
 
 async function importExcelLines() {
   if (!account || !(account.excel || {}).file) return;
+  if (!isLocal()) return laptopJob('excel', 'read the Excel ledger');
   say('Reading the Excel ledger…');
   try {
     const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/import-excel`, {});
@@ -3126,8 +3128,24 @@ async function importExcelLines() {
     await loadAccounts(); await selectAccount(acc);
   } catch (e) { say('Import failed: ' + e.message, 'err'); }
 }
+// From the website: drop the request, then watch the account until the laptop reports back
+async function laptopJob(kind, label) {
+  const asked = new Date().toISOString();
+  try { await Admin.api('POST', `/api/accounting/accounts/${acc}/laptop-job`, { kind }); }
+  catch (e) { say('Could not ask the laptop: ' + e.message, 'err'); return; }
+  say(`Asked the laptop to ${label} — it checks every 30 s; the lines land here when it is done…`);
+  const t0 = Date.now();
+  while (Date.now() - t0 < 4 * 60e3) {
+    await new Promise(r => setTimeout(r, 8000));
+    let a; try { a = await Admin.api('GET', `/api/accounting/accounts/${acc}`); } catch { continue; }
+    const r = a && (a.account || a).laptopJobResult;
+    if (r && r.at > asked) { say((r.ok ? '' : 'Laptop: ') + r.summary, r.ok ? 'ok' : 'err'); await loadAccounts(); await selectAccount(acc); return; }
+  }
+  say('The laptop has not answered in 4 minutes — is it on, with the WhatsApp daemon running?', 'err');
+}
 async function importWhatsappLines() {
-  if (!account || !(account.whatsapp || {}).chatId) return;
+  if (!account || !(account.whatsapp || {}).chatId && !(account.whatsapp || {}).name) return;
+  if (!isLocal()) return laptopJob('whatsapp', 'read the WhatsApp group');
   say('Reading the WhatsApp group…');
   try {
     const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/import-whatsapp`, {});

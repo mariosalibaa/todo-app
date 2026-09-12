@@ -1244,6 +1244,36 @@ async function handle(req, res, url, user, ctx) {
     try { return json(res, 200, await ledgers.closeStatement(ledgerCtx, a, who, cb || {})); }
     catch (e) { console.error('close-statement', e); return json(res, 400, { error: String(e.message || e) }); }
   }
+  // ── Laptop jobs: the website asks, the laptop does ───────────────────────────────────────
+  // WhatsApp and the Excel workbooks live on Mario's laptop, so those buttons used to be dead on
+  // hub.shift-group.co. Now the page drops a request on the account; the always-on WhatsApp
+  // daemon (wa-contacts/wa-daemon.mjs) polls this list every 30 s, runs the read through the
+  // local server, and posts the result back (Mario, 2026-09-12: "pressing on the WhatsApp
+  // button is not working").
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/laptop-job$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    const kind = ['whatsapp', 'excel'].includes(b.kind) ? b.kind : '';
+    if (!kind) return json(res, 400, { error: 'kind: whatsapp | excel' });
+    const job = { kind, at: now(), by: who };
+    await a.ref.set({ laptopJob: job, laptopJobResult: admin.firestore.FieldValue.delete() }, { merge: true });
+    return json(res, 200, { ok: true, job });
+  }
+  if (url === '/api/accounting/laptop-jobs' && req.method === 'GET') {
+    const all = await listAccounts(ws);
+    return json(res, 200, all.filter(a => a.laptopJob && a.laptopJob.kind).map(a => ({ id: a.id, name: a.name, ...a.laptopJob })));
+  }
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/laptop-job\/done$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    const result = { at: now(), kind: (a.laptopJob && a.laptopJob.kind) || b.kind || '', ok: !b.error, summary: String(b.summary || b.error || '').slice(0, 300) };
+    await a.ref.set({ laptopJob: admin.firestore.FieldValue.delete(), laptopJobResult: result }, { merge: true });
+    await hubLog(ws, 'whatsapp', { who, txId: 'laptop-job', line: `${a.id}: ${result.kind} — ${result.summary}`, before: {}, after: result });
+    return json(res, 200, { ok: true, result });
+  }
+
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/import-whatsapp$/)) && req.method === 'POST') {
     if (!local) return json(res, 400, { error: LOCAL_ONLY });
     const a = await resolve(ws, m[1]);
