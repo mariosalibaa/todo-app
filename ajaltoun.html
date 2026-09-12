@@ -51,6 +51,14 @@
   tr.mrow{cursor:pointer;} tr.mrow:hover td{background:rgba(255,255,255,.03);} tr.mdet td{background:rgba(0,0,0,.18);padding:4px 8px 4px 28px;font-size:.78rem;color:var(--sub);}
   td.qin input{width:90px;} td.qin{white-space:nowrap;}
   .warn{color:var(--amber);} tr.logw td{background:rgba(242,169,59,.07);}
+  .secbtn{display:inline-flex;align-items:center;gap:6px;background:var(--base);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 8px;font-size:.8rem;cursor:pointer;max-width:200px;} .secbtn:hover,.secbtn.open{border-color:var(--amber);} .secbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .secbtn i{font-style:normal;color:var(--overlay0);font-size:.7rem;}
+  #secpop{position:fixed;z-index:60;background:var(--mantle);border:1px solid var(--surface1);border-radius:12px;padding:10px;width:480px;max-width:calc(100vw - 20px);box-shadow:0 14px 40px rgba(0,0,0,.55);}
+  #secpop input{width:100%;box-sizing:border-box;margin-bottom:8px;}
+  #secpop .grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;}
+  #secpop .it{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:none;border:1px solid transparent;color:var(--text);border-radius:7px;padding:5px 9px;font-size:.8rem;cursor:pointer;}
+  #secpop .it:hover,#secpop .it.hit{background:var(--surface0);} #secpop .it.cur{border-color:var(--amber);color:var(--amber);} #secpop .it.eq{color:var(--blue);} #secpop .it.cur.eq{color:var(--amber);}
+  #secpop .it small{color:var(--overlay0);font-size:.66rem;} #secpop .none{grid-column:1/-1;color:var(--overlay0);font-size:.78rem;padding:6px 9px;}
+  #secpop .hint{color:var(--overlay0);font-size:.68rem;margin-top:8px;}
   .stamp{font-size:.7rem;color:var(--overlay0);line-height:1.35;}
   .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -346,19 +354,19 @@ function renderDetail() {
   document.getElementById('pg-prev').disabled = pageNo === 0; document.getElementById('pg-next').disabled = pageNo >= last;
   if (D.admin) bulkBar(rows);
   document.getElementById('detail').innerHTML = `<table>
-    <thead><tr>${D.admin ? `<th class="ck"><input type="checkbox" onchange="tickAll(this.checked)" ${page.length && page.every(l => SEL.has(l.id)) ? 'checked' : ''}></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Review</th></tr></thead>
+    <thead><tr>${D.admin ? `<th class="ck"><input type="checkbox" onchange="tickAll(this.checked)" ${page.length && page.every(l => SEL.has(l.id)) ? 'checked' : ''}></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Mario</th><th>Antoine</th></tr></thead>
     <tbody>${page.map(l => `<tr>
       ${D.admin ? `<td class="ck"><input type="checkbox" ${SEL.has(l.id) ? 'checked' : ''} onchange="tick(${l.id}, this.checked)"></td>` : ''}
       <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
       <td>${esc(l.partner || '—')}</td>
       <td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}<div class="small muted">${esc(l.account)} · ${esc(l.company.replace(/SHIFT /i, ''))}</div></td>
       <td><span class="pill">${esc(l.villa)}</span></td>
-      <td>${D.admin ? `<select onchange="setSection(${l.id}, this.value, false)">${D.sections.map(s => `<option value="${s.id}" ${s.id === l.section ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+      <td>${D.admin ? `<button class="secbtn" onclick="openSecPop(${l.id}, this)" title="Change the section"><span>${esc(secName(l.section))}</span><i>▾</i></button>
         <div class="small"><a href="#" class="muted" onclick="setSection(${l.id}, null, true);return false;">whole supplier →</a></div>` : `<span class="pill ${(D.sections.find(s => s.id === l.section) || {}).equipment ? 'eq' : ''}">${esc(secName(l.section))}</span>`}</td>
       <td class="small">${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
       <td class="n">${usd2(l.amount)}</td>
-      <td>${reviewCell(l)}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Nothing matches.</td></tr>'}
-    <tr class="tot"><td colspan="${D.admin ? 7 : 6}">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td></tr></tbody></table>`;
+      <td>${marioCell(l)}</td><td>${antoineCell(l)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">Nothing matches.</td></tr>'}
+    <tr class="tot"><td colspan="${D.admin ? 7 : 6}">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td><td></td></tr></tbody></table>`;
 }
 
 // a worker's month-bill carries every receipt of the month: show two, fold the rest behind "+N"
@@ -369,24 +377,30 @@ function fileLinks(l, all) {
   return fs.slice(0, 2).map(link).join('') + `<a class="file muted" href="#" onclick="this.parentElement.innerHTML = fileLinks(D.lines.find(x => x.id === ${l.id}), true);return false;">+${fs.length - 2} more</a>`;
 }
 // the four-eyes column: the partner verifies or flags; the writer only sees the stamp (and may clear an answered flag)
-function reviewCell(l) {
-  const r = l.review || {}; const when = s => s ? s.at.replace('T', ' ').slice(0, 16) : '';
-  const line = (cls, label, s) => `<div class="${cls}">${label}</div><div class="stamp">${esc(s.by)} · ${esc(when(s))}</div>`;
-  let html = '';
-  if (r.approved) html += line('ap', '✓ Approved', r.approved);
-  if (r.verified) html += line('ok', '✓✓ Verified', r.verified);
-  if (r.flag) html += line('flag', '⚑ Flagged', r.flag) + (r.flag.note ? `<div class="stamp" style="color:var(--text)">“${esc(r.flag.note)}”</div>` : '');
-  for (const w of (r.withdrawn || [])) html += `<div class="stamp warn" title="A verification that was taken back">↩ verification by ${esc(w.by)} (${esc(when(w))}) withdrawn ${esc((w.undoneAt || '').replace('T', ' ').slice(0, 16))}</div>`;
+// two columns: what Mario did to the line, what Antoine did — each with its own buttons for whoever is logged in
+const whenOf = s => s ? s.at.replace('T', ' ').slice(0, 16) : '';
+const stampOf = (cls, label, s) => `<div class="${cls}">${label}</div><div class="stamp">${esc(s.by)} · ${esc(whenOf(s))}</div>`;
+function marioCell(l) {
+  const r = l.review || {}; let html = '';
+  if (r.approved) html += stampOf('ap', '✓ Approved', r.approved);
   if (D.admin) {
     if (r.flag) html += `<button class="btn" onclick="review(${l.id}, null)" title="Clear the flag once you have answered it">answered</button> `;
     html += r.approved ? `<button class="btn" onclick="approve([${l.id}], false)">withdraw</button>` : `<button class="btn ap" onclick="approve([${l.id}], true)">✓ Approve</button>`;
-  } else if (D.canVerify) {
+  }
+  return html || '<span class="stamp">booked · not yet approved</span>';
+}
+function antoineCell(l) {
+  const r = l.review || {}; let html = '';
+  if (r.verified) html += stampOf('ok', '✓✓ Verified', r.verified);
+  if (r.flag) html += stampOf('flag', '⚑ Flagged', r.flag) + (r.flag.note ? `<div class="stamp" style="color:var(--text)">“${esc(r.flag.note)}”</div>` : '');
+  for (const w of (r.withdrawn || [])) html += `<div class="stamp warn" title="A verification that was taken back">↩ verification by ${esc(w.by)} (${esc(whenOf(w))}) withdrawn ${esc((w.undoneAt || '').replace('T', ' ').slice(0, 16))}</div>`;
+  if (D.canVerify) {
     if (r.approved && !r.verified) html += `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> `;
     if (r.approved && !r.flag) html += `<button class="btn flag" onclick="review(${l.id}, 'flagged')">⚑ Flag</button>`;
     if (r.verified || r.flag) html += ` <button class="btn" onclick="review(${l.id}, null)">undo</button>`;
-    if (!r.approved) html += '<span class="stamp">not yet approved by Mario</span>';
   }
-  return html || '<span class="stamp">booked</span>';
+  if (!html) return r.approved ? '<span class="stamp">— waiting</span>' : '<span class="stamp muted">—</span>';
+  return html;
 }
 function tick(id, on) { if (on) SEL.add(id); else SEL.delete(id); bulkBar(); }
 function tickAll(on) { const q = F.q.toLowerCase(); for (const l of D.lines) { if (visible(l, q)) { if (on) SEL.add(l.id); else SEL.delete(l.id); } } renderDetail(); }
@@ -412,10 +426,50 @@ async function review(lineId, state) {
     const l = D.lines.find(x => x.id === lineId); l.review = r.review; render();
   } catch (e) { alert('Could not save: ' + e.message); }
 }
+// ── the section picker: one shared popover, every section visible at once, type to filter ──
+let SP = { line: null, btn: null, hit: 0 };
+function openSecPop(lineId, btn) {
+  if (SP.line === lineId && document.getElementById('secpop')) return closeSecPop();
+  closeSecPop();
+  SP = { line: lineId, btn, hit: -1 };
+  btn.classList.add('open');
+  const pop = document.createElement('div'); pop.id = 'secpop';
+  pop.innerHTML = `<input type="text" placeholder="type to filter…" oninput="secPopList(this.value)" onkeydown="secPopKey(event)"><div class="grid"></div><div class="hint">↑↓ move · Enter choose · Esc close · blue = equipment</div>`;
+  document.body.appendChild(pop);
+  secPopList('');
+  const r = btn.getBoundingClientRect(), h = pop.offsetHeight, w = pop.offsetWidth;
+  let top = r.bottom + 4; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+  pop.style.top = top + 'px'; pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+  pop.querySelector('input').focus();
+  setTimeout(() => { document.addEventListener('mousedown', secPopOutside); window.addEventListener('scroll', closeSecPop, { once: true }); }, 0);
+}
+function secPopList(q) {
+  const l = D.lines.find(x => x.id === SP.line); const qq = q.trim().toLowerCase();
+  const items = D.sections.filter(s => !qq || s.name.toLowerCase().includes(qq) || s.id.includes(qq));
+  SP.items = items; SP.hit = qq ? 0 : Math.max(0, items.findIndex(s => s.id === l.section));
+  document.querySelector('#secpop .grid').innerHTML = items.length ? items.map((s, i) => `<button class="it ${s.id === l.section ? 'cur' : ''} ${s.equipment ? 'eq' : ''} ${i === SP.hit ? 'hit' : ''}" onclick="pickSection('${s.id}')">${esc(s.name)}${s.id === l.section ? '<small>current</small>' : s.equipment ? '<small>equipment</small>' : ''}</button>`).join('') : '<div class="none">No section matches.</div>';
+}
+function secPopKey(e) {
+  const n = (SP.items || []).length;
+  if (e.key === 'Escape') { closeSecPop(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); if (n) pickSection(SP.items[SP.hit].id); return; }
+  const d = { ArrowDown: 2, ArrowUp: -2, ArrowRight: 1, ArrowLeft: -1 }[e.key];   // two columns
+  if (d === undefined || !n) return;
+  e.preventDefault(); SP.hit = (SP.hit + d + n) % n;
+  document.querySelectorAll('#secpop .it').forEach((b, i) => b.classList.toggle('hit', i === SP.hit));
+}
+function secPopOutside(e) { if (!e.target.closest('#secpop')) closeSecPop(); }
+function closeSecPop() {
+  const pop = document.getElementById('secpop'); if (pop) pop.remove();
+  if (SP.btn) SP.btn.classList.remove('open');
+  document.removeEventListener('mousedown', secPopOutside);
+  SP = { line: null, btn: null, hit: 0 };
+}
+function pickSection(id) { const line = SP.line; closeSecPop(); setSection(line, id, false); }
+
 async function setSection(lineId, section, forPartner) {
   const l = D.lines.find(x => x.id === lineId);
-  const sel = event.target.closest('td').querySelector('select');
-  const sec = section || sel.value;
+  const sec = section || l.section;   // "whole supplier →" spreads the line's current section over the partner
   try {
     await Admin.api('POST', '/api/ajaltoun/section', forPartner ? { section: sec, forPartner: l.partner } : { lineId, section: sec });
     if (forPartner) for (const x of D.lines) { if (x.partner === l.partner) x.section = sec; } else l.section = sec;
