@@ -54,6 +54,7 @@
   .composer button.send{background:#00a884;color:#fff;}
   .composer button.rec{background:var(--red);color:#fff;}
   .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
+  .pull{height:0;overflow:hidden;text-align:center;font-size:.74rem;color:var(--sub);line-height:48px;transition:height .15s;}
 </style></head>
 <body>
 <header><div class="hleft"><span id="crumbs"></span><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>SITE</small></a><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Site']]));</script></div><div class="who" id="who"></div></header>
@@ -136,6 +137,14 @@ async function retry(id) {
     p.digesting = false; p.error = prevError; draw();
   }
 }
+// pull down at the top of the feed to refresh (phone), like WhatsApp; the browser's own reload is a long way up
+(function () {
+  let y0 = null, pulled = 0; const hint = document.createElement('div'); hint.className = 'pull'; hint.textContent = '↓ pull to refresh';
+  document.querySelector('main').prepend(hint);
+  addEventListener('touchstart', e => { y0 = scrollY <= 0 ? e.touches[0].clientY : null; pulled = 0; }, { passive: true });
+  addEventListener('touchmove', e => { if (y0 == null) return; pulled = e.touches[0].clientY - y0; hint.style.height = Math.min(48, Math.max(0, pulled / 2)) + 'px'; hint.textContent = pulled > 90 ? '↻ release to refresh' : '↓ pull to refresh'; }, { passive: true });
+  addEventListener('touchend', async () => { const go = pulled > 90; y0 = null; pulled = 0; hint.style.height = go ? '48px' : '0'; if (go) { hint.textContent = 'refreshing…'; await Promise.all([loadThreads(), loadPosts()]); } hint.style.height = '0'; });
+})();
 async function loadPosts() {
   if (!cur) { el('feed').innerHTML = '<div class="empty">No thread is open to your account yet. Ask Mario.</div>'; setComposerEnabled(false); return; }
   const r = await Admin.api('GET', `/api/site/${cur}/posts?limit=100`);
