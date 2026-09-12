@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#1e1e2e"><title>Site · Shift Hub</title>
+<meta name="theme-color" content="#f0f2f5"><title>Site · Shift Hub</title>
 <link rel="icon" href="/icons/icon-192.png"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><link rel="manifest" href="/manifest.json">
 <style>
-  :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  /* Light, WhatsApp-like palette (Mario, 2026-09-12): the site chat replaces the WhatsApp groups, so it should feel like them */
+  :root{--base:#efeae2;--mantle:#ffffff;--crust:#ffffff;--surface0:#e2ddd5;--surface1:#cfc9bf;--text:#111b21;--sub:#54656f;--overlay0:#8696a0;--amber:#c47f0a;--green:#1f7a3a;--red:#c0392b;--blue:#027eb5;--bar:#f0f2f5;--me:#d9fdd3;}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
-  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--bar);}
   .hleft{display:flex;align-items:center;gap:16px;}
   .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
   .hback:hover{background:var(--surface0);}
@@ -15,37 +16,43 @@
   .wordmark span{color:var(--amber);}
   a.wordmark{color:inherit;text-decoration:none;}
   .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .whofoot{display:none;text-align:center;font-size:.74rem;color:var(--overlay0);padding:24px 16px 8px;} .whofoot a{color:var(--sub);margin-left:10px;}
+  /* phone: wordmark on top, ‹ Back + path under it; the e-mail moves to the bottom of the page */
+  @media (max-width:640px){
+    header{padding:10px 14px;} .hleft{flex-direction:column;align-items:flex-start;gap:8px;} #crumbs{order:2;} .wordmark{order:1;}
+    header .who{display:none;} .whofoot{display:block;}
+  }
   .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
   .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
   main{max-width:760px;margin:0 auto;padding:0 0 120px;}
   .threads{position:relative;padding:12px 16px;border-bottom:1px solid var(--surface0);}
   .threads .pick{width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--mantle);border:1px solid var(--amber);color:var(--amber);border-radius:12px;padding:10px 14px;font-size:.95rem;font-weight:600;cursor:pointer;font-family:inherit;}
   .threads .pick small{color:var(--overlay0);font-weight:400;font-size:.8rem;}
-  .threads .menu{position:absolute;left:16px;right:16px;top:calc(100% - 6px);z-index:60;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.45);overflow:hidden;}
+  .threads .menu{position:absolute;left:16px;right:16px;top:calc(100% - 6px);z-index:60;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.18);overflow:hidden;}
   .threads .menu input{width:100%;box-sizing:border-box;background:var(--base);border:0;border-bottom:1px solid var(--surface0);color:var(--text);padding:10px 14px;font-size:.95rem;font-family:inherit;outline:none;}
   .threads .menu ul{list-style:none;margin:0;padding:6px 0;max-height:50vh;overflow-y:auto;}
   .threads .menu li{padding:9px 14px;cursor:pointer;font-size:.9rem;} .threads .menu li:hover,.threads .menu li.hi{background:var(--surface0);} .threads .menu li.on{color:var(--amber);}
   .feed{padding:12px 16px;display:flex;flex-direction:column;gap:10px;overflow-x:hidden;}
-  .post{max-width:88%;background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:10px 12px;font-size:.9rem;}
-  .post.me{align-self:flex-end;border-color:#4a3e26;}
+  .post{max-width:88%;background:var(--mantle);border:0;border-radius:12px;padding:8px 10px;font-size:.9rem;box-shadow:0 1px .5px rgba(11,20,26,.13);}
+  .post.me{align-self:flex-end;background:var(--me);}
   .post .meta{font-size:.68rem;color:var(--overlay0);margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;}
   .post img,.post video{max-width:100%;border-radius:10px;display:block;}
-  .post .line{font-size:.72rem;margin-top:6px;padding:4px 8px;border-radius:8px;background:#3b3220;color:var(--amber);}
-  .post .line.accepted{background:#26352a;color:var(--green);} .post .line.dismissed{background:#3a2630;color:#f38ba8;}
+  .post .line{font-size:.72rem;margin-top:6px;padding:4px 8px;border-radius:8px;background:#fff3d6;color:#8a5a00;}
+  .post .line.accepted{background:#dcf8c6;color:#0b6b2c;} .post .line.dismissed{background:#fde2e4;color:#b3261e;}
   .post .line a{color:inherit;}
-  .post .err{font-size:.72rem;color:#f38ba8;margin-top:4px;}
+  .post .err{font-size:.72rem;color:var(--red);margin-top:4px;}
   .day{align-self:center;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay0);margin:8px 0 2px;}
-  .composer{position:fixed;bottom:0;left:0;right:0;z-index:890;background:var(--mantle);border-top:1px solid var(--surface0);padding:10px 12px calc(10px + env(safe-area-inset-bottom));}
+  .composer{position:fixed;bottom:0;left:0;right:0;z-index:890;background:var(--bar);border-top:1px solid var(--surface0);padding:10px 12px calc(10px + env(safe-area-inset-bottom));}
   /* Mario, 2026-09-12: the composer sits below the phone-preview button (z-index 900);
      at narrow widths the button would land on top of the composer row, so push it up instead. */
   body.has-composer .pp-btn{ bottom: 84px; }
   .composer .row{max-width:760px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;}
-  .composer textarea{flex:1;min-height:42px;max-height:140px;resize:none;background:var(--crust,#11111b);color:var(--text);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;font:inherit;}
+  .composer textarea{flex:1;min-height:42px;max-height:140px;resize:none;background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;font:inherit;}
   .composer textarea:disabled{opacity:.5;}
   .composer button{background:var(--surface0);border:0;color:var(--text);border-radius:12px;width:42px;height:42px;font-size:1.15rem;cursor:pointer;flex:none;}
   .composer button:disabled{opacity:.4;cursor:default;}
-  .composer button.send{background:var(--amber);color:var(--base);}
-  .composer button.rec{background:#f38ba8;color:var(--base);}
+  .composer button.send{background:#00a884;color:#fff;}
+  .composer button.rec{background:var(--red);color:#fff;}
   .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
 </style></head>
 <body>
@@ -53,6 +60,7 @@
 <main>
   <div class="threads" id="threads" hidden></div>
   <div class="feed" id="feed"><div class="empty">Loading…</div></div>
+  <div class="whofoot" id="whofoot"></div>
 </main>
 <div class="composer"><div class="row">
   <button id="btnphoto" disabled onclick="pick('image/*','photo')" title="Photo">📷</button>
@@ -196,7 +204,8 @@ async function toggleRec() {
   if (rec) { rec.stop(); return; }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+    // mp4/AAC first: it plays everywhere (an iPhone stalls on webm); webm only where mp4 recording is missing (older Chrome)
+    const mime = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm';
     rec = new MediaRecorder(stream, { mimeType: mime }); chunks = [];
     rec.ondataavailable = e => chunks.push(e.data);
     rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); el('recbtn').classList.remove('rec'); const b = new Blob(chunks, { type: mime }); rec = null; sendFile(new File([b], 'voice.' + (mime === 'audio/webm' ? 'webm' : 'm4a'), { type: mime }), 'voice'); };
@@ -211,7 +220,7 @@ async function flip(id) {
 }
 Admin.require('site', async m => {
   me = m;
-  el('who').innerHTML = `<a href="/">&lsaquo; Hub</a> ${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  el('who').innerHTML = el('whofoot').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   document.body.classList.add('has-composer');
   await loadThreads(); await loadPosts();
 });

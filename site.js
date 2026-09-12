@@ -195,7 +195,7 @@ async function handle(req, res, url, user, ctx) {
     if (!(await threadsFor(ctx)).some(t => t.id === m[1])) return json(res, 403, { error: 'not your thread' });
     const d = await ws.collection('site').doc(m[1]).collection('posts').doc(m[2]).get();
     if (!d.exists || !d.data().file) return json(res, 404, { error: 'no file' });
-    await files.streamFile(ctx, d.data().file, res);
+    await files.streamFile(ctx, d.data().file, res, req);
     return true;
   }
 

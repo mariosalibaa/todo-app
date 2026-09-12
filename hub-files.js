@@ -23,7 +23,9 @@ async function saveFile(ctx, { buf, mime, name, key, who, meta }) {
   return { id, name: String(name || '').slice(0, 120), mime, size: buf.length, key, store, at: now(), by: who };
 }
 
-async function streamFile(ctx, doc, res) {
+// req is optional: with it, byte ranges are honoured — iOS Safari refuses to play <audio>/<video> from a server
+// that answers a Range request with a plain 200 (the site's voice notes spun forever on the iPhone, 2026-09-12)
+async function streamFile(ctx, doc, res, req) {
   const { admin, db, TEAM_ID } = ctx;
   let buf;
   if (doc.store === 'firestore') {
@@ -34,8 +36,17 @@ async function streamFile(ctx, doc, res) {
   }
   if (!buf) { res.writeHead(404); res.end('file gone'); return; }
   const safeName = (doc.name || 'file').replace(/[^\w.-]/g, '_');
-  res.writeHead(200, { 'Content-Type': doc.mime || 'application/octet-stream', 'Content-Length': buf.length, 'Cache-Control': 'private, max-age=86400',
-    'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline; filename="' + safeName + '"' });
+  const head = { 'Content-Type': doc.mime || 'application/octet-stream', 'Cache-Control': 'private, max-age=86400', 'Accept-Ranges': 'bytes',
+    'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline; filename="' + safeName + '"' };
+  const range = req && req.headers && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  if (range && (range[1] || range[2])) {
+    let start = range[1] ? +range[1] : Math.max(0, buf.length - +range[2]);
+    let end = range[1] && range[2] ? Math.min(+range[2], buf.length - 1) : buf.length - 1;
+    if (start > end || start >= buf.length) { res.writeHead(416, { 'Content-Range': 'bytes */' + buf.length }); res.end(); return; }
+    res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${buf.length}`, 'Content-Length': end - start + 1 });
+    res.end(buf.subarray(start, end + 1)); return;
+  }
+  res.writeHead(200, { ...head, 'Content-Length': buf.length });
   res.end(buf);
 }
 module.exports = { saveFile, streamFile };
