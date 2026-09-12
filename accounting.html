@@ -340,6 +340,29 @@
   .btn,button.btn{background:var(--surface0);border-color:var(--surface1);} .btn:hover:not(:disabled){border-color:var(--amber);}
   .btn.primary,button.primary{background:var(--amber);border-color:var(--amber);color:var(--crust);}
   ::placeholder{color:var(--overlay0);} hr{border-color:var(--surface0);}
+
+  /* ── Phone toolbar: one pinned row, the rest behind ⋯ (2026-09-12) ── */
+  #btn-more .badge{display:inline-block;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:var(--amber);color:var(--crust);font-size:10px;font-weight:700;text-align:center;padding:0 4px;margin-left:5px;vertical-align:1px;}
+  .more-box{width:100%!important;max-width:none;border-radius:14px 14px 0 0;max-height:82vh;}
+  .sheet.more{align-items:flex-end;}
+  .more-g{margin-bottom:14px;} .more-g[hidden]{display:none;}
+  .more-g h5{margin:0 0 6px;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--overlay0);font-weight:600;}
+  .more-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .more-row .btn,.more-row label.btn{height:40px;font-size:15px;padding:0 14px;display:inline-flex;align-items:center;}
+  .more-row select,.more-row input[type=date]{height:40px;font-size:15px;flex:1;min-width:140px;}
+  .more-row .pager{font-size:14px;} .more-row .pager .btn{height:34px;}
+  @media (max-width: 560px) {
+    #btn-more{display:inline-flex!important;align-items:center;height:36px;padding:0 12px;font-size:18px;line-height:1;}
+    .bar{flex-wrap:nowrap;gap:6px;padding:6px 8px;align-items:center;overflow:visible;}
+    .bar .acc-pick{width:auto;flex:1 1 40%;min-width:0;} .bar .acc-pick input{height:36px;font-size:15px;}
+    .bar .qbox{flex:1 1 30%;min-width:0;} .bar .qbox .search{width:100%;min-width:0;height:36px;font-size:15px;}
+    .bar #btn-line{height:36px;padding:0 12px;white-space:nowrap;}
+    /* everything else leaves the bar on a phone (moved into the sheet by phoneBar()) */
+    .bar > :not(.acc-pick):not(.qbox):not(#btn-line):not(#btn-more):not(#acc):not(#file){display:none!important;}
+    .legend{display:none;}
+    .msg{position:fixed;left:10px;right:10px;bottom:14px;z-index:70;border:1px solid var(--surface1);border-radius:10px;background:var(--surface0);padding:9px 12px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+    .msg:not(.ok):not(.err){display:none;}
+  }
 </style>
 </head>
 <body>
@@ -376,6 +399,7 @@
   <button class="btn" id="btn-log" onclick="openLog()" title="Every edit made on this account's lines: when, who, from what to what">🕘 Log</button>
   <button class="btn" id="btn-check" onclick="toggleReviewImported()" title="WhatsApp messages that match nothing in the Excel or in Odoo: not counted until you accept them" style="display:none">❓ To review</button>
   <button class="btn primary" id="btn-line" onclick="openLineForm()" title="Type a line: money in or out of this account">＋ Line</button>
+  <button class="btn" id="btn-more" onclick="openMore()" title="Everything else" hidden>⋯<span class="badge" id="more-badge" hidden></span></button>
   <label class="btn primary" for="file" id="btn-upload">⬆ Upload statement (PDF)</label>
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
   <button class="btn" id="btn-import" onclick="importOdooLines()" title="Pull every line of this account's Odoo journals (re-running updates, never duplicates)">⇄ Import Odoo</button>
@@ -390,6 +414,22 @@
   <button class="btn" id="btn-stmt" onclick="openStmt()" title="The statement as the Excel shows it: old sum (what he last saw), the new rows, all sum. Once sent, mark the new rows old." style="display:none">📄 Statement</button>
   <button class="btn" id="btn-queue" onclick="openQueue()" title="Lines you asked to be booked in Odoo — reviewed here before anything is written" hidden>📗 To book</button>
   <button class="btn" id="btn-bills" onclick="openBills()" title="Recurring payments with a standing rule — create their draft bills in Odoo">📗 Odoo bills</button>
+</div>
+<!-- Phone: the toolbar's 20-odd buttons live here, in groups, behind ⋯ — the bar keeps one row
+     (account, search, ＋ Line, ⋯) so the ledger gets the screen (Mario, 2026-09-12: "half of the page is fixed") -->
+<div class="sheet more" id="more" hidden onclick="if(event.target===this)closeMore()">
+  <div class="sheet-box more-box">
+    <div class="sheet-head"><b>Actions</b><span class="sp" style="flex:1"></span><button class="btn" onclick="closeMore()">✕ Close</button></div>
+    <div class="sheet-body more-body">
+      <div class="more-g" data-g="review"><h5>Review</h5><div class="more-row"></div></div>
+      <div class="more-g" data-g="edit"><h5>Edits</h5><div class="more-row"></div></div>
+      <div class="more-g" data-g="period"><h5>Period</h5><div class="more-row"></div></div>
+      <div class="more-g" data-g="import"><h5>Imports</h5><div class="more-row"></div></div>
+      <div class="more-g" data-g="odoo"><h5>Odoo</h5><div class="more-row"></div></div>
+      <div class="more-g" data-g="views"><h5>Views</h5><div class="more-row"></div></div>
+      <div class="more-g" data-g="account"><h5>Account</h5><div class="more-row"></div></div>
+    </div>
+  </div>
 </div>
 <div class="legend">
   <span class="q-note" id="q-note" hidden></span>
@@ -3533,6 +3573,54 @@ async function saveTransfer() {
     say(`Transfer saved: ${fmt(r.amount)} ${esc(r.fromName)} → ${esc(r.toName)}`);
   } catch (e) { document.getElementById('trform-msg').textContent = 'Could not save: ' + e.message; }
 }
+
+// ── Phone: re-parent the bar's buttons into the ⋯ sheet (ids, handlers and disabled state travel with them) ──
+const MORE_GROUPS = { review: ['btn-review', 'btn-check', 'btn-queue'], edit: ['btn-undo', 'btn-redo', 'btn-log'],
+  period: ['period', 'from', 'to', 'pager', 'rowcount'], import: ['btn-upload', 'btn-import', 'btn-wa', 'btn-xl', 'btn-contacts'],
+  odoo: ['btn-odoo', 'btn-months', 'btn-bills'], views: ['btn-timesheet', 'btn-projects', 'btn-stmt'], account: ['btn-edit'] };
+const _home = new Map();   // element → [parent, nextSibling] in the desktop bar
+function isPhone() { return matchMedia('(max-width: 560px)').matches; }
+function phoneBar() {
+  const bar = document.querySelector('.bar'); if (!bar) return;
+  if (isPhone()) {
+    for (const [g, ids] of Object.entries(MORE_GROUPS)) {
+      const row = document.querySelector(`.more-g[data-g="${g}"] .more-row`); if (!row) continue;
+      for (const id of ids) { const el = document.getElementById(id); if (!el || row.contains(el)) continue;
+        if (!_home.has(el)) _home.set(el, [el.parentNode, el.nextSibling]); row.appendChild(el); }
+    }
+    // the Fuel button has no id: it is the one whose onclick opens the fuel view
+    const fuel = [...bar.querySelectorAll('button')].find(b => /openFuel/.test(b.getAttribute('onclick') || ''));
+    if (fuel) { const row = document.querySelector('.more-g[data-g="views"] .more-row'); if (!_home.has(fuel)) _home.set(fuel, [fuel.parentNode, fuel.nextSibling]); row.appendChild(fuel); }
+    document.getElementById('btn-more').hidden = false;
+  } else {
+    for (const [el, [parent, next]] of _home) { if (el.parentNode !== parent) parent.insertBefore(el, next && next.parentNode === parent ? next : null); }
+    document.getElementById('btn-more').hidden = true;
+  }
+  moreBadge();
+}
+function moreBadge() {
+  const b = document.getElementById('more-badge'), r = document.getElementById('btn-review'); if (!b || !r) return;
+  const n = +((r.textContent || '').match(/\d+/) || [0])[0];
+  // write only what changes: setting the same attribute again is still a mutation, and the
+  // observer below would feed on it forever (the page froze the first time, 2026-09-12)
+  const txt = n ? String(n) : '', hide = !n || r.disabled;
+  if (b.textContent !== txt) b.textContent = txt;
+  if (b.hidden !== hide) b.hidden = hide;
+  // a group with nothing visible in it folds away
+  document.querySelectorAll('.more-g').forEach(g => { const want = ![...g.querySelectorAll('.more-row > *')].some(e => !e.hidden && getComputedStyle(e).display !== 'none'); if (g.hidden !== want) g.hidden = want; });
+}
+function openMore() { moreBadge(); document.getElementById('more').hidden = false; }
+function closeMore() { document.getElementById('more').hidden = true; }
+document.addEventListener('DOMContentLoaded', phoneBar);
+matchMedia('(max-width: 560px)').addEventListener('change', phoneBar);
+let _badgeTick = false;
+new MutationObserver(muts => {
+  if (!isPhone() || _badgeTick) return;
+  if (muts.every(m => m.target.closest && m.target.closest('#more, #btn-more'))) return;   // our own writes
+  _badgeTick = true; requestAnimationFrame(() => { _badgeTick = false; moreBadge(); });
+}).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['disabled', 'style', 'hidden'] });
+// tapping an action in the sheet closes the sheet
+document.addEventListener('click', e => { const m = document.getElementById('more'); if (m && !m.hidden && e.target.closest('.more-row .btn, .more-row label.btn')) setTimeout(closeMore, 50); });
 </script>
 </body>
 </html>
