@@ -635,7 +635,7 @@ function parseMoney(text, owner, fromMe, lbpRate) {
   let m = t.match(/(-?\d+(?:[.,]\d+)?)\s*(?:\$|usd|dollars?)/i) || t.match(/\$\s*(-?\d+(?:[.,]\d+)?)/);
   if (m) { amount = parseFloat(m[1].replace(',', '.')); currency = 'USD'; }
   else if ((m = t.match(/(\d+(?:[.,]\d+)?)\s*دولار(?:\s*و\s*(\d+)\s*سنت)?/))) { amount = parseFloat(m[1].replace(',', '.')) + (m[2] ? parseInt(m[2], 10) / 100 : 0); currency = 'USD'; }
-  else if ((m = t.match(/(\d+(?:[.,]\d+)?)\s*(مليون|الف|ألف|ليرة|lbp|l\.l\.?|ll)\b/i))) {
+  else if ((m = t.match(/(\d+(?:[.,]\d+)?)\s*(مليون|الف|ألف|ليرة|lbp|l\.l\.?|ll)(?=[\s.,!?؟)\/\-]|[a-z]|$)/i))) {
     const mult = /مليون/.test(m[2]) ? 1e6 : /الف|ألف/.test(m[2]) ? 1e3 : 1;
     amount = parseFloat(m[1].replace(',', '.')) * mult / (lbpRate || 89500); currency = 'LBP';
   }
