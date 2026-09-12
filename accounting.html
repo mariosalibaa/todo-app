@@ -56,7 +56,7 @@
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:var(--overlay0);}
   .c-sel{width:26px;text-align:center;padding-left:4px!important;padding-right:0!important;} .c-sel input{margin:0;cursor:pointer;} tr.sel td{background:rgba(242,169,59,.07);}
-  #bulk{position:sticky;bottom:0;z-index:40;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;background:var(--mantle);border-top:2px solid var(--amber);font-size:13px;} #bulk b{color:var(--amber);}
+  #bulk[hidden]{display:none;} #bulk{position:sticky;bottom:0;z-index:40;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;background:var(--mantle);border-top:2px solid var(--amber);font-size:13px;} #bulk b{color:var(--amber);}
   .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:16%;white-space:normal;} .c-partner{width:10%;} .c-cash{width:10%;} .c-company{width:8%;} .c-proj{width:11%;} td.num,th.num{width:6.5%;} .c-odoo{width:10%;} .c-recon{width:6%;font-size:12px;white-space:nowrap;} td.c-recon.yes{color:var(--green);} td.c-recon.no{color:var(--odoo,#e0a04a);} td.c-recon:not(.yes):not(.no){color:var(--muted);}
   /* ☑ Reviewed: the box, then the stamp under it */
   .c-rev{width:7%;} .c-rev label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;}
@@ -1565,7 +1565,7 @@ function render() {
     document.getElementById('pg-next').disabled = pageNo >= last; }
   document.getElementById('grid').style.display = tx.length ? '' : 'none';
   document.getElementById('empty').style.display = tx.length ? 'none' : '';
-  for (const c of COLS) document.getElementById('arr-' + c.k).textContent = sort.k === c.k ? (sort.dir > 0 ? '▲' : '▼') : '';
+  for (const c of COLS) { const ar = document.getElementById('arr-' + c.k); if (ar) ar.textContent = sort.k === c.k ? (sort.dir > 0 ? '▲' : '▼') : ''; }   // the ☐ column has no arrow
   document.getElementById('clr').classList.toggle('on', Object.keys(colF).length > 0 || !!sugFilter);
 
   let pending = 0;
