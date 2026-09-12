@@ -24,7 +24,33 @@
   }
   .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
   .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
-  main{max-width:760px;margin:0 auto;padding:0 0 120px;}
+  main{display:flex;height:calc(100vh - var(--hdr,61px));overflow:hidden;}
+  .pane{display:flex;flex-direction:column;min-width:0;}
+  .pane.list{width:360px;flex:none;background:var(--mantle);border-right:1px solid var(--surface0);overflow-y:auto;}
+  .pane.chat{flex:1;overflow-y:auto;padding-bottom:90px;}
+  .pane.list h1{font-size:1.6rem;margin:14px 16px 8px;}
+  .search{padding:0 12px 8px;} .search input{width:100%;box-sizing:border-box;background:var(--bar);border:0;border-radius:10px;padding:9px 12px;font:inherit;font-size:.95rem;color:var(--text);outline:none;}
+  .chats{flex:1;}
+  .chat-row{display:grid;grid-template-columns:50px 1fr auto;column-gap:12px;align-items:center;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--surface0);}
+  .chat-row:hover,.chat-row.on{background:var(--base);}
+  .chat-row .av{width:50px;height:50px;border-radius:50%;background:#dfe5e7;color:#54656f;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:1.15rem;}
+  .chat-row .av.me{background:#c47f0a;color:#fff;}
+  .chat-row > div:nth-child(2){min-width:0;}
+  .chat-row .n{font-weight:600;font-size:.98rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .chat-row .p{font-size:.8rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+  .chat-row .t{font-size:.72rem;color:var(--overlay0);align-self:start;margin-top:3px;text-align:right;} .chat-row .t .pin{display:block;margin-top:8px;}
+  .chatbar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--bar);border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:5;}
+  .chatbar .back{display:none;color:var(--blue);text-decoration:none;font-size:1.3rem;padding:0 4px;}
+  .chatbar .av{width:38px;height:38px;border-radius:50%;background:#dfe5e7;color:#54656f;display:flex;align-items:center;justify-content:center;font-weight:600;} .chatbar .av.me{background:#c47f0a;color:#fff;}
+  .chatbar .n{font-weight:600;} .chatbar .s{font-size:.72rem;color:var(--sub);}
+  .composer{left:360px;}
+  @media (max-width:800px){
+    main{display:block;height:auto;overflow:visible;}
+    .pane.list{width:auto;border:0;} .pane.chat{padding-bottom:110px;}
+    body.in-chat .pane.list{display:none;} body:not(.in-chat) .pane.chat{display:none;} body:not(.in-chat) .composer{display:none;}
+    .chatbar .back{display:inline;} .composer{left:0;} .pull{display:block;}
+    body.in-chat header{display:none;}   /* inside a chat the phone shows only the chat bar, like WhatsApp; ‹ goes back to the list */
+  }
   .threads{position:relative;padding:12px 16px;border-bottom:1px solid var(--surface0);}
   .threads .pick{width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--mantle);border:1px solid var(--amber);color:var(--amber);border-radius:12px;padding:10px 14px;font-size:.95rem;font-weight:600;cursor:pointer;font-family:inherit;}
   .threads .pick small{color:var(--overlay0);font-weight:400;font-size:.8rem;}
@@ -61,14 +87,21 @@
   .sheet .t{font-size:.78rem;color:var(--sub);text-align:center;padding:4px 8px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .sheet button{border:0;border-radius:12px;padding:13px;font:inherit;font-size:1rem;background:var(--base);color:var(--text);cursor:pointer;}
   .sheet button.del{color:var(--red);font-weight:600;}
-  .pull{height:0;overflow:hidden;text-align:center;font-size:.74rem;color:var(--sub);line-height:48px;transition:height .15s;}
+  .pull{display:none;height:0;overflow:hidden;text-align:center;font-size:.74rem;color:var(--sub);line-height:48px;transition:height .15s;}
 </style></head>
 <body>
 <header><div class="hleft"><span id="crumbs"></span><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>WHATSAPP</small></a><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Shift WhatsApp']]));</script></div><div class="who" id="who"></div></header>
 <main>
-  <div class="threads" id="threads" hidden></div>
-  <div class="feed" id="feed"><div class="empty">Loading…</div></div>
-  <div class="whofoot" id="whofoot"></div>
+  <section class="pane list" id="listpane">
+    <h1>Chats</h1>
+    <div class="search"><input id="q" placeholder="Search" autocomplete="off" oninput="drawList()"></div>
+    <div class="chats" id="chats"><div class="empty">Loading…</div></div>
+    <div class="whofoot" id="whofoot"></div>
+  </section>
+  <section class="pane chat" id="chatpane">
+    <div class="chatbar" id="chatbar"></div>
+    <div class="feed" id="feed"><div class="empty">Pick a chat</div></div>
+  </section>
 </main>
 <div class="composer"><div class="row">
   <button id="btnphoto" disabled onclick="pick('image/*','photo')" title="Photo">📷</button>
@@ -93,36 +126,42 @@ const dayLabel = ymd => new Date(ymd + 'T12:00:00+03:00').toLocaleDateString('en
 function setComposerEnabled(on) {
   ['text', 'btnsend', 'btnphoto', 'btnvideo', 'recbtn'].forEach(id => el(id).disabled = !on);
 }
+const ONE_DAY = 864e5;
+function whenLabel(iso) {
+  if (!iso) return ''; const d = new Date(iso), now = new Date();
+  const dd = Math.floor((now.setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / ONE_DAY);
+  return dd <= 0 ? hhmm(iso) : dd === 1 ? 'Yesterday' : dd < 7 ? d.toLocaleDateString('en-GB', { weekday: 'long' }) : d.toLocaleDateString('en-GB');
+}
+const initial = t => t.kind === 'general' ? 'M' : (t.name || '?').trim().charAt(0).toUpperCase();
+function previewText(t) {
+  const p = t.preview; if (!p) return '<span style="color:var(--overlay0)">No messages yet</span>';
+  const who = p.by === me.email ? '' : esc((p.by || '').split('@')[0]) + ': ';
+  const icon = p.kind === 'voice' ? '🎤 ' : p.kind === 'photo' ? '📷 ' : p.kind === 'video' ? '🎬 ' : '';
+  const body = p.kind === 'deleted' ? '🚫 This message was deleted' : icon + (esc(p.text) || (p.kind === 'voice' ? 'Voice message' : p.kind === 'photo' ? 'Photo' : p.kind === 'video' ? 'Video' : ''));
+  return who + body;
+}
 async function loadThreads() {
   threads = await Admin.api('GET', '/api/site/threads');
-  if (!cur) cur = (location.hash.slice(1) && threads.some(t => t.id === location.hash.slice(1))) ? location.hash.slice(1) : (threads[0] || {}).id || '';
-  const c = threads.find(t => t.id === cur) || {};
-  el('threads').innerHTML = `<button class="pick" onclick="toggleMenu()">${esc(c.name || 'Pick a thread')}<small>${threads.length} threads ▾</small></button>`;
-  el('threads').hidden = threads.length < 2;
+  // Mario's own chat (id general) stays pinned on top; the rest by last message
+  threads.sort((a, b) => (a.kind === 'general' ? -1 : b.kind === 'general' ? 1 : (b.last || '').localeCompare(a.last || '')));
+  drawList();
   setComposerEnabled(!!cur);
 }
-function open_(id) { cur = id; location.hash = id; closeMenu(); loadThreads(); loadPosts(); }
-// Mario, 2026-09-12: pills overflowed on the phone; one picker + search instead
-function closeMenu() { const m = document.querySelector('.threads .menu'); if (m) m.remove(); }
-function toggleMenu() {
-  if (document.querySelector('.threads .menu')) return closeMenu();
-  const m = document.createElement('div'); m.className = 'menu';
-  m.innerHTML = '<input placeholder="Search…" autocomplete="off"><ul></ul>';
-  el('threads').appendChild(m);
-  const inp = m.querySelector('input'), ul = m.querySelector('ul');
-  let hi = 0;
-  const list = () => threads.filter(t => t.name.toLowerCase().includes(inp.value.trim().toLowerCase()));
-  const draw_ = () => { const L = list(); hi = Math.min(hi, Math.max(0, L.length - 1));
-    ul.innerHTML = L.map((t, i) => `<li class="${t.id === cur ? 'on' : ''}${i === hi ? ' hi' : ''}" onmousedown="open_('${t.id}')">${esc(t.name)}</li>`).join('') || '<li style="color:var(--overlay0)">No match</li>'; };
-  inp.oninput = () => { hi = 0; draw_(); };
-  inp.onkeydown = e => { const L = list();
-    if (e.key === 'ArrowDown') { hi = Math.min(hi + 1, L.length - 1); draw_(); e.preventDefault(); }
-    else if (e.key === 'ArrowUp') { hi = Math.max(hi - 1, 0); draw_(); e.preventDefault(); }
-    else if (e.key === 'Enter' && L[hi]) open_(L[hi].id);
-    else if (e.key === 'Escape') closeMenu(); };
-  draw_(); inp.focus();
-  setTimeout(() => document.addEventListener('click', function h(e) { if (!m.contains(e.target) && !e.target.closest('.pick')) { closeMenu(); document.removeEventListener('click', h); } }), 0);
+function drawList() {
+  const q = (el('q').value || '').trim().toLowerCase();
+  const L = threads.filter(t => !q || t.name.toLowerCase().includes(q));
+  el('chats').innerHTML = L.map(t => `<div class="chat-row ${t.id === cur ? 'on' : ''}" onclick="open_('${esc(t.id)}')">
+      <div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div>
+      <div><div class="n">${esc(t.name)}</div><div class="p">${previewText(t)}</div></div>
+      <div class="t">${whenLabel(t.last)}${t.kind === 'general' ? '<span class="pin">📌</span>' : ''}</div>
+    </div>`).join('') || '<div class="empty">No chat matches</div>';
 }
+function drawChatBar() {
+  const t = threads.find(x => x.id === cur); if (!t) { el('chatbar').innerHTML = ''; return; }
+  el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'}</div></div>`;
+}
+function showList() { document.body.classList.remove('in-chat'); history.replaceState(null, '', location.pathname); }
+function open_(id) { cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts(); }
 function replacePost(d) { const i = posts.findIndex(p => p.id === d.id); if (i >= 0) posts[i] = d; else posts.push(d); }
 async function digestOne(thread, id) {
   try { const d = await Admin.api('POST', `/api/site/${thread}/posts/${id}/digest`, {}); if (thread === cur) { replacePost(d); draw(); } }
@@ -183,7 +222,7 @@ function draw() {
     const canDel = mine || me.admin;
     return `${day}<div class="post ${mine ? 'me' : ''}" data-id="${esc(p.id)}" ${canDel ? `oncontextmenu="event.preventDefault();askDelete('${esc(p.id)}')" ontouchstart="pressStart(event,'${esc(p.id)}')" ontouchend="pressEnd()" ontouchmove="pressEnd()"` : ''}>${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
   }).join('');
-  window.scrollTo(0, document.body.scrollHeight);
+  const pane = el('chatpane'); pane.scrollTop = pane.scrollHeight; window.scrollTo(0, document.body.scrollHeight);
 }
 // long-press a message (or right-click on the laptop) → Delete, the WhatsApp way
 let pressT = null;
@@ -255,10 +294,15 @@ async function flip(id) {
   try { const d = await Admin.api('POST', `/api/site/${cur}/posts/${id}/flip`, {}); replacePost(d); draw(); }
   catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
 }
+const setHdr = () => document.documentElement.style.setProperty('--hdr', document.querySelector('header').offsetHeight + 'px');
+addEventListener('resize', setHdr); setHdr();
 Admin.require('site', async m => {
   me = m;
   el('who').innerHTML = el('whofoot').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   document.body.classList.add('has-composer');
-  await loadThreads(); await loadPosts();
+  await loadThreads();
+  const h = location.hash.slice(1);
+  if (h && threads.some(t => t.id === h)) open_(h);
+  else if (innerWidth > 800 && threads[0]) open_(threads[0].id);
 });
 </script></body></html>

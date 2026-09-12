@@ -39,7 +39,7 @@ async function readBytes(ctx, doc) {
 async function threadsFor(ctx) {
   const ws = ctx.db.collection('workspaces').doc(ctx.TEAM_ID);
   const people = (await acc.listAccounts(ws)).filter(a => a.daily && !a.archived);
-  const all = [{ id: 'general', name: 'General', kind: 'general' }, ...people.map(p => ({ id: p.id, name: p.name, kind: 'worker' }))];
+  const all = [{ id: 'general', name: 'Mario', kind: 'general' }, ...people.map(p => ({ id: p.id, name: p.name, kind: 'worker' }))];
   return ctx.access.admin ? all : all.filter(t => t.kind === 'worker' && t.id === ctx.access.account);
 }
 
@@ -142,6 +142,8 @@ async function handle(req, res, url, user, ctx) {
     await Promise.all(ts.map(async t => {   // one round trip for all threads, not one each
       const last = await ws.collection('site').doc(t.id).collection('posts').orderBy('at', 'desc').limit(1).get();
       t.last = last.empty ? '' : last.docs[0].data().at;
+      // the chat-list preview, WhatsApp style
+      if (!last.empty) { const p = last.docs[0].data(); t.preview = { kind: p.kind, by: p.by, text: p.deleted ? '' : p.kind === 'text' ? String(p.text || '').slice(0, 90) : (p.parsed && p.parsed.transcript ? String(p.parsed.transcript).slice(0, 90) : '') }; }
     }));
     return json(res, 200, ts);
   }
