@@ -358,11 +358,41 @@
     .bar .qbox{flex:1 1 30%;min-width:0;} .bar .qbox .search{width:100%;min-width:0;height:36px;font-size:15px;}
     .bar #btn-line{height:36px;padding:0 12px;white-space:nowrap;}
     /* everything else leaves the bar on a phone (moved into the sheet by phoneBar()) */
-    .bar > :not(.acc-pick):not(.qbox):not(#btn-line):not(#btn-more):not(#acc):not(#file){display:none!important;}
+    .bar > :not(.acc-pick):not(.qbox):not(#btn-line):not(#btn-more):not(#btn-todo):not(#acc):not(#file){display:none!important;}
     .legend{display:none;}
     .msg{position:fixed;left:10px;right:10px;bottom:14px;z-index:70;border:1px solid var(--surface1);border-radius:10px;background:var(--surface0);padding:9px 12px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
     .msg:not(.ok):not(.err){display:none;}
   }
+
+  /* ── ✓ To review deck (2026-09-12) ── */
+  #btn-todo .badge{display:inline-block;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:var(--amber);color:var(--crust);font-size:10px;font-weight:700;text-align:center;padding:0 4px;margin-left:5px;vertical-align:1px;}
+  #btn-todo.off{opacity:.45;}
+  .deck{position:fixed;inset:0;z-index:90;background:var(--base);display:flex;flex-direction:column;}
+  .deck[hidden]{display:none;}
+  .deck-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--surface0);font-size:15px;}
+  .deck-pos{color:var(--overlay0);font-size:13px;}
+  .deck-stage{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;align-items:flex-start;justify-content:center;touch-action:pan-y;}
+  .card{width:min(560px,100%);background:var(--mantle);border:1px solid var(--surface1);border-radius:16px;padding:16px;transition:transform .18s ease,opacity .18s ease;will-change:transform;}
+  .card.gone-r{transform:translateX(120vw) rotate(8deg);opacity:0;} .card.gone-l{transform:translateX(-120vw) rotate(-8deg);opacity:0;}
+  .card .when{font-size:12px;color:var(--overlay0);display:flex;gap:10px;flex-wrap:wrap;}
+  .card .amt{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;margin:6px 0 2px;} .card .amt.out{color:var(--red);} .card .amt.in{color:var(--green);}
+  .card .what{font-size:16px;line-height:1.4;margin:4px 0 8px;}
+  .card .msg-q{background:var(--crust);border:1px solid var(--surface0);border-radius:10px;padding:8px 10px;font-size:14px;line-height:1.45;margin:8px 0;white-space:pre-wrap;}
+  .card .msg-q small{display:block;color:var(--overlay0);font-size:11px;margin-bottom:3px;}
+  .card .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:8px 0;} .card .kv b{color:var(--overlay0);font-weight:500;}
+  .card .kv .warn{color:var(--amber);}
+  .card .pics{display:flex;flex-direction:column;gap:8px;margin:8px 0;} .card .pics img{width:100%;max-height:60vh;object-fit:contain;border-radius:10px;border:1px solid var(--surface0);background:var(--crust);}
+  .card .effect{font-size:12.5px;color:var(--sub);border-top:1px solid var(--surface0);padding-top:8px;margin-top:8px;}
+  .card .why{font-size:12px;color:var(--amber);margin-top:4px;}
+  .deck-foot{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--surface0);background:var(--mantle);}
+  .deck-foot .btn{flex:1;height:48px;font-size:16px;display:inline-flex;align-items:center;justify-content:center;}
+  .deck-foot .deck-no{color:var(--red);} .deck-foot .deck-fix{color:var(--blue);}
+  .deck-undo{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:95;display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--surface0);border:1px solid var(--surface1);border-radius:12px;padding:8px 12px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .deck-undo[hidden]{display:none;}
+  .deck-ask{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;} .deck-ask .btn{height:42px;font-size:15px;padding:0 14px;}
+  .deck-done{text-align:center;padding:30px 16px;color:var(--sub);font-size:15px;line-height:1.7;} .deck-done b{display:block;font-size:22px;color:var(--text);margin-bottom:8px;}
+  .deck-hint{position:absolute;top:50%;font-size:56px;opacity:0;pointer-events:none;transition:opacity .1s;} .deck-hint.l{left:14px;color:var(--red);} .deck-hint.r{right:14px;color:var(--green);}
+  @media (max-width: 560px) { .bar #btn-todo{display:inline-flex!important;align-items:center;height:36px;padding:0 10px;white-space:nowrap;} .card{border-radius:14px;padding:14px;} .card .amt{font-size:28px;} }
 </style>
 </head>
 <body>
@@ -399,6 +429,7 @@
   <button class="btn" id="btn-log" onclick="openLog()" title="Every edit made on this account's lines: when, who, from what to what">🕘 Log</button>
   <button class="btn" id="btn-check" onclick="toggleReviewImported()" title="WhatsApp messages that match nothing in the Excel or in Odoo: not counted until you accept them" style="display:none">❓ To review</button>
   <button class="btn primary" id="btn-line" onclick="openLineForm()" title="Type a line: money in or out of this account">＋ Line</button>
+  <button class="btn" id="btn-todo" onclick="openDeck()" title="Everything waiting for your decision, one card at a time">✓ To review<span class="badge" id="todo-badge" hidden></span></button>
   <button class="btn" id="btn-more" onclick="openMore()" title="Everything else" hidden>⋯<span class="badge" id="more-badge" hidden></span></button>
   <label class="btn primary" for="file" id="btn-upload">⬆ Upload statement (PDF)</label>
   <input type="file" id="file" accept="application/pdf" style="display:none" onchange="upload(this.files[0])">
@@ -430,6 +461,18 @@
       <div class="more-g" data-g="account"><h5>Account</h5><div class="more-row"></div></div>
     </div>
   </div>
+</div>
+<!-- ✓ To review: the queue as a deck of cards — one decision per card, swipe or tap
+     (Mario, 2026-09-12: "show the statement on the phone as card, and we swipe left, right") -->
+<div class="deck" id="deck" hidden>
+  <div class="deck-head"><b id="deck-title">✓ To review</b><span class="deck-pos" id="deck-pos"></span><span class="sp" style="flex:1"></span><button class="btn" onclick="closeDeck()">✕</button></div>
+  <div class="deck-stage" id="deck-stage"></div>
+  <div class="deck-foot" id="deck-foot">
+    <button class="btn deck-no" onclick="deckAct('no')" title="Keep it out of the balance">⊘ Not counted</button>
+    <button class="btn deck-fix" onclick="deckAct('fix')" title="Change partner, project, amount…">✎ Fix</button>
+    <button class="btn primary deck-yes" onclick="deckAct('yes')" title="Count it — and book it if the account books itself">✓ Accept</button>
+  </div>
+  <div class="deck-undo" id="deck-undo" hidden><span id="deck-undo-txt"></span><button class="btn" onclick="deckUndo()">↶ Undo</button></div>
 </div>
 <div class="legend">
   <span class="q-note" id="q-note" hidden></span>
@@ -1648,6 +1691,7 @@ function render() {
   const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t))).length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
+  todoBadge();
   rv.disabled = !waiting && sugFilter !== 'pending';
   const ck = document.getElementById('btn-check'), toCheck = tx.filter(t => t.review).length;
   ck.style.display = toCheck || reviewImported ? '' : 'none';
@@ -3621,6 +3665,131 @@ new MutationObserver(muts => {
 }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['disabled', 'style', 'hidden'] });
 // tapping an action in the sheet closes the sheet
 document.addEventListener('click', e => { const m = document.getElementById('more'); if (m && !m.hidden && e.target.closest('.more-row .btn, .more-row label.btn')) setTimeout(closeMore, 50); });
+
+// ── ✓ To review: the queue as a deck ─────────────────────────────────────────────────────────
+// One card = one decision. What waits: a WhatsApp/site line nobody has looked at (❓ review),
+// a proposal ready to be counted (✓ accept), a line with a partner/project suggestion pending.
+// Buttons are the action; a swipe is the shortcut (right = accept, left = not counted). Every
+// action can be undone for a few seconds. (Mario, 2026-09-12)
+function todoKind(t) {
+  if ((t.src === 'whatsapp' || t.src === 'site') && t.review && t.excluded && !t.waAccepted) return 'review';
+  if ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && !t.waAccepted) return 'accept';
+  if (sugState(t) === 'pending') return 'suggest';
+  if (!t.excluded && t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') return 'guess';
+  if (t.ask && t.ask.options && t.ask.options.length) return 'ask';
+  return '';
+}
+const todoList = () => tx.filter(t => !t._ts && todoKind(t)).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+function todoBadge() {
+  const b = document.getElementById('todo-badge'), btn = document.getElementById('btn-todo'); if (!b || !btn) return;
+  const n = todoList().length, txt = n ? String(n) : '';
+  if (b.textContent !== txt) b.textContent = txt; if (b.hidden !== !n) b.hidden = !n;
+  if (btn.classList.contains('off') !== !n) btn.classList.toggle('off', !n);
+}
+let deck = { items: [], i: 0, done: [], undo: null, undoTimer: null };
+function openDeck() {
+  deck = { items: todoList().map(t => t.id), i: 0, done: [], undo: null, undoTimer: null };
+  document.getElementById('deck').hidden = false; closeMore && closeMore();
+  deckShow();
+}
+function closeDeck() { document.getElementById('deck').hidden = true; document.getElementById('deck-undo').hidden = true; render(); }
+function deckShow() {
+  const st = document.getElementById('deck-stage'), pos = document.getElementById('deck-pos'), foot = document.getElementById('deck-foot');
+  const id = deck.items[deck.i], t = id && tx.find(x => x.id === id);
+  if (!t) {   // the end: what happened
+    const c = { yes: 0, no: 0, fix: 0 }; deck.done.forEach(d => c[d.act]++);
+    pos.textContent = ''; foot.style.visibility = 'hidden';
+    st.innerHTML = `<div class="deck-done"><b>${deck.items.length ? 'All done' : 'Nothing waiting'}</b>${deck.items.length ? `${c.yes} accepted · ${c.no} not counted · ${c.fix} fixed` : 'Every line on this account has been looked at.'}<br><button class="btn" style="margin-top:14px" onclick="closeDeck()">Back to the ledger</button></div>`;
+    return;
+  }
+  foot.style.visibility = ''; pos.textContent = `${deck.i + 1} of ${deck.items.length}`;
+  const kind = todoKind(t), amt = t.debit || t.credit || 0, out = !!t.debit;
+  const when = t.waAt ? (d => { const b = new Date(d.getTime() + 3 * 3600e3); return b.toISOString().slice(0, 10) + ' ' + b.toISOString().slice(11, 16); })(new Date(t.waAt)) : '';
+  const pics = (t.docs || []).filter(d => /^image\//.test(d.mime || '') || /\.(jpe?g|png|webp)$/i.test(d.name || '')).map(d => `<img src="${esc(docHref(t, d))}" alt="" loading="lazy">`).join('');
+  const sg = kind === 'suggest' ? sugFor(t) : null;
+  const bal = closing(); const after = bal == null ? null : (t.excluded ? bal + (t.credit || 0) - (t.debit || 0) : bal);
+  const who = t.waFrom === 'mario' ? 'you' : (account && account.owner ? account.owner : 'him');
+  const why = kind === 'review' ? 'Read off WhatsApp — nothing in the Excel or Odoo matches it. Count it, or leave it out.'
+    : kind === 'accept' ? 'Matched a line already booked — accept to confirm it is the same money.'
+    : kind === 'guess' ? `Project not written in the sheet — taken from ${esc(t.projectFrom)}. ✓ keeps ${esc(t.analyticName)}, ⊘ clears it so you pick one.`
+    : kind === 'ask' ? esc(t.ask.text || 'A question on this line')
+    : 'A partner / project suggestion is waiting on this line.';
+  const askBtns = kind === 'ask' ? `<div class="deck-ask">${(t.ask.options || []).map((o, i) => `<button class="btn" onclick="deckAnswer('${t.id}', ${i})">${esc(o.label || o.text || o)}</button>`).join('')}<button class="btn" onclick="deckAct('fix')">✎ other…</button></div>` : '';
+  const foot = document.getElementById('deck-foot');
+  foot.querySelector('.deck-yes').textContent = kind === 'guess' ? '✓ Keep' : '✓ Accept';
+  foot.querySelector('.deck-no').textContent = kind === 'guess' ? '⊘ Clear' : '⊘ Not counted';
+  foot.querySelector('.deck-yes').style.display = foot.querySelector('.deck-no').style.display = kind === 'ask' ? 'none' : '';
+  st.innerHTML = `<div class="deck-hint l">⊘</div><div class="deck-hint r">✓</div><div class="card" id="deck-card">
+    <div class="when"><span>${esc(longDate(t.date))}</span>${when ? `<span>💬 ${esc(when.slice(11))} · from ${esc(who)}</span>` : ''}<span class="src">${esc(t.src || 'manual')}</span></div>
+    <div class="amt ${out ? 'out' : 'in'}">${out ? '−' : '+'}${fmt(amt)} <small style="font-size:14px;color:var(--overlay0)">${esc((account && account.currency) || 'USD')}</small></div>
+    <div class="what">${esc(t.description || '')}</div>
+    ${t.waMsg || (t.src === 'whatsapp' && t.description) ? `<div class="msg-q"><small>his message</small>${esc(t.waMsg || t.description)}</div>` : ''}
+    ${pics ? `<div class="pics">${pics}</div>` : ''}
+    <div class="kv">
+      <b>Partner</b><span>${esc(t.partnerName || t.partnerText || '—')}${sg && sg.partner ? ` <span class="warn">→ ${esc(sg.partner.name || sg.partner)}</span>` : ''}</span>
+      <b>Project</b><span>${esc(t.analyticName || t.analyticText || '—')}${sg && sg.analytic ? ` <span class="warn">→ ${esc(sg.analytic.name || sg.analytic)}</span>` : ''}</span>
+      <b>Company</b><span>${esc(companyOf(t) || '—')}</span>
+      ${t.note ? `<b>Note</b><span>${esc(t.note)}</span>` : ''}
+    </div>
+    <div class="why">${why}</div>${askBtns}
+    ${after != null && t.excluded ? `<div class="effect">${esc((account && account.name) || '')}: closing <b>${fmt(bal) || '0.00'}</b> → if counted <b>${fmt(after) || '0.00'}</b></div>` : ''}
+  </div>`;
+  deckSwipe(document.getElementById('deck-card'));
+}
+// the paper's address, as the grid builds it
+function docHref(t, d) { return d.url || (`/api/accounting/accounts/${acc}/tx/${t.id}/docs/${d.id}`); }
+async function deckAct(act) {
+  const id = deck.items[deck.i], t = id && tx.find(x => x.id === id); if (!t) return;
+  const kind = todoKind(t);
+  const before = { excluded: t.excluded, review: t.review, waAccepted: t.waAccepted, dupOf: t.dupOf, suggestSkip: t.suggestSkip };
+  const card = document.getElementById('deck-card');
+  try {
+    if (act === 'fix') { openLineForm(id); return; }   // the form saves; the card is re-drawn when it closes
+    if (card) card.classList.add(act === 'yes' ? 'gone-r' : 'gone-l');
+    if (kind === 'review') await patch(id, act === 'yes' ? { excluded: false, review: false, waAccepted: true, dupOf: null } : { review: false });
+    else if (kind === 'accept') await patch(id, act === 'yes' ? { waAccepted: true } : { excluded: true, review: false });
+    else if (kind === 'suggest') { if (act === 'yes') await acceptRow(id); else await skipRow(id, true); }
+    else if (kind === 'guess') { await confirmAnalytic(id, act === 'yes'); }
+    // mirror the change in the page's copy of the line
+    if (kind !== 'suggest' && kind !== 'guess') { const w = act === 'yes' ? (kind === 'review' ? { excluded: false, review: false, waAccepted: true, dupOf: null } : { waAccepted: true }) : (kind === 'review' ? { review: false } : { excluded: true, review: false }); Object.assign(t, w); computeBalances(); }
+    deck.done.push({ id, act, before, kind });
+    deckUndoShow(`${act === 'yes' ? (kind === 'guess' ? 'Kept' : 'Accepted') : (kind === 'guess' ? 'Cleared' : 'Not counted')}: ${(t.description || '').slice(0, 40)}`);
+    // accepting a proposal books it when the account books itself (same as ⊘ count on the grid)
+    if (act === 'yes' && kind === 'review' && t.src !== 'excel' && !t.bookedMove && t.nature && t.nature !== 'note' && account && account.odooPartner) autoBook(id).catch(() => {});
+  } catch (e) { say('Could not save: ' + e.message, 'err'); if (card) card.classList.remove('gone-r', 'gone-l'); return; }
+  setTimeout(() => { deck.i++; deckShow(); }, 180);
+}
+async function deckAnswer(id, i) {
+  try { await answerAsk(id, i); deck.done.push({ id, act: 'fix', kind: 'ask' }); setTimeout(() => { deck.i++; deckShow(); }, 120); }
+  catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+function deckUndoShow(txt) {
+  const u = document.getElementById('deck-undo'); document.getElementById('deck-undo-txt').textContent = txt; u.hidden = false;
+  clearTimeout(deck.undoTimer); deck.undoTimer = setTimeout(() => { u.hidden = true; }, 6000);
+}
+async function deckUndo() {
+  const last = deck.done.pop(); document.getElementById('deck-undo').hidden = true; if (!last) return;
+  const t = tx.find(x => x.id === last.id);
+  try {
+    if (last.kind === 'guess') { say('Undo of a project decision: use ↶ Undo in the ledger', 'err'); }
+    else if (last.kind === 'suggest') { if (last.act === 'no') await skipRow(last.id, false); else say('Undo of an applied suggestion: use ↶ Undo in the ledger', 'err'); }
+    else { await patch(last.id, last.before); if (t) { Object.assign(t, last.before); computeBalances(); } }
+    deck.i = Math.max(0, deck.i - 1); deckShow(); say('Undone');
+  } catch (e) { say('Could not undo: ' + e.message, 'err'); }
+}
+// swipe: right = accept, left = not counted; the hints fade in as the card moves
+function deckSwipe(card) {
+  if (!card) return; let x0 = null, dx = 0;
+  const hl = document.querySelector('.deck-hint.l'), hr = document.querySelector('.deck-hint.r');
+  card.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; dx = 0; card.style.transition = 'none'; }, { passive: true });
+  card.addEventListener('touchmove', e => { if (x0 == null) return; dx = e.touches[0].clientX - x0; card.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`; if (hr) hr.style.opacity = Math.min(1, Math.max(0, dx / 90)); if (hl) hl.style.opacity = Math.min(1, Math.max(0, -dx / 90)); }, { passive: true });
+  card.addEventListener('touchend', () => { card.style.transition = ''; if (hr) hr.style.opacity = 0; if (hl) hl.style.opacity = 0;
+    const t = tx.find(x => x.id === deck.items[deck.i]); const swipeable = t && todoKind(t) !== 'ask';
+    if (swipeable && dx > 90) deckAct('yes'); else if (swipeable && dx < -90) deckAct('no'); else card.style.transform = ''; x0 = null; }, { passive: true });
+}
+// keyboard on the laptop: → accept, ← not counted, e fix, Esc close
+document.addEventListener('keydown', e => { const d = document.getElementById('deck'); if (!d || d.hidden || e.target.matches('input,textarea,select')) return;
+  if (e.key === 'ArrowRight') deckAct('yes'); else if (e.key === 'ArrowLeft') deckAct('no'); else if (e.key === 'e') deckAct('fix'); else if (e.key === 'Escape') closeDeck(); });
 </script>
 </body>
 </html>
