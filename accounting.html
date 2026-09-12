@@ -57,7 +57,7 @@
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:var(--overlay0);}
   .c-sel{width:26px;text-align:center;padding-left:4px!important;padding-right:0!important;} .c-sel input{margin:0;cursor:pointer;} tr.sel td{background:rgba(242,169,59,.07);}
   #bulk[hidden]{display:none;} #bulk{position:sticky;bottom:0;z-index:40;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;background:var(--mantle);border-top:2px solid var(--amber);font-size:13px;} #bulk b{color:var(--amber);}
-  .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:16%;white-space:normal;} .c-partner{width:10%;} .c-cash{width:10%;} .c-company{width:8%;} .c-proj{width:11%;} td.num,th.num{width:6.5%;} .c-odoo{width:10%;} .c-recon{width:6%;font-size:12px;white-space:nowrap;} td.c-recon.yes{color:var(--green);} td.c-recon.no{color:var(--odoo,#e0a04a);} td.c-recon:not(.yes):not(.no){color:var(--muted);}
+  .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:16%;white-space:normal;} .c-partner{width:10%;} .c-cash{width:10%;} .c-company{width:8%;} .c-proj{width:11%;} td.num,th.num{width:6.5%;} .c-odoo{width:10%;} .c-recon{width:6%;font-size:12px;white-space:nowrap;} td.c-recon.yes{color:var(--green);} td.c-recon.no{color:var(--odoo,#e0a04a);} td.c-recon a.recon{cursor:pointer;margin-left:4px;color:var(--amber);font-size:14px;} td.c-recon a.recon:hover{text-decoration:underline;} td.c-recon:not(.yes):not(.no){color:var(--muted);}
   /* ☑ Reviewed: the box, then the stamp under it */
   .c-rev{width:7%;} .c-rev label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;}
   .c-rev input{width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--green);}
@@ -540,6 +540,14 @@
       <span class="sp" style="flex:1"></span>
       <button class="btn" onclick="document.getElementById('projects').hidden = true">✕ Close</button></div>
     <div class="sheet-body" id="projects-body"></div>
+  </div>
+</div>
+<div class="sheet" id="recon" hidden>
+  <div class="sheet-box" style="max-width:760px">
+    <div class="sheet-head"><b id="recon-title">Reconcile</b><span class="sp" style="flex:1"></span>
+      <button class="btn primary" id="recon-go" onclick="doReconcile()">⇄ Reconcile ticked</button>
+      <button class="btn" onclick="document.getElementById('recon').hidden = true">✕ Close</button></div>
+    <div class="sheet-body" id="recon-body"></div>
   </div>
 </div>
 <div id="bulk" hidden>
@@ -1654,7 +1662,7 @@ function render() {
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : esc(t.description)}</div>
         ${sheetEdit(t)}
-        ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}')" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
+        ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}', this)" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
         ${t.ask ? `<div class="sug-act" title="${esc(t.ask.text)}"><span class="sug-why">${esc(t.ask.text)}</span> ${(t.ask.options || []).map((o, i) => `<button class="yes" style="width:auto;padding:0 6px" onclick="answerAsk('${t.id}', ${i})">${esc(o.label)}</button>`).join(' ')}${(t.ask.options || []).some(o => o.debit != null || o.credit != null) ? ` <button class="yes" style="width:auto;padding:0 6px" onclick="answerCustom('${t.id}')" title="Type any amount for this row">Other amount…</button>` : ''}</div>` : t.answer ? `<div class="sug-act"><span class="sug-why">Answered: ${esc(String(t.answer))}</span></div>` : ''}
         ${fuelStrip(t)}${tsCloseNote(t)}
@@ -1703,7 +1711,7 @@ function render() {
         ${t.projectFrom && t.analyticName && t.analyticSrc !== 'manual' ? `<div class="sug-act" title="${esc('Not written in the sheet: taken from the ' + t.projectFrom + '. ✓ keeps it, ✕ clears it so you pick one.')}"><span class="sug-why">from the ${esc(t.projectFrom)}</span> <button class="yes" onclick="confirmAnalytic('${t.id}', true)">✓</button><button class="no" onclick="confirmAnalytic('${t.id}', false)">✕</button></div>` : ''}
       </td>`}
       <td class="c-odoo">${odooCell(t)}</td>
-      ${(() => { const r = reconOf(t); return `<td class="c-recon ${r}" title="${r === 'yes' ? 'Reconciled in Odoo with a bill or invoice — the project cost is on that document' : r === 'no' ? 'In Odoo but not yet reconciled — the project shows this payment until it is' : 'Not in Odoo'}">${r === 'yes' ? '✓ reconciled' : r === 'no' ? '○ open' : '—'}</td>`; })()}
+      ${(() => { const r = reconOf(t); return `<td class="c-recon ${r}" title="${r === 'yes' ? 'Reconciled in Odoo with a bill or invoice — the project cost is on that document' : r === 'no' ? 'In Odoo but not yet reconciled — the project shows this payment until it is' : 'Not in Odoo'}">${r === 'yes' ? '✓ reconciled' : r === 'no' ? `○ open <a class="recon" onclick="openReconcile('${t.id}')" title="Reconcile this payment with the partner's open bills or invoices in Odoo">⇄</a>` : '—'}</td>`; })()}
       <td class="c-rev${t.reviewed ? ' on' : ''}" title="${t.reviewed ? esc('Reviewed ' + stamp(t.reviewedAt) + ' by ' + (t.reviewedBy || '?')) : 'Tick when you have looked at this line — the time and your name are kept, and it goes in the log'}">
         <label><input type="checkbox" ${t.reviewed ? 'checked' : ''} onchange="setReviewed('${t.id}', this.checked, this)"> ${t.reviewed ? 'reviewed' : 'review'}</label>
         ${t.reviewed ? `<div class="hint">${esc(stamp(t.reviewedAt))}<br>${esc(shortWho(t.reviewedBy))}</div>` : ''}
@@ -2390,6 +2398,42 @@ async function cjClear(rowId) {
   catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 
+// ── Reconcile an open payment with the partner's open documents (Mario, 2026-09-13) ──
+let reconRow = null;
+async function openReconcile(id) {
+  reconRow = id; const t = tx.find(x => x.id === id); if (!t) return;
+  const sh = document.getElementById('recon'), body = document.getElementById('recon-body');
+  sh.hidden = false; body.innerHTML = '<p class="hint">Reading the payment and the partner\'s open documents in Odoo…</p>';
+  document.getElementById('recon-title').textContent = `Reconcile — ${t.date} · ${fmt(t.debit || t.credit)} · ${partnerShown(t) || ''}`;
+  try {
+    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx/${id}/reconcile`);
+    const p = r.payment, what = p.direction === 'out' ? 'bills' : 'invoices';
+    let left = p.residual;
+    body.innerHTML = `<p><b>${esc(p.name)}</b> · ${esc(p.date)} · ${fmt(p.amount)} ${p.direction === 'out' ? 'paid to' : 'received from'} <b>${esc(p.partner)}</b> · ${esc(p.company)} · ${esc(p.journal)}<br>
+      <span class="hint">${fmt(p.residual)} still to apply${p.reconciled ? ` · already on ${p.reconciled} document${p.reconciled > 1 ? 's' : ''}` : ''}</span></p>
+      ${r.open.length ? `<p class="hint">Open ${what} of ${esc(p.partner)} in ${esc(p.company)} — ticked oldest first up to the amount of the payment; change the ticks as you like:</p>
+      <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th></th><th>Date</th><th>Document</th><th>Reference</th><th class="num">Total</th><th class="num">Open</th></tr></thead><tbody>
+      ${r.open.map(d => { const held = /retention/i.test(d.ref); const tick = !held && left > 0.005; if (tick) left -= d.residual; return `<tr><td><input type="checkbox" class="recon-pick" value="${d.id}" ${tick ? 'checked' : ''}></td><td>${esc(d.date)}</td><td><a target="_blank" href="${ODOO}${d.id}">${esc(d.name)}</a></td><td>${esc(d.ref)}${held ? ' <span class="hint" style="color:var(--odoo)">— retention, held until the project ends: not ticked</span>' : ''}</td><td class="num">${fmt(d.total)}</td><td class="num">${fmt(d.residual)}</td></tr>`; }).join('')}
+      </tbody></table>` : `<p class="hint">${esc(p.partner)} has no open ${what} in ${esc(p.company)}. The payment stays open as an advance until a ${what.slice(0, -1)} is posted — then come back here.</p>`}`;
+    document.getElementById('recon-go').disabled = !r.open.length || p.residual < 0.005;
+  } catch (e) { body.innerHTML = `<p class="hint" style="color:var(--red)">${esc(e.message)}</p>`; document.getElementById('recon-go').disabled = true; }
+}
+async function doReconcile() {
+  const ids = [...document.querySelectorAll('.recon-pick:checked')].map(x => +x.value);
+  if (!ids.length) return say('Tick at least one document', 'err');
+  const btn = document.getElementById('recon-go'); btn.disabled = true; btn.textContent = 'Reconciling…';
+  try {
+    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/tx/${reconRow}/reconcile`, { moveIds: ids });
+    const done = r.done.filter(d => d.applied).map(d => `${d.name} ${fmt(d.applied)}${d.stillOpen ? ' (' + fmt(d.stillOpen) + ' still open)' : ''}`);
+    const skipped = r.done.filter(d => d.skipped).map(d => `${d.name}: ${d.skipped}`);
+    say(`${r.payment.name}: ${done.length ? 'applied to ' + done.join(', ') : 'nothing applied'}${r.payment.residual ? ` · ${fmt(r.payment.residual)} left open` : ''}${skipped.length ? ' · skipped ' + skipped.join('; ') : ''}${odooSay({ odooAnalytic: r.odooAnalytic })}`, done.length ? 'ok' : 'err');
+    await Admin.api('POST', `/api/accounting/accounts/${acc}/odoo-check`, { ids: [reconRow] }).catch(() => {});
+    await reloadTx(); render();
+    document.getElementById('recon').hidden = true;
+  } catch (e) { say('Could not reconcile: ' + e.message, 'err'); }
+  btn.disabled = false; btn.textContent = '⇄ Reconcile ticked';
+}
+
 // ── Multi-select + bulk actions (Mario, 2026-09-12: "select multiple lines and press Book at Odoo") ──
 let selected = new Set();
 function selRow(id, on) { if (on) selected.add(id); else selected.delete(id); const tr = document.querySelector(`tr[data-id="${id}"]`); if (tr) tr.classList.toggle('sel', on); bulkBar(); }
@@ -2960,10 +3004,19 @@ async function autoBook(id) {
       : `Booked in Odoo: ${r.move || ''} (${r.kind})${r.photos ? ' · ' + r.photos + ' photo' + (r.photos > 1 ? 's' : '') + ' attached' : ''}${r.pendingExcel ? ' · still to be written into the workbook' : ''}`);
   } catch (e) { say('Accepted, but Odoo refused it: ' + e.message, 'err'); }
 }
-async function renameContact(phone) {
+// the name is edited in place, on the row (Mario, 2026-09-13: "allow in line editing") — no browser prompt
+function renameContact(phone, el) {
   const cur = (contacts[phone] || {}).name || '';
-  const name = prompt('Who owns 0' + phone.replace(/^961/, '') + '?', cur);
-  if (name === null) return;
+  const who = el || (event && event.currentTarget); if (!who || who.querySelector('input')) return;
+  who.innerHTML = `<input type="text" class="who-in" value="${esc(cur)}" placeholder="who owns 0${esc(phone.replace(/^961/, ''))}?" style="width:100%;font:inherit;font-style:normal;background:var(--crust);color:var(--text);border:1px solid var(--odoo2);border-radius:4px;padding:1px 4px">`;
+  const inp = who.querySelector('input'); inp.focus(); inp.select();
+  let doneOnce = false;
+  const finish = save => { if (doneOnce) return; doneOnce = true; const v = inp.value.trim(); if (save && v !== cur) saveContactName(phone, v); else render(); };
+  inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } if (e.key === 'Escape') { e.preventDefault(); finish(false); } e.stopPropagation(); };
+  inp.onblur = () => finish(true);
+  inp.onclick = e => e.stopPropagation();
+}
+async function saveContactName(phone, name) {
   contacts[phone] = { phone, name: name.trim(), source: 'manual' };
   try {
     await Admin.api('POST', '/api/accounting/whish/contacts', { items: [{ phone, name: name.trim(), source: 'manual' }] });

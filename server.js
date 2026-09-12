@@ -10,7 +10,8 @@ const accounts = require('./accounts');        // cash & bank accounts, their li
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
-const excavation = require('./excavation');     // /api/accounting/excavation (Georges EL Hajj collections dashboard)           // /api/reports/* (SARL trial balance + GL in LBP for the accountant)        // /api/ajaltoun/* (the project's accounts, from Odoo)
+const excavation = require('./excavation');
+const reconcileLine = require('./reconcile-line');   // /api/accounting/accounts/<id>/tx/<txId>/reconcile     // /api/accounting/excavation (Georges EL Hajj collections dashboard)           // /api/reports/* (SARL trial balance + GL in LBP for the accountant)        // /api/ajaltoun/* (the project's accounts, from Odoo)
 const site = require('./site');            // /api/site/* (the conversation that replaces the WhatsApp groups)
 
 // Initialize Firebase Admin
@@ -816,7 +817,8 @@ const handler = async (req, res) => {
       const aurl = url.replace(/^\/api\/accounting\/whish\/(\d+)\/(tx|tx-bulk|odoo-check|book|book-preview)(\/|$)/, '/api/accounting/accounts/$1/$2$3');
       const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)
         : url.startsWith('/api/accounting/wise/') ? await wise.handle(req, res, url, user, ctx)
-        : await whishRules.handle(req, res, aurl, user, ctx)     // rules first: it only claims its own routes
+        : await reconcileLine.handle(req, res, aurl, user, ctx)   // reconcile a line's payment with the partner's open documents
+          || await whishRules.handle(req, res, aurl, user, ctx)     // rules first: it only claims its own routes
           || await accounts.handle(req, res, aurl, user, ctx)
           || await accounting.handle(req, res, url, user, ctx);
       if (handled === false) { res.writeHead(404); res.end('not found'); }
