@@ -49,7 +49,7 @@
 </head>
 <body>
 <div class="top">
-  <span id="crumbs"></span><script>Admin.crumbs([['Accounting', '/accounting'], ['Transfers']]);</script>
+  <span id="crumbs"></span><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Accounting', '/accounting'], ['Transfers']]));</script>
   <span style="opacity:.6;margin-left:10px">|</span>
   <a href="/accounting/accounts" style="opacity:.7">Accounts</a>
   <a href="/accounting/budget" style="opacity:.7">Budget</a>

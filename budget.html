@@ -180,7 +180,7 @@
 </head>
 <body>
 <div class="side">
-  <div class="head"><span id="crumbs"></span><div class="t"><span id="side-month"></span></div></div><script>Admin.crumbs([['Accounting', '/accounting'], ['Budget']]);</script>
+  <div class="head"><span id="crumbs"></span><div class="t"><span id="side-month"></span></div></div><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Accounting', '/accounting'], ['Budget']]));</script>
   <ul class="nav" id="nav"></ul>
   <div class="foot"><span id="who"></span><span class="sp"></span><a onclick="openPhone()" title="Preview the phone version (iPhone 15 Pro Max)">📱</a><a onclick="openSettings()" title="Currencies &amp; settings">⚙</a></div>
 </div>

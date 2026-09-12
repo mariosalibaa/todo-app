@@ -524,7 +524,7 @@
 <script>
 // Hub › Accounting › Accounts › <account> — the whole path is clickable (Admin.crumbs, shared with every hub page)
 function setCrumb(leaf) { const grid = location.pathname.endsWith('/whish') ? ['Whish', '/accounting/whish'] : ['Accounts', '/accounting/accounts']; Admin.crumbs([['Accounting', '/accounting'], ...(leaf ? [grid, [leaf]] : [[grid[0]]])]); }
-setCrumb(null);
+document.addEventListener("DOMContentLoaded", () => setCrumb(null));
 </script>
 <script>
 const esc = Admin.esc;
@@ -1129,7 +1129,15 @@ function amountMatch(v, f) {
   if ((m = f.match(/^=?\s*([\d.]+)$/))) return Math.abs(v - +m[1]) < 0.005;
   return String(v).includes(f);
 }
+// a WhatsApp/site proposal that only repeats a line Mario has already reviewed or booked says
+// nothing new: it stays in the data (still paired, still not counted) but not on the grid —
+// the "skipped" view shows it (Mario, 2026-09-12: "these two lines are added for the second time")
+let _byId = null, _byIdOf = null;
+const byId = id => { if (_byIdOf !== tx) { _byId = new Map(tx.map(x => [x.id, x])); _byIdOf = tx; } return _byId.get(id); };
+const foldedDup = t => (t.src === 'whatsapp' || t.src === 'site') && t.excluded && t.dupOf && t.dupSrc !== 'manual'
+  && (o => !!(o && (o.reviewed || o.reviewedAt || o.ref || o.bookedMove)))(byId(t.dupOf));
 function passes(t) {
+  if (sugFilter !== 'skipped' && foldedDup(t)) return false;
   if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)))) return false;
   for (const c of COLS) {
     const f = colF[c.k]; if (!f) continue;

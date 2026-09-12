@@ -71,7 +71,7 @@
 </head>
 <body>
 <div class="top">
-  <span id="crumbs"></span><script>Admin.crumbs([['Accounting', '/accounting'], ['Wise']]);</script>
+  <span id="crumbs"></span><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Accounting', '/accounting'], ['Wise']]));</script>
   <span class="sp"></span>
   <a href="/accounting/whish">Whish</a><a href="/accounting/budget">Budget</a>
   <span class="who" id="who"></span>
