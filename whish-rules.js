@@ -187,7 +187,11 @@ async function handle(req, res, url, user, ctx) {
           let payId = dup.length ? dup[0].id : null, already = !!payId;
           const analyticId = t.analyticId || rule.analyticId || null;
           if (!payId) {
-            const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: t.debit ? 'supplier' : 'customer', partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
+            // money in from a partner who is mainly a VENDOR is a vendor refund on the payable account, not a customer
+            // receipt on the receivable (Mario, 2026-09-13: Anthony's $636 return landed on 411100 and could meet nothing)
+            const [pr] = await odooCall('res.partner', 'read', [[rule.partnerId], ['supplier_rank', 'customer_rank']], { context: pctx });
+            const vendorish = pr && (pr.supplier_rank || 0) >= (pr.customer_rank || 0) && (pr.supplier_rank || 0) > 0;
+            const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: t.debit ? 'supplier' : (vendorish ? 'supplier' : 'customer'), partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
               company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: ref };
             if (analyticId) vals.x_studio_project = analyticId;
             const [method] = await odooCall('account.payment.method.line', 'search_read', [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', vals.payment_type]]], { fields: ['id'], context: pctx, limit: 1 });
