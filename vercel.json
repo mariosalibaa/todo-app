@@ -4,7 +4,8 @@
     "todo-app": {
       "root": ".",
       "runtime": "node",
-      "entrypoint": "server.js"
+      "entrypoint": "server.js",
+      "maxDuration": 60
     }
   },
   "rewrites": [
