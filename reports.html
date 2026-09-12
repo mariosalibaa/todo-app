@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>SARL · Trial Balance LBP · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1280px;margin:0 auto;padding:22px 20px 60px;}
+  h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 16px;line-height:1.5;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .bar .sp{flex:1;}
+  select,input,button{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:6px 10px;font-size:.8rem;font-family:inherit;}
+  button{cursor:pointer;} button:hover{border-color:var(--amber);} button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
+  button:disabled{opacity:.4;cursor:default;}
+  .tabs{display:flex;gap:4px;} .tabs button{border-radius:7px 7px 0 0;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;position:sticky;top:0;background:var(--mantle);}
+  th.grp{text-align:center;border-bottom:0;color:var(--sub);letter-spacing:.14em;}
+  td{padding:5px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;}
+  td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  td.lbp{color:var(--sub);} td.code{white-space:nowrap;color:var(--amber);font-variant-numeric:tabular-nums;}
+  tr.tot td{font-weight:600;background:rgba(242,169,59,.10);color:var(--amber);border-top:2px solid var(--amber);}
+  tr.gap td{color:var(--red);font-style:italic;}
+  tr.acc td{background:var(--surface0);font-weight:600;cursor:pointer;} tr.acc td .arr{display:inline-block;width:14px;color:var(--overlay0);}
+  tr.open td{color:var(--sub);font-style:italic;} tr.sub td{font-weight:600;border-bottom:2px solid var(--surface1);}
+  tr.ln td{font-size:.76rem;} tr.ln td.d{white-space:nowrap;color:var(--sub);}
+  .muted{color:var(--overlay0);} .small{font-size:.74rem;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;}
+  .kpi .v{font-size:1.1rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.68rem;color:var(--sub);margin-top:2px;}
+  .kpi.usd .v{color:var(--blue);} .kpi.lbp .v{color:var(--amber);} .kpi.gap .v{color:var(--red);}
+  #msg{font-size:.8rem;color:var(--sub);margin:8px 0;}
+  @media print{
+    header,.bar,.note,.kpis,#msg{display:none!important;} body{background:#fff;color:#000;} main{max-width:none;padding:0;}
+    .card{border:0;padding:0;overflow:visible;} table{font-size:9.5px;} th{position:static;background:#eee;color:#000;} td{color:#000!important;border-color:#ccc;}
+    tr.acc td{background:#eee!important;} tr.tot td{background:#fff!important;color:#000!important;} tr.gap td{color:#000!important;}
+    #ptitle{display:block!important;font-size:14px;font-weight:600;margin:0 0 6px;} #psub{display:block!important;font-size:10px;color:#555;margin:0 0 8px;}
+    @page{size:A4 landscape;margin:10mm;} thead{display:table-header-group;}
+  }
+  #ptitle,#psub{display:none;}
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><a class="hback" href="/admin">‹ Hub</a><div class="wordmark">SHIFT <span>GROUP</span><small>REPORTS</small></div></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1 id="title">SHIFT GROUP SARL — Trial Balance in LBP</h1>
+  <p class="lead">USD books translated into Lebanese pounds at the <b>historical rate</b>: every posted line at the LBP/USD rate in force on its own date; lines booked in LBP keep their exact amount. No translation-difference entry is added — the debit / credit gap that results is shown as the last line, as the accountant asked. Same rules as the CSV and Excel files handed over before.</p>
+  <div class="bar">
+    <div class="tabs"><button id="tab-tb" class="on" onclick="setTab('tb')">Trial balance</button><button id="tab-gl" onclick="setTab('gl')">General ledger</button><button id="tab-rates" onclick="setTab('rates')">Rates</button></div>
+    <span class="sp"></span>
+    <label class="small muted">from <input type="date" id="from" onchange="render()"></label>
+    <label class="small muted">to <input type="date" id="to" onchange="render()"></label>
+    <select id="preset" onchange="preset(this.value)"><option value="">period…</option><option value="all">all time</option><option value="y">this year</option><option value="py">last year</option><option value="q">this quarter</option><option value="m">this month</option></select>
+    <input type="text" id="q" placeholder="filter account / partner / label" oninput="render()" style="min-width:220px">
+    <button onclick="exportCsv()" title="The table shown, as a UTF-8 CSV Excel opens">⬇ CSV</button>
+    <button onclick="exportXlsx()" title="Trial balance + general ledger + rates in one Excel workbook, for the period shown">⬇ Excel</button>
+    <button onclick="window.print()" title="Print the table shown">🖨 Print</button>
+    <button id="btn-fresh" onclick="load(true)" title="Pull Odoo again now (admin)" style="display:none">↻ Pull now</button>
+  </div>
+  <div id="msg">Loading the SARL journal from Odoo…</div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><div id="ptitle"></div><div id="psub"></div><div id="out"></div></div>
+  <div class="note" id="foot"></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc;
+let D = null, tab = 'tb', openAcc = new Set();
+const f2 = n => (Math.abs(n) < 0.005 ? '' : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const f0 = n => (Math.abs(n) < 0.5 ? '' : Math.round(n).toLocaleString('en-US'));
+const f2z = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const f0z = n => Math.round(n).toLocaleString('en-US');
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// compact line → object
+const L = r => ({ id: r[0], date: r[1], moveId: r[2], move: r[3], journal: r[4], partner: r[5], label: r[6], ref: r[7], acc: r[8], debit: r[9], credit: r[10], lbp: r[11], rate: r[12] });
+
+Admin.require('reports', me => {
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  if (me.admin) document.getElementById('btn-fresh').style.display = '';
+  preset('y');
+  load(false);
+});
+
+async function load(fresh) {
+  document.getElementById('msg').textContent = fresh ? 'Pulling Odoo again…' : 'Loading the SARL journal from Odoo…';
+  try {
+    D = await Admin.api('GET', '/api/reports/sarl-lbp' + (fresh ? '?fresh=1' : ''));
+    D.L = D.lines.map(L);
+    document.getElementById('msg').innerHTML = `${D.L.length.toLocaleString('en-US')} posted lines · ${Object.keys(D.accounts).length} accounts · Odoo read ${esc(D.pulledAt.replace('T', ' ').slice(0, 16))} UTC${D.cached ? ' (cached, refreshed every 15 min)' : ''} · latest rate <b>${D.rates.length ? D.rates[D.rates.length - 1].rate.toLocaleString('en-US') : '?'}</b> LBP/USD`;
+    render();
+  } catch (e) { document.getElementById('msg').innerHTML = `<span style="color:var(--red)">Could not load: ${esc(e.message || String(e))}</span>`; }
+}
+
+function preset(v) {
+  const d = new Date(), y = d.getFullYear(), m = d.getMonth();
+  const set = (a, b) => { document.getElementById('from').value = a; document.getElementById('to').value = b; };
+  const ymd = (yy, mm, dd) => `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  if (v === 'all') set('', today());
+  else if (v === 'y') set(ymd(y, 1, 1), today());
+  else if (v === 'py') set(ymd(y - 1, 1, 1), ymd(y - 1, 12, 31));
+  else if (v === 'q') set(ymd(y, Math.floor(m / 3) * 3 + 1, 1), today());
+  else if (v === 'm') set(ymd(y, m + 1, 1), today());
+  if (v) render();
+}
+function setTab(t) { tab = t; for (const k of ['tb', 'gl', 'rates']) document.getElementById('tab-' + k).classList.toggle('on', k === t); render(); }
+
+// ── the period's figures: opening (before from), period debit/credit, closing — in USD and in LBP ──
+function compute() {
+  const from = document.getElementById('from').value || '0000-00-00', to = document.getElementById('to').value || '9999-99-99';
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const A = {};
+  for (const l of D.L) {
+    if (l.date > to) continue;
+    const meta = D.accounts[l.acc] || { code: '', name: 'acct ' + l.acc };
+    const a = (A[l.acc] ||= { id: l.acc, code: meta.code, name: meta.name, type: meta.type, openUSD: 0, openLBP: 0, drUSD: 0, crUSD: 0, drLBP: 0, crLBP: 0, rows: [] });
+    if (l.date < from) { a.openUSD += l.debit - l.credit; a.openLBP += l.lbp; continue; }
+    if (q && !(a.code + ' ' + a.name + ' ' + l.partner + ' ' + l.label + ' ' + l.ref + ' ' + l.move).toLowerCase().includes(q)) continue;
+    a.drUSD += l.debit; a.crUSD += l.credit; a.drLBP += l.lbp > 0 ? l.lbp : 0; a.crLBP += l.lbp < 0 ? -l.lbp : 0; a.rows.push(l);
+  }
+  const list = Object.values(A).map(a => ({ ...a, closeUSD: a.openUSD + a.drUSD - a.crUSD, closeLBP: a.openLBP + a.drLBP - a.crLBP }))
+    .filter(a => a.rows.length || Math.abs(a.openLBP) >= 1 || Math.abs(a.openUSD) >= 0.01)
+    .filter(a => !q || a.rows.length || (a.code + ' ' + a.name).toLowerCase().includes(q))
+    .sort((x, y) => (x.code || 'zzz').localeCompare(y.code || 'zzz'));
+  const T = { openUSD: 0, openLBP: 0, drUSD: 0, crUSD: 0, drLBP: 0, crLBP: 0, closeDrUSD: 0, closeCrUSD: 0, closeDrLBP: 0, closeCrLBP: 0, lines: 0 };
+  for (const a of list) { T.openUSD += a.openUSD; T.openLBP += a.openLBP; T.drUSD += a.drUSD; T.crUSD += a.crUSD; T.drLBP += a.drLBP; T.crLBP += a.crLBP; T.lines += a.rows.length;
+    if (a.closeUSD > 0) T.closeDrUSD += a.closeUSD; else T.closeCrUSD -= a.closeUSD; if (a.closeLBP > 0) T.closeDrLBP += a.closeLBP; else T.closeCrLBP -= a.closeLBP; }
+  return { list, T, from: document.getElementById('from').value, to: document.getElementById('to').value || today(), q };
+}
+
+function render() {
+  if (!D) return;
+  const R = compute();
+  const per = `${R.from || 'start'} → ${R.to}`;
+  document.getElementById('ptitle').textContent = `${D.company.name} — ${tab === 'tb' ? 'Trial balance' : tab === 'gl' ? 'General ledger' : 'LBP rates'} in LBP at historical rates`;
+  document.getElementById('psub').textContent = `Period ${per}${R.q ? ' · filter "' + R.q + '"' : ''} · Odoo read ${D.pulledAt.slice(0, 10)} · printed ${today()}`;
+  const gap = R.T.closeDrLBP - R.T.closeCrLBP;
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi usd"><div class="v">${f2z(R.T.drUSD)}</div><div class="l">Period debits, USD (credits ${f2z(R.T.crUSD)})</div></div>
+    <div class="kpi lbp"><div class="v">${f0z(R.T.drLBP)}</div><div class="l">Period debits, LBP (credits ${f0z(R.T.crLBP)})</div></div>
+    <div class="kpi usd"><div class="v">${f2z(R.T.closeDrUSD)}</div><div class="l">Closing debit balances, USD (credit ${f2z(R.T.closeCrUSD)}) — Dr = Cr checks the books</div></div>
+    <div class="kpi gap"><div class="v">${f0z(gap)}</div><div class="l">Closing Dr − Cr in LBP: the historical-rate translation gap (not booked)</div></div>`;
+  if (tab === 'tb') renderTB(R); else if (tab === 'gl') renderGL(R); else renderRates();
+  document.getElementById('foot').innerHTML = `<b>How to read it.</b> USD columns are the books as kept. LBP columns are the same lines translated one by one at the rate of their date, so early-2023 lines sit at 1,500 / 15,000 / 85,500 and later ones at 89,500. The USD trial balance balances exactly; the LBP one cannot, and the difference is the translation gap on the last line. Opening = every posted line before the period's first day, translated the same way.`;
+}
+
+function renderTB(R) {
+  const rows = R.list.map(a => `<tr><td class="code">${esc(a.code)}</td><td>${esc(a.name)}</td>
+    <td class="n">${f2(a.openUSD)}</td><td class="n">${f2(a.drUSD)}</td><td class="n">${f2(a.crUSD)}</td><td class="n"><b>${f2(a.closeUSD)}</b></td>
+    <td class="n lbp">${f0(a.openLBP)}</td><td class="n lbp">${f0(a.drLBP)}</td><td class="n lbp">${f0(a.crLBP)}</td><td class="n"><b>${f0(a.closeLBP)}</b></td></tr>`).join('');
+  const T = R.T, gap = T.closeDrLBP - T.closeCrLBP;
+  document.getElementById('out').innerHTML = `<table id="tbl"><thead>
+    <tr><th colspan="2"></th><th class="grp" colspan="4">USD (books)</th><th class="grp" colspan="4">LBP at historical rates</th></tr>
+    <tr><th>Code</th><th>Account</th><th class="n">Opening</th><th class="n">Debit</th><th class="n">Credit</th><th class="n">Closing</th><th class="n">Opening</th><th class="n">Debit</th><th class="n">Credit</th><th class="n">Closing</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="10" class="muted">No posted lines in this period.</td></tr>'}</tbody>
+    <tfoot><tr class="tot"><td colspan="2">TOTAL · ${R.list.length} accounts</td><td class="n">${f2(T.openUSD)}</td><td class="n">${f2z(T.drUSD)}</td><td class="n">${f2z(T.crUSD)}</td><td class="n">${f2z(T.closeDrUSD)} / ${f2z(T.closeCrUSD)}</td>
+      <td class="n">${f0(T.openLBP)}</td><td class="n">${f0z(T.drLBP)}</td><td class="n">${f0z(T.crLBP)}</td><td class="n">${f0z(T.closeDrLBP)} / ${f0z(T.closeCrLBP)}</td></tr>
+    <tr class="gap"><td colspan="2">DIFFERENCE — currency translation at historical rates (not booked)</td><td colspan="4"></td><td class="n" colspan="4">${f0z(gap)}</td></tr></tfoot></table>`;
+}
+
+function renderGL(R) {
+  const html = R.list.map(a => {
+    const open = openAcc.has(a.id);
+    let run = a.openLBP, runU = a.openUSD;
+    const lines = open ? `<tr class="open"><td colspan="3">Opening balance before ${esc(R.from || 'the first entry')}</td><td class="n">${f2(runU)}</td><td></td><td></td><td class="n">${f0(run)}</td><td class="n">${f0z(run)}</td></tr>`
+      + a.rows.map(l => { run += l.lbp; runU += l.debit - l.credit; return `<tr class="ln"><td class="d">${esc(l.date)}</td><td><a class="muted" target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_move_journal_line/${l.moveId}">${esc(l.move)}</a><div class="muted small">${esc(l.journal)}</div></td><td>${esc(l.partner)}${l.partner ? ' · ' : ''}${esc(l.label)}${l.ref ? ` <span class="muted">(${esc(l.ref)})</span>` : ''}</td>
+        <td class="n">${l.debit ? f2(l.debit) : l.credit ? '<span class="muted">(' + f2(l.credit) + ')</span>' : ''}</td><td class="n muted">${l.rate ? l.rate.toLocaleString('en-US') : 'LBP'}</td><td class="n lbp">${f0(l.lbp > 0 ? l.lbp : 0)}</td><td class="n lbp">${f0(l.lbp < 0 ? -l.lbp : 0)}</td><td class="n">${f0z(run)}</td></tr>`; }).join('')
+      + `<tr class="sub"><td colspan="3">Closing ${esc(a.code)} ${esc(a.name)}</td><td class="n">${f2(a.closeUSD)}</td><td></td><td class="n">${f0(a.drLBP)}</td><td class="n">${f0(a.crLBP)}</td><td class="n">${f0z(a.closeLBP)}</td></tr>` : '';
+    return `<tr class="acc" onclick="toggleAcc(${a.id})"><td colspan="3"><span class="arr">${open ? '▾' : '▸'}</span><span class="code">${esc(a.code)}</span> ${esc(a.name)} <span class="muted small">· ${a.rows.length} lines</span></td>
+      <td class="n">${f2(a.closeUSD)}</td><td></td><td class="n lbp">${f0(a.drLBP)}</td><td class="n lbp">${f0(a.crLBP)}</td><td class="n">${f0z(a.closeLBP)}</td></tr>${lines}`;
+  }).join('');
+  const T = R.T;
+  document.getElementById('out').innerHTML = `<div class="small muted" style="margin:0 0 6px">Click an account to open its lines · <a href="#" onclick="openAll(true);return false;">open all</a> · <a href="#" onclick="openAll(false);return false;">close all</a></div>
+    <table id="tbl"><thead><tr><th>Date</th><th>Entry</th><th>Partner · label</th><th class="n">USD Dr (Cr)</th><th class="n">Rate</th><th class="n">LBP Debit</th><th class="n">LBP Credit</th><th class="n">LBP balance</th></tr></thead>
+    <tbody>${html || '<tr><td colspan="8" class="muted">No posted lines in this period.</td></tr>'}</tbody>
+    <tfoot><tr class="tot"><td colspan="3">TOTAL · ${R.list.length} accounts · ${T.lines} lines</td><td class="n">${f2z(T.drUSD)} / ${f2z(T.crUSD)}</td><td></td><td class="n">${f0z(T.drLBP)}</td><td class="n">${f0z(T.crLBP)}</td><td class="n">${f0z(T.closeDrLBP - T.closeCrLBP)}</td></tr></tfoot></table>`;
+}
+function toggleAcc(id) { if (openAcc.has(id)) openAcc.delete(id); else openAcc.add(id); render(); }
+function openAll(on) { openAcc = on ? new Set(compute().list.map(a => a.id)) : new Set(); render(); }
+
+function renderRates() {
+  document.getElementById('out').innerHTML = `<table id="tbl"><thead><tr><th>From date</th><th class="n">LBP per USD</th></tr></thead><tbody>
+    ${D.rates.map(r => `<tr><td>${esc(r.date)}</td><td class="n">${r.rate.toLocaleString('en-US')}</td></tr>`).join('')}</tbody></table>
+    <p class="small muted">Odoo's rate table for company ${esc(D.company.name)} (res.currency.rate). Each rate applies from its date until the next one; the last one carries forward.</p>`;
+}
+
+// ── exports ──
+function tbRows(R) {
+  const T = R.T;
+  return [['Code', 'Account', 'Opening USD', 'Debit USD', 'Credit USD', 'Closing USD', 'Opening LBP', 'Debit LBP', 'Credit LBP', 'Closing LBP'],
+    ...R.list.map(a => [a.code, a.name, r2(a.openUSD), r2(a.drUSD), r2(a.crUSD), r2(a.closeUSD), r0(a.openLBP), r0(a.drLBP), r0(a.crLBP), r0(a.closeLBP)]),
+    ['', 'TOTAL', r2(T.openUSD), r2(T.drUSD), r2(T.crUSD), '', r0(T.openLBP), r0(T.drLBP), r0(T.crLBP), ''],
+    ['', 'Closing Dr / Cr', '', '', '', `${r2(T.closeDrUSD)} / ${r2(T.closeCrUSD)}`, '', '', '', `${r0(T.closeDrLBP)} / ${r0(T.closeCrLBP)}`],
+    ['', 'DIFFERENCE (currency translation, not booked)', '', '', '', '', '', '', '', r0(T.closeDrLBP - T.closeCrLBP)]];
+}
+function glRows(R) {
+  const out = [['Code', 'Account', 'Date', 'Entry', 'Journal', 'Partner', 'Label', 'Ref', 'USD Debit', 'USD Credit', 'Rate', 'LBP Debit', 'LBP Credit', 'LBP balance']];
+  for (const a of R.list) {
+    let run = a.openLBP;
+    out.push([a.code, a.name, '', 'OPENING', '', '', `before ${R.from || 'first entry'}`, '', r2(a.openUSD > 0 ? a.openUSD : 0), r2(a.openUSD < 0 ? -a.openUSD : 0), '', '', '', r0(run)]);
+    for (const l of a.rows) { run += l.lbp; out.push([a.code, a.name, l.date, l.move, l.journal, l.partner, l.label, l.ref, r2(l.debit), r2(l.credit), l.rate || 'native LBP', r0(l.lbp > 0 ? l.lbp : 0), r0(l.lbp < 0 ? -l.lbp : 0), r0(run)]); }
+    out.push([a.code, a.name, '', 'CLOSING', '', '', '', '', r2(a.drUSD), r2(a.crUSD), '', r0(a.drLBP), r0(a.crLBP), r0(a.closeLBP)]);
+  }
+  return out;
+}
+const r2 = n => Math.round(n * 100) / 100, r0 = n => Math.round(n);
+function fname(kind) { return `SARL ${kind} LBP ${document.getElementById('from').value || 'start'} to ${document.getElementById('to').value || today()}`; }
+function exportCsv() {
+  const R = compute();
+  const rows = tab === 'gl' ? glRows(R) : tab === 'rates' ? [['From date', 'LBP per USD'], ...D.rates.map(r => [r.date, r.rate])] : tbRows(R);
+  const csv = rows.map(r => r.map(v => typeof v === 'number' ? v : `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  save(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), fname(tab === 'gl' ? 'GL' : tab === 'rates' ? 'rates' : 'TB') + '.csv');
+}
+async function exportXlsx() {
+  const R = compute();
+  await new Promise((ok, no) => { if (window.XLSX) return ok(); const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tbRows(R)), 'Trial balance');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(glRows(R)), 'General ledger');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['From date', 'LBP per USD'], ...D.rates.map(r => [r.date, r.rate])]), 'Rates');
+  XLSX.writeFile(wb, fname('TB+GL') + '.xlsx');
+}
+function save(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+</script>
+</body>
+</html>

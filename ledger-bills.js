@@ -1059,38 +1059,72 @@ async function pushAnalytic(ctx, account, t) {
   const dist = distOf(t, { id: t.analyticId, name: t.analyticName });
   if (!dist) return { skipped: 'the row has no project' };
   const chosen = t.odoo && (t.odoo.matches || []).find(x => x.chosen);
-  // A project belongs on the expense line of a BILL. A row tied to its settlement (PSETT, TRANS)
-  // names an entry whose only lines are the payable and the clearing account — writing a project
-  // there would be wrong — so follow that match's documents to the bill behind it.
+  const ctxO = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
+  const out = { ok: false, moves: [], payments: [] };
+  const projectId = Number(Object.keys(dist)[0]);   // the Project field on a payment takes one account: the first (or only) one of the split
+
+  // 1. the PAYMENT itself (Mario, 2026-09-13): its Project field (x_studio_project) follows the hub line —
+  //    the project's only trace of the money until the payment is reconciled
+  const payMoveIds = [(chosen && chosen.moveId) || null, (t.bookedMove && t.bookedMove.kind === 'payment' && t.bookedMove.id) || null].filter(Number.isInteger);
+  const payIds = [(t.bookedMove && t.bookedMove.payment && t.bookedMove.payment.id) || null, (t.booked && t.booked.payment && t.booked.payment.id) || null].filter(Number.isInteger);
+  if (payMoveIds.length || payIds.length) {
+    const dom = ['|', ['move_id', 'in', payMoveIds], ['id', 'in', payIds]];
+    const pays = await odooCall('account.payment', 'search_read', [dom], { fields: ['name', 'x_studio_project', 'reconciled_bill_ids', 'reconciled_invoice_ids', 'company_id'], context: ctxO });
+    for (const p of pays) {
+      const cur = p.x_studio_project ? p.x_studio_project[0] : null;
+      if (cur !== projectId) await odooCall('account.payment', 'write', [[p.id], { x_studio_project: projectId }], { context: { ...ctxO, company_id: p.company_id[0] } });
+      out.payments.push({ id: p.id, name: p.name, already: cur === projectId });
+      out.ok = true;
+    }
+    // 2. what the payment is reconciled with — the documents the project really lives on
+    var reconciledDocs = pays.flatMap(p => [...(p.reconciled_bill_ids || []), ...(p.reconciled_invoice_ids || [])]);
+  }
+
+  // A project belongs on the expense / income line of a document. A row tied to its settlement (PSETT, TRANS)
+  // names an entry whose only lines are the payable and the clearing account — so follow the match's documents
+  // and the payment's reconciliations to the bill, invoice or journal entry behind it.
   const candidates = [
-    (t.bookedMove && t.bookedMove.id) || null,
+    (t.bookedMove && t.bookedMove.kind !== 'payment' && t.bookedMove.id) || null,
     (chosen && chosen.moveId) || null,
     ...Object.values((chosen && chosen.docIds) || {}),
+    ...(reconciledDocs || []),
   ].filter(Number.isInteger);
-  if (!candidates.length) return { skipped: 'the row is not booked in Odoo' };
+  if (!candidates.length) return out.ok ? { ...out, move: out.payments.map(p => p.name).join(', '), note: 'payment only — nothing reconciled yet' } : { skipped: 'the row is not booked in Odoo' };
 
-  const ctxO = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
-  const found = await odooCall('account.move', 'read', [[...new Set(candidates)], ['name', 'state', 'move_type', 'company_id', 'invoice_line_ids']], { context: ctxO });
-  const bills = found.filter(x => ['in_invoice', 'in_refund'].includes(x.move_type) && x.state !== 'cancel' && (x.invoice_line_ids || []).length);
-  if (!bills.length) {
-    if (!found.length) return { skipped: 'the entry it names no longer exists in Odoo' };
-    return { skipped: `${found.map(x => x.name).join(', ')} carries no bill line — a project lives on the bill, not on its settlement` };
-  }
-  const mv = bills[0];
-
-  const lines = await odooCall('account.move.line', 'read', [mv.invoice_line_ids, ['name', 'price_subtotal', 'analytic_distribution']], { context: ctxO });
-  // the line this row became: the label the Book run wrote, else the one line of the same amount
+  const found = await odooCall('account.move', 'read', [[...new Set(candidates)], ['name', 'state', 'move_type', 'company_id', 'invoice_line_ids', 'line_ids', 'payment_id']], { context: ctxO });
   const label = (chosen && chosen.label) || '';
   const amount = money(t.debit || t.credit);
   const same = v => Math.abs(v - amount) < 0.02;
-  let line = label ? lines.find(l => String(l.name || '').startsWith(String(label).slice(0, 40))) : null;
-  if (!line) { const near = lines.filter(l => same(l.price_subtotal)); if (near.length === 1) line = near[0]; }
-  if (!line) return { skipped: `could not tell which line of ${mv.name} this row is (${lines.length} lines, ${lines.filter(l => same(l.price_subtotal)).length} of the same amount)` };
-
-  if (JSON.stringify(line.analytic_distribution || null) === JSON.stringify(dist)) return { ok: true, move: mv.name, line: line.id, distribution: dist, already: true };
-  await odooCall('account.move.line', 'write', [[line.id], { analytic_distribution: dist }],
-    { context: { ...ctxO, company_id: mv.company_id[0] } });
-  return { ok: true, move: mv.name, line: line.id, distribution: dist, was: line.analytic_distribution || null };
+  const skippedWhy = [];
+  for (const mv of found) {
+    if (mv.state === 'cancel' || mv.payment_id) continue;   // a payment's own entry: handled above, no project line in it
+    let lineIds = [];
+    if (['in_invoice', 'in_refund', 'out_invoice', 'out_refund'].includes(mv.move_type) && (mv.invoice_line_ids || []).length) {
+      const lines = await odooCall('account.move.line', 'read', [mv.invoice_line_ids, ['name', 'price_subtotal', 'analytic_distribution', 'display_type']], { context: ctxO });
+      const real = lines.filter(l => !l.display_type || l.display_type === 'product');
+      // the line this row became: the label the Book run wrote, else the one line of the same amount, else every line of the document
+      let pick = label ? real.filter(l => String(l.name || '').startsWith(String(label).slice(0, 40))) : [];
+      if (!pick.length) { const near = real.filter(l => same(l.price_subtotal)); if (near.length === 1) pick = near; }
+      if (!pick.length) pick = real;
+      lineIds = pick.filter(l => JSON.stringify(l.analytic_distribution || null) !== JSON.stringify(dist)).map(l => l.id);
+      if (!lineIds.length) { out.moves.push({ name: mv.name, already: true }); out.ok = true; continue; }
+    } else if (mv.move_type === 'entry') {
+      // a journal entry: the project goes on every line that is not a payable, receivable or cash/bank account
+      const lines = await odooCall('account.move.line', 'read', [mv.line_ids, ['account_id', 'analytic_distribution']], { context: ctxO });
+      const accIds = [...new Set(lines.map(l => l.account_id[0]))];
+      const accs = await odooCall('account.account', 'read', [accIds, ['account_type']], { context: ctxO });
+      const money_ = new Set(accs.filter(a => ['asset_receivable', 'liability_payable', 'asset_cash', 'liability_credit_card'].includes(a.account_type)).map(a => a.id));
+      lineIds = lines.filter(l => !money_.has(l.account_id[0]) && JSON.stringify(l.analytic_distribution || null) !== JSON.stringify(dist)).map(l => l.id);
+      if (!lineIds.length) { out.moves.push({ name: mv.name, already: true }); out.ok = true; continue; }
+    } else { skippedWhy.push(`${mv.name} has no line to carry a project`); continue; }
+    await odooCall('account.move.line', 'write', [lineIds, { analytic_distribution: dist }], { context: { ...ctxO, company_id: mv.company_id[0] } });
+    out.moves.push({ name: mv.name, lines: lineIds.length });
+    out.ok = true;
+  }
+  if (!out.ok) return { skipped: skippedWhy.join('; ') || 'the entry it names no longer exists in Odoo' };
+  const named = [...out.payments.map(p => p.name), ...out.moves.map(m => m.name)];
+  const changed = [...out.payments.filter(p => !p.already).map(p => p.name), ...out.moves.filter(m => !m.already).map(m => m.name)];
+  return { ...out, move: named.join(', '), distribution: dist, already: !changed.length, changed };
 }
 
 module.exports = { pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };

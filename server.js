@@ -8,7 +8,9 @@ const wise = require('./wise');               // /api/accounting/wise/* (Wise st
 const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
 const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
-const ajaltoun = require('./ajaltoun');        // /api/ajaltoun/* (the project's accounts, from Odoo)
+const ajaltoun = require('./ajaltoun');
+const reports = require('./reports');
+const excavation = require('./excavation');     // /api/accounting/excavation (Georges EL Hajj collections dashboard)           // /api/reports/* (SARL trial balance + GL in LBP for the accountant)        // /api/ajaltoun/* (the project's accounts, from Odoo)
 const site = require('./site');            // /api/site/* (the conversation that replaces the WhatsApp groups)
 
 // Initialize Firebase Admin
@@ -390,7 +392,8 @@ async function executeSyncPlan(direction, odoo, app) {
 // Admins always have every app and are the only ones who may edit the list.
 // daily = may READ the Day report (a partner, filtered to his projects); site = may post on /site
 // (a worker: his own thread only). Neither opens anything else.
-const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site'];
+// reports = the accountant: SARL trial balance / general ledger in LBP at historical rates, read-only, nothing else
+const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports'];
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
@@ -637,12 +640,15 @@ const handler = async (req, res) => {
     'partners.html': path.join(__dirname, 'partners.html'),
     'ajaltoun.html': path.join(__dirname, 'ajaltoun.html'),
     'site.html': path.join(__dirname, 'site.html'),
+    'reports.html': path.join(__dirname, 'reports.html'),
+    'excavation.html': path.join(__dirname, 'excavation.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
-    '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html' };
+    '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
+    '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/accounting/excavation': 'excavation.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
@@ -811,6 +817,7 @@ const handler = async (req, res) => {
       const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)
         : url.startsWith('/api/accounting/wise/') ? await wise.handle(req, res, url, user, ctx)
         : await whishRules.handle(req, res, aurl, user, ctx)     // rules first: it only claims its own routes
+          || await excavation.handle(req, res, url, user, ctx)
           || await accounts.handle(req, res, aurl, user, ctx)
           || await accounting.handle(req, res, url, user, ctx);
       if (handled === false) { res.writeHead(404); res.end('not found'); }
@@ -818,6 +825,17 @@ const handler = async (req, res) => {
       console.error('accounting error:', e);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(e && e.message || e) }));
+    }
+    return;
+  }
+  if (url.startsWith('/api/reports/')) {
+    if (!access.apps.includes('reports') && !access.apps.includes('accounting')) return noApp('reports');
+    try {
+      const handled = await reports.handle(req, res, url, user, { odooCall, access });
+      if (handled === false) { res.writeHead(404); res.end('not found'); }
+    } catch (e) {
+      console.error('reports error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e && e.message || e) }));
     }
     return;
   }

@@ -1,0 +1,10 @@
+import admin from "firebase-admin";
+import { readFileSync } from "node:fs";
+admin.initializeApp({ credential: admin.credential.cert(JSON.parse(readFileSync("./firebase-service-account.json", "utf8"))) });
+const db = admin.firestore();
+const email = 'roger83aziz@gmail.com';
+const ref = db.doc(`workspaces/team/allowlist/${email}`);
+const cur = (await ref.get()).data() || {};
+const now = new Date().toISOString();
+await ref.set({ email, apps: ['reports'], ...(cur.addedAt ? {} : { addedAt: now, addedBy: 'mario.salibaa@gmail.com' }), updatedAt: now, updatedBy: 'mario.salibaa@gmail.com', note: 'Accountant — SARL trial balance / GL in LBP (Mario, 2026-09-12)' }, { merge: true });
+console.log('allowlist', email, (await ref.get()).data());

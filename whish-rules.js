@@ -154,6 +154,40 @@ async function handle(req, res, url, user, ctx) {
       // book:false = the rule only classifies. Astro and Solaris need the official
       // bill in hand (and attached) before anything is posted.
       if (rule.book === false) { out.push({ id, error: 'this rule classifies only — book it from the bill itself' }); continue; }
+      // book:'payment' = no bill at all: the line is money handed to a partner against bills that exist (or will)
+      // on their own — Georges' excavation certificates (Mario, 2026-09-13). A vendor payment on the rule's cash
+      // journal, memo WHISH-<id> as the idempotency key, the Project field carrying the line's analytic account.
+      if (rule.book === 'payment') {
+        if (!rule.partnerId || !rule.paymentJournalId || !rule.companyId) { out.push({ id, error: 'the rule is missing the partner, company or cash journal' }); continue; }
+        const ref = REF(t, account);
+        const pctx = { allowed_company_ids: [rule.companyId], company_id: rule.companyId };
+        try {
+          const dup = await odooCall('account.payment', 'search_read', [[['memo', '=', ref], ['company_id', '=', rule.companyId]]], { fields: ['id', 'name', 'state', 'move_id'], context: pctx, limit: 1 });
+          let payId = dup.length ? dup[0].id : null, already = !!payId;
+          const analyticId = t.analyticId || rule.analyticId || null;
+          if (!payId) {
+            const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: 'supplier', partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
+              company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: ref };
+            if (analyticId) vals.x_studio_project = analyticId;
+            const [method] = await odooCall('account.payment.method.line', 'search_read', [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', vals.payment_type]]], { fields: ['id'], context: pctx, limit: 1 });
+            if (method) vals.payment_method_line_id = method.id;
+            payId = await odooCall('account.payment', 'create', [vals], { context: pctx });
+          }
+          let [py] = await odooCall('account.payment', 'read', [[payId], ['name', 'state', 'move_id', 'amount', 'date', 'x_studio_project']], { context: pctx });
+          if (py.state === 'draft') { await odooCall('account.payment', 'action_post', [[payId]], { context: pctx }); [py] = await odooCall('account.payment', 'read', [[payId], ['name', 'state', 'move_id', 'amount', 'date', 'x_studio_project']], { context: pctx }); }
+          if (analyticId && !py.x_studio_project) await odooCall('account.payment', 'write', [[payId], { x_studio_project: analyticId }], { context: pctx }).catch(() => {});
+          const payment = { id: payId, name: py.name, date: py.date, amount: py.amount };
+          const booked = { moveId: py.move_id ? py.move_id[0] : null, move: py.name, ref, kind: 'payment', state: py.state, paymentState: 'paid', payment, at: now(), by: who, ruleId: rule.id };
+          const data = { booked };
+          if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
+          if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
+          await col.doc(id).set(data, { merge: true });
+          out.push({ id, moveId: booked.moveId, move: py.name, amount: py.amount, state: py.state, paymentState: 'paid', payment, already, kind: 'payment' });
+        } catch (e) {
+          out.push({ id, error: String(e.message || e).slice(0, 300) });
+        }
+        continue;
+      }
       if (!rule.partnerId || !rule.journalId || !rule.accountId || !rule.companyId) {
         out.push({ id, error: 'the rule is missing the vendor, company, journal or account' }); continue;
       }

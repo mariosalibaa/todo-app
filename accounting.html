@@ -55,6 +55,8 @@
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:var(--overlay0);}
+  .c-sel{width:26px;text-align:center;padding-left:4px!important;padding-right:0!important;} .c-sel input{margin:0;cursor:pointer;} tr.sel td{background:rgba(242,169,59,.07);}
+  #bulk{position:sticky;bottom:0;z-index:40;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;background:var(--mantle);border-top:2px solid var(--amber);font-size:13px;} #bulk b{color:var(--amber);}
   .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:16%;white-space:normal;} .c-partner{width:10%;} .c-cash{width:10%;} .c-company{width:8%;} .c-proj{width:11%;} td.num,th.num{width:6.5%;} .c-odoo{width:10%;} .c-recon{width:6%;font-size:12px;white-space:nowrap;} td.c-recon.yes{color:var(--green);} td.c-recon.no{color:var(--odoo,#e0a04a);} td.c-recon:not(.yes):not(.no){color:var(--muted);}
   /* ☑ Reviewed: the box, then the stamp under it */
   .c-rev{width:7%;} .c-rev label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;}
@@ -231,6 +233,7 @@
     #rows td.debit,#rows td.credit{grid-column:2;grid-row:1;text-align:right;font-weight:600;
       white-space:nowrap;max-width:36vw;align-self:start;}
     #rows td.zero{display:none;}          /* only the side that carries money is drawn */
+    #rows td.c-sel{display:none;}
     #rows td.c-date{grid-column:1/-1;grid-row:2;font-size:12px;color:var(--muted);
       display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;}
     #rows td.c-date .ref{display:inline;}
@@ -539,6 +542,16 @@
     <div class="sheet-body" id="projects-body"></div>
   </div>
 </div>
+<div id="bulk" hidden>
+  <b id="bulk-n">0 selected</b>
+  <button class="btn primary" onclick="bulkBook()" title="Put the selected lines on the To-book list and open it: each is checked there, then booked as a bill paid from its cash journal or as a cash payment">📗 Book in Odoo</button>
+  <button class="btn" onclick="bulkReviewed(true)" title="Tick Reviewed on every selected line">☑ Reviewed</button>
+  <button class="btn" onclick="bulkReviewed(false)">☐ Not reviewed</button>
+  <button class="btn" onclick="bulkProject()" title="Give every selected line the same project (analytic account)">🏗 Set project…</button>
+  <button class="btn" onclick="bulkCompany()" title="Give every selected line the same company">🏢 Set company…</button>
+  <span style="flex:1"></span>
+  <button class="btn" onclick="selClear()">✕ Clear selection</button>
+</div>
 <div class="sheet" id="stmt" hidden>
   <div class="sheet-box">
     <div class="sheet-head"><b>Statement — the sheet's new block</b>
@@ -695,6 +708,8 @@ const unjustified = t => !t.excluded && !!(t.debit || t.credit) && !partnerShown
 // ── Columns: the first five are the statement as printed (or the Odoo line), then what we add ──
 // `only` limits a column to one account type: who physically paid matters for a wallet, not for a bank.
 const ALL_COLS = [
+  // ☐ pick lines, then act on all of them at once — Book in Odoo, reviewed, project… (Mario, 2026-09-12)
+  { k: 'sel',     l: '',                      f: 'sel',    v: t => selected.has(t.id) ? 1 : 0, c: 'c-sel' },
   { k: 'date',    l: 'Date / ref',            f: 'date',   v: t => t.date + ' ' + (t.ref || ''), c: 'c-date' },
   { k: 'acct',    l: 'Account',               f: 'select', v: t => t._accName || '', c: 'c-acct', only: 'all' },
   { k: 'desc',    l: 'Description',           f: 'text',   v: t => [t.service, t.description, contactName(t).name, t.note].filter(Boolean).join(' '), c: 'c-desc' },
@@ -1223,8 +1238,9 @@ const srcClass = s => s === 'manual' ? 'src-manual' : (s === 'odoo' || s === 'ex
 
 // ── Header + column filters ──
 function buildHeader() {
-  document.getElementById('hdr').innerHTML = COLS.map(c =>
-    `<th class="${c.num ? 'num ' : ''}${c.c || ''}" onclick="setSort('${c.k}')">${c.l}<span class="arr" id="arr-${c.k}"></span></th>`).join('');
+  document.getElementById('hdr').innerHTML = COLS.map(c => c.k === 'sel'
+    ? `<th class="c-sel" title="Select every line shown (all pages of the current view)"><input type="checkbox" id="sel-all" onclick="event.stopPropagation()" onchange="selAll(this.checked)"></th>`
+    : `<th class="${c.num ? 'num ' : ''}${c.c || ''}" onclick="setSort('${c.k}')">${c.l}<span class="arr" id="arr-${c.k}"></span></th>`).join('');
   document.getElementById('flt').innerHTML = COLS.map(c => {
     const on = colF[c.k] ? 'on' : '';
     if (c.f === 'text') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="filter" oninput="setFilter('${c.k}', this.value)"></th>`;
@@ -1361,6 +1377,7 @@ function bookButton(t) {
   const what = [r.partnerName, r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · ');
   // classify-only: the answers are filled in, but the bill has to come from the document
   if (r.book === false) return `<span class="odoo-no" title="${esc((r.description || 'This rule fills the answers in but does not book.') + ' — ' + what)}">needs the bill</span>`;
+  if (r.book === 'payment') return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('A vendor payment to ' + r.partnerName + ' from ' + (r.paymentJournalName || 'the cash journal') + ' — no bill; it reconciles against his own bills later')}">📗 Pay</button>`;
   return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('Create the bill, post it and pay it from ' + (r.paymentJournalName || 'the cash journal') + ':\n' + what)}">${bk ? '📗 Post & pay' : '📗 Book'}</button>`;
 }
 // Every line's amount can be corrected here, on any account (Mario, 2026-09-07). An Odoo line mirrors
@@ -1614,7 +1631,8 @@ function render() {
         + ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this proposed line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
         + ((t.src === 'whatsapp' || t.src === 'site') && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + '';   // the line's paper is listed by name in the Odoo column now, not counted here
-    return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}${unjustified(t) ? ' unjust' : ''}">
+    return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}${unjustified(t) ? ' unjust' : ''}${selected.has(t.id) ? ' sel' : ''}">
+      <td class="c-sel"><input type="checkbox" ${selected.has(t.id) ? 'checked' : ''} onchange="selRow('${t.id}', this.checked)"></td>
       <td class="c-date">${t.src === 'excel' ? datePick(t, "The day this row falls on, in the workbook", `saveSheet('${t.id}', 'date', this.value, this.parentNode)`)
         // a line a person typed, or one read off WhatsApp, can be moved to its right day: the
         // receipt is often photographed days after it was paid (Mario, 2026-09-09)
@@ -1730,6 +1748,7 @@ function render() {
     if (!b.dataset.tip) b.dataset.tip = b.title || '';
     b.title = ok ? b.dataset.tip : 'A statement is drawn from an Excel ledger that has un-sent rows'; }
   queueButton();
+  bulkBar();
   const rv = document.getElementById('btn-review');
   const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t) || unjustified(t))).length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
@@ -1796,6 +1815,7 @@ function injectTimesheet() {
 // in the Description and the projects in Analytic, and every money cell left empty.
 function tsRowHtml(t) {
   const cell = c => {
+    if (c.k === 'sel') return '<td class="c-sel"></td>';
     if (c.k === 'date') return `<td class="c-date"><span class="ts-when">${esc(t.date)}</span><span class="src ts">timesheet</span></td>`;
     if (c.k === 'desc') return `<td class="c-desc"><span class="ts-task">🕐 ${esc(t.description)}</span></td>`;
     if (c.k === 'proj') return `<td class="c-proj">${(t.projects || []).length
@@ -2359,6 +2379,51 @@ async function cjClear(rowId) {
   catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 
+// ── Multi-select + bulk actions (Mario, 2026-09-12: "select multiple lines and press Book at Odoo") ──
+let selected = new Set();
+function selRow(id, on) { if (on) selected.add(id); else selected.delete(id); const tr = document.querySelector(`tr[data-id="${id}"]`); if (tr) tr.classList.toggle('sel', on); bulkBar(); }
+function selAll(on) { const all = visible(); selected = on ? new Set(all.map(t => t.id)) : new Set(); render(); }
+function selClear() { selected = new Set(); render(); }
+function bulkBar() {
+  const b = document.getElementById('bulk'); if (!b) return;
+  // only lines still on the page count — a filter change drops the rest silently
+  const ids = new Set(tx.map(t => t.id)); for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
+  b.hidden = !selected.size;
+  document.getElementById('bulk-n').textContent = `${selected.size} selected`;
+  const hd = document.getElementById('sel-all'); if (hd) { const all = visible(); hd.checked = !!all.length && all.every(t => selected.has(t.id)); hd.indeterminate = !hd.checked && all.some(t => selected.has(t.id)); }
+}
+const selLines = () => tx.filter(t => selected.has(t.id));
+async function bulkBook() {
+  const list = selLines().filter(t => t.src !== 'odoo' && !t.bookedMove && !(t.odoo && (t.odoo.matches || []).some(x => x.chosen)));
+  const skipped = selected.size - list.length;
+  if (!list.length) return say('Every selected line is already in Odoo', 'err');
+  const stamp = { bookWanted: true, bookWantedAt: new Date().toISOString(), bookWantedBy: (Admin.me || {}).email || '' };
+  say(`Putting ${list.length} line${list.length > 1 ? 's' : ''} on the To-book list…`);
+  for (const t of list) { if (!t.bookWanted) { Object.assign(t, stamp); await patch(t.id, stamp).catch(e => console.warn('want', t.id, e.message)); } }
+  queueButton(); render();
+  say(`${list.length} on the list${skipped ? ` · ${skipped} already in Odoo, left out` : ''} — check them and press Book all`);
+  openQueue();
+}
+async function bulkReviewed(on) {
+  const list = selLines().filter(t => !!t.reviewed !== on);
+  for (const t of list) await setReviewed(t.id, on).catch(e => console.warn('reviewed', t.id, e.message));
+  say(`${list.length} line${list.length === 1 ? '' : 's'} marked ${on ? 'reviewed' : 'not reviewed'}`); render();
+}
+function bulkProject() {
+  const name = prompt('Project (analytic account) for the ' + selected.size + ' selected lines — type its name as in Odoo:', 'Ajaltoun 4193'); if (!name) return;
+  const a = analytic.find(x => norm(x.name) === norm(name)) || analytic.find(x => norm(x.name).includes(norm(name)));
+  if (!a) return say('No analytic account called "' + name + '"', 'err');
+  const list = selLines().filter(t => t.analyticId !== a.id && t.nature !== 'transfer');
+  (async () => { for (const t of list) { const data = { analyticId: a.id, analyticName: a.name, analyticSrc: 'manual', analyticText: '' }; Object.assign(t, data); await patch(t.id, data).catch(e => console.warn('project', t.id, e.message)); }
+    say(`${list.length} line${list.length === 1 ? '' : 's'} → ${a.name}`); render(); })();
+}
+function bulkCompany() {
+  const name = prompt('Company for the ' + selected.size + ' selected lines (' + companies.map(c => c.name).join(' / ') + ' / Personal):', 'SHIFT DEVELOPMENT'); if (!name) return;
+  const co = name === 'Personal' ? 'Personal' : (companies.find(c => norm(c.name) === norm(name)) || companies.find(c => norm(c.name).includes(norm(name))) || {}).name;
+  if (!co) return say('No company called "' + name + '"', 'err');
+  (async () => { const list = selLines().filter(t => companyOf(t) !== co); for (const t of list) await saveCompany(t.id, co, null).catch(e => console.warn('company', t.id, e.message)); say(`${list.length} line${list.length === 1 ? '' : 's'} → ${co}`); render(); })();
+}
+
 // ── Saving ──
 function flash(el, ok) { el.classList.remove('dirty'); el.classList.toggle('saved', ok); el.classList.toggle('dirty', !ok); setTimeout(() => el.classList.remove('saved'), 1200); }
 function mark(el, src) { const td = el.closest('td'); td.classList.remove('src-auto', 'src-manual', 'src-odoo'); if (src) td.classList.add(srcClass(src)); }
@@ -2695,7 +2760,7 @@ const stamp = iso => { if (!iso) return ''; const d = new Date(iso); return isNa
 const shortWho = who => who ? cap(String(who).split('@')[0].split(/[._-]/)[0]) : '';
 async function setReviewed(id, on, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
-  el.disabled = true;
+  if (el) el.disabled = true;
   try {
     const r = await patch(id, { reviewed: on });
     Object.assign(t, r.after || { reviewed: on });
@@ -2775,7 +2840,7 @@ function odooSay(r) {
   if (o.error) return ` — but Odoo was not updated: ${o.error}`;
   if (o.skipped) return ` — not carried into Odoo: ${o.skipped}`;
   if (o.already) return ` — ${o.move} already said that`;
-  if (o.ok) return ` — written onto ${o.move} in Odoo`;
+  if (o.ok) return ` — written onto ${(o.changed || [o.move]).join(', ')} in Odoo${o.note ? ' (' + o.note + ')' : ''}`;
   return '';
 }
 async function saveAnalytic(id, a, el) {
@@ -2852,10 +2917,9 @@ async function saveCompany(id, value, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
   const data = { company: value, companySrc: value ? 'manual' : '', kind: kindOf(value), kindSrc: value ? 'manual' : '' };
   Object.assign(t, data);
-  el.classList.add('dirty'); mark(el, value ? 'manual' : '');
-  el.closest('tr').classList.toggle('personal', value === 'Personal');
-  try { await patch(id, data); flash(el, true); }
-  catch (e) { flash(el, false); say('Could not save: ' + e.message, 'err'); }
+  if (el) { el.classList.add('dirty'); mark(el, value ? 'manual' : ''); el.closest('tr').classList.toggle('personal', value === 'Personal'); }
+  try { await patch(id, data); if (el) flash(el, true); }
+  catch (e) { if (el) flash(el, false); say('Could not save: ' + e.message, 'err'); if (!el) throw e; }
 }
 async function savePaidBy(id, value, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
@@ -3221,7 +3285,7 @@ async function bookOne(id, btn) {
 async function bookRow(id, btn) {
   const t = tx.find(x => x.id === id), r = t && ruleFor(t); if (!r) return;
   const amt = fmt(t.debit || t.credit);
-  if (!confirm(`Book ${amt} of ${t.date} in Odoo?\n\n${r.partnerName} · ${r.companyName}\n${r.accountCode}${r.analyticName ? '\n' + r.analyticName : ''}\n\nThe bill is created, posted and paid from ${r.paymentJournalName || 'the cash journal'} on that date.`)) return;
+  if (r.book === 'payment' ? !confirm(`Record ${amt} of ${t.date} in Odoo as a payment to ${r.partnerName} (${r.companyName}) from ${r.paymentJournalName || 'the cash journal'}?\n\nNo bill is created: it is money against his own bills, to reconcile there.`) : !confirm(`Book ${amt} of ${t.date} in Odoo?\n\n${r.partnerName} · ${r.companyName}\n${r.accountCode}${r.analyticName ? '\n' + r.analyticName : ''}\n\nThe bill is created, posted and paid from ${r.paymentJournalName || 'the cash journal'} on that date.`)) return;
   btn.disabled = true; btn.textContent = 'Booking…';
   try {
     const one = await bookLine(id);

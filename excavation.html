@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Excavation · Georges EL Hajj · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;} .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;} .hback:hover{background:var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;} .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;}
+  main{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
+  h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 18px;line-height:1.5;}
+  h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:26px 0 10px;font-weight:600;display:flex;align-items:center;gap:10px;} h2 .r{margin-left:auto;font-weight:400;letter-spacing:0;text-transform:none;font-size:.74rem;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px;} .kpi .v{font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;}
+  .kpi.in .v{color:var(--green);} .kpi.out .v{color:var(--red);} .kpi.cash .v{color:var(--amber);} .kpi.eq .v{color:var(--blue);}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;overflow-x:auto;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;} @media(max-width:800px){.grid2{grid-template-columns:1fr;}}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;} th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  td{padding:6px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;} td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  tr.tot td{font-weight:600;background:rgba(242,169,59,.10);color:var(--amber);}
+  .bar{height:6px;background:var(--surface0);border-radius:3px;overflow:hidden;min-width:100px;} .bar i{display:block;height:100%;background:var(--amber);}
+  .muted{color:var(--overlay0);} .small{font-size:.74rem;} .ok{color:var(--green);} .warn{color:var(--amber);} .bad{color:var(--red);}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
+  a{color:var(--amber);} button{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 10px;font-size:.78rem;cursor:pointer;} button:hover{border-color:var(--amber);}
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><a class="hback" href="/accounting">‹ Accounting</a><div class="wordmark">SHIFT <span>GROUP</span><small>EXCAVATION</small></div></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1>Excavation — Georges EL Hajj · Ajaltoun 4193</h1>
+  <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil and Dib Mokhtar through Whish, or cash to Georges himself), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
+  <div id="msg" class="small muted">Loading…</div>
+  <div class="kpis" id="kpis"></div>
+  <h2>Collected by <span class="r muted" id="at"></span></h2>
+  <div class="grid2">
+    <div class="card"><table id="collectors"></table></div>
+    <div class="card"><table id="journals"></table></div>
+  </div>
+  <h2>Against his bills</h2>
+  <div class="card"><table id="bills"></table></div>
+  <h2>Payments <span class="r"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderPays()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
+  <div class="card"><table id="pays"></table></div>
+  <div class="note" id="foot"></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc; let D = null;
+const f = n => (+n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+Admin.require('accounting', me => {
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  load();
+});
+async function load() {
+  try { D = await Admin.api('GET', '/api/accounting/excavation'); render(); }
+  catch (e) { document.getElementById('msg').innerHTML = `<span class="bad">Could not load: ${esc(e.message || e)}</span>`; }
+}
+function render() {
+  const T = D.totals;
+  document.getElementById('msg').textContent = '';
+  document.getElementById('at').textContent = 'Odoo read ' + D.at.replace('T', ' ').slice(0, 16) + ' UTC';
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi cash"><div class="v">$ ${f(T.collected)}</div><div class="l">Collected in total — ${f(T.paidOdoo)} booked in Odoo${T.pendingHub ? ` + ${f(T.pendingHub)} on Whish not yet booked` : ''}</div></div>
+    ${D.collectors.map(c => `<div class="kpi in"><div class="v">$ ${f(c.amount + (c.pending || 0))}</div><div class="l">by ${esc(c.key)} — ${c.n} payment${c.n === 1 ? '' : 's'}${c.pending ? ` + ${c.pendingN} pending (${f(c.pending)})` : ''}</div></div>`).join('')}
+    <div class="kpi out"><div class="v">$ ${f(T.excavation + T.diesel)}</div><div class="l">His bills so far: excavation ${f(T.excavation)} + diesel difference ${f(T.diesel)}</div></div>
+    <div class="kpi eq"><div class="v">$ ${f(T.retentionOpen)}</div><div class="l">Retention held (${f(T.retention)} booked) — released at project end, less the ${f(T.unmatched)} he is ahead</div></div>`;
+  const cRows = D.collectors.map(c => `<tr><td>${esc(c.key)}</td><td class="n">${f(c.amount)}</td><td class="n muted">${c.pending ? f(c.pending) : ''}</td><td class="n">${c.n}</td><td><div class="bar"><i style="width:${Math.round(100 * (c.amount + (c.pending || 0)) / Math.max(1, T.collected))}%"></i></div></td></tr>`).join('');
+  document.getElementById('collectors').innerHTML = `<thead><tr><th>Collected by</th><th class="n">In Odoo</th><th class="n">Pending</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${cRows}</tbody><tfoot><tr class="tot"><td>Total</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${T.pendingHub ? f(T.pendingHub) : ''}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
+  const jRows = D.journals.map(j => `<tr><td>${esc(j.key)}</td><td class="n">${f(j.amount)}</td><td class="n">${j.n}</td><td><div class="bar"><i style="width:${Math.round(100 * j.amount / Math.max(1, T.paidOdoo))}%"></i></div></td></tr>`).join('');
+  document.getElementById('journals').innerHTML = `<thead><tr><th>From which cash / bank account</th><th class="n">Amount</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${jRows}</tbody><tfoot><tr class="tot"><td>Total in Odoo</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
+  const kind = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Retention' };
+  const bRows = D.bills.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_move_in_invoice_type/${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${kind[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('');
+  document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${bRows}</tbody><tfoot><tr class="tot"><td colspan="4">Total · ${D.bills.length} bills</td><td class="n">${f(T.bills)}</td><td class="n">${f(T.bills - T.open - T.retentionOpen)}</td><td class="n">${f(T.open + T.retentionOpen)}</td></tr></tfoot>`;
+  renderPays();
+  document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Georges. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from the Accounts page (📗 Pay).`;
+}
+function renderPays() {
+  const open = document.getElementById('only-open').checked;
+  const rows = [...D.payments.map(p => ({ ...p, pending: false })), ...D.pending.map(l => ({ id: 'hub-' + l.id, name: '— not in Odoo', date: l.date, amount: l.amount, memo: l.desc + (l.note ? ' · ' + l.note : ''), journal: 'Whish · Mario Saliba (hub)', collector: l.collector, reconciled: false, pending: true }))]
+    .filter(p => !open || !p.reconciled).sort((a, b) => b.date.localeCompare(a.date));
+  document.getElementById('pays').innerHTML = `<thead><tr><th>Date</th><th>Payment</th><th>Collected by</th><th>From account</th><th>Memo</th><th class="n">Amount</th><th>Reconciled</th></tr></thead><tbody>${rows.map(p => `<tr>
+    <td>${esc(p.date)}</td><td>${p.pending ? '<span class="warn">pending</span>' : `<a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_account_payments_payable/${p.id}">${esc(p.name)}</a>`}</td><td>${esc(p.collector)}</td><td>${esc(p.journal)}</td><td class="small muted">${esc(p.memo)}</td><td class="n">${f(p.amount)}</td>
+    <td>${p.pending ? '<span class="muted">—</span>' : p.reconciled ? '<span class="ok">✓ ' + p.bills + ' bill' + (p.bills > 1 ? 's' : '') + '</span>' : '<span class="warn">○ open</span>'}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="tot"><td colspan="5">${rows.length} payments</td><td class="n">${f(rows.reduce((s, p) => s + p.amount, 0))}</td><td></td></tr></tfoot>`;
+}
+function csv() {
+  const rows = [['Date', 'Payment', 'Collected by', 'From account', 'Memo', 'Amount', 'Reconciled'], ...D.payments.map(p => [p.date, p.name, p.collector, p.journal, p.memo, p.amount, p.reconciled ? 'yes' : 'no']), ...D.pending.map(l => [l.date, 'not in Odoo', l.collector, 'Whish (hub)', l.desc, l.amount, ''])];
+  const csv = rows.map(r => r.map(v => typeof v === 'number' ? v : `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'Excavation Georges EL Hajj payments.csv'; a.click();
+}
+</script>
+</body>
+</html>
