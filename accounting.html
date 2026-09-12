@@ -1964,7 +1964,10 @@ function pickFilter(id) {
   // The other side of a transfer is one of OUR OWN accounts, never an Odoo partner — so they head
   // the list, and picking one is what ties the row to Mario's box (Mario, 2026-09-09: "why i
   // cannot select mario cash from here").
-  const mine = row && (row.nature === 'transfer' || row.partnerKind === 'cash')
+  // … and on any other row, typing the name of one of our accounts must still find it (Mario, 2026-09-12:
+  // "i cannot select mario cash" on a row that was still tagged partner) — picking it turns the row into a transfer
+  const ownMatch = !!q && accounts.some(x => x.id !== acc && (norm(x.name).includes(q) || norm(x.owner || '').includes(q)));
+  const mine = row && (row.nature === 'transfer' || row.partnerKind === 'cash' || ownMatch)
     ? accounts.filter(x => x.id !== acc && (!q || norm(x.name).includes(q) || norm(x.owner || '').includes(q)))
         // the one the row already names first, then Mario's box: money reaching a worker is almost
         // always Mario's, so it should be one click away (Mario, 2026-09-09)
