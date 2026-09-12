@@ -2416,7 +2416,7 @@ async function openReconcile(id) {
   sh.hidden = false; body.innerHTML = '<p class="hint">Reading the payment and the partner\'s open documents in Odoo…</p>';
   document.getElementById('recon-title').textContent = `Reconcile — ${t.date} · ${fmt(t.debit || t.credit)} · ${partnerShown(t) || ''}`;
   try {
-    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx/${id}/reconcile`);
+    const r = await Admin.api('GET', `/api/accounting/accounts/${accOf(t)}/tx/${id}/reconcile`);
     const p = r.payment, what = p.direction === 'out' ? 'bills' : 'invoices';
     let left = p.residual;
     body.innerHTML = `<p><b>${esc(p.name)}</b> · ${esc(p.date)} · ${fmt(p.amount)} ${p.direction === 'out' ? 'paid to' : 'received from'} <b>${esc(p.partner)}</b> · ${esc(p.company)} · ${esc(p.journal)}<br>
@@ -2433,11 +2433,12 @@ async function doReconcile() {
   if (!ids.length) return say('Tick at least one document', 'err');
   const btn = document.getElementById('recon-go'); btn.disabled = true; btn.textContent = 'Reconciling…';
   try {
-    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/tx/${reconRow}/reconcile`, { moveIds: ids });
+    const ra = accOf(tx.find(x => x.id === reconRow));
+    const r = await Admin.api('POST', `/api/accounting/accounts/${ra}/tx/${reconRow}/reconcile`, { moveIds: ids });
     const done = r.done.filter(d => d.applied).map(d => `${d.name} ${fmt(d.applied)}${d.stillOpen ? ' (' + fmt(d.stillOpen) + ' still open)' : ''}`);
     const skipped = r.done.filter(d => d.skipped).map(d => `${d.name}: ${d.skipped}`);
     say(`${r.payment.name}: ${done.length ? 'applied to ' + done.join(', ') : 'nothing applied'}${r.payment.residual ? ` · ${fmt(r.payment.residual)} left open` : ''}${skipped.length ? ' · skipped ' + skipped.join('; ') : ''}${odooSay({ odooAnalytic: r.odooAnalytic })}`, done.length ? 'ok' : 'err');
-    await Admin.api('POST', `/api/accounting/accounts/${acc}/odoo-check`, { ids: [reconRow] }).catch(() => {});
+    await Admin.api('POST', `/api/accounting/accounts/${ra}/odoo-check`, { ids: [reconRow] }).catch(() => {});
     await reloadTx(); render();
     document.getElementById('recon').hidden = true;
   } catch (e) { say('Could not reconcile: ' + e.message, 'err'); }
@@ -3008,7 +3009,7 @@ async function autoBook(id) {
   const t = tx.find(x => x.id === id); if (!t) return;
   say('Booking ' + (t.description || '').slice(0, 40) + ' into Odoo…');
   try {
-    const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-row`, { txId: id });
+    const r = await Admin.api('POST', `/api/accounting/accounts/${accOf(t)}/book-row`, { txId: id });
     await loadTx();
     say(r.already ? 'Already in Odoo: ' + r.move
       : `Booked in Odoo: ${r.move || ''} (${r.kind})${r.photos ? ' · ' + r.photos + ' photo' + (r.photos > 1 ? 's' : '') + ' attached' : ''}${r.pendingExcel ? ' · still to be written into the workbook' : ''}`);
@@ -3045,7 +3046,7 @@ async function acceptRow(id) {
   const t = tx.find(x => x.id === id); if (!t) return;
   const it = itemFor(t); if (!it) return;
   try {
-    await Admin.api('POST', `/api/accounting/accounts/${acc}/tx-bulk`, { items: [it] });
+    await Admin.api('POST', `/api/accounting/accounts/${accOf(t)}/tx-bulk`, { items: [it] });
     Object.assign(t, it); render();
     say(`Applied: ${[it.partnerName, it.company].filter(Boolean).join(' / ')}`);
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
@@ -3054,7 +3055,7 @@ async function acceptRow(id) {
 async function skipRow(id, on) {
   const t = tx.find(x => x.id === id); if (!t) return;
   try {
-    await Admin.api('POST', `/api/accounting/accounts/${acc}/tx-bulk`, { items: [{ id, suggestSkip: !!on }] });
+    await Admin.api('POST', `/api/accounting/accounts/${accOf(t)}/tx-bulk`, { items: [{ id, suggestSkip: !!on }] });
     t.suggestSkip = !!on; render();
     say(on ? 'Suggestion skipped for this line' : 'Suggestion back');
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
@@ -3085,7 +3086,9 @@ async function acceptSame(id) {
   if (!confirm(`Apply "${what}" to all ${mates.length} pending lines from ${who}?\n\nThey all carry the same suggestion. Anything you already filled in is untouched.`)) return;
   const items = mates.map(itemFor).filter(Boolean);
   try {
-    await Admin.api('POST', `/api/accounting/accounts/${acc}/tx-bulk`, { items });
+    // the mates may sit on several accounts in the Everything view: one call per account
+    const byAcc = {}; for (const it of items) { const a = accOf(tx.find(x => x.id === it.id)); (byAcc[a] ||= []).push(it); }
+    for (const [a, its] of Object.entries(byAcc)) await Admin.api('POST', `/api/accounting/accounts/${a}/tx-bulk`, { items: its });
     for (const it of items) Object.assign(tx.find(x => x.id === it.id), it);
     render();
     say(`${items.length} lines from ${who} set to ${what}`);
@@ -3340,10 +3343,11 @@ function drawBills() {
 // Book one line: create the bill if needed, post it, pay it from the cash journal, then
 // let the matcher see the new payment so the Odoo cell turns green.
 async function bookLine(id) {
-  const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book`, { ids: [id], post: true });
+  const a = accOf(tx.find(x => x.id === id));
+  const r = await Admin.api('POST', `/api/accounting/accounts/${a}/book`, { ids: [id], post: true });
   const one = (r.results || [])[0] || {};
   if (one.error) throw new Error(one.error);
-  await Admin.api('POST', `/api/accounting/accounts/${acc}/odoo-check`, { ids: [id] }).catch(() => {});
+  await Admin.api('POST', `/api/accounting/accounts/${a}/odoo-check`, { ids: [id] }).catch(() => {});
   await reloadTx();
   render();
   return one;
@@ -3626,7 +3630,7 @@ async function bookAny(id) {
   const ad = t && !ruleFor(t) && adHocRule(t);
   if (ad && ad.suggested) await acceptRow(id);
   if (t && (ruleFor(t) || ad)) return bookLine(id);   // a rule, or partner + company (own or suggested) → a payment
-  const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-row`, { txId: id });
+  const r = await Admin.api('POST', `/api/accounting/accounts/${accOf(t)}/book-row`, { txId: id });
   await reloadTx(); render();
   return { move: r.move || '', kind: r.kind, already: r.already };
 }
@@ -3769,7 +3773,7 @@ function lfRemove(i) { lfDocs.splice(i, 1); lfDrawDocs(); }
 async function lfRemoveSaved(id) {
   if (!lineEditing) return;
   try {
-    await Admin.api('DELETE', `/api/accounting/accounts/${acc}/tx/${lineEditing.id}/docs/${id}`);
+    await Admin.api('DELETE', `/api/accounting/accounts/${accOf(lineEditing)}/tx/${lineEditing.id}/docs/${id}`);
     lfSaved = lfSaved.filter(d => d.id !== id);
     const t = tx.find(x => x.id === lineEditing.id); if (t) t.docs = lfSaved;
     lfDrawDocs(); render();
@@ -3779,7 +3783,7 @@ function lfDrawDocs() {
   const el = document.getElementById('lf-list'); if (!el) return;
   const thumb = (src, isImg, name, close) =>
     `<div class="lf-doc">${isImg ? `<img src="${src}" alt="">` : '<div class="pdf">📄</div>'}<button type="button" class="x" title="Remove" onclick="${close}">✕</button><div class="nm">${esc(name)}</div></div>`;
-  el.innerHTML = lfSaved.map(d => thumb(`/api/accounting/accounts/${acc}/tx/${lineEditing.id}/docs/${d.id}`, /^image\//.test(d.mime), d.name, `lfRemoveSaved('${d.id}')`)).join('')
+  el.innerHTML = lfSaved.map(d => thumb(`/api/accounting/accounts/${accOf(lineEditing)}/tx/${lineEditing.id}/docs/${d.id}`, /^image\//.test(d.mime), d.name, `lfRemoveSaved('${d.id}')`)).join('')
     + lfDocs.map((d, i) => thumb(d.url, /^image\//.test(d.mime), d.name, `lfRemove(${i})`)).join('');
 }
 // HP Smart: open it, then watch the scan folder until a page lands
@@ -3813,7 +3817,7 @@ async function lfScan() {
 }
 async function lfUpload(txId) {
   for (const d of lfDocs) {
-    try { await Admin.api('POST', `/api/accounting/accounts/${acc}/tx/${txId}/docs`, { name: d.name, mime: d.mime, dataBase64: d.url, from: d.from }); }
+    try { await Admin.api('POST', `/api/accounting/accounts/${accOf(tx.find(x => x.id === txId))}/tx/${txId}/docs`, { name: d.name, mime: d.mime, dataBase64: d.url, from: d.from }); }
     catch (e) { say(`${d.name} did not upload: ${e.message}`, 'err'); }
   }
   const n = lfDocs.length; lfDocs = [];
@@ -3874,7 +3878,7 @@ async function saveLine() {
     note: document.getElementById('lf-note').value.trim(), noteSrc: document.getElementById('lf-note').value.trim() ? 'manual' : '' };
   try {
     let id;
-    if (lineEditing) { await Admin.api('PATCH', `/api/accounting/accounts/${acc}/tx/${lineEditing.id}`, body); id = lineEditing.id; }
+    if (lineEditing) { await Admin.api('PATCH', `/api/accounting/accounts/${accOf(lineEditing)}/tx/${lineEditing.id}`, body); id = lineEditing.id; }
     else id = (await Admin.api('POST', `/api/accounting/accounts/${acc}/tx`, body)).id;
     const files = lfDocs.length ? await lfUpload(id) : 0;
     closeSheet('lineform');
@@ -3889,7 +3893,7 @@ async function deleteLine(id) {
   const t = tx.find(x => x.id === id); if (!t) return;
   if (!confirm(`Delete this line?\n${t.date} · ${fmt(t.debit || t.credit)} · ${t.description || ''}`)) return;
   try {
-    await Admin.api('DELETE', `/api/accounting/accounts/${acc}/tx/${id}`);
+    await Admin.api('DELETE', `/api/accounting/accounts/${accOf(t)}/tx/${id}`);
     tx = tx.filter(x => x.id !== id); computeBalances(); render(); say('Line deleted');
   } catch (e) { say('Could not delete: ' + e.message, 'err'); }
 }
@@ -4044,7 +4048,7 @@ function deckShow() {
   deckSwipe(document.getElementById('deck-card'));
 }
 // the paper's address, as the grid builds it
-function docHref(t, d) { return d.url || (`/api/accounting/accounts/${acc}/tx/${t.id}/docs/${d.id}`); }
+function docHref(t, d) { return d.url || (`/api/accounting/accounts/${accOf(t)}/tx/${t.id}/docs/${d.id}`); }
 async function deckAct(act) {
   const id = deck.items[deck.i], t = id && tx.find(x => x.id === id); if (!t) return;
   const kind = todoKind(t);
