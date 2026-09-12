@@ -8,18 +8,24 @@
   const usd0 = n => Math.abs(n) < 0.5 ? '' : usd(n);
   const VILLAS = ['U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
   const PHASES = { site: 'Site works', structure: 'Structure', finishing: 'Finishing' };
-  // the 14 divisions of the Fanar 212 BOQ (Sayed Saadeh, Jul 2026) — our bill numbers follow them; 00 = summary
-  const DIVISIONS = ['Summary', 'Excavation', 'Concrete', 'Block work', 'Waterproofing', 'Wood work', 'Metal & aluminium', 'Plaster work', 'Tiling & cladding', 'Painting', 'Suspended ceiling', 'Plumbing', 'Electrical', 'Ventilation', 'Lift',
-    'Lift (ours)', 'Pool', 'Kitchen', 'General — permits, connections, insurance', , 'Landscape'];   // 15+ = our own bills beyond Fanar's 14
+  // the 15 PDFs of the Fanar 212 BOQ (Sayed Saadeh, Jul 2026): 00 = summary, 01–14 = divisions
+  const FANAR = ['Summary', 'Excavation', 'Concrete', 'Block work', 'Waterproofing', 'Wood work', 'Metal & aluminium', 'Plaster work', 'Tiling & cladding', 'Painting', 'Suspended ceiling', 'Plumbing', 'Electrical', 'Ventilation', 'Lift'];
+  // our bill numbers follow Fanar up to 13, then diverge: 14 = terraces/green areas, 15 = lift, 16 = pool …
+  const DIVISIONS = [...FANAR.slice(0, 14), 'Terraces & green areas', 'Lift', 'Pool', 'Kitchen', 'General — permits, connections, insurance', , 'Fencing'];
+  const FANAR_OF = b => b >= 1 && b <= 13 ? b : b === 15 ? 14 : null;   // which Fanar PDF a bill of ours compares to
   const fanarPdf = n => `/api/ajaltoun/plan/fanar/${String(n).padStart(2, '0')}`;
   const divName = b => DIVISIONS[b] || (b ? 'Bill ' + b : 'Other');
   const THIS_YEAR = new Date().getFullYear();
   let P = null, tab = 'U', scenario = 'expected', editing = null;
   const openDivs = new Set();   // divisions unfolded on the BOQ grid (key type:bill); everything starts collapsed
+  const BF = { q: '', phase: '', review: false };   // BOQ filter: text · phase · only "2022 prices" lines; a filter opens the matching divisions
 
   const secName = id => ((window.D && D.sections.find(s => s.id === id)) || { name: id }).name;
   const isEquip = id => !!((window.D && D.sections.find(s => s.id === id)) || {}).equipment;
   const sum = (a, f) => a.reduce((x, i) => x + (f ? f(i) : i), 0);
+
+  // every edit re-draws the tab; keep the scroll where it was (Mario, 2026-09-12: "stay at the same place")
+  function rerender() { const y = window.scrollY; window.renderTab && renderTab(); window.scrollTo(0, y); }
 
   async function load() { P = await Admin.api('GET', '/api/ajaltoun/plan'); return P; }
 
@@ -115,7 +121,10 @@
     const rows = ids.filter(id => !isEquip(id)).map(id => { const b = B.trades[id] || 0, s = B.spent[id] || 0; return { id, b, s, r: b - s }; });
     const totB = sum(rows, r => r.b), totS = sum(rows, r => r.s);
     const equipRows = ids.filter(isEquip).map(id => ({ id, s: B.spent[id] || 0 }));
-    const items = B.byType[tab];
+    const q = BF.q.trim().toLowerCase();
+    const hit = i => (!q || [i.name, i.note, secName(i.trade), i.unit, PHASES[i.phase], String(i.bill ?? '')].some(v => (v || '').toLowerCase().includes(q))) && (!BF.phase || i.phase === BF.phase) && (!BF.review || i.review);
+    const filtering = !!(q || BF.phase || BF.review);
+    const items = B.byType[tab].filter(hit);
     const groups = []; for (const i of items) { const b = i.bill == null || i.bill === '' ? null : +i.bill; let g = groups.find(x => x.bill === b); if (!g) groups.push(g = { bill: b, items: [] }); g.items.push(i); }
     groups.sort((a, b) => (a.bill ?? 99) - (b.bill ?? 99));
     el.innerHTML = `
@@ -136,10 +145,14 @@
         </tbody></table></div>
         <div class="note">A trade with spend but no budget line (e.g. Topo, Site & general) shows a negative remaining — add a budget line for it, or reclassify the lines on the Accounts tab.</div>
       </div>
-      <h2>BOQ lines <span class="r"><span class="lang"><button class="${tab === 'U' ? 'on' : ''}" onclick="Plan.setTab('U')">Villa U — up 333</button><button class="${tab === 'D' ? 'on' : ''}" onclick="Plan.setTab('D')">Villa D — down</button></span> &nbsp; <button class="btn" onclick="Plan.foldAll(true)" title="Open every division">Expand all</button><button class="btn" onclick="Plan.foldAll(false)" title="Close every division">Collapse all</button>${P.admin ? ` &nbsp; <button class="btn ap" onclick="Plan.edit(null)">+ Add a line</button>` : ''}</span></h2>
+      <h2>BOQ lines${filtering ? ` <span class="small muted" style="font-weight:400">· ${items.length} of ${B.byType[tab].length} lines</span>` : ''} <span class="r"><span class="lang"><button class="${tab === 'U' ? 'on' : ''}" onclick="Plan.setTab('U')">Villa U — up 333</button><button class="${tab === 'D' ? 'on' : ''}" onclick="Plan.setTab('D')">Villa D — down</button></span> &nbsp; <button class="btn" onclick="Plan.foldAll(true)" title="Open every division">Expand all</button><button class="btn" onclick="Plan.foldAll(false)" title="Close every division">Collapse all</button>${P.admin ? ` &nbsp; <button class="btn ap" onclick="Plan.edit(null)">+ Add a line</button>` : ''}</span></h2>
+      <div class="boqf"><input id="bf-q" placeholder="search item, note, trade, unit…" value="${esc(BF.q)}" oninput="Plan.filter({ q: this.value })">
+        <select onchange="Plan.filter({ phase: this.value })"><option value="">All phases</option>${Object.entries(PHASES).map(([k, n]) => `<option value="${k}" ${BF.phase === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        <label class="small muted"><input type="checkbox" ${BF.review ? 'checked' : ''} onchange="Plan.filter({ review: this.checked })"> still at 2022 prices</label>
+        ${filtering ? `<button class="btn" onclick="Plan.filter({ q: '', phase: '', review: false })">✕ Clear</button>` : ''}</div>
       <div class="card"><div class="wrap"><table>
         <thead><tr><th>Bill</th><th>Item</th><th>Trade</th><th>Phase</th><th>Unit</th><th class="n">Qty</th><th class="n">Unit price</th>${P.admin ? '<th class="n">Jul 2026 ref</th>' : ''}<th class="n">Total</th><th></th></tr></thead>
-        <tbody>${groups.map(g => { const key = tab + ':' + g.bill, open = openDivs.has(key) || g.items.some(i => i.id === editing); return `<tr class="div ${open ? 'open' : ''}" onclick="Plan.toggleDiv('${key}')" style="cursor:pointer"><td class="muted small">${g.bill ?? ''}</td><td colspan="${P.admin ? 7 : 6}"><span class="caret">${open ? '▾' : '▸'}</span>${esc(divName(g.bill))} <span class="small muted" style="font-weight:400">· ${g.items.length} line${g.items.length > 1 ? 's' : ''}</span>${P.admin && g.bill >= 1 && g.bill <= 14 ? ` <a class="small" href="${fanarPdf(g.bill)}" target="_blank" title="Fanar 212 reference BOQ — ${esc(DIVISIONS[g.bill])}" onclick="event.stopPropagation()">📄 Fanar ref</a>` : ''}</td><td class="n">${usd(sum(g.items, i => i.total || 0))}</td><td></td></tr>` + (open ? g.items : []).map(i => editing === i.id ? editRow(i) : `<tr ${P.admin ? `style="cursor:pointer" onclick="Plan.edit('${i.id}')"` : ''}>
+        <tbody>${groups.map(g => { const key = tab + ':' + g.bill, open = filtering || openDivs.has(key) || g.items.some(i => i.id === editing); return `<tr class="div ${open ? 'open' : ''}" onclick="Plan.toggleDiv('${key}')" style="cursor:pointer"><td class="muted small">${g.bill ?? ''}</td><td colspan="${P.admin ? 7 : 6}"><span class="caret">${open ? '▾' : '▸'}</span>${esc(divName(g.bill))} <span class="small muted" style="font-weight:400">· ${g.items.length} line${g.items.length > 1 ? 's' : ''}</span>${P.admin && FANAR_OF(g.bill) ? ` <a class="small" href="${fanarPdf(FANAR_OF(g.bill))}" target="_blank" title="Fanar 212 reference BOQ — ${esc(FANAR[FANAR_OF(g.bill)])}" onclick="event.stopPropagation()">📄 Fanar ref</a>` : ''}</td><td class="n">${usd(sum(g.items, i => i.total || 0))}</td><td></td></tr>` + (open ? g.items : []).map(i => editing === i.id ? editRow(i) : `<tr ${P.admin ? `style="cursor:pointer" onclick="Plan.edit('${i.id}')"` : ''}>
           <td class="muted small">${i.bill ?? ''}</td>
           <td>${esc(i.name)}${i.review ? ' <span class="pill" title="Imported from the 2022–2024 BOQ — to review">2022 prices</span>' : ''}${i.note ? `<div class="small muted">${esc(i.note)}</div>` : ''}${(i.history || []).length ? `<div class="small muted" title="${esc(i.history.map(h => h.at.slice(0, 10) + ' ' + h.by + ': ' + h.changes.map(c => c.f + ' ' + c.from + ' → ' + c.to).join(', ')).join('\n'))}">🕘 ${i.history.length} change${i.history.length > 1 ? 's' : ''} · last ${esc(i.history[i.history.length - 1].at.slice(0, 10))} by ${esc(i.history[i.history.length - 1].by)}</div>` : ''}</td>
           <td><span class="pill">${esc(secName(i.trade))}</span></td><td class="small muted">${PHASES[i.phase] || ''}</td>
@@ -150,10 +163,11 @@
         <div class="note">Quantities come from the take-off sheets in <i>0. EXCEL boq</i> (Dropbox); this is the summary that becomes the budget. Click a division to open it, a line to edit it in place (Enter saves, Esc cancels) — every change is kept with who and when.</div>
       </div>
       ${P.admin ? `<h2>Reference · Fanar 212 BOQ <span class="r muted">Sayed Saadeh, July 2026 — the rates in the “Jul 2026 ref” column come from here</span></h2>
-      <div class="card"><div class="fanar">${DIVISIONS.slice(0, 15).map((d, n) => `<a href="${fanarPdf(n)}" target="_blank">📄 <b>${String(n).padStart(2, '0')}</b> ${esc(d)}</a>`).join('')}<a href="/api/ajaltoun/plan/fanar/specs" target="_blank">📘 Specifications (7-22-2026)</a></div>
+      <div class="card"><div class="fanar">${FANAR.map((d, n) => `<a href="${fanarPdf(n)}" target="_blank">📄 <b>${String(n).padStart(2, '0')}</b> ${esc(d)}</a>`).join('')}<a href="/api/ajaltoun/plan/fanar/specs" target="_blank">📘 Specifications (7-22-2026)</a></div>
         <div class="note">One PDF per division; the same numbering as our bill column. Mario only — the links open in a new tab.</div>
       </div>` : ''}`;
     const first = el.querySelector('tr.editing input'); if (first) { first.focus(); first.select(); }
+    else if (BF._focus) { const b = document.getElementById('bf-q'); if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); } BF._focus = false; }
   }
 
   // Fanar 212 (Sayed Saadeh, Jul 2026) rate next to ours; "use" adopts it, stamped in the line's history
@@ -167,7 +181,7 @@
     const i = P.items.find(x => x.id === id); if (!i || !i.ref) return;
     const item = { ...i, price: i.ref.rate, review: false, note: [i.note, 'rate from ' + (i.ref.src || 'Fanar 2026')].filter(Boolean).join(' · ') };
     delete item.history; delete item.total;
-    try { const r = await Admin.api('POST', '/api/ajaltoun/plan/item', { item }); const k = P.items.findIndex(x => x.id === r.item.id); P.items[k] = r.item; window.renderTab && renderTab(); } catch (e) { alert('Could not save: ' + e.message); }
+    try { const r = await Admin.api('POST', '/api/ajaltoun/plan/item', { item }); const k = P.items.findIndex(x => x.id === r.item.id); P.items[k] = r.item; rerender(); } catch (e) { alert('Could not save: ' + e.message); }
   }
 
   // the line being edited, drawn in place of its grid row (Enter saves, Esc cancels); ids e-* are read back by save()
@@ -197,17 +211,17 @@
     if (e.key === 'Escape') { e.preventDefault(); closeEdit(); }
     else if (e.key === 'Enter' && e.target.tagName !== 'SELECT') { e.preventDefault(); save(id); }
   }
-  function closeEdit() { editing = null; window.renderTab && renderTab(); }
+  function closeEdit() { editing = null; rerender(); }
 
   async function save(id) {
     const g = k => document.getElementById('e-' + k).value;
     const item = { id: id || undefined, type: tab, name: g('name'), bill: g('bill'), trade: g('trade'), phase: g('phase'), unit: g('unit'), qty: g('qty'), price: g('price'), amount: g('amount'), note: g('note'), review: document.getElementById('e-review').checked };
-    try { const r = await Admin.api('POST', '/api/ajaltoun/plan/item', { item }); const k = P.items.findIndex(x => x.id === r.item.id); if (k >= 0) P.items[k] = r.item; else P.items.push(r.item); editing = null; window.renderTab && renderTab(); }
+    try { const r = await Admin.api('POST', '/api/ajaltoun/plan/item', { item }); const k = P.items.findIndex(x => x.id === r.item.id); if (k >= 0) P.items[k] = r.item; else P.items.push(r.item); editing = null; rerender(); }
     catch (e) { alert('Could not save: ' + e.message); }
   }
   async function remove(id) {
     if (!confirm('Delete this budget line?')) return;
-    try { await Admin.api('POST', '/api/ajaltoun/plan/item', { id, delete: true }); P.items = P.items.filter(x => x.id !== id); editing = null; window.renderTab && renderTab(); } catch (e) { alert(e.message); }
+    try { await Admin.api('POST', '/api/ajaltoun/plan/item', { id, delete: true }); P.items = P.items.filter(x => x.id !== id); editing = null; rerender(); } catch (e) { alert(e.message); }
   }
 
   // ── Plan tab ─────────────────────────────────────────────────────────────
@@ -278,14 +292,15 @@
     document.querySelectorAll('[data-v]').forEach(i => { const v = i.dataset.v, k = i.dataset.k; villas[v] = villas[v] || { ...P.settings.villas[v] }; villas[v][k] = i.type === 'number' ? (i.value === '' ? null : +i.value) : i.value; });
     const settings = { villas, siteYear: +document.getElementById('s-siteYear').value, d3LandHalf: +document.getElementById('s-d3LandHalf').value,
       fee: { ...P.settings.fee, total: +document.getElementById('s-feeTotal').value, startYear: +document.getElementById('s-feeStart').value } };
-    try { await Admin.api('POST', '/api/ajaltoun/plan/settings', { settings }); await load(); window.renderTab && renderTab(); } catch (e) { alert('Could not save: ' + e.message); }
+    try { await Admin.api('POST', '/api/ajaltoun/plan/settings', { settings }); await load(); rerender(); } catch (e) { alert('Could not save: ' + e.message); }
   }
 
   // planned money out per year in the current scenario (the Accounts tab's cash-flow facts use it)
   function yearOut() { if (!P) return null; const R = plan(); const o = {}; for (const y of R.years) o[y] = R.tot(R.out, y); return o; }
   window.Plan = { load, renderBudget, renderPlan, yearOut, get P() { return P; },
-    setTab: t => { tab = t; window.renderTab && renderTab(); }, setScenario: s => { scenario = s; window.renderTab && renderTab(); },
-    edit: id => { editing = id || ''; window.renderTab && renderTab(); },
-    toggleDiv: k => { openDivs.has(k) ? openDivs.delete(k) : openDivs.add(k); window.renderTab && renderTab(); },
-    foldAll: on => { for (const i of P.items) { const k = i.type + ':' + (i.bill == null || i.bill === '' ? null : +i.bill); on ? openDivs.add(k) : openDivs.delete(k); } window.renderTab && renderTab(); }, useRef, closeEdit, editKey, liveTotal, save, remove, saveSettings };
+    setTab: t => { tab = t; rerender(); }, setScenario: s => { scenario = s; rerender(); },
+    edit: id => { editing = id || ''; rerender(); },
+    filter: f => { Object.assign(BF, f); BF._focus = 'q' in f; rerender(); },
+    toggleDiv: k => { openDivs.has(k) ? openDivs.delete(k) : openDivs.add(k); rerender(); },
+    foldAll: on => { for (const i of P.items) { const k = i.type + ':' + (i.bill == null || i.bill === '' ? null : +i.bill); on ? openDivs.add(k) : openDivs.delete(k); } rerender(); }, useRef, closeEdit, editKey, liveTotal, save, remove, saveSettings };
 })();
