@@ -85,7 +85,7 @@ const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 //   excluded the line is not counted in the balance (a duplicate, a note, a cancelled entry)
 //   dupOf    the id of the line this one repeats
 const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'companySrc', 'partnerId', 'partnerName', 'partnerSrc',
-  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'projectFrom', 'retype', 'ask', 'answer', 'amountSrc', 'pendingExcel', 'noBook', 'waAccepted',
+  'noteSrc', 'kindSrc', 'analyticSrc', 'analyticFrom', 'suggestSkip', 'paidBy', 'paidBySrc', 'excluded', 'dupOf', 'transferId', 'review', 'nature', 'natureSrc', 'partnerKind', 'cashAccountId', 'cashJournalId', 'cashJournalName', 'cashJournalCompany', 'projectFrom', 'retype', 'ask', 'answer', 'amountSrc', 'pendingExcel', 'noBook', 'waAccepted',
   // What was typed on the phone before Odoo had a say: free text, never rejected.
   // The laptop turns it into a real partner / analytic when you accept the proposal.
   'partnerText', 'analyticText',

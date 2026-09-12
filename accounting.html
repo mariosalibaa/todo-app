@@ -55,7 +55,7 @@
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:var(--overlay0);}
-  .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:18%;white-space:normal;} .c-partner{width:11%;} .c-company{width:9%;} .c-proj{width:12%;} td.num,th.num{width:6.5%;} .c-odoo{width:12%;}
+  .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:16%;white-space:normal;} .c-partner{width:10%;} .c-cash{width:10%;} .c-company{width:8%;} .c-proj{width:11%;} td.num,th.num{width:6.5%;} .c-odoo{width:12%;}
   /* ☑ Reviewed: the box, then the stamp under it */
   .c-rev{width:7%;} .c-rev label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;}
   .c-rev input{width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--green);}
@@ -82,7 +82,10 @@
   .c-desc .who{font-size:11.5px;color:var(--muted);cursor:pointer;margin-top:1px;}
   .c-desc .who:hover{text-decoration:underline;}
   .c-desc .who.src-manual{color:var(--green);font-style:normal;} .c-desc .who.src-auto{color:var(--auto);font-style:italic;}
-  td.c-desc,td.c-partner,td.c-company{vertical-align:top;padding-top:4px;}
+  td.c-desc,td.c-partner,td.c-cash,td.c-company{vertical-align:top;padding-top:4px;}
+  td.c-cash .co{font-size:11px;color:var(--muted);}
+  tr.unjust td.c-partner input::placeholder,tr.unjust td.c-cash input::placeholder{color:var(--red,#c0392b);opacity:1;}
+  td.c-cash .clr{cursor:pointer;color:var(--muted);font-size:11px;margin-left:4px;}
   .odoo-warn{color:var(--amber);font-size:11px;margin-top:2px;}
   .sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;}
   .sheet[hidden]{display:none;}   /* display:flex would otherwise beat the hidden attribute and cover the grid */
@@ -233,11 +236,12 @@
     #rows td.c-date .ref{display:inline;}
     #rows td.c-date .acts{display:inline-flex;gap:11px;margin-left:auto;font-size:16px;}
     #rows td.c-partner{grid-column:1/-1;grid-row:3;}
-    #rows td.c-company{grid-column:1/-1;grid-row:4;}
-    #rows td.c-proj{grid-column:1/-1;grid-row:5;}
-    #rows td.c-type{grid-column:1/-1;grid-row:6;}
-    #rows td.c-odoo{grid-column:1/-1;grid-row:7;font-size:12px;}
-    #rows td.c-rev{grid-column:1/-1;grid-row:8;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
+    #rows td.c-cash{grid-column:1/-1;grid-row:4;}
+    #rows td.c-company{grid-column:1/-1;grid-row:5;}
+    #rows td.c-proj{grid-column:1/-1;grid-row:6;}
+    #rows td.c-type{grid-column:1/-1;grid-row:7;}
+    #rows td.c-odoo{grid-column:1/-1;grid-row:8;font-size:12px;}
+    #rows td.c-rev{grid-column:1/-1;grid-row:9;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
     #rows td.c-rev label{font-size:15px;} #rows td.c-rev input{width:20px;height:20px;} #rows td.c-rev .hint br{display:none;}
     /* the ref and the source chips read as one quiet line, not a stack of fragments */
     #rows td.c-date .ref{white-space:normal;word-break:normal;}
@@ -542,6 +546,7 @@
       <button class="btn" onclick="stmtAllDates()" title="Back to every new row since his last statement">all dates</button>
       <button class="btn" onclick="stmtExport('png')" title="The block as a picture, ready to send on WhatsApp">🖼 Image</button>
       <button class="btn" onclick="stmtExport('pdf')" title="The block as an A4 PDF">📄 PDF</button>
+      <button class="btn" onclick="stmtPrint()" title="Print the block — the browser's print dialog, paper or 'Save as PDF'">🖨 Print</button>
       <button class="btn" onclick="document.getElementById('stmt').hidden = true">✕ Close</button></div>
     <div class="sheet-body" id="stmt-body"></div>
   </div>
@@ -662,6 +667,20 @@ const pickList = () => [ALL_ACCOUNT, ...accounts, ...tsSheets()];
 // which account a line belongs to — its own in the Everything view, the open one otherwise
 const accOf = t => (t && t._acc) || acc;
 const isCash = () => !!(account && account.type === 'cash');
+// what the Partner column shows: an Odoo partner only — a transfer row's other side lives in the Cash column
+const partnerShown = t => t.partnerKind === 'cash' ? '' : (t.partnerName || '');
+// the Odoo cash/bank journal on the other side of a transfer: the one chosen on the row, or — for rows
+// tagged before the column existed — the journal of the hub account they named, matched on the row's company
+function cashOf(t) {
+  if (t.cashJournalId) return { id: t.cashJournalId, name: t.cashJournalName || '', company: t.cashJournalCompany || '' };
+  if (t.partnerKind !== 'cash' || !t.cashAccountId) return null;
+  const a = accounts.find(x => x.id === t.cashAccountId); if (!a) return null;
+  const js = a.odooJournals || [], co = companyOf(t);
+  const j = js.find(x => x.company === co) || js[0];
+  return j ? { id: j.id, name: j.name, company: j.company || '', derived: true } : { id: null, name: a.name, company: '', derived: true };
+}
+// a payment that names neither a partner nor a cash/bank journal is not justified yet
+const unjustified = t => !t.excluded && !!(t.debit || t.credit) && !partnerShown(t) && !t.partnerText && !cashOf(t);
 
 // ── Columns: the first five are the statement as printed (or the Odoo line), then what we add ──
 // `only` limits a column to one account type: who physically paid matters for a wallet, not for a bank.
@@ -673,7 +692,10 @@ const ALL_COLS = [
   { k: 'out',     l: 'Debit',                 f: 'amount', v: t => t.debit || 0, num: true },
   { k: 'in',      l: 'Credit',                f: 'amount', v: t => t.credit || 0, num: true },
   { k: 'bal',     l: 'Balance',               f: 'amount', v: t => isStatement() ? t.balance : t._bal, num: true },
-  { k: 'partner', l: 'Partner / cash',        f: 'text',   v: t => t.partnerName || '', c: 'c-partner' },
+  // Partner and Cash are two columns (Mario, 2026-09-12): every payment in or out is justified
+  // either by an Odoo partner or by the other cash/bank journal it moved to — one of the two, never neither.
+  { k: 'partner', l: 'Partner',               f: 'text',   v: t => partnerShown(t), c: 'c-partner' },
+  { k: 'cash',    l: 'Cash / bank',           f: 'text',   v: t => (cashOf(t) || {}).name || '', c: 'c-cash' },
   { k: 'company', l: 'Company',               f: 'select', v: t => companyOf(t), c: 'c-company' },
   { k: 'proj',    l: 'Analytic (Odoo)',       f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
   { k: 'odoo',    l: 'Odoo',                  f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length, c: 'c-odoo' },
@@ -782,6 +804,7 @@ async function loadPartners() {
     ]);
     partners = r.partners || []; companies = r.companies || [];
     analytic = an; plans = pl; rules = ru;
+    loadJournals().then(() => render()).catch(() => {});   // the Cash / bank column lists them
     matchMemo.clear();
     if (acc) await adoptOdooFacts();   // now the partner ids can be filled in too
     buildHeader(); render();
@@ -1256,7 +1279,7 @@ function dateMatch(t, f) {
 }
 function passes(t) {
   if (sugFilter !== 'skipped' && foldedDup(t)) return false;
-  if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)))) return false;
+  if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t) || unjustified(t)))) return false;
   for (const c of COLS) {
     const f = colF[c.k]; if (!f) continue;
     const v = c.v(t);
@@ -1577,7 +1600,7 @@ function render() {
         + ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this proposed line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
         + ((t.src === 'whatsapp' || t.src === 'site') && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + '';   // the line's paper is listed by name in the Odoo column now, not counted here
-    return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
+    return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}${unjustified(t) ? ' unjust' : ''}">
       <td class="c-date">${t.src === 'excel' ? datePick(t, "The day this row falls on, in the workbook", `saveSheet('${t.id}', 'date', this.value, this.parentNode)`)
         // a line a person typed, or one read off WhatsApp, can be moved to its right day: the
         // receipt is often photographed days after it was paid (Mario, 2026-09-09)
@@ -1599,15 +1622,20 @@ function render() {
       <td class="num credit${t.credit ? '' : ' zero'}">${amountCell(t, 'credit')}</td>
       <td class="num c-bal">${fmt(st ? t.balance : t._bal)}</td>
       <td class="c-partner ${srcClass(t.partnerName ? (t.partnerSrc || 'manual') : '')}" title="${t.partnerSrc === 'odoo' ? 'From the matched Odoo payment' : sg.partner ? esc('Suggested: ' + sg.partner.name + ' — ' + sg.partner.why) : ''}">
-        <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(t.partnerName || t.partnerText || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : 'partner'}"
+        <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(partnerShown(t) || t.partnerText || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : unjustified(t) ? 'partner or cash?' : 'partner'}"
           oninput="pickFilter('pp-${t.id}')" onkeydown="pickKey(event,'pp-${t.id}')" onblur="pickBlur('pp-${t.id}')">
           <input type="hidden" id="pp-${t.id}" value="${esc(t.partnerId || '')}" data-row="${t.id}"><div class="pick-list" id="pp-${t.id}-list"></div></div>
         ${(() => { const pr = partnerProposal(t); return pr
           ? `<div class="sug-act typed" title="${esc('You typed "' + t.partnerText + '" — the closest Odoo partner is ' + pr.name)}"><span class="sug-why">typed</span> <button class="yes" onclick="takeTyped('${t.id}','partner',true)">✓ ${esc(pr.name)}</button><button class="no" title="Leave it as you typed it" onclick="takeTyped('${t.id}','partner',false)">✕</button></div>`
           : t.partnerText ? `<div class="sug-skip" title="Typed on the phone; nothing in Odoo looks like it">typed · no Odoo match</div>` : ''; })()}
         ${(() => { const w = t.odoo && (t.odoo.matches || []).find(x => x.chosen); return w && w.partner && (t.nature === 'vendor' || t.nature === 'refund' || !t.nature) && t.partnerSrc !== 'odoo' && similarity(w.partner, t.partnerName || '') < 0.95 ? `<div class="odoo-partner" title="The partner on the Odoo entry this row matches">${esc(w.partner)}</div>` : ''; })()}
-        ${t.partnerKind === 'cash' ? `<a class="ptag cash" href="/accounting/accounts?id=${esc(t.cashAccountId || '')}" title="One of our own accounts — this row is a transfer">cash</a>` : t.partnerKind === 'partner' ? '<span class="ptag" title="An Odoo partner">partner</span>' : ''}
       </td>
+      ${(() => { const cj = cashOf(t); return `<td class="c-cash ${cj ? (cj.derived ? 'src-auto' : 'src-manual') : ''}" title="${cj ? esc('The cash or bank journal on the other side of this payment' + (cj.derived ? ' — taken from the account this transfer named' : '')) : 'A transfer between our own accounts: pick the Odoo cash/bank journal the money went to or came from'}">
+        <div class="pick"><input type="text" id="cj-${t.id}-txt" autocomplete="off" value="${esc(cj ? cj.name : '')}" placeholder="${unjustified(t) ? 'partner or cash?' : 'cash / bank'}"
+          oninput="cjFilter('cj-${t.id}')" onkeydown="cjKey(event,'cj-${t.id}')" onblur="cjBlur('cj-${t.id}')">
+          <input type="hidden" id="cj-${t.id}" value="${esc(cj && cj.id || '')}" data-row="${t.id}"><div class="pick-list" id="cj-${t.id}-list"></div></div>
+        ${cj ? `<div class="co">${esc(cj.company)}${t.cashAccountId ? ` · <a class="ptag cash" href="/accounting/accounts?id=${esc(t.cashAccountId)}" title="Open that account">open</a>` : ''}<span class="clr" onclick="cjClear('${t.id}')" title="Clear the cash side">✕</span></div>` : ''}
+      </td>`; })()}
       ${isTr ? `<td class="c-company"><span class="locked" title="A transfer between our own accounts: S LB by rule">${esc(co || 'S LB')}</span></td>` : `<td class="c-company ${srcClass(co ? (t.companySrc || (t.kind ? t.kindSrc : '') || 'manual') : '')}"><select onchange="saveCompany('${t.id}', this.value, this)">
         <option value="" ${!co ? 'selected' : ''}>${sg.company && !t.suggestSkip ? '↳ ' + esc(sg.company) + '?' : t.src === 'excel' ? '? which company' : '—'}</option>
         <option ${co === 'Personal' ? 'selected' : ''}>Personal</option>
@@ -1688,7 +1716,7 @@ function render() {
     b.title = ok ? b.dataset.tip : 'A statement is drawn from an Excel ledger that has un-sent rows'; }
   queueButton();
   const rv = document.getElementById('btn-review');
-  const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t))).length;
+  const waiting = tx.filter(t => sugState(t) === 'pending').length + tx.filter(t => !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t) || unjustified(t))).length;
   rv.textContent = waiting ? `⚡ Review ${waiting} suggestion${waiting > 1 ? 's' : ''}` : '⚡ No suggestions waiting';
   rv.classList.toggle('primary', sugFilter === 'pending');
   todoBadge();
@@ -1988,6 +2016,25 @@ function saveFile(blob, name) {
   setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
 }
 // `sel` and `name`: the timesheet sheet leaves as a picture the same way the statement does
+// Print (Mario, 2026-09-12): the statement table alone, in a clean window, straight to the print dialog.
+// The table keeps its own styles (copied from this page) so it prints as it looks; the rest of the app stays out.
+function stmtPrint(sel, name) {
+  const table = document.querySelector(sel || '#stmt-body table.xl');
+  if (!table) { say('Open the statement first', 'err'); return; }
+  const from = document.getElementById('stmt-from').value, to = document.getElementById('stmt-to').value;
+  const who = (account && (account.name || account.id) || 'statement');
+  const title = name || `${who} — statement ${from || 'start'} → ${to || localYmd(new Date())}`;
+  const css = [...document.querySelectorAll('style')].map(x => x.textContent).join(String.fromCharCode(10));
+  const w = window.open('', '_blank');
+  if (!w) { say('The browser blocked the print window — allow pop-ups for this site', 'err'); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style>
+    <style>@page{size:A4;margin:12mm} body{background:#fff!important;color:#000!important;margin:0;font:12px system-ui,sans-serif}
+      h1{font-size:15px;margin:0 0 8px} table.xl{width:100%;border-collapse:collapse} table.xl th,table.xl td{border:1px solid #bbb;padding:3px 6px;color:#000!important;background:#fff!important}
+      .no-print{display:none}</style></head><body><h1>${esc(title)}</h1>${table.outerHTML}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 300);
+}
 async function stmtExport(kind, sel, name) {
   const table = document.querySelector(sel || '#stmt-body table.xl');
   if (!table) return;
@@ -2051,7 +2098,7 @@ function pickFilter(id) {
   // … and on any other row, typing the name of one of our accounts must still find it (Mario, 2026-09-12:
   // "i cannot select mario cash" on a row that was still tagged partner) — picking it turns the row into a transfer
   const ownMatch = !!q && accounts.some(x => x.id !== acc && (norm(x.name).includes(q) || norm(x.owner || '').includes(q)));
-  const mine = row && (row.nature === 'transfer' || row.partnerKind === 'cash' || ownMatch)
+  const mine = false && row && (row.nature === 'transfer' || row.partnerKind === 'cash' || ownMatch)
     ? accounts.filter(x => x.id !== acc && (!q || norm(x.name).includes(q) || norm(x.owner || '').includes(q)))
         // the one the row already names first, then Mario's box: money reaching a worker is almost
         // always Mario's, so it should be one click away (Mario, 2026-09-09)
@@ -2163,7 +2210,8 @@ function pickCash(id, accId) {
 }
 async function saveCash(rowId, a, el) {
   const t = tx.find(x => x.id === rowId); if (!t) return;
-  const data = { partnerKind: 'cash', cashAccountId: a.id, partnerName: a.name, partnerSrc: 'manual', partnerId: null };
+  const js = a.odooJournals || [], j = js.find(x => x.company === companyOf(t)) || js[0];
+  const data = { partnerKind: 'cash', cashAccountId: a.id, partnerName: '', partnerSrc: '', partnerId: null, cashJournalId: j ? j.id : null, cashJournalName: j ? j.name : '', cashJournalCompany: j ? (j.company || '') : '' };
   Object.assign(t, data);
   if (el) { el.classList.add('dirty'); mark(el, 'manual'); }
   try { await patch(rowId, data); if (el) flash(el, true); say('Other side: ' + a.name); render(); }
@@ -2190,6 +2238,75 @@ function pickBlur(id) {
     if (exact) { if (exact.id !== row.partnerId) { hidden.value = exact.id; txt.value = exact.name; savePartner(row.id, exact, 'manual', txt); } return; }
     txt.value = row.partnerName || '';   // no such partner: snap back
   }, 160);
+}
+
+// ── Cash / bank picker: the Odoo cash and bank journals, ↑↓, Enter or click ──
+const cjList = () => journals.filter(j => j.active !== false);
+function cjFilter(id) {
+  const txt = document.getElementById(id + '-txt'), box = document.getElementById(id + '-list');
+  if (!txt || !box) return;
+  if (!journals.length) { loadJournals().then(() => cjFilter(id)); box.innerHTML = '<div class="none">loading the Odoo journals…</div>'; box.className = 'pick-list on'; return; }
+  const q = norm(txt.value);
+  const row = tx.find(x => x.id === (document.getElementById(id) || {}).dataset?.row);
+  const co = row && companyOf(row);
+  // the line's company first, then the rest — a transfer usually stays inside one company
+  const list = cjList().filter(j => !q || norm(j.name).includes(q) || norm(j.company || '').includes(q))
+    .sort((a, b) => ((b.company === co) - (a.company === co)) || String(a.company).localeCompare(String(b.company)) || a.name.localeCompare(b.name)).slice(0, 40);
+  P[id] = { list, hi: 0 };
+  box.innerHTML = list.length
+    ? list.map((j, i) => `<div class="${i === 0 ? 'hi' : ''}" onmousedown="event.preventDefault();cjChoose('${id}',${j.id})"><span>${esc(j.name)}</span><span class="g">${esc(j.company || '')}</span></div>`).join('')
+    : '<div class="none">no cash or bank journal matches</div>';
+  box.className = 'pick-list on';
+}
+function cjKey(e, id) {
+  const box = document.getElementById(id + '-list');
+  if (e.key === 'Escape') { if (box.className.includes('on')) e.stopPropagation(); box.className = 'pick-list'; return; }
+  if (e.key === 'ArrowDown' && !box.className.includes('on')) { e.preventDefault(); cjFilter(id); return; }
+  const st = P[id]; if (!st) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!st.list.length) return;
+    e.preventDefault();
+    st.hi = Math.min(st.list.length - 1, Math.max(0, st.hi + (e.key === 'ArrowDown' ? 1 : -1)));
+    [...box.children].forEach((c, i) => c.className = i === st.hi ? 'hi' : '');
+    const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') { e.preventDefault(); if (!box.className.includes('on') || !st.list.length) return; cjChoose(id, st.list[st.hi].id); }
+}
+function cjChoose(id, jid) {
+  const j = journals.find(x => x.id === jid); if (!j) return;
+  const hidden = document.getElementById(id), txt = document.getElementById(id + '-txt');
+  hidden.value = j.id; txt.value = j.name; P[id] = null;
+  document.getElementById(id + '-list').className = 'pick-list';
+  saveCashJournal(hidden.dataset.row, j, txt);
+}
+function cjBlur(id) {
+  setTimeout(() => {
+    const txt = document.getElementById(id + '-txt'), hidden = document.getElementById(id); if (!txt || !hidden) return;
+    document.getElementById(id + '-list').className = 'pick-list';
+    const row = tx.find(x => x.id === hidden.dataset.row); if (!row) return;
+    const cur = cashOf(row);
+    if (!txt.value.trim()) { if (cur) cjClear(row.id); return; }
+    const exact = cjList().find(j => norm(j.name) === norm(txt.value));
+    if (exact) { if (!cur || exact.id !== cur.id) cjChoose(id, exact.id); return; }
+    txt.value = cur ? cur.name : '';   // no such journal: snap back
+  }, 160);
+}
+// the journal the money went to (or came from) — and, when one of our hub accounts mirrors that
+// journal, the row keeps that account too, so booking still knows which box (Mario, 2026-09-09)
+async function saveCashJournal(rowId, j, el) {
+  const t = tx.find(x => x.id === rowId); if (!t) return;
+  const own = accounts.find(a => a.id !== acc && (a.odooJournals || []).some(x => +x.id === j.id));
+  const data = { partnerKind: 'cash', cashJournalId: j.id, cashJournalName: j.name, cashJournalCompany: j.company || '', cashAccountId: own ? own.id : null, partnerId: null, partnerName: '', partnerSrc: '' };
+  Object.assign(t, data);
+  if (el) { el.classList.add('dirty'); mark(el, 'manual'); }
+  try { await patch(rowId, data); if (el) flash(el, true); say('Cash side: ' + j.name); render(); }
+  catch (e) { if (el) flash(el, false); say('Could not save: ' + e.message, 'err'); }
+}
+async function cjClear(rowId) {
+  const t = tx.find(x => x.id === rowId); if (!t) return;
+  const data = { cashJournalId: null, cashJournalName: '', cashJournalCompany: '', cashAccountId: null, partnerKind: t.partnerId ? 'partner' : '' };
+  Object.assign(t, data);
+  try { await patch(rowId, data); say('Cash side cleared'); render(); }
+  catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 
 // ── Saving ──
@@ -2673,7 +2790,7 @@ It is created for every company — ${co.name} on this line is only what makes i
 }
 async function savePartner(id, p, src, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
-  const data = p ? { partnerId: p.id, partnerName: p.name, partnerSrc: src } : { partnerId: null, partnerName: '', partnerSrc: '' };
+  const data = p ? { partnerId: p.id, partnerName: p.name, partnerSrc: src, partnerKind: 'partner', cashJournalId: null, cashJournalName: '', cashJournalCompany: '', cashAccountId: null } : { partnerId: null, partnerName: '', partnerSrc: '' };
   Object.assign(t, data);
   if (el) { el.classList.add('dirty'); mark(el, p ? src : ''); }
   try { await patch(id, data); if (el) flash(el, true); say(p ? `Partner: ${p.name}` : 'Partner cleared'); render(); }
