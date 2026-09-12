@@ -73,6 +73,9 @@
   .btn,button.btn{background:var(--surface0);border-color:var(--surface1);} .btn:hover:not(:disabled){border-color:var(--amber);}
   .btn.primary,button.primary{background:var(--amber);border-color:var(--amber);color:var(--crust);}
   ::placeholder{color:var(--overlay0);} hr{border-color:var(--surface0);}
+
+  /* phone: the bar is one swipeable row, not a stack (2026-09-12) */
+  @media (max-width:560px){ .bar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:6px;padding:6px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none;} .bar::-webkit-scrollbar{display:none;} .bar > *{flex:0 0 auto;} .bar select,.bar input{max-width:44vw;} }
 </style>
 </head>
 <body>
