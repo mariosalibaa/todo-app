@@ -443,7 +443,9 @@ function pairUp(rows, targets, opts) {
   const pairs = [];
   for (const r of rows) for (const o of targets) {
     if (taken.has(o.id) || !sameDir(r, o)) continue;
-    const d = days(r.date, o.date); if (d > maxDays) continue;
+    // a twin born from a dated message (WhatsApp / site) is exact about its day: same day only —
+    // otherwise "200$ from mario" on the 7th swallowed the separate 200$ on the 10th (Mario, 2026-09-12)
+    const d = days(r.date, o.date); if (d > ((o.src === 'whatsapp' || o.src === 'site') ? 0 : maxDays)) continue;
     const a = amt(r), b = amt(o), diff = Math.abs(a - b);
     if (diff < 0.011) pairs.push({ r, o, d, w: 0 });
     else if (loose && diff <= Math.max(1, a * 0.1)) {
