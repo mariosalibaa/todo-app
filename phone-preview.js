@@ -5,6 +5,8 @@
    Never mounts inside the preview itself (no phones in phones). */
 (function () {
   if (window.top !== window.self) return;          // we are the preview
+  // on an actual phone or tablet there is nothing to preview (Mario, 2026-09-12: no 📱 button on the mobile)
+  if (matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 700) return;
   if (window.__phonePreview) return;
   window.__phonePreview = true;
   // budget.html and todo.html ship their own preview (budget has a separate
