@@ -55,7 +55,7 @@
   td.src-manual input,td.src-manual select{background:var(--manual-bg);}
   td.src-odoo input,td.src-odoo select,td.src-odoo{color:var(--odoo);font-weight:600;}
   tr.personal td.src-auto input,tr.personal td.src-auto select{color:var(--overlay0);}
-  .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:16%;white-space:normal;} .c-partner{width:10%;} .c-cash{width:10%;} .c-company{width:8%;} .c-proj{width:11%;} td.num,th.num{width:6.5%;} .c-odoo{width:12%;}
+  .c-date{width:9%;} .c-acct{width:8%;} .c-acct a{cursor:pointer;color:var(--link,#5b3d6e);text-decoration:none;} .c-acct a:hover{text-decoration:underline;} .c-desc{width:16%;white-space:normal;} .c-partner{width:10%;} .c-cash{width:10%;} .c-company{width:8%;} .c-proj{width:11%;} td.num,th.num{width:6.5%;} .c-odoo{width:10%;} .c-recon{width:6%;font-size:12px;white-space:nowrap;} td.c-recon.yes{color:var(--green);} td.c-recon.no{color:var(--odoo,#e0a04a);} td.c-recon:not(.yes):not(.no){color:var(--muted);}
   /* ☑ Reviewed: the box, then the stamp under it */
   .c-rev{width:7%;} .c-rev label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;}
   .c-rev input{width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--green);}
@@ -241,7 +241,8 @@
     #rows td.c-proj{grid-column:1/-1;grid-row:6;}
     #rows td.c-type{grid-column:1/-1;grid-row:7;}
     #rows td.c-odoo{grid-column:1/-1;grid-row:8;font-size:12px;}
-    #rows td.c-rev{grid-column:1/-1;grid-row:9;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
+    #rows td.c-recon{grid-column:1/-1;grid-row:9;}
+    #rows td.c-rev{grid-column:1/-1;grid-row:10;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
     #rows td.c-rev label{font-size:15px;} #rows td.c-rev input{width:20px;height:20px;} #rows td.c-rev .hint br{display:none;}
     /* the ref and the source chips read as one quiet line, not a stack of fragments */
     #rows td.c-date .ref{white-space:normal;word-break:normal;}
@@ -681,6 +682,14 @@ function cashOf(t) {
   return j ? { id: j.id, name: j.name, company: j.company || '', derived: true } : { id: null, name: a.name, company: '', derived: true };
 }
 // a payment that names neither a partner nor a cash/bank journal is not justified yet
+// yes = the Odoo payment this line matches is reconciled with a bill or invoice (or the hub booked it paid);
+// no = it sits in Odoo unreconciled; '' = not in Odoo at all
+function reconOf(t) {
+  const won = t.odoo && (t.odoo.matches || []).find(x => x.chosen);
+  if (won) return (won.docs || []).some(d => !/^P(CSH|SETT|BNK)/.test(d)) ? 'yes' : 'no';
+  if (t.bookedMove && t.bookedMove.id) return t.bookedMove.paymentState === 'paid' || t.bookedMove.paymentState === 'in_payment' ? 'yes' : 'no';
+  return '';
+}
 const unjustified = t => !t.excluded && !!(t.debit || t.credit) && !partnerShown(t) && !t.partnerText && !cashOf(t);
 
 // ── Columns: the first five are the statement as printed (or the Odoo line), then what we add ──
@@ -698,8 +707,12 @@ const ALL_COLS = [
   { k: 'partner', l: 'Partner',               f: 'text',   v: t => partnerShown(t), c: 'c-partner' },
   { k: 'cash',    l: 'Cash / bank',           f: 'text',   v: t => (cashOf(t) || {}).name || '', c: 'c-cash' },
   { k: 'company', l: 'Company',               f: 'select', v: t => companyOf(t), c: 'c-company' },
-  { k: 'proj',    l: 'Analytic (Odoo)',       f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
+  // "Project" (Mario, 2026-09-12): the analytic account the payment belongs to. Until the payment is reconciled
+  // it is the project's only trace of the money; once reconciled, the bill or invoice carries the analytic and
+  // the hub shows the amount just once — the Reconciled column says which state a line is in.
+  { k: 'proj',    l: 'Project',               f: 'text',   v: t => t.analyticName || '', c: 'c-proj' },
   { k: 'odoo',    l: 'Odoo',                  f: 'odoo',   v: t => !t.odoo ? -1 : (t.odoo.matches || []).length, c: 'c-odoo' },
+  { k: 'recon',   l: 'Reconciled',            f: 'select', v: t => reconOf(t), c: 'c-recon' },
   // ☑ a person looked at the line: the box, then when and who (stamped by the server, in the log)
   { k: 'reviewed', l: 'Reviewed',             f: 'select', v: t => t.reviewed ? 'yes' : '', c: 'c-rev' },
 ];
@@ -1661,6 +1674,7 @@ function render() {
         ${t.projectFrom && t.analyticName && t.analyticSrc !== 'manual' ? `<div class="sug-act" title="${esc('Not written in the sheet: taken from the ' + t.projectFrom + '. ✓ keeps it, ✕ clears it so you pick one.')}"><span class="sug-why">from the ${esc(t.projectFrom)}</span> <button class="yes" onclick="confirmAnalytic('${t.id}', true)">✓</button><button class="no" onclick="confirmAnalytic('${t.id}', false)">✕</button></div>` : ''}
       </td>`}
       <td class="c-odoo">${odooCell(t)}</td>
+      ${(() => { const r = reconOf(t); return `<td class="c-recon ${r}" title="${r === 'yes' ? 'Reconciled in Odoo with a bill or invoice — the project cost is on that document' : r === 'no' ? 'In Odoo but not yet reconciled — the project shows this payment until it is' : 'Not in Odoo'}">${r === 'yes' ? '✓ reconciled' : r === 'no' ? '○ open' : '—'}</td>`; })()}
       <td class="c-rev${t.reviewed ? ' on' : ''}" title="${t.reviewed ? esc('Reviewed ' + stamp(t.reviewedAt) + ' by ' + (t.reviewedBy || '?')) : 'Tick when you have looked at this line — the time and your name are kept, and it goes in the log'}">
         <label><input type="checkbox" ${t.reviewed ? 'checked' : ''} onchange="setReviewed('${t.id}', this.checked, this)"> ${t.reviewed ? 'reviewed' : 'review'}</label>
         ${t.reviewed ? `<div class="hint">${esc(stamp(t.reviewedAt))}<br>${esc(shortWho(t.reviewedBy))}</div>` : ''}
@@ -2032,9 +2046,9 @@ function printView() {
     ['Description', t => esc([t.service, t.description, contactName(t).name].filter(Boolean).join(' · ')) + (t.note ? `<div class="s">${esc(t.note)}</div>` : '')],
     ['Debit', t => fmt(t.debit), 'n'], ['Credit', t => fmt(t.credit), 'n'], ['Balance', t => fmt(isStatement() ? t.balance : t._bal), 'n'],
     ['Partner', t => esc(partnerShown(t) || t.partnerText || '')], ['Cash / bank', t => esc((cashOf(t) || {}).name || '')],
-    ['Company', t => esc(companyOf(t))], ['Analytic', t => esc(t.analyticName || t.analyticText || '')],
+    ['Company', t => esc(companyOf(t))], ['Project', t => esc(t.analyticName || t.analyticText || '')],
     ['Odoo', t => esc((t.odoo && (t.odoo.matches || []).filter(x => x.chosen).map(x => x.name).join(', ')) || '')],
-    ['Reviewed', t => t.reviewed ? '✓' : ''],
+    ['Reconciled', t => reconOf(t)], ['Reviewed', t => t.reviewed ? '✓' : ''],
   ];
   const deb = all.reduce((s, t) => s + (+t.debit || 0), 0), cre = all.reduce((s, t) => s + (+t.credit || 0), 0);
   const body = all.map(t => `<tr${t.excluded ? ' class="x"' : ''}>${cols.map(c => `<td class="${c[2] || ''}">${c[1](t)}</td>`).join('')}</tr>`).join('');
