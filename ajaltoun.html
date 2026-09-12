@@ -87,9 +87,11 @@
   .vbody{flex:1;overflow:auto;padding:12px;} .vbody canvas,.vbody img{display:block;margin:0 auto 12px;max-width:100%;height:auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.5);}
   .vstatus{color:var(--overlay0);font-size:.85rem;text-align:center;padding:40px 0;}
   /* tabs, plan table, edit dialog */
-  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--surface0);margin:0 0 18px;}
-  .tabs a{padding:9px 16px;color:var(--sub);text-decoration:none;font-size:.9rem;border-bottom:2px solid transparent;margin-bottom:-1px;}
-  .tabs a.on{color:var(--amber);border-bottom-color:var(--amber);font-weight:600;} .tabs a:hover{color:var(--text);}
+  /* the tabs live in the sticky header (saves vertical space, always reachable while scrolling) */
+  .tabs{display:flex;gap:2px;margin:0 auto;}
+  .tabs a{padding:8px 14px;color:var(--sub);text-decoration:none;font-size:.88rem;border-radius:8px;white-space:nowrap;}
+  .tabs a.on{color:var(--amber);background:rgba(242,169,59,.1);font-weight:600;} .tabs a:hover{color:var(--text);}
+  @media (max-width:700px){.tabs a{padding:6px 9px;font-size:.8rem;}}
   .lang button{background:none;border:1px solid var(--surface0);color:var(--sub);font-size:.75rem;padding:4px 11px;cursor:pointer;}
   .lang button:first-child{border-radius:6px 0 0 6px;} .lang button:last-child{border-radius:0 6px 6px 0;margin-left:-1px;} .lang button.on{background:var(--amber);border-color:var(--amber);color:var(--base);font-weight:600;}
   table.plan td:first-child{min-width:260px;} table.plan tr.grp td{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);padding-top:14px;border-bottom:0;}
@@ -106,6 +108,7 @@
     <a class="hback" href="/admin?stay">&lsaquo; Back</a>
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
   </div>
+  <nav class="tabs" id="tabs"></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -191,7 +194,8 @@ function compute() {
 
 function render() {
   const root = document.getElementById('app');
-  root.innerHTML = `<div class="tabs">${[['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('')}</div><div id="tab"></div>`;
+  document.getElementById('tabs').innerHTML = [['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('');
+  root.innerHTML = `<div id="tab"></div>`;
   history.replaceState(null, '', '#' + TAB);
   const app = document.getElementById('tab');
   if (TAB === 'budget') return Plan.renderBudget(app);
