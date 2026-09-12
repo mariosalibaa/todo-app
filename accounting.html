@@ -582,7 +582,7 @@ const isCash = () => !!(account && account.type === 'cash');
 // ── Columns: the first five are the statement as printed (or the Odoo line), then what we add ──
 // `only` limits a column to one account type: who physically paid matters for a wallet, not for a bank.
 const ALL_COLS = [
-  { k: 'date',    l: 'Date / ref',            f: 'text',   v: t => t.date + ' ' + (t.ref || ''), c: 'c-date' },
+  { k: 'date',    l: 'Date / ref',            f: 'date',   v: t => t.date + ' ' + (t.ref || ''), c: 'c-date' },
   { k: 'acct',    l: 'Account',               f: 'select', v: t => t._accName || '', c: 'c-acct', only: 'all' },
   { k: 'desc',    l: 'Description',           f: 'text',   v: t => [t.service, t.description, contactName(t).name, t.note].filter(Boolean).join(' '), c: 'c-desc' },
   { k: 'type',    l: 'Type',                  f: 'select', v: t => t.nature || '', c: 'c-type', only: 'ledger' },
@@ -1107,6 +1107,7 @@ function buildHeader() {
     const on = colF[c.k] ? 'on' : '';
     if (c.f === 'text') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="filter" oninput="setFilter('${c.k}', this.value)"></th>`;
     if (c.f === 'amount') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="=, >, <, a-b" title="150  ·  >100  ·  <50  ·  100-200" oninput="setFilter('${c.k}', this.value)"></th>`;
+    if (c.f === 'date') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="day, month, from..to" title="3/9  ·  2026-09-03  ·  09/2026  ·  1/9..9/9  ·  >1/9  ·  <5/9  ·  today  ·  or a ref like BILL/2026/09" oninput="setFilter('${c.k}', this.value)"></th>`;
     if (c.f === 'odoo') return `<th><select class="${on}" onchange="setFilter('${c.k}', this.value)">
         <option value="">all</option><option value="found" ${colF[c.k] === 'found' ? 'selected' : ''}>found</option>
         <option value="none" ${colF[c.k] === 'none' ? 'selected' : ''}>not found</option><option value="unchecked" ${colF[c.k] === 'unchecked' ? 'selected' : ''}>unchecked</option></select></th>`;
@@ -1142,6 +1143,32 @@ let _byId = null, _byIdOf = null;
 const byId = id => { if (_byIdOf !== tx) { _byId = new Map(tx.map(x => [x.id, x])); _byIdOf = tx; } return _byId.get(id); };
 const foldedDup = t => (t.src === 'whatsapp' || t.src === 'site') && t.excluded && t.dupOf && t.dupSrc !== 'manual'
   && (o => !!(o && (o.reviewed || o.reviewedAt || o.ref || o.bookedMove)))(byId(t.dupOf));
+// The Date column's box reads dates the way Mario types them: 3/9, 03-09, 2026-09-03, a month
+// (09/2026, 2026-09), a range (1/9..9/9, 1/9 - 9/9), >1/9 or <5/9, today / yesterday. Anything
+// that is not a date still matches the ref text (BILL/2026/09/0016). (Mario, 2026-09-12)
+function parseDay(s, end) {
+  s = String(s || '').trim().toLowerCase();
+  const pad = n => String(n).padStart(2, '0'), Y = new Date().getFullYear();
+  const today = (d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10))(new Date());
+  if (s === 'today') return [today, today];
+  if (s === 'yesterday') { const d = new Date(Date.parse(today + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10); return [d, d]; }
+  let m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) { const d = `${m[1]}-${pad(m[2])}-${pad(m[3])}`; return [d, d]; }
+  if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) { const d = `${m[3]}-${pad(m[2])}-${pad(m[1])}`; return [d, d]; }
+  if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})$/))) { const d = `${Y}-${pad(m[2])}-${pad(m[1])}`; return [d, d]; }        // 3/9 = 3 September this year
+  if ((m = s.match(/^(\d{4})-(\d{1,2})$/))) { const a = `${m[1]}-${pad(m[2])}`; return [a + '-01', a + '-31']; }
+  if ((m = s.match(/^(\d{1,2})[\/.-](\d{4})$/))) { const a = `${m[2]}-${pad(m[1])}`; return [a + '-01', a + '-31']; }
+  if ((m = s.match(/^((?:19|20)\d{2})$/))) return [m[1] + '-01-01', m[1] + '-12-31'];   // a bare year; 0016 is a ref, not a year
+  return null;
+}
+function dateMatch(t, f) {
+  f = f.trim(); let m, r;
+  if ((m = f.match(/^(.+?)\s*(?:\.\.|\s-\s|→|>)\s*(.+)$/)) && parseDay(m[1]) && parseDay(m[2])) return t.date >= parseDay(m[1])[0] && t.date <= parseDay(m[2])[1];
+  if ((m = f.match(/^>=?\s*(.+)$/)) && (r = parseDay(m[1]))) return t.date >= r[0];
+  if ((m = f.match(/^<=?\s*(.+)$/)) && (r = parseDay(m[1]))) return t.date <= r[1];
+  if ((r = parseDay(f))) return t.date >= r[0] && t.date <= r[1];
+  return (t.date + ' ' + (t.ref || '')).toLowerCase().includes(f.toLowerCase());
+}
 function passes(t) {
   if (sugFilter !== 'skipped' && foldedDup(t)) return false;
   if (sugFilter && sugState(t) !== sugFilter && !(sugFilter === 'pending' && !t.excluded && ((t.projectFrom && t.analyticName && t.analyticSrc !== 'manual') || asks(t)))) return false;
@@ -1152,6 +1179,7 @@ function passes(t) {
     else if (c.f === 'select') { if (f === '__unset' ? !!v : v !== f) return false; }
     else if (c.f === 'odoo') { if (f === 'found' ? v <= 0 : f === 'none' ? v !== 0 : v !== -1) return false; }
     else if (c.f === 'amount') { if (!amountMatch(v, f)) return false; }
+    else if (c.f === 'date') { if (!dateMatch(t, f)) return false; }
   }
   return true;
 }
