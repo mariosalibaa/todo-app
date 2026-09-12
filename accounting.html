@@ -14,6 +14,7 @@
   html,body{height:100%;}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
   .top,.bar,.msg,.legend{flex:none;}
+  .top .hback{color:var(--amber,#F2A93B);text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px;opacity:1;} .top .hback:hover{background:rgba(255,255,255,.1);}
   .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;}
   .top a{color:#fff;text-decoration:none;opacity:.85;}
   .top .brand{font-weight:600;font-size:14px;}
@@ -336,7 +337,7 @@
 </head>
 <body>
 <div class="top">
-  <a href="/accounting" title="Accounting">‹</a>
+  <a class="hback" href="/accounting" title="Accounting">&lsaquo; Back</a>
   <a href="/admin" title="Shift Hub">⌂</a>
   <span class="brand">Accounting</span>
   <span style="opacity:.6">›</span>
@@ -905,7 +906,7 @@ async function loadWaSince(periodSince) {
   // never before the grid's own window: the carry below already counts what is earlier
   const since = periodSince && periodSince > from ? periodSince : from;
   try {
-    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx?since=${since}&src=whatsapp&carry=0`);
+    const r = await Admin.api('GET', `/api/accounting/accounts/${acc}/tx?since=${since}&src=whatsapp,site&carry=0`);
     const have = new Set(tx.map(t => t.id));
     let n = 0;
     for (const t of (Array.isArray(r) ? r : r.tx || [])) if (!have.has(t.id)) { tx.push(t); n++; }
@@ -926,7 +927,7 @@ async function ensureSources(keys) {
   say('');
   computeBalances();
 }
-const HIDDEN_SRCS = ['odoo', 'whatsapp', 'telegram', 'transfer'];
+const HIDDEN_SRCS = ['odoo', 'whatsapp', 'telegram', 'transfer', 'site'];
 async function setPeriod(p) {
   if (!PERIODS[p]) return;
   period = p; localStorage.setItem('acct_period', p);
@@ -1430,7 +1431,8 @@ function render() {
     const onlyFlag = t.src === 'odoo' && t.odooOnly && t.excluded ? `<div class="flag" title="Booked in Odoo on this person's cash journal, but no row of the Excel ledger matches it. Not counted: the Excel is the account.">🟣 not in Excel</div>` : '';
     const reviewFlag = t.review ? `<div class="flag" title="Read from WhatsApp; matches nothing in the Excel ledger or in Odoo. Not counted — click ✓ accept to count it, or 🗑 to drop it.">❓ not in Excel / Odoo</div>` : '';
     // nothing read off WhatsApp reaches Odoo or the workbook before Mario presses ✓ (2026-09-08)
-    const waFlag = t.src === 'whatsapp' && !t.waAccepted && !t.excluded && !t.review
+    // a /site post is a proposal the same way (2026-09-12)
+    const waFlag = (t.src === 'whatsapp' || t.src === 'site') && !t.waAccepted && !t.excluded && !t.review
       ? `<div class="flag" title="Read from WhatsApp. It counts on this page, but it is not written to Odoo or to the workbook until you accept it.">✋ waiting for your ✓</div>` : '';
     const acts = st ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>`
       : (t.excluded ? `<a onclick="toggleExcluded('${t.id}', false)" title="${esc(t.dupOf ? 'Not counted: repeats ' + t.dupOf + '. Click to count it.' : t.review ? 'Not counted: nobody wrote this down in the Excel or in Odoo. Click to accept and count it.' : 'Not counted. Click to count it.')}">${t.review ? '✓ accept' : '⊘ count'}</a>`
@@ -1438,16 +1440,18 @@ function render() {
         + (t.kind !== 'transfer' ? `<a onclick="openTransferForm('${t.id}')" title="This line is a transfer between two of your accounts">⇄</a>` : '')
         + (t.src === 'manual' || t.src === 'telegram' ? `<a onclick="openLineForm('${t.id}')" title="Edit">✎</a>` : '')
         + `<a onclick="openLineForm('${t.id}', true)" title="Duplicate this line — a new line filled in like this one, for you to adjust and save">⧉</a>`
-        + (['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '')
+        // a /site post is a proposal the same way (2026-09-12)
+        + (['manual', 'telegram', 'budget', 'excel', 'whatsapp', 'site'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '')
         + (t.src !== 'odoo' && !t.bookedMove ? `<a class="wantbook${t.bookWanted ? ' on' : ''}" onclick="wantBook('${t.id}', ${!t.bookWanted})" title="${t.bookWanted ? 'Waiting to be booked — click to take it off the list' : 'Ask for this line to be booked in Odoo. Nothing is written until it is approved on the laptop.'}">📗</a>` : '')
-        + (t.src === 'whatsapp' && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this WhatsApp line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
-        + (t.src === 'whatsapp' && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
+        + ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this proposed line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
+        + ((t.src === 'whatsapp' || t.src === 'site') && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + '';   // the line's paper is listed by name in the Odoo column now, not counted here
     return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}">
       <td class="c-date">${t.src === 'excel' ? datePick(t, "The day this row falls on, in the workbook", `saveSheet('${t.id}', 'date', this.value, this.parentNode)`)
         // a line a person typed, or one read off WhatsApp, can be moved to its right day: the
         // receipt is often photographed days after it was paid (Mario, 2026-09-09)
-        : ['manual', 'telegram', 'whatsapp', 'budget'].includes(t.src) && !t.bookedMove ? datePick(t, "The day this line falls on. Change it and the line moves to that day.", `saveDate('${t.id}', this.value, this.parentNode)`)
+        // a /site post is a proposal the same way (2026-09-12)
+        : ['manual', 'telegram', 'whatsapp', 'budget', 'site'].includes(t.src) && !t.bookedMove ? datePick(t, "The day this line falls on. Change it and the line moves to that day.", `saveDate('${t.id}', this.value, this.parentNode)`)
         : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
       ${!isAll() ? '' : `<td class="c-acct"><a onclick="selectAccount('${esc(t._acc || '')}')" title="Open ${esc(t._accName || '')} on its own">${esc(t._accName || '')}</a>${t._accCur ? `<div class="ref">${esc(t._accCur)}</div>` : ''}</td>`}
       <td class="c-desc" title="${esc(t.description)}">
@@ -1509,7 +1513,7 @@ function render() {
   // the count, broken down by where the lines came from, and which of them move the balance
   const bySrc = {}, countedBy = {};
   for (const t of tx) { const k = t.src || 'manual'; bySrc[k] = (bySrc[k] || 0) + 1; if (!t.excluded) countedBy[k] = (countedBy[k] || 0) + 1; }
-  const ORDER = ['excel', 'odoo', 'whatsapp', 'budget', 'transfer', 'telegram', 'manual'];
+  const ORDER = ['excel', 'odoo', 'whatsapp', 'site', 'budget', 'transfer', 'telegram', 'manual'];
   // a source not fetched yet (Odoo, WhatsApp… behind an Excel-kept account) keeps its chip, so it can be clicked open
   const unloaded = k => loadedSrc && !loadedSrc.has(k) && HIDDEN_SRCS.includes(k) && !(k === 'transfer' && !account.odooPartner);
   const chips = ORDER.filter(k => bySrc[k] || unloaded(k)).map(k => {
@@ -1533,7 +1537,7 @@ function render() {
       : ` · <a class="srctog off" onclick="setPeriod('all')" title="${esc(`${before.count} lines before ${sinceOf(period)} (from ${before.first}) are not loaded; their balance is carried. Click to load everything.`)}">+${before.count} earlier</a>`)
     : '';
   rc.innerHTML = tx.length ? chips + (all.length !== tx.length ? ` · ${all.length} shown` : '') + earlier : (earlier ? earlier.replace(/^ · /, '') : '');
-  const parts = [['excel', 'Excel rows'], ['whatsapp', 'WhatsApp messages'], ['odoo', 'Odoo entries'], ['budget', 'HomeBudget rows'], ['transfer', 'transfer lines'], ['telegram', 'Telegram lines'], ['manual', 'lines typed here']]
+  const parts = [['excel', 'Excel rows'], ['whatsapp', 'WhatsApp messages'], ['site', 'posts on /site'], ['odoo', 'Odoo entries'], ['budget', 'HomeBudget rows'], ['transfer', 'transfer lines'], ['telegram', 'Telegram lines'], ['manual', 'lines typed here']]
     .filter(([k]) => bySrc[k]).map(([k, l]) => `${bySrc[k]} ${l}`);
   const hidden = tx.length - all.length;
   rc.title = tx.length ? [
@@ -1743,7 +1747,8 @@ function openStmt() {
   const all = tx.filter(t => !t.excluded && !t._ts && t.period !== 'old').sort(dayOrder);
   const rows = all.filter(t => (!from || t.date >= from) && (!to || t.date <= to));
   const hidden = all.length - rows.length;
-  const waiting = rows.filter(t => t.src === 'whatsapp' && t.waAccepted !== true).length;
+  // a /site post is a proposal the same way (2026-09-12)
+  const waiting = rows.filter(t => (t.src === 'whatsapp' || t.src === 'site') && t.waAccepted !== true).length;
   const a = -closing();                                   // the account as it stands right now
   const own = account.owner || '';
   // The block is screenshotted and sent over WhatsApp on a phone held upright, so it has to be

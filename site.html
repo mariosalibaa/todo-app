@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e"><title>Site · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><link rel="manifest" href="/manifest.json">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1rem;}
+  .wordmark span{color:var(--amber);}
+  a.wordmark{color:inherit;text-decoration:none;}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:760px;margin:0 auto;padding:0 0 120px;}
+  .threads{position:relative;padding:12px 16px;border-bottom:1px solid var(--surface0);}
+  .threads .pick{width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--mantle);border:1px solid var(--amber);color:var(--amber);border-radius:12px;padding:10px 14px;font-size:.95rem;font-weight:600;cursor:pointer;font-family:inherit;}
+  .threads .pick small{color:var(--overlay0);font-weight:400;font-size:.8rem;}
+  .threads .menu{position:absolute;left:16px;right:16px;top:calc(100% - 6px);z-index:60;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.45);overflow:hidden;}
+  .threads .menu input{width:100%;box-sizing:border-box;background:var(--base);border:0;border-bottom:1px solid var(--surface0);color:var(--text);padding:10px 14px;font-size:.95rem;font-family:inherit;outline:none;}
+  .threads .menu ul{list-style:none;margin:0;padding:6px 0;max-height:50vh;overflow-y:auto;}
+  .threads .menu li{padding:9px 14px;cursor:pointer;font-size:.9rem;} .threads .menu li:hover,.threads .menu li.hi{background:var(--surface0);} .threads .menu li.on{color:var(--amber);}
+  .feed{padding:12px 16px;display:flex;flex-direction:column;gap:10px;overflow-x:hidden;}
+  .post{max-width:88%;background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:10px 12px;font-size:.9rem;}
+  .post.me{align-self:flex-end;border-color:#4a3e26;}
+  .post .meta{font-size:.68rem;color:var(--overlay0);margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;}
+  .post img,.post video{max-width:100%;border-radius:10px;display:block;}
+  .post .line{font-size:.72rem;margin-top:6px;padding:4px 8px;border-radius:8px;background:#3b3220;color:var(--amber);}
+  .post .line.accepted{background:#26352a;color:var(--green);} .post .line.dismissed{background:#3a2630;color:#f38ba8;}
+  .post .line a{color:inherit;}
+  .post .err{font-size:.72rem;color:#f38ba8;margin-top:4px;}
+  .day{align-self:center;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay0);margin:8px 0 2px;}
+  .composer{position:fixed;bottom:0;left:0;right:0;z-index:890;background:var(--mantle);border-top:1px solid var(--surface0);padding:10px 12px calc(10px + env(safe-area-inset-bottom));}
+  /* Mario, 2026-09-12: the composer sits below the phone-preview button (z-index 900);
+     at narrow widths the button would land on top of the composer row, so push it up instead. */
+  body.has-composer .pp-btn{ bottom: 84px; }
+  .composer .row{max-width:760px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;}
+  .composer textarea{flex:1;min-height:42px;max-height:140px;resize:none;background:var(--crust,#11111b);color:var(--text);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;font:inherit;}
+  .composer textarea:disabled{opacity:.5;}
+  .composer button{background:var(--surface0);border:0;color:var(--text);border-radius:12px;width:42px;height:42px;font-size:1.15rem;cursor:pointer;flex:none;}
+  .composer button:disabled{opacity:.4;cursor:default;}
+  .composer button.send{background:var(--amber);color:var(--base);}
+  .composer button.rec{background:#f38ba8;color:var(--base);}
+  .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
+</style></head>
+<body>
+<header><div class="hleft"><a class="hback" href="/admin?stay" title="Back">&lsaquo; Back</a><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>SITE</small></a></div><div class="who" id="who"></div></header>
+<main>
+  <div class="threads" id="threads" hidden></div>
+  <div class="feed" id="feed"><div class="empty">Loading…</div></div>
+</main>
+<div class="composer"><div class="row">
+  <button id="btnphoto" disabled onclick="pick('image/*','photo')" title="Photo">📷</button>
+  <button id="btnvideo" disabled onclick="pick('video/*','video')" title="Video">🎬</button>
+  <button id="recbtn" disabled onclick="toggleRec()" title="Voice note">🎤</button>
+  <textarea id="text" disabled placeholder="Write, or talk with Flow" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText();}"></textarea>
+  <button id="btnsend" disabled class="send" onclick="sendText()" title="Send">➤</button>
+</div></div>
+<input type="file" id="file" hidden>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script><script src="/phone-preview.js"></script>
+<script>
+// Mario, 2026-09-12: no background digest on the server any more — the page awaits
+// POST .../digest right after a successful post (Vercel can freeze a function right
+// after the reply), and again once at load for any post whose digest never ran.
+const esc = Admin.esc, el = id => document.getElementById(id);
+let threads = [], cur = '', posts = [], me = null;
+const hhmm = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Beirut' });
+const dayLabel = ymd => new Date(ymd + 'T12:00:00+03:00').toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', weekday: 'long', day: 'numeric', month: 'long' });
+
+function setComposerEnabled(on) {
+  ['text', 'btnsend', 'btnphoto', 'btnvideo', 'recbtn'].forEach(id => el(id).disabled = !on);
+}
+async function loadThreads() {
+  threads = await Admin.api('GET', '/api/site/threads');
+  if (!cur) cur = (location.hash.slice(1) && threads.some(t => t.id === location.hash.slice(1))) ? location.hash.slice(1) : (threads[0] || {}).id || '';
+  const c = threads.find(t => t.id === cur) || {};
+  el('threads').innerHTML = `<button class="pick" onclick="toggleMenu()">${esc(c.name || 'Pick a thread')}<small>${threads.length} threads ▾</small></button>`;
+  el('threads').hidden = threads.length < 2;
+  setComposerEnabled(!!cur);
+}
+function open_(id) { cur = id; location.hash = id; closeMenu(); loadThreads(); loadPosts(); }
+// Mario, 2026-09-12: pills overflowed on the phone; one picker + search instead
+function closeMenu() { const m = document.querySelector('.threads .menu'); if (m) m.remove(); }
+function toggleMenu() {
+  if (document.querySelector('.threads .menu')) return closeMenu();
+  const m = document.createElement('div'); m.className = 'menu';
+  m.innerHTML = '<input placeholder="Search…" autocomplete="off"><ul></ul>';
+  el('threads').appendChild(m);
+  const inp = m.querySelector('input'), ul = m.querySelector('ul');
+  let hi = 0;
+  const list = () => threads.filter(t => t.name.toLowerCase().includes(inp.value.trim().toLowerCase()));
+  const draw_ = () => { const L = list(); hi = Math.min(hi, Math.max(0, L.length - 1));
+    ul.innerHTML = L.map((t, i) => `<li class="${t.id === cur ? 'on' : ''}${i === hi ? ' hi' : ''}" onmousedown="open_('${t.id}')">${esc(t.name)}</li>`).join('') || '<li style="color:var(--overlay0)">No match</li>'; };
+  inp.oninput = () => { hi = 0; draw_(); };
+  inp.onkeydown = e => { const L = list();
+    if (e.key === 'ArrowDown') { hi = Math.min(hi + 1, L.length - 1); draw_(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { hi = Math.max(hi - 1, 0); draw_(); e.preventDefault(); }
+    else if (e.key === 'Enter' && L[hi]) open_(L[hi].id);
+    else if (e.key === 'Escape') closeMenu(); };
+  draw_(); inp.focus();
+  setTimeout(() => document.addEventListener('click', function h(e) { if (!m.contains(e.target) && !e.target.closest('.pick')) { closeMenu(); document.removeEventListener('click', h); } }), 0);
+}
+function replacePost(d) { const i = posts.findIndex(p => p.id === d.id); if (i >= 0) posts[i] = d; else posts.push(d); }
+async function digestOne(thread, id) {
+  try { const d = await Admin.api('POST', `/api/site/${thread}/posts/${id}/digest`, {}); if (thread === cur) { replacePost(d); draw(); } }
+  catch (e) {
+    console.error('digest', id, e.message);
+    // Mario, 2026-09-12: don't swallow this — the post needs a visible retry, not a silent stall
+    if (thread === cur) { const p = posts.find(p => p.id === id); if (p) { p.error = 'could not read this post: ' + e.message; draw(); } }
+  }
+}
+async function retry(id) {
+  const p = posts.find(p => p.id === id); if (!p) return;
+  const prevError = p.error;
+  p.error = null; p.digesting = true; draw();
+  try {
+    const d = await Admin.api('POST', `/api/site/${cur}/posts/${id}/digest`, { force: true });
+    replacePost(d); draw();
+  } catch (e) {
+    alert('Could not read this post: ' + e.message);
+    p.digesting = false; p.error = prevError; draw();
+  }
+}
+async function loadPosts() {
+  if (!cur) { el('feed').innerHTML = '<div class="empty">No thread is open to your account yet. Ask Mario.</div>'; setComposerEnabled(false); return; }
+  const r = await Admin.api('GET', `/api/site/${cur}/posts?limit=100`);
+  posts = r.posts; draw();
+  // a digest that never ran (e.g. the phone lost signal), or one that hung mid-way, gets one chance to run now
+  posts.filter(p => !p.error && (!p.digestedAt && !p.digesting || (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3))).forEach(p => digestOne(cur, p.id));
+}
+function lineTag(p) {
+  if (p.error) return `<div class="err">${esc(p.error)} · <a href="#" onclick="retry('${esc(p.id)}');return false;">retry</a></div>`;
+  // Mario, 2026-09-12: a digest that hung (Vercel froze the function, no error ever came back)
+  // shouldn't sit on "reading…" forever — offer the same retry after 2 minutes
+  if (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3) return `<div class="line">reading took too long · <a href="#" onclick="retry('${esc(p.id)}');return false;">retry</a></div>`;
+  if (!p.digestedAt) return `<div class="line">reading…</div>`;
+  if (!p.line) return p.parsed && p.parsed.receipt === false && (p.kind === 'photo' || p.kind === 'video') ? `<div class="line" style="background:#26352a;color:var(--green)">progress photo · <a href="#" onclick="flip('${esc(p.id)}');return false;">this is a receipt</a></div>` : '';
+  const amt = p.parsed && (p.parsed.amount || 0);
+  return `<div class="line ${esc(p.line.state || 'waiting')}">${amt ? amt.toFixed(2) + ' ' + esc(p.parsed.currency || 'USD') + ' · ' : ''}suggested on ${esc(p.line.accountId)} — ${p.line.state === 'accepted' ? 'accepted ✓' : p.line.state === 'dismissed' ? 'dismissed' : 'waiting for Mario\'s ✓'}${(p.kind === 'photo') ? ` · <a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : ''}</div>`;
+}
+function draw() {
+  if (!posts.length) { el('feed').innerHTML = '<div class="empty">Nothing here yet. Write what happened, send a photo, or record.</div>'; return; }
+  let lastDay = '';
+  el('feed').innerHTML = posts.map(p => {
+    const day = p.date !== lastDay ? `<div class="day">${esc(dayLabel(p.date))}</div>` : ''; lastDay = p.date;
+    const mine = p.by === me.email;
+    const body = p.kind === 'photo' ? `<img src="/api/site/${cur}/posts/${p.id}/file" loading="lazy">`
+      : p.kind === 'video' ? `<video src="/api/site/${cur}/posts/${p.id}/file" controls preload="metadata"></video>`
+      : p.kind === 'voice' ? `<audio src="/api/site/${cur}/posts/${p.id}/file" controls></audio>${p.parsed && p.parsed.transcript ? `<div style="margin-top:6px;font-style:italic">${esc(p.parsed.transcript)}</div>` : ''}`
+      : esc(p.text);
+    return `${day}<div class="post ${mine ? 'me' : ''}" data-id="${esc(p.id)}">${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
+  }).join('');
+  window.scrollTo(0, document.body.scrollHeight);
+}
+async function sendText() {
+  const t = el('text').value.trim(); if (!t || !cur) return;
+  el('text').value = '';
+  try {
+    const p = await Admin.api('POST', `/api/site/${cur}/posts`, { kind: 'text', text: t });
+    posts.push(p); draw();
+    await digestOne(cur, p.id);
+  } catch (e) { alert('Could not send: ' + e.message); el('text').value = t; }
+}
+function pick(accept, kind) { const f = el('file'); f.accept = accept; f.capture = kind === 'photo' ? 'environment' : ''; f.onchange = () => sendFile(f.files[0], kind); f.click(); }
+// photos shrink to 1600 px on the phone; a video over 60 s is refused (the spec's phone-side limits)
+async function sendFile(file, kind) {
+  if (!file || !cur) return;
+  let blob = file, mime = file.type, name = file.name;
+  if (kind === 'photo') { blob = await shrink(file, 1600); mime = 'image/jpeg'; name = (name || 'photo').replace(/\.\w+$/, '') + '.jpg'; }
+  if (kind === 'video') { const secs = await duration(file); if (secs > 60) return alert('Keep a video under 60 seconds.'); }
+  if (blob.size > 4e6) return alert('The hub cannot take files over 4 MB yet — a photo is fine, keep videos for later.');
+  const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+  try {
+    const p = await Admin.api('POST', `/api/site/${cur}/posts`, { kind, dataBase64: b64, mime, name });
+    posts.push(p); draw();
+    await digestOne(cur, p.id);
+  } catch (e) { alert('Could not send: ' + e.message); }
+}
+function shrink(file, max) {
+  return new Promise(res => { const img = new Image(); img.onload = () => {
+    const s = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => res(b || file), 'image/jpeg', 0.85); };
+    img.onerror = () => res(file); img.src = URL.createObjectURL(file); });
+}
+function duration(file) { return new Promise(res => { const v = document.createElement('video'); v.preload = 'metadata'; v.onloadedmetadata = () => res(v.duration || 0); v.onerror = () => res(0); v.src = URL.createObjectURL(file); }); }
+let rec = null, chunks = [];
+async function toggleRec() {
+  if (rec) { rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+    rec = new MediaRecorder(stream, { mimeType: mime }); chunks = [];
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); el('recbtn').classList.remove('rec'); const b = new Blob(chunks, { type: mime }); rec = null; sendFile(new File([b], 'voice.' + (mime === 'audio/webm' ? 'webm' : 'm4a'), { type: mime }), 'voice'); };
+    rec.start(); el('recbtn').classList.add('rec');
+  } catch (e) { alert('Microphone not available: ' + e.message); }
+}
+// /flip re-reads the picture the other way (progress ↔ receipt); a 409 means the previous
+// digest is still running — its `error` explains that, so surface it instead of retrying blind
+async function flip(id) {
+  try { const d = await Admin.api('POST', `/api/site/${cur}/posts/${id}/flip`, {}); replacePost(d); draw(); }
+  catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
+}
+Admin.require('site', async m => {
+  me = m;
+  el('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  document.body.classList.add('has-composer');
+  await loadThreads(); await loadPosts();
+});
+</script></body></html>

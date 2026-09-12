@@ -63,8 +63,9 @@ async function summary(ctx, opts = {}) {
     try { odooAtDate = stmtDate ? await odooAt(odooCall, a.odooPartner.id, stmtDate) : null; odooNow = await odooAt(odooCall, a.odooPartner.id, null); }
     catch (e) { odooError = String(e.message || e).slice(0, 90); }
     // waiting for the ✓: read off WhatsApp, counted here, not yet allowed into the sheet or Odoo
+    // a /site post is a proposal the same way (2026-09-12)
     const after = t => !stmtDate || t.date > stmtDate;
-    const pend = txs.filter(t => t.src === 'whatsapp' && !t.waAccepted && after(t) && (!t.excluded || t.review));
+    const pend = txs.filter(t => (t.src === 'whatsapp' || t.src === 'site') && !t.waAccepted && after(t) && (!t.excluded || t.review));
     const review = pend.filter(t => t.review);
     const sheet = local && !opts.fast ? await sheetFigures(a) : null;
     out.push({

@@ -105,7 +105,7 @@ function replacementFor(r) {
   return null;
 }
 
-let retie = 0, clear = 0, ambiguous = 0;
+let retie = 0, clear = 0, ambiguous = 0, held = 0;
 const plan = [];
 for (const r of dead) {
   const f = replacementFor(r);
@@ -149,6 +149,11 @@ for (const p of plan) {
     after = { company: co, ref: p.to.name, odooMoveId: p.to.id };
   } else if (p.many) {
     continue;                                   // several candidates: a person decides
+  } else if (!r.t.noBook && !process.argv.includes('--all')) {
+    // Clearing the link puts the row back in the booking queue, and the next Book months
+    // would post a bill for it. A row already marked noBook cannot be rebooked, so its dead
+    // link goes quietly; a counted row waits for Mario (2026-09-12) unless --all is passed.
+    held++; continue;
   } else {
     // nothing replaced it: stop showing a ✓ that leads nowhere, put the row back in the queue
     data = { bookedMove: admin.firestore.FieldValue.delete(), ref: '',

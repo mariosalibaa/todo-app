@@ -12,6 +12,7 @@
   *{box-sizing:border-box;}
   html,body{height:100%;}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
+  .top .hback{color:var(--amber,#F2A93B);text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px;opacity:1;} .top .hback:hover{background:rgba(255,255,255,.1);}
   .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;flex:none;}
   .top a{color:#fff;text-decoration:none;opacity:.85;} .top .brand{font-weight:600;font-size:14px;} .top .sp{flex:1;} .top .who{font-size:12px;opacity:.85;}
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg);flex:none;}
@@ -48,7 +49,7 @@
 </head>
 <body>
 <div class="top">
-  <a href="/accounting" title="Accounting">‹</a>
+  <a class="hback" href="/accounting" title="Accounting">&lsaquo; Back</a>
   <a href="/admin" title="Shift Hub">⌂</a>
   <span class="brand">Accounting</span>
   <span style="opacity:.6">›</span>

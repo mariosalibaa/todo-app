@@ -159,7 +159,8 @@ async function applyMap(ctx, account) {
 // excel the whatsapp entries before i accept them, for all hub workers") — `waAccepted` is that press.
 const isRow = t => t.src === 'excel'
   || ((t.src === 'manual' || t.src === 'telegram') && !t.excluded && !t.review)
-  || (t.src === 'whatsapp' && !t.excluded && !t.review && t.waAccepted === true);
+  // a /site post is a proposal the same way (2026-09-12)
+  || ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && t.waAccepted === true);
 // `noBook` means this row is deliberately kept out of Odoo — a bill deleted by hand, or a cost
 // booked another way (Ziad's monthly pay, which the timesheet bill carries project by project).
 // The month bills honoured it nowhere, so a Rewrite kept putting such a row back (2026-09-09).

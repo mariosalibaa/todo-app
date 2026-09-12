@@ -11,7 +11,10 @@
   :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
-  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1rem;}
   .wordmark span{color:var(--amber);}
   .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
@@ -48,11 +51,10 @@
 </head>
 <body>
 <header>
-  <div class="wordmark">SHIFT<span>.</span><small>HUB</small></div>
+  <div class="hleft"><a class="hback" href="/accounting" title="Back">&lsaquo; Back</a><div class="wordmark">SHIFT<span>.</span><small>HUB</small></div></div>
   <div class="who" id="who"></div>
 </header>
-<main>
-  <a class="back" href="/accounting">← Accounting</a>
+<main>
   <h1>Statements</h1>
   <p class="lede">Where each man stands: the last statement he received on WhatsApp, whether his workbook, this hub and Odoo still tell the same story, and what has arrived since that is waiting for your ✓. Nothing read off WhatsApp reaches the sheet or Odoo until you accept it.</p>
   <div class="bar">

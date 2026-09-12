@@ -1,7 +1,13 @@
 // Ajaltoun 4193 app — the project's accounts, read straight out of Odoo.
 // Mounted by server.js under /api/ajaltoun/*; needs ctx = { db, TEAM_ID, odooCall, access }.
 //
-//   GET  /api/ajaltoun/data[?fresh=1]   everything the page shows (cached 10 min; fresh = admin re-pull)
+//   GET  /api/ajaltoun/data[?fresh=1]   everything the page shows, from the Odoo SNAPSHOT (fresh = admin re-pull now)
+//
+// Speed (Mario, 2026-09-12): the hub runs on Vercel, so a memory cache dies with the instance and every visit
+// used to re-pull Odoo (9 calls in a row, 10-30 s). The pull now lands in Firestore (ajaltounMeta/snapshot +
+// ajaltounSnap/<n> chunks) and the page renders from there at once. The snapshot is refreshed by the cron
+// (/api/cron/ajaltoun, see server.js + vercel.json), in the background when a visitor finds it older than
+// SNAP_TTL, or on demand with ?fresh=1. Review states and section rules stay live from Firestore.
 //   GET  /api/ajaltoun/file/<attId>      an Odoo attachment (the bill scan), streamed for the viewer
 //   POST /api/ajaltoun/section           { lineId, section, forPartner? }  admin: classify a line (or its whole supplier)
 //   POST /api/ajaltoun/qty                { section, qty, unit }   admin: quantity done so far in a section (for $/unit)
@@ -71,9 +77,77 @@ function readBody(req, limit = 1e6) {
   });
 }
 
-let cache = { at: 0, data: null };
+const SNAP_TTL = 10 * 60e3;          // older than this → serve it, refresh behind
+const CHUNK = 900 * 1024;             // Firestore doc limit is 1 MB
+let cache = { at: 0, data: null };    // per-instance fast path in front of Firestore
+let refreshing = null;                // the in-flight pull, so two visitors never start two
+
+const snapRef = (db, TEAM_ID) => db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('snapshot');
+const snapCol = (db, TEAM_ID) => db.collection('workspaces').doc(TEAM_ID).collection('ajaltounSnap');
+
+async function saveSnapshot(db, TEAM_ID, data, at) {
+  const text = JSON.stringify(data);
+  const parts = []; for (let i = 0; i < text.length; i += CHUNK) parts.push(text.slice(i, i + CHUNK));
+  const batch = db.batch();
+  parts.forEach((p, i) => batch.set(snapCol(db, TEAM_ID).doc(String(i)), { p }));
+  batch.set(snapRef(db, TEAM_ID), { at, parts: parts.length, lines: data.lines.length, bytes: text.length });
+  await batch.commit();
+}
+async function loadSnapshot(db, TEAM_ID) {
+  const h = (await snapRef(db, TEAM_ID).get()).data();
+  if (!h || !h.parts) return null;
+  const docs = await Promise.all(Array.from({ length: h.parts }, (_, i) => snapCol(db, TEAM_ID).doc(String(i)).get()));
+  if (docs.some(d => !d.exists)) return null;
+  return { at: h.at, data: JSON.parse(docs.map(d => d.data().p).join('')) };
+}
+// one pull → memory + Firestore; shared by the page, the cron and the re-pull link
+function refresh(odooCall, db, TEAM_ID) {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    const t0 = Date.now();
+    const data = await pull(odooCall);
+    const at = Date.now();
+    cache = { at, data };
+    await saveSnapshot(db, TEAM_ID, data, at);
+    console.log(`ajaltoun snapshot: ${data.lines.length} lines in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    return cache;
+  })().finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+// sum of a field grouped by one many2one, via read_group (one call instead of paging every journal item);
+// falls back to reading the lines if this Odoo refuses read_group
+async function sumBy(odooCall, domain, groupField, sumField, limit) {
+  try {
+    const rows = await odooCall('account.move.line', 'read_group', [domain, [sumField], [groupField]], { context: CTX, lazy: false });
+    return rows.filter(r => r[groupField]).map(r => ({ key: r[groupField], value: r[sumField] || 0 }));
+  } catch (e) {
+    console.warn('ajaltoun read_group fallback:', e.message);
+    const ls = await odooCall('account.move.line', 'search_read', [domain], { fields: [groupField, sumField], context: CTX, limit });
+    const acc = new Map();
+    for (const l of ls) { if (!l[groupField]) continue; const k = l[groupField][0]; const cur = acc.get(k) || { key: l[groupField], value: 0 }; cur.value += l[sumField]; acc.set(k, cur); }
+    return [...acc.values()];
+  }
+}
 
 async function pull(odooCall) {
+  // The independent reads — cost lines (+ their bills), the sale, the S DEV balances — go out together.
+  const [costs, sale, wallets, apRows] = await Promise.all([pullCosts(odooCall), pullSale(odooCall), pullWallets(odooCall), pullPayables(odooCall)]);
+  const { lines } = costs;
+  const { income } = sale;
+
+  // 5. what is really still owed to suppliers (S DEV exists only for Ajaltoun): the payables ledger, net of payments not yet matched to their bill
+  // (many cash payments were never reconciled with the bill they settle, so a bill's own "paid" flag misleads)
+  const ajPartners = new Set(lines.map(l => l.partnerId).filter(Boolean));
+  const owedBy = {};
+  for (const r of apRows) { if (!ajPartners.has(r.key[0])) continue; owedBy[r.key[1]] = (owedBy[r.key[1]] || 0) + r.value; }
+  const owed = Object.entries(owedBy).filter(([, v]) => v < -0.5).map(([partner, v]) => ({ partner, amount: +(-v).toFixed(2) })).sort((a, b) => b.amount - a.amount);
+  const prepaid = Object.entries(owedBy).filter(([, v]) => v > 0.5).map(([partner, v]) => ({ partner, amount: +v.toFixed(2) }));
+
+  return { pulledAt: now(), lines, income, owed, prepaid, wallets };
+}
+
+async function pullCosts(odooCall) {
   // 1. every analytic line on the seven Ajaltoun accounts
   const raw = await odooCall('account.analytic.line', 'search_read', [[['account_id', 'in', Object.keys(VILLAS).map(Number)]]],
     { fields: ['date', 'name', 'amount', 'partner_id', 'general_account_id', 'company_id', 'account_id', 'move_line_id'], context: CTX, limit: 5000, order: 'date, id' });
@@ -82,10 +156,11 @@ async function pull(odooCall) {
   const mls = mlIds.length ? await odooCall('account.move.line', 'read', [mlIds, ['move_id', 'account_id']], { context: CTX }) : [];
   const moveOf = new Map(mls.map(m => [m.id, m.move_id]));
   const moveIds = [...new Set(mls.map(m => m.move_id && m.move_id[0]).filter(Boolean))];
-  const moves = moveIds.length ? await odooCall('account.move', 'read', [moveIds, ['name', 'ref', 'invoice_date', 'date', 'payment_state', 'amount_total', 'journal_id']], { context: CTX }) : [];
+  const [moves, atts] = moveIds.length ? await Promise.all([
+    odooCall('account.move', 'read', [moveIds, ['name', 'ref', 'invoice_date', 'date', 'payment_state', 'amount_total', 'journal_id']], { context: CTX }),
+    odooCall('ir.attachment', 'search_read', [[['res_model', '=', 'account.move'], ['res_id', 'in', moveIds]]], { fields: ['res_id', 'name', 'mimetype'], context: CTX, limit: 5000 }),
+  ]) : [[], []];
   const moveById = new Map(moves.map(m => [m.id, m]));
-  const atts = moveIds.length ? await odooCall('ir.attachment', 'search_read', [[['res_model', '=', 'account.move'], ['res_id', 'in', moveIds]]],
-    { fields: ['res_id', 'name', 'mimetype'], context: CTX, limit: 5000 }) : [];
   const attsOf = {}; for (const a of atts) (attsOf[a.res_id] = attsOf[a.res_id] || []).push({ id: a.id, name: a.name, mime: a.mimetype });
 
   const lines = [];
@@ -99,35 +174,35 @@ async function pull(odooCall) {
       villa: VILLAS[l.account_id[0]] || l.account_id[1], moveId: move ? move.id : null, moveName: move ? move.name : '', moveRef: move ? move.ref : '',
       paid: move ? move.payment_state : '', files: move ? (attsOf[move.id] || []) : [] });
   }
+  return { lines };
+}
 
+async function pullSale(odooCall) {
   // 3. the sale: U2 to Jean — invoice, instalments, what arrived
-  const inv = await odooCall('account.move', 'search_read', [[['company_id', '=', SDEV], ['move_type', '=', 'out_invoice'], ['state', '=', 'posted']]],
-    { fields: ['name', 'partner_id', 'invoice_date', 'amount_total', 'amount_residual', 'payment_state'], context: CTX });
+  const [inv, pays] = await Promise.all([
+    odooCall('account.move', 'search_read', [[['company_id', '=', SDEV], ['move_type', '=', 'out_invoice'], ['state', '=', 'posted']]],
+      { fields: ['name', 'partner_id', 'invoice_date', 'amount_total', 'amount_residual', 'payment_state'], context: CTX }),
+    odooCall('account.payment', 'search_read', [[['company_id', '=', SDEV], ['payment_type', '=', 'inbound'], ['state', 'in', ['paid', 'posted', 'in_process']]]],
+      { fields: ['date', 'amount', 'partner_id', 'journal_id', 'memo'], context: CTX, order: 'date' }),
+  ]);
   const invIds = inv.map(i => i.id);
   const due = invIds.length ? await odooCall('account.move.line', 'search_read', [[['move_id', 'in', invIds], ['account_type', '=', 'asset_receivable']]],
     { fields: ['move_id', 'date_maturity', 'debit', 'amount_residual'], context: CTX, order: 'date_maturity' }) : [];
-  const pays = await odooCall('account.payment', 'search_read', [[['company_id', '=', SDEV], ['payment_type', '=', 'inbound'], ['state', 'in', ['paid', 'posted', 'in_process']]]],
-    { fields: ['date', 'amount', 'partner_id', 'journal_id', 'memo'], context: CTX, order: 'date' });
   const income = inv.map(i => ({ id: i.id, name: i.name, partner: i.partner_id[1], date: i.invoice_date, total: i.amount_total, residual: i.amount_residual, state: i.payment_state,
     schedule: due.filter(d => d.move_id[0] === i.id).map(d => ({ due: d.date_maturity, amount: d.debit, residual: d.amount_residual })),
     received: pays.filter(p => p.partner_id && p.partner_id[0] === i.partner_id[0]).map(p => ({ date: p.date, amount: p.amount, journal: p.journal_id[1], memo: p.memo })) }));
+  return { income };
+}
 
-  // 4. where the project's cash sits (S DEV liquidity accounts)
-  const cashLines = await odooCall('account.move.line', 'search_read', [[['company_id', '=', SDEV], ['account_id.account_type', '=', 'asset_cash'], ['parent_state', '=', 'posted']]],
-    { fields: ['account_id', 'balance'], context: CTX, limit: 20000 });
-  const wallets = {}; for (const c of cashLines) wallets[c.account_id[1]] = (wallets[c.account_id[1]] || 0) + c.balance;
+async function pullWallets(odooCall) {
+  // 4. where the project's cash sits (S DEV liquidity accounts) — one grouped sum per account
+  const rows = await sumBy(odooCall, [['company_id', '=', SDEV], ['account_id.account_type', '=', 'asset_cash'], ['parent_state', '=', 'posted']], 'account_id', 'balance', 20000);
+  return rows.filter(r => Math.abs(r.value) > 0.005).map(r => ({ name: r.key[1], balance: +r.value.toFixed(2) }));
+}
 
-  // 5. what is really still owed to suppliers (S DEV exists only for Ajaltoun): the payables ledger, net of payments not yet matched to their bill
-  // (many cash payments were never reconciled with the bill they settle, so a bill's own "paid" flag misleads)
-  const ap = await odooCall('account.move.line', 'search_read', [[['company_id', '=', SDEV], ['account_type', '=', 'liability_payable'], ['parent_state', '=', 'posted'], ['reconciled', '=', false]]],
-    { fields: ['partner_id', 'amount_residual', 'company_id'], context: CTX, limit: 5000 });
-  const ajPartners = new Set(lines.map(l => l.partnerId).filter(Boolean));
-  const owedBy = {};
-  for (const l of ap) { if (!l.partner_id || !ajPartners.has(l.partner_id[0])) continue; owedBy[l.partner_id[1]] = (owedBy[l.partner_id[1]] || 0) + l.amount_residual; }
-  const owed = Object.entries(owedBy).filter(([, v]) => v < -0.5).map(([partner, v]) => ({ partner, amount: +(-v).toFixed(2) })).sort((a, b) => b.amount - a.amount);
-  const prepaid = Object.entries(owedBy).filter(([, v]) => v > 0.5).map(([partner, v]) => ({ partner, amount: +v.toFixed(2) }));
-
-  return { pulledAt: now(), lines, income, owed, prepaid, wallets: Object.entries(wallets).filter(([, v]) => Math.abs(v) > 0.005).map(([name, balance]) => ({ name, balance: +balance.toFixed(2) })) };
+async function pullPayables(odooCall) {
+  // 5. open payables per partner (filtered to Ajaltoun suppliers in pull())
+  return sumBy(odooCall, [['company_id', '=', SDEV], ['account_type', '=', 'liability_payable'], ['parent_state', '=', 'posted'], ['reconciled', '=', false]], 'partner_id', 'amount_residual', 5000);
 }
 
 const metaRef = (db, TEAM_ID) => db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('sections');
@@ -151,12 +226,17 @@ async function handle(req, res, url, user, ctx) {
 
   if (url === '/api/ajaltoun/data' && req.method === 'GET') {
     const fresh = /[?&]fresh=1/.test(req.url || '') && access.admin;
-    if (fresh || !cache.data || Date.now() - cache.at > 10 * 60e3) { cache = { at: Date.now(), data: await pull(odooCall) }; }
-    const mt = await meta(db, TEAM_ID);
-    const vsnap = await db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get();
+    if (fresh) await refresh(odooCall, db, TEAM_ID);
+    else if (!cache.data) {                                    // cold instance: the stored snapshot, or the first pull ever
+      const snap = await loadSnapshot(db, TEAM_ID);
+      if (snap) cache = snap; else await refresh(odooCall, db, TEAM_ID);
+    }
+    const stale = Date.now() - cache.at > SNAP_TTL;
+    if (stale && !refreshing) refresh(odooCall, db, TEAM_ID).catch(e => console.error('ajaltoun refresh:', e));   // serve now, refresh behind
+    const [mt, vsnap] = await Promise.all([meta(db, TEAM_ID), db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get()]);
     const ver = {}; for (const d of vsnap.docs) { const x = d.data(); ver[d.id] = x.state ? { approved: null, verified: x.state === 'verified' ? x : null, flag: x.state === 'flagged' ? x : null } : x; }   // (old one-field shape)
     const lines = cache.data.lines.map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
-    return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
+    return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), stale, admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
   }
 
   if ((m = url.match(/^\/api\/ajaltoun\/file\/(\d+)$/)) && req.method === 'GET') {
@@ -263,4 +343,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle };
+module.exports = { handle, refresh };

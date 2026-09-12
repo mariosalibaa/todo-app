@@ -16,6 +16,7 @@
   .side{width:250px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;}
   .side .head{background:var(--band);color:#fff;height:46px;display:flex;align-items:center;padding:0 10px;gap:8px;}
   .side .head a{color:#fff;text-decoration:none;opacity:.85;font-size:16px;}
+  .side .head .hback{color:#F2A93B;font-size:12px;font-weight:600;white-space:nowrap;padding:4px 8px;border:1px solid rgba(255,255,255,.25);border-radius:8px;opacity:1;}
   .side .head .t{flex:1;text-align:center;line-height:1.1;}
   .side .head .t b{display:block;font-size:14px;}
   .side .head .t span{font-size:11px;color:#8fd0ff;}
@@ -179,7 +180,7 @@
 </head>
 <body>
 <div class="side">
-  <div class="head"><a href="/accounting" title="Accounting">‹</a><div class="t"><b>Budget</b><span id="side-month"></span></div><a href="/admin" title="Hub">⌂</a></div>
+  <div class="head"><a class="hback" href="/accounting" title="Accounting">&lsaquo; Back</a><div class="t"><b>Budget</b><span id="side-month"></span></div><a href="/admin" title="Hub">⌂</a></div>
   <ul class="nav" id="nav"></ul>
   <div class="foot"><span id="who"></span><span class="sp"></span><a onclick="openPhone()" title="Preview the phone version (iPhone 15 Pro Max)">📱</a><a onclick="openSettings()" title="Currencies &amp; settings">⚙</a></div>
 </div>

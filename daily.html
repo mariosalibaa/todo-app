@@ -11,7 +11,10 @@
   :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
-  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1rem;}
   .wordmark span{color:var(--amber);}
   .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
@@ -34,6 +37,12 @@
   input,select{background:var(--crust);color:var(--text);border:1px solid var(--surface0);border-radius:8px;padding:8px 9px;font-size:.85rem;font-family:inherit;width:100%;}
   input:focus,select:focus{outline:none;border-color:var(--amber);}
   input[type=date]{color-scheme:dark;}
+  input.unknown{border-color:#f38ba8;}
+  tr.suggest td{opacity:.62;font-style:italic;}
+  tr.suggest td.acts{opacity:1;font-style:normal;white-space:nowrap;}
+  .tag.sug{background:#3b3220;color:var(--amber);border:1px solid #5a4a2a;}
+  .docbtn.ok{color:var(--green);} .docbtn.no{color:#f38ba8;}
+  .pill.sugpill{border-color:#5a4a2a;color:var(--amber);}   /* a name that is nobody on the sheet */
 
   table{width:100%;border-collapse:collapse;font-size:.85rem;}
   th{text-align:left;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay0);font-weight:600;padding:0 8px 7px;border-bottom:1px solid var(--surface0);}
@@ -55,6 +64,7 @@
   /* the draft rows — the paper being filled in */
   .draft{display:grid;grid-template-columns:1.1fr 1fr 1.6fr 92px 96px 34px;gap:8px;align-items:center;margin-bottom:8px;}
   .draft .lbl{display:none;}
+  .strip{display:flex;gap:8px;overflow-x:auto;padding:6px 0} .strip img{height:84px;border-radius:8px} .strip .vid{display:flex;align-items:center;padding:0 12px;height:84px;border:1px solid var(--surface0);border-radius:8px;color:var(--text);text-decoration:none;font-size:.8rem}
   .drafthead{display:grid;grid-template-columns:1.1fr 1fr 1.6fr 92px 96px 34px;gap:8px;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay0);margin-bottom:6px;padding:0 2px;}
   .x{background:transparent;border:none;color:var(--overlay0);font-size:1rem;padding:4px;}
   .x:hover{color:var(--red);}
@@ -65,6 +75,8 @@
   .pill b{color:var(--green);}
   .docbtn{background:transparent;border:none;color:var(--overlay0);cursor:pointer;font-size:.9rem;padding:2px 4px;}
   .docbtn:hover{color:var(--amber);}
+  /* a `daily`-only holder (a partner) reads his own lines and nothing else (Mario, 2026-09-12) */
+  body.ro .card.write, body.ro #hh-host, body.ro .docbtn, body.ro #wabox { display:none !important; }
   @media (max-width:640px){
     header{padding:12px 14px;} main{padding:14px 12px 90px;}
     .daybar h1{flex:1 0 100%;}
@@ -84,11 +96,10 @@
 </head>
 <body>
 <header>
-  <div class="wordmark">SHIFT <span>GROUP</span><small>DAY REPORT</small></div>
+  <div class="hleft"><a class="hback" href="/accounting" title="Back">&lsaquo; Back</a><div class="wordmark">SHIFT <span>GROUP</span><small>DAY REPORT</small></div></div>
   <div class="who" id="who"></div>
 </header>
 <main>
-  <a class="back" href="/accounting">&lsaquo; Accounting</a>
 
   <div class="daybar">
     <h1 id="daytitle">Day report<em id="daysub"></em></h1>
@@ -100,9 +111,9 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card write">
     <h2>Write the day <span class="muted" id="ratehint"></span></h2>
-    <div class="drafthead"><div>Who</div><div>Project</div><div>What he did</div><div>Debit</div><div>Due to</div><div></div></div>
+    <div class="drafthead"><div>Who</div><div>Project</div><div>What he did</div><div>Paid by Shift</div><div>Due to employee</div><div></div></div>
     <div id="drafts"></div>
     <div class="foot">
       <button onclick="addDraft()">+ Person</button>
@@ -119,10 +130,12 @@
     <h2><span id="linestitle">The day</span><span><button class="ghost" id="spanbtn" onclick="toggleSpan()">Last 7 days</button></span></h2>
     <div id="lines"></div>
     <div class="totals" id="totals"></div>
+    <div id="media"></div>
   </div>
 </main>
 
 <datalist id="ans"></datalist>
+<datalist id="whos"></datalist>
 <input type="file" id="photo" accept="image/*" capture="environment" hidden>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -132,7 +145,8 @@
 <script src="/hub-history.js"></script>
 <script>
 const esc = Admin.esc;
-let people = [], lines = [], analytic = [], drafts = [], span = 1;
+let people = [], lines = [], media = [], analytic = [], drafts = [], span = 1;
+let READ_ONLY = false;
 const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 const fmt = n => (Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const el = id => document.getElementById(id);
@@ -154,6 +168,17 @@ function addDraft(seed) {
   drawDrafts();
 }
 function delDraft(i) { drafts.splice(i, 1); drawDrafts(); }
+// the "who" box: typed text, resolved to a person on the sheet (any part of the name, case-blind);
+// a lone match is taken as you type, so "abe" is already Abed cash, and a full pick wins outright
+function setWho(i, input, final) {
+  const v = input.value; drafts[i].who = v;
+  const q = norm(v);
+  let p = q ? people.find(x => norm(x.name) === q) : null;
+  if (!p && q) { const hits = people.filter(x => norm(x.name).includes(q)); if (hits.length === 1) p = hits[0]; }
+  input.classList.toggle('unknown', !!q && !p);
+  if (p) { if (final) { drafts[i].who = p.name; input.value = p.name; } setDraft(i, 'accountId', p.id); }
+  else drafts[i].accountId = '';
+}
 function setDraft(i, k, v) {
   drafts[i][k] = v;
   // his day has a price of its own — fill it in the first time he is picked
@@ -166,21 +191,20 @@ function setDraft(i, k, v) {
 function drawDrafts() {
   el('drafts').innerHTML = drafts.map((d, i) => `
     <div class="draft">
-      <div><div class="lbl">Who</div><select onchange="setDraft(${i},'accountId',this.value)">
-        <option value="">— who —</option>
-        ${people.map(p => `<option value="${esc(p.id)}" ${d.accountId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
-      </select></div>
+      <div><div class="lbl">Who</div><input list="whos" value="${esc(d.who != null ? d.who : ((people.find(p => p.id === d.accountId) || {}).name || ''))}" placeholder="who" class="${d.who && !d.accountId ? 'unknown' : ''}"
+        oninput="setWho(${i},this)" onchange="setWho(${i},this,true)" title="${d.accountId ? '' : 'type a few letters — the name has to be one of the people on the sheet'}"></div>
       <div><div class="lbl">Project</div><input list="ans" value="${esc(d.project)}" placeholder="project" oninput="setDraft(${i},'project',this.value)"></div>
       <div class="wide"><div class="lbl">What he did</div><input value="${esc(d.description)}" placeholder="what he did" oninput="setDraft(${i},'description',this.value)"></div>
-      <div><div class="lbl">Debit</div><input type="number" step="0.01" min="0" value="${esc(d.debit)}" placeholder="0" oninput="setDraft(${i},'debit',this.value)"></div>
-      <div><div class="lbl">Due to</div><input type="number" step="0.01" min="0" value="${esc(d.credit)}" placeholder="0" oninput="setDraft(${i},'credit',this.value)"></div>
+      <div><div class="lbl">Paid by Shift</div><input type="number" step="0.01" min="0" value="${esc(d.debit)}" placeholder="0" oninput="setDraft(${i},'debit',this.value)"></div>
+      <div><div class="lbl">Due to employee</div><input type="number" step="0.01" min="0" value="${esc(d.credit)}" placeholder="0" oninput="setDraft(${i},'credit',this.value)"></div>
       <div><button class="x" onclick="delDraft(${i})" title="Remove this line">✕</button></div>
     </div>`).join('') || '<div class="empty">Press <b>+ Person</b> to start the day.</div>';
 }
 
-// The paper writes what we owe him in the "Due to" column. His ledger is kept the other way
-// round — what he is owed is a debit on his account — so "Due to" is stored as a debit and
-// "Debit" (money he received, or a correction) as a credit. The screen stays the paper's way.
+// The paper writes what we owe him in the "Due to employee" column. His ledger is kept the other
+// way round — what he is owed is a debit on his account — so "Due to employee" is stored as a
+// debit and "Paid by Shift" (money he received, or a correction) as a credit. The screen stays
+// the paper's way (labels renamed from Debit / Due to, Mario 2026-09-12).
 function saveDrafts() {
   const rows = drafts.filter(d => d.accountId);
   if (!rows.length) return say('Pick who worked first.');
@@ -251,37 +275,65 @@ async function pullWa() {
 }
 
 // ── what is already written ─────────────────────────────────────────────────
+// A line the nightly WhatsApp read proposed is a SUGGESTION until Mario accepts it (2026-09-12:
+// "do not add any booking without my approval"): shown apart, kept out of every total.
+const isSuggestion = t => (t.src === 'whatsapp' || t.src === 'site') && !t.waAccepted;
+async function decide(accountId, id, yes) {
+  const t = lines.find(x => x.id === id && x.accountId === accountId); if (!t) return;
+  const body = yes ? { waAccepted: true, review: false, excluded: false } : { excluded: true, review: false };
+  const undoBody = { waAccepted: !!t.waAccepted, review: !!t.review, excluded: !!t.excluded };
+  say(yes ? 'Accepting…' : 'Dismissing…');
+  await HubHistory.run({
+    label: `${yes ? 'accept' : 'dismiss'} the WhatsApp line "${(t.description || '').slice(0, 30)}"`,
+    do: () => Admin.api('PATCH', `/api/accounting/accounts/${accountId}/tx/${id}`, body),
+    undo: () => Admin.api('PATCH', `/api/accounting/accounts/${accountId}/tx/${id}`, undoBody),
+  }).catch(e => say('Could not ' + (yes ? 'accept' : 'dismiss') + ': ' + e.message));
+  say(yes ? 'Accepted — it is on his sheet now.' : 'Dismissed.');
+  await load();
+}
 function drawLines() {
   const d = dayOf();
   const show = span === 1 ? lines.filter(t => t.date === d) : lines;
   el('linestitle').textContent = span === 1 ? 'Written for this day' : 'Written in the last 7 days';
+  const shownMedia = media.filter(x => span === 1 ? x.date === d : true);
+  el('media').innerHTML = shownMedia.length ? `<div class="lbl" style="margin-top:14px">From the site</div><div class="strip">${shownMedia.map(x =>
+    x.kind === 'photo' ? `<a href="/api/site/${x.thread}/posts/${x.postId}/file" target="_blank" title="${esc(x.who)} · ${esc(x.note)}"><img src="/api/site/${x.thread}/posts/${x.postId}/file" loading="lazy"></a>`
+      : `<a href="/api/site/${x.thread}/posts/${x.postId}/file" target="_blank" class="vid" title="${esc(x.who)} · ${esc(x.note)}">🎬 ${esc(x.who)}</a>`).join('')}</div>` : '';
   if (!show.length) { el('lines').innerHTML = '<div class="empty">Nothing written for this day yet.</div>'; el('totals').innerHTML = ''; return; }
   el('lines').innerHTML = `<table><thead><tr>
       <th style="width:96px">Date</th><th style="width:17%">Partner</th><th style="width:15%">Analytical</th><th>Description</th>
-      <th class="num" style="width:90px">Debit</th><th class="num" style="width:100px">Due to</th><th style="width:34px"></th></tr></thead>
+      <th class="num" style="width:110px">Paid by Shift</th><th class="num" style="width:130px">Due to employee</th><th style="width:34px"></th></tr></thead>
     <tbody>${show.map(t => {
       const proj = t.analyticName || t.analyticText || '';
       const typed = !t.analyticId && !!t.analyticText;
-      return `<tr class="line">
+      const sug = !READ_ONLY && isSuggestion(t);
+      return `<tr class="line ${sug ? 'suggest' : ''}">
         <td class="muted">${esc(t.date.slice(8) + '/' + t.date.slice(5, 7))}</td>
         <td class="who-cell">${esc(t.accountName)}</td>
         <td class="proj ${typed ? 'typed' : ''}">${esc(proj) || '<span class="muted">—</span>'}</td>
-        <td>${esc(t.description || '')}${t.bookedMove ? '<span class="tag">booked</span>' : ''}${t.noBook ? '<span class="tag">no price</span>' : ''}</td>
+        <td>${esc(t.description || '')}${sug ? (t.src === 'site'
+          ? `<span class="tag sug" title="Posted on /site by ${esc(t.createdBy || 'him')}. Nothing is written on his sheet until you accept it.">Site suggestion</span>`
+          : `<span class="tag sug" title="Read out of ${esc(t.waFrom === 'mario' ? 'your' : 'his')} WhatsApp message${t.waAt ? ' of ' + esc(t.waAt.slice(0, 16).replace('T', ' ')) : ''}. Nothing is written on his sheet until you accept it.">WhatsApp suggestion</span>`) : ''}${t.bookedMove ? '<span class="tag">booked</span>' : ''}${t.noBook ? '<span class="tag">no price</span>' : ''}</td>
         <td class="num deb">${t.credit ? fmt(t.credit) : ''}</td>
         <td class="num due">${t.debit ? fmt(t.debit) : ''}</td>
-        <td><button class="docbtn" onclick="attach('${t.accountId}','${t.id}')" title="${(t.docs || []).length ? (t.docs || []).length + ' file(s)' : 'Photograph the paper'}">${(t.docs || []).length ? '📎' : '📷'}</button></td>
+        <td class="acts">${sug
+          ? `<button class="docbtn ok" onclick="decide('${t.accountId}','${t.id}',true)" title="Accept — write it on his sheet">✓</button><button class="docbtn no" onclick="decide('${t.accountId}','${t.id}',false)" title="Dismiss — not a day, not money">✕</button>`
+          : `<button class="docbtn" onclick="attach('${t.accountId}','${t.id}')" title="${(t.docs || []).length ? (t.docs || []).length + ' file(s)' : 'Photograph the paper'}">${(t.docs || []).length ? '📎' : '📷'}</button>`}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
 
   const byPerson = {}, byProject = {};
-  for (const t of show) {
+  const counted = show.filter(t => !isSuggestion(t));   // a suggestion is not owed until Mario says so
+  const nSug = show.length - counted.length;
+  for (const t of counted) {
     byPerson[t.accountName] = (byPerson[t.accountName] || 0) + (t.debit || 0) - (t.credit || 0);
     const p = t.analyticName || t.analyticText || '—';
     byProject[p] = (byProject[p] || 0) + (t.debit || 0) - (t.credit || 0);
   }
-  const total = show.reduce((s, t) => s + (t.debit || 0) - (t.credit || 0), 0);
+  const total = counted.reduce((s, t) => s + (t.debit || 0) - (t.credit || 0), 0);
   el('totals').innerHTML =
     `<span class="pill">Owed for the day <b>${fmt(total)}</b></span>` +
+    (nSug ? `<span class="pill sugpill">${nSug} WhatsApp suggestion${nSug > 1 ? 's' : ''} waiting for your ✓ — not counted</span>` : '') +
     Object.entries(byPerson).map(([k, v]) => `<span class="pill">${esc(k)} <b>${fmt(v)}</b></span>`).join('') +
     Object.entries(byProject).map(([k, v]) => `<span class="pill" style="border-color:#45475a">${esc(k)} <b style="color:var(--blue)">${fmt(v)}</b></span>`).join('');
 }
@@ -326,20 +378,24 @@ async function load() {
   const d = dayOf();
   el('daysub').textContent = pretty(d);
   const r = await Admin.api('GET', `/api/accounting/daily?date=${d}&days=${span}`);
-  people = r.people || []; lines = r.lines || [];
+  people = r.people || []; lines = r.lines || []; media = r.media || [];
+  el('whos').innerHTML = people.map(p => `<option value="${esc(p.name)}">`).join('');
   el('ratehint').textContent = people.length ? `${people.length} people on the sheet` : 'no people flagged yet — open an account and tick “on the day report”';
-  drawDrafts();
-  drawWa();
+  if (!READ_ONLY) { drawDrafts(); drawWa(); }
   drawLines();
 }
-Admin.require('accounting', async me => {
+Admin.require(null, async me => {
+  if (!me.apps.includes('accounting') && !me.apps.includes('daily')) { document.body.innerHTML = '<p style="padding:40px;color:#a6adc8">This page is not open to your account.</p>'; return; }
+  READ_ONLY = !me.admin && !me.apps.includes('accounting');
+  if (READ_ONLY) document.querySelector('.hback').href = '/admin?stay';   // a partner has no /accounting page to go back to
+  if (READ_ONLY) document.body.classList.add('ro');
   el('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
-  HubHistory.mount({ into: '#hh-host', area: 'daily', reload: load });
+  if (!READ_ONLY) HubHistory.mount({ into: '#hh-host', area: 'daily', reload: load });
   el('day').value = ymd(new Date());
   try { analytic = await Admin.api('GET', '/api/accounting/analytic'); } catch (e) { analytic = []; }
   el('ans').innerHTML = analytic.map(a => `<option value="${esc(a.name)}">`).join('');
   await load();
-  if (!drafts.length) addDraft();
+  if (!READ_ONLY && !drafts.length) addDraft();
 });
 </script>
 </body>

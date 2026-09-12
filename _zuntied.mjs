@@ -1,0 +1,17 @@
+import admin from "firebase-admin";import {readFileSync,writeFileSync} from "node:fs";
+admin.initializeApp({credential:admin.credential.cert(JSON.parse(readFileSync("./firebase-service-account.json","utf8")))});
+const db=admin.firestore();
+const s=await db.collection("workspaces/team/accounts/ziad-cash/tx").get();
+const all=s.docs.map(d=>({id:d.id,...d.data()}));
+const mv=t=>((t.credit||0)-(t.debit||0));
+const tied=new Set(all.filter(t=>t.src==="odoo"&&t.dupOf).map(t=>t.dupOf));
+const xl=all.filter(t=>t.src==="excel");
+const un=xl.filter(t=>!tied.has(t.id));
+console.log("excel rows with NO Odoo line at all:",un.length,"net",+un.reduce((a,t)=>a+mv(t),0).toFixed(2));
+const byYear={};un.forEach(t=>{const y=(t.date||"").slice(0,4);byYear[y]=(byYear[y]||0)+mv(t);});
+console.log("by year:",JSON.stringify(Object.fromEntries(Object.entries(byYear).map(([k,v])=>[k,+v.toFixed(2)]))));
+const big=un.filter(t=>Math.abs(mv(t))>=20).sort((a,b)=>Math.abs(mv(b))-Math.abs(mv(a)));
+console.log(`\n${big.length} of them are $20 or more:`);
+big.slice(0,25).forEach(t=>console.log(`  ${t.date} ${String(mv(t)).padStart(9)} ${(t.description||"").slice(0,55)} | noBook=${!!t.noBook} | ref=${t.ref||""}`));
+writeFileSync("D:/vscode/odoo/out/ziad-not-in-odoo.json",JSON.stringify(un.map(t=>({date:t.date,amount:mv(t),desc:t.description,noBook:!!t.noBook,ref:t.ref||""})),null,1));
+process.exit(0);

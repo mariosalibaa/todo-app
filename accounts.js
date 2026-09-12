@@ -139,6 +139,7 @@ async function resolve(ws, id) {
 const txCol = a => a.ref.collection('tx');
 
 const { LOG_AREAS, logCol, diffOf, hubLog } = require('./hub-log');
+const dailyAccess = require('./daily-access');
 
 // ── ⛽ Fuel by car ────────────────────────────────────────────────────────────
 // A benzine line carries the car it went into and the odometer at the pump, so the fuel view
@@ -599,7 +600,18 @@ async function handle(req, res, url, user, ctx) {
       snap.docs.forEach(d => { const t = d.data(); if (t.src !== 'odoo') lines.push({ ...t, accountId: a.id, accountName: a.name }); });
     }));
     lines.sort((x, y) => x.date < y.date ? 1 : x.date > y.date ? -1 : String(x.accountName).localeCompare(String(y.accountName)));
-    return json(res, 200, { date, since, people: people.map(p => ({ id: p.id, name: p.name, owner: p.owner || '', odooPartner: p.odooPartner || null, defaultRate: p.defaultRate || 0, defaultProject: p.defaultProject || null, wa: !!((p.whatsapp && p.whatsapp.chatName) || WA_CHATS[p.id]) })), lines });
+    const access = ctx.access || { apps: ['accounting'], admin: true, projects: [] };
+    const readOnly = dailyAccess.readOnlyFor(access);
+    const shown = readOnly ? dailyAccess.filterForPartner(lines, access.projects) : lines;
+    // progress photos / videos the workers posted on /site for these days (no amount on them)
+    const media = [];
+    await Promise.all(people.map(async a => {
+      const snap = await ws.collection('site').doc(a.id).collection('posts').where('date', '>=', since).where('date', '<=', date).get();
+      snap.docs.forEach(d => { const p = d.data(); if ((p.kind === 'photo' || p.kind === 'video') && p.parsed && p.parsed.receipt === false) media.push({ thread: a.id, who: a.name, postId: p.id, kind: p.kind, date: p.date, at: p.at, note: p.parsed.note || '' }); });
+    }));
+    return json(res, 200, { date, since, readOnly,
+      people: readOnly ? [] : people.map(p => ({ id: p.id, name: p.name, owner: p.owner || '', odooPartner: p.odooPartner || null, defaultRate: p.defaultRate || 0, defaultProject: p.defaultProject || null, wa: !!((p.whatsapp && p.whatsapp.chatName) || WA_CHATS[p.id]) })),
+      lines: shown, media: readOnly ? [] : media });
   }
 
   // Several lines at once — the whole day in one round trip (the phone is on site data).
@@ -886,7 +898,7 @@ async function handle(req, res, url, user, ctx) {
       if (!live) throw new Error('bucket not created');
       await bk.file(key).save(buf, { contentType: mime, resumable: false, metadata: { metadata: { account: a.id, tx: m[2], by: who } } });
     } catch (e) {
-      if (buf.length > 900e3) return json(res, 400, { error: 'Firebase Storage is not enabled for this project, so a file must stay under 900 KB. Enable Storage in the Firebase console and any size will work.' });
+      if (buf.length > 700e3) return json(res, 400, { error: 'Firebase Storage is not enabled for this project, so a file must stay under 700 KB. Enable Storage in the Firebase console and any size will work.' });
       await ws.collection('txDocs').doc(docId).set({ account: a.id, tx: m[2], mime, name: String(b.name || '').slice(0, 120), b64: buf.toString('base64'), at: now(), by: who });
       store = 'firestore';
       console.warn('tx doc kept in Firestore (Storage not enabled):', e.message);
@@ -930,7 +942,8 @@ async function handle(req, res, url, user, ctx) {
       [buf] = await admin.storage().bucket().file(doc.key).download();
     }
     res.writeHead(200, { 'Content-Type': doc.mime || 'application/octet-stream',
-      'Content-Disposition': `inline; filename="${doc.name.replace(/"/g, '')}"`, 'Cache-Control': 'private, max-age=3600' });
+      'Content-Disposition': `inline; filename="${doc.name.replace(/"/g, '')}"`, 'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff' });
     res.end(buf);
     return true;
   }
@@ -984,7 +997,8 @@ async function handle(req, res, url, user, ctx) {
     for (const k of ANNOT) if (k in body) data[k] = body[k];
     // the line itself may be edited only when a person wrote it
     // a person wrote it, or it is a row of the workbook — which is corrected in the sheet below
-    if (['manual', 'telegram', 'whatsapp', 'excel'].includes(cur.src)) {
+    // a /site post is a proposal the same way (2026-09-12)
+    if (['manual', 'telegram', 'whatsapp', 'excel', 'site'].includes(cur.src)) {
       for (const k of LINE) {
         if (!Object.prototype.hasOwnProperty.call(body, k)) continue;
         data[k] = k === 'debit' || k === 'credit' ? money(body[k]) : body[k];
@@ -996,8 +1010,9 @@ async function handle(req, res, url, user, ctx) {
     if (body.excluded === false) data.review = false;
     // ✓ on a WhatsApp line is the acceptance that lets it reach Odoo and the workbook — nothing
     // read off WhatsApp is booked before that (Mario, 2026-09-08)
-    if (cur.src === 'whatsapp' && (body.excluded === false || body.review === false || 'answer' in body || body.waAccepted === true)) data.waAccepted = true;
-    if (cur.src === 'whatsapp' && (body.excluded === true || body.waAccepted === false)) data.waAccepted = false;
+    // a /site post is a proposal the same way (2026-09-12)
+    if ((cur.src === 'whatsapp' || cur.src === 'site') && (body.excluded === false || body.review === false || 'answer' in body || body.waAccepted === true)) data.waAccepted = true;
+    if ((cur.src === 'whatsapp' || cur.src === 'site') && (body.excluded === true || body.waAccepted === false)) data.waAccepted = false;
     // A transfer moves against one of our own cash accounts — whichever the row names ("from
     // Mario", "to Ziad"), Mario's when it names nobody. The type dropdown and the WhatsApp lines
     // used to leave it empty, and an empty one is what no poster would book, so the line sat
@@ -1091,18 +1106,25 @@ async function handle(req, res, url, user, ctx) {
       try { live = await odooCall('account.move', 'read', [[moveId], ['name']], {}); }
       catch (e) { return json(res, 400, { error: 'could not ask Odoo whether that entry still exists: ' + String(e.message || e) }); }
       if (live.length) return json(res, 400, { error: `this line mirrors ${live[0].name} in Odoo, which still exists — Odoo lines are facts` });
-    } else if (!['manual', 'telegram', 'budget', 'excel', 'whatsapp'].includes(cur.src)) {
+      // a /site post is a proposal the same way (2026-09-12)
+    } else if (!['manual', 'telegram', 'budget', 'excel', 'whatsapp', 'site'].includes(cur.src)) {
       return json(res, 400, { error: 'only typed or imported ledger lines can be deleted; statement lines are facts' });
     }
     if (cur.transferId) return json(res, 400, { error: 'this line belongs to a transfer — delete the transfer' });
-    // the paper goes with the line, wherever it was kept
-    for (const d of cur.docs || []) {
-      try {
-        if (d.store === 'firestore') await ws.collection('txDocs').doc(d.id).delete();
-        else await admin.storage().bucket().file(d.key).delete();
-      } catch (e) { console.warn('doc delete with line', e.message); }
+    // the paper goes with the line, wherever it was kept — except a /site line, whose file
+    // belongs to the post, not the line (Mario, 2026-09-12)
+    if (cur.src !== 'site') {
+      for (const d of cur.docs || []) {
+        try {
+          if (d.store === 'firestore') await ws.collection('txDocs').doc(d.id).delete();
+          else await admin.storage().bucket().file(d.key).delete();
+        } catch (e) { console.warn('doc delete with line', e.message); }
+      }
     }
     await ref.delete();
+    // a WhatsApp / site proposal Mario deleted by hand stays deleted: the hourly read would
+    // otherwise propose the same message again (Mario, 2026-09-12: "added for the second time")
+    if (cur.src === 'whatsapp' || cur.src === 'site') await a.ref.set({ waDeleted: { [m[2]]: now() } }, { merge: true });
     await a.ref.collection('log').add({ at: now(), who, txId: m[2],
       line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80),
       before: { date: cur.date, description: cur.description || '', debit: cur.debit || 0, credit: cur.credit || 0, src: cur.src },

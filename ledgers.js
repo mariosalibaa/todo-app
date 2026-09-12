@@ -748,6 +748,10 @@ async function importWhatsappLive(ctx, account, who, messages, since) {
 
 async function absorbWaLines(ctx, account, who, lines) {
   const { acc, txCol } = ctx;
+  // a proposal Mario deleted by hand is gone for good (accounts.js DELETE writes waDeleted)
+  const gone = (account.waDeleted && typeof account.waDeleted === 'object') ? account.waDeleted : {};
+  const dropped = lines.filter(l => gone[l.id]).length;
+  lines = lines.filter(l => !gone[l.id]);
   const col = txCol(account);
   const cur = await col.get();
   const existing = {}; cur.docs.forEach(d => { existing[d.id] = d.data(); });
@@ -776,7 +780,7 @@ async function absorbWaLines(ctx, account, who, lines) {
   });
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
-  return { lines: lines.length, added, updated, kept, linked, review, accepted, first, last };
+  return { lines: lines.length, added, updated, kept, linked, review, accepted, dropped, first, last };
 }
 
 // ── Transfers between this account and the other people's ───────────────────

@@ -9,6 +9,7 @@ const whishRules = require('./whish-rules');  // standing orders: a Whish line -
 const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 const ajaltoun = require('./ajaltoun');        // /api/ajaltoun/* (the project's accounts, from Odoo)
+const site = require('./site');            // /api/site/* (the conversation that replaces the WhatsApp groups)
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -50,14 +51,31 @@ function loadOdooCreds() {
   }
   return odooCreds;
 }
+// Odoo Online answers a burst of parallel RPCs with an HTML "429 Rate limit exceeded" page
+// (seen 2026-09-12 with 5 calls at once), so a 429 / non-JSON reply is retried with a short back-off.
+// ...and at most ODOO_PARALLEL calls in flight from this process, so a page that fans out stays under it.
+const ODOO_PARALLEL = 2;
+let odooInFlight = 0; const odooQueue = [];
+const odooSlot = () => new Promise(r => { if (odooInFlight < ODOO_PARALLEL) { odooInFlight++; r(); } else odooQueue.push(r); });
+const odooFree = () => { const n = odooQueue.shift(); if (n) n(); else odooInFlight--; };
 async function odooRpc(service, method, args) {
+  await odooSlot();
+  try { return await odooRpcNow(service, method, args); } finally { odooFree(); }
+}
+async function odooRpcNow(service, method, args) {
   const creds = loadOdooCreds();
-  const res = await fetch(`${creds.url}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', method: 'call', params: { service, method, args } })
-  });
-  const data = await res.json();
+  let data;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${creds.url}/jsonrpc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'call', params: { service, method, args } })
+    });
+    const text = await res.text();
+    try { data = JSON.parse(text); break; } catch { /* html error page */ }
+    if (attempt >= 3) throw new Error(`Odoo: HTTP ${res.status} ${(text.match(/<title>(.*?)<\/title>/) || [])[1] || 'non-JSON reply'}`);
+    await new Promise(r => setTimeout(r, 1000 * 2 ** attempt + Math.random() * 500));   // 1 s, 2 s, 4 s
+  }
   if (data.error) {
     const d = data.error.data || {};
     throw new Error(`Odoo: ${d.message || data.error.message}`);
@@ -370,7 +388,9 @@ async function executeSyncPlan(direction, odoo, app) {
 // Each approved email carries the list of apps it may open (`apps`, default
 // ['todo']); the admin hub shows only those tiles and the API refuses the rest.
 // Admins always have every app and are the only ones who may edit the list.
-const APPS = ['todo', 'accounting', 'partners', 'ajaltoun'];
+// daily = may READ the Day report (a partner, filtered to his projects); site = may post on /site
+// (a worker: his own thread only). Neither opens anything else.
+const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site'];
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
@@ -381,7 +401,9 @@ async function allowlistMap() {
     for (const d of snap.docs) {
       const x = d.data();
       const email = (x.email || d.id).toLowerCase();
-      map.set(email, { email, apps: Array.isArray(x.apps) ? x.apps.filter(a => APPS.includes(a)) : ['todo'] });
+      map.set(email, { email, apps: Array.isArray(x.apps) ? x.apps.filter(a => APPS.includes(a)) : ['todo'],
+        account: typeof x.account === 'string' ? x.account : '',           // a worker's own ledger (site thread)
+        projects: Array.isArray(x.projects) ? x.projects.map(Number).filter(n => n > 0) : [] });   // a partner's analytic ids (daily)
     }
     _allowCache = { map, at: Date.now() };
   }
@@ -394,7 +416,8 @@ async function accessFor(email) {
   const isAdmin = ADMIN_EMAILS.has(e);
   const entry = (await allowlistMap()).get(e);
   if (!entry && !isAdmin) return null;
-  return { email: e, apps: isAdmin ? APPS.slice() : entry.apps, admin: isAdmin };
+  return { email: e, apps: isAdmin ? APPS.slice() : entry.apps, admin: isAdmin,
+    account: entry ? entry.account : '', projects: entry ? entry.projects : [] };
 }
 async function isAllowedEmail(email) { return !!(await accessFor(email)); }
 
@@ -613,12 +636,13 @@ const handler = async (req, res) => {
     'dashboard.html': path.join(__dirname, 'dashboard.html'),
     'partners.html': path.join(__dirname, 'partners.html'),
     'ajaltoun.html': path.join(__dirname, 'ajaltoun.html'),
+    'site.html': path.join(__dirname, 'site.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
-    '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html' };
+    '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
@@ -670,6 +694,23 @@ const handler = async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out));
     } catch (e) {
       console.error('wise cron:', e);
+      res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) }));
+    }
+    return;
+  }
+
+  // Ajaltoun Odoo snapshot (vercel.json cron, every 30 min) — keeps the page instant. Same guard.
+  if (url === '/api/cron/ajaltoun') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const secret = process.env.CRON_SECRET;
+    const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || q.get('key') || '';
+    if (!secret || given !== secret) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return; }
+    try {
+      const t0 = Date.now();
+      const snap = await ajaltoun.refresh(odooCall, db, TEAM_ID);
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, lines: snap.data.lines.length, seconds: (Date.now() - t0) / 1000 }));
+    } catch (e) {
+      console.error('ajaltoun cron:', e);
       res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) }));
     }
     return;
@@ -742,11 +783,13 @@ const handler = async (req, res) => {
     res.end(JSON.stringify({ error: 'no_app', app, email: access.email }));
   };
   if (url.startsWith('/api/accounting/')) {
-    if (!access.apps.includes('accounting')) return noApp('accounting');
+    // a `daily` holder (a partner) may READ the day report and nothing else under accounting
+    const dailyRead = req.method === 'GET' && /^\/api\/accounting\/(daily|analytic)(\?|$)/.test(url) && access.apps.includes('daily');
+    if (!access.apps.includes('accounting') && !dailyRead) return noApp('accounting');
     try {
       // `local` = this is the laptop, not Render/Vercel: the scanner and the Excel/WhatsApp
       // imports only exist here
-      const ctx = { db, admin, TEAM_ID, odooCall, local: AUTH_DISABLED };
+      const ctx = { db, admin, TEAM_ID, odooCall, local: AUTH_DISABLED, access };
       // the Whish account is one account among others now: its old per-line URLs map onto the generic ones
       const aurl = url.replace(/^\/api\/accounting\/whish\/(\d+)\/(tx|tx-bulk|odoo-check|book|book-preview)(\/|$)/, '/api/accounting/accounts/$1/$2$3');
       const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)
@@ -771,6 +814,17 @@ const handler = async (req, res) => {
       console.error('ajaltoun error:', e);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(e && e.message || e) }));
+    }
+    return;
+  }
+  if (url.startsWith('/api/site/')) {
+    if (!access.apps.includes('site')) return noApp('site');
+    try {
+      const handled = await site.handle(req, res, url, user, { db, admin, TEAM_ID, odooCall, access });
+      if (handled === false) { res.writeHead(404); res.end('not found'); }
+    } catch (e) {
+      console.error('site error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e && e.message || e) }));
     }
     return;
   }
@@ -812,6 +866,8 @@ const handler = async (req, res) => {
         // apps omitted (old To-Do access modal) → keep what the doc has, default To-Do only
         const doc = { email, updatedBy: user.email || user.uid, updatedAt: new Date().toISOString() };
         if (Array.isArray(b.apps)) doc.apps = b.apps.filter(a => APPS.includes(a));
+        if ('account' in b) doc.account = String(b.account || '').replace(/[^\w-]/g, '').slice(0, 40);
+        if ('projects' in b) doc.projects = (Array.isArray(b.projects) ? b.projects : []).map(Number).filter(n => n > 0).slice(0, 50);
         const ref = db.collection('workspaces').doc(TEAM_ID).collection('allowlist').doc(email);
         if (!(await ref.get()).exists) { doc.addedBy = doc.updatedBy; doc.addedAt = doc.updatedAt; if (!doc.apps) doc.apps = ['todo']; }
         await ref.set(doc, { merge: true });

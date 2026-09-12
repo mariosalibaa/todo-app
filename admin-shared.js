@@ -112,7 +112,7 @@
       const cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
       if (cfg.authDisabled) {   // local machine: no sign-in, everything open
         A.disabled = true;
-        A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners', 'ajaltoun'], admin: true, local: true };
+        A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site'], admin: true, local: true };
         ready = true; overlay(''); onReady(A.me); return;
       }
       overlay(card('Checking session…'));
@@ -143,4 +143,27 @@
   };
 
   A.esc = esc;
+
+  // Breadcrumb for every hub page — Mario, 2026-09-12: "I should be able to understand where I am sitting inside the
+  // software": ‹ Back goes one step up, and the full path Hub › Accounting › Accounts › Ziad cash is clickable at
+  // every level. path = [[label, href], ..., [current label]] (the hub home is added in front).
+  // Renders into #crumbs (or the element passed). Colors inherit from the bar it sits in.
+  A.crumbs = function (path, el) {
+    el = el || document.getElementById('crumbs'); if (!el) return;
+    if (!document.getElementById('crumbs-css')) {
+      const st = document.createElement('style'); st.id = 'crumbs-css';
+      st.textContent = `.crumbs{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;}
+        .crumbs .hback{color:var(--amber,#F2A93B);text-decoration:none;font-size:.86rem;font-weight:600;padding:5px 10px;border:1px solid rgba(128,128,128,.4);border-radius:8px;opacity:1;margin-right:6px;}
+        .crumbs .hback:hover{background:rgba(128,128,128,.15);}
+        .crumbs a{color:inherit;text-decoration:none;opacity:.7;font-size:.9rem;} .crumbs a:hover{opacity:1;text-decoration:underline;}
+        .crumbs .sep{opacity:.45;font-size:.85rem;} .crumbs .cur{font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;}
+        @media (max-width:640px){.crumbs a:not(.hback):not(:nth-last-child(3)){display:none;} .crumbs .sep:not(:nth-last-child(2)){display:none;}}`;
+      document.head.appendChild(st);
+    }
+    const full = [['Hub', '/admin?stay'], ...path];
+    const back = full[full.length - 2];
+    el.className = 'crumbs';
+    el.innerHTML = `<a class="hback" href="${esc(back[1])}" title="Back to ${esc(back[0])}">&lsaquo; Back</a>` +
+      full.map((c, i) => (i ? '<span class="sep">›</span>' : '') + (i < full.length - 1 ? `<a href="${esc(c[1])}" title="${esc(c[0])}">${i === 0 ? '⌂ ' : ''}${esc(c[0])}</a>` : `<span class="cur">${esc(c[0])}</span>`)).join('');
+  };
 })();

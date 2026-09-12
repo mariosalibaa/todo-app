@@ -12,6 +12,7 @@
   *{box-sizing:border-box;}
   html,body{height:100%;}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
+  .top .hback{color:var(--amber,#F2A93B);text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px;opacity:1;} .top .hback:hover{background:rgba(255,255,255,.1);}
   .top{background:var(--wise);color:#fff;display:flex;align-items:center;gap:12px;padding:0 14px;height:46px;flex:none;}
   .top a{color:var(--lime);text-decoration:none;}
   .top .brand{font-weight:600;font-size:14px;}
@@ -70,7 +71,7 @@
 </head>
 <body>
 <div class="top">
-  <a href="/accounting" title="Accounting">&lsaquo;</a>
+  <a class="hback" href="/accounting" title="Accounting">&lsaquo; Back</a>
   <span class="brand">Accounting</span>
   <span style="opacity:.5">›</span><span>Wise</span>
   <span class="sp"></span>

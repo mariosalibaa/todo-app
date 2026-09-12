@@ -11,7 +11,7 @@
   :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--red:#f38ba8;--green:#a6e3a1;}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
-  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
   .wordmark span{color:var(--amber);}
   .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
@@ -31,6 +31,7 @@
   th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--surface0);}
   th{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);font-weight:600;}
   td.c,th.c{text-align:center;width:110px;}
+  .small{width:110px;font-size:.75rem;padding:4px 6px;}
   input[type=checkbox]{width:16px;height:16px;accent-color:var(--amber);cursor:pointer;}
   input[type=email]{background:var(--base);border:1px solid var(--surface1);color:var(--text);border-radius:8px;padding:8px 10px;font-size:.86rem;width:100%;}
   button{background:var(--amber);color:var(--base);border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;font-size:.84rem;}
@@ -54,7 +55,7 @@
   <section id="members" style="display:none;">
     <h2>Members &amp; access</h2>
     <table>
-      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th style="width:40px"></th></tr></thead>
+      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th class="c">Daily</th><th class="c">Site</th><th>Ledger</th><th>Projects</th><th style="width:40px"></th></tr></thead>
       <tbody id="member-rows"></tbody>
     </table>
     <div class="addrow">
@@ -79,12 +80,17 @@ const APPS = [
   { id: 'accounting', ico: '🧾', name: 'Accounting', desc: 'Whish · Wise · Budget — statements, accounts, expenses and income', href: '/accounting' },
   { id: 'partners', ico: '🤝', name: 'Partners', desc: 'Agreements, fee frameworks and proposals shared with a partner', href: '/partners' },
   { id: 'ajaltoun', ico: '🏗️', name: 'Ajaltoun 4193', desc: 'Project accounts from Odoo — cash flow, costs by section and villa, each partner share', href: '/ajaltoun' },
+  { id: 'daily', ico: '📋', name: 'Day report', desc: 'Who worked on your project each day, what he did and what it cost.', href: '/accounting/daily' },
+  { id: 'site', ico: '📍', name: 'Site', desc: 'Post your day: text, photos, a voice note. Start and Finish with your location.', href: '/site' },
 ];
 const esc = Admin.esc;
+// Mario, 2026-09-12: an app id isn't always its own URL (daily lives under /accounting/daily) —
+// the one-app redirect used to just prepend '/', which sent a daily-only member to the wrong page
+const APP_HREF = { todo: '/todo', accounting: '/accounting', partners: '/partners', ajaltoun: '/ajaltoun', daily: '/accounting/daily', site: '/site' };
 
 Admin.require(null, me => {
   // one app only (and not admin) → straight into it, no tile page in the way
-  if (!me.admin && me.apps.length === 1 && !location.search.includes('stay')) { location.replace('/' + me.apps[0]); return; }
+  if (!me.admin && me.apps.length === 1 && !location.search.includes('stay')) { location.replace(APP_HREF[me.apps[0]] || '/' + me.apps[0]); return; }
   document.getElementById('who').innerHTML =
     `<span>${esc(me.name || me.email)}${me.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</span>` +
     (me.local ? '<span style="color:var(--overlay0)">local</span>' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
@@ -101,23 +107,33 @@ async function loadMembers() {
     const list = await Admin.api('GET', '/api/allowlist');
     list.sort((a, b) => a.email.localeCompare(b.email));
     rows.innerHTML = list.map(m => {
-      const apps = m.admin ? APPS.map(a => a.id) : (Array.isArray(m.apps) ? m.apps : ['todo']);
+      const apps = m.admin ? ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site'] : (Array.isArray(m.apps) ? m.apps : ['todo']);
       return `<tr data-email="${esc(m.email)}">
         <td>${esc(m.email)}${m.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</td>
         <td class="c"><input type="checkbox" data-app="todo" ${apps.includes('todo') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
         <td class="c"><input type="checkbox" data-app="accounting" ${apps.includes('accounting') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
         <td class="c"><input type="checkbox" data-app="partners" ${apps.includes('partners') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
         <td class="c"><input type="checkbox" data-app="ajaltoun" ${apps.includes('ajaltoun') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
+        <td class="c"><input type="checkbox" data-app="daily" ${apps.includes('daily') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="May read the Day report — only the lines of his projects"></td>
+        <td class="c"><input type="checkbox" data-app="site" ${apps.includes('site') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="May post on /site — his own thread"></td>
+        <td><input class="small" value="${esc(m.account || '')}" placeholder="ledger id" title="The worker's ledger account id, e.g. khodr-cash (site)" onchange="setField('${esc(m.email)}','account',this.value)"></td>
+        <td><input class="small" value="${esc((m.projects || []).join(','))}" placeholder="analytic ids" title="Analytic account ids the partner may see on the Day report, e.g. 69,59,60,61,62,63,64" onchange="setField('${esc(m.email)}','projects',this.value)"></td>
         <td>${m.admin ? '' : `<button class="ghost" title="Remove" onclick="removeMember('${esc(m.email)}')">✕</button>`}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="6" style="color:var(--overlay0)">Nobody yet</td></tr>';
-  } catch (e) { rows.innerHTML = `<tr><td colspan="6" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
+    }).join('') || '<tr><td colspan="10" style="color:var(--overlay0)">Nobody yet</td></tr>';
+  } catch (e) { rows.innerHTML = `<tr><td colspan="10" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
 }
 async function toggleApp(cb) {
   const tr = cb.closest('tr');
   const apps = [...tr.querySelectorAll('input[data-app]')].filter(i => i.checked).map(i => i.dataset.app);
   try { await Admin.api('POST', '/api/allowlist', { email: tr.dataset.email, apps }); }
   catch (e) { alert('Could not save: ' + e.message); cb.checked = !cb.checked; }
+}
+async function setField(email, field, value) {
+  const body = { email };
+  body[field] = field === 'projects' ? value.split(/[ ,;]+/).map(Number).filter(n => n > 0) : value.trim();
+  try { await Admin.api('POST', '/api/allowlist', body); }
+  catch (e) { alert('Could not save: ' + e.message); }
 }
 async function addMember() {
   const inp = document.getElementById('new-email');
