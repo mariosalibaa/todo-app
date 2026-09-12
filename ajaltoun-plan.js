@@ -84,8 +84,9 @@ async function handle(req, res, url, user, ctx) {
     const changes = [];
     for (const f of FIELDS) {
       let v = it[f];
-      if (['qty', 'price', 'amount', 'bill'].includes(f)) v = v === '' || v == null ? null : +v;
+      // a field the caller did not send keeps its value (a partial update wiped the excavation prices, 2026-09-13)
       if (v === undefined) v = cur ? cur[f] : null;
+      else if (['qty', 'price', 'amount', 'bill'].includes(f)) v = v === '' || v == null ? null : +v;
       next[f] = v == null ? null : v;
       if (cur && JSON.stringify(cur[f] ?? null) !== JSON.stringify(next[f] ?? null)) changes.push({ f, from: cur[f] ?? null, to: next[f] });
     }
