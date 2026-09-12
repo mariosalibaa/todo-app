@@ -6,6 +6,7 @@
 const acc = require('./accounts');
 const files = require('./hub-files');
 const parse = require('./site-parse');
+const attendance = require('./site-attendance');   // part 2: sites, Start/Finish, the self-written day
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const now = () => new Date().toISOString();
@@ -125,6 +126,7 @@ async function digest(ctx, ws, ref, post, buf) {
       } catch (e) { console.error('site digest stale-line delete', post.id, e.message); }
     }
     await ref.set({ parsed, line, error: null, digestedAt: now(), digesting: false }, { merge: true });
+    if (!isGeneral) { try { await attendance.writeDay(ctx, ws, post.thread, post.date, { who: post.by }); } catch (e) { console.error('site day refresh', post.id, e.message); } }
   } catch (e) {
     console.error('site digest', post.id, e.message);
     await ref.set({ error: String(e.message || e).slice(0, 200), digestedAt: now(), digesting: false }, { merge: true });
@@ -134,8 +136,17 @@ async function digest(ctx, ws, ref, post, buf) {
 async function handle(req, res, url, user, ctx) {
   const { db, TEAM_ID, access } = ctx;
   const ws = db.collection('workspaces').doc(TEAM_ID);
+  const att = await attendance.handle(req, res, url, user, { ...ctx, threadsFor });
+  if (att !== false) return att;
   const who = user.email || user.uid;
   let m;
+
+  // the analytic accounts (projects) for the Sites sheet — admin
+  if (url === '/api/site/analytics' && req.method === 'GET') {
+    if (!access.admin) return json(res, 403, { error: 'admin only' });
+    const { analytics } = await refs(ctx);
+    return json(res, 200, analytics.map(a => ({ id: a.id, name: a.name })).sort((a, b) => a.name.localeCompare(b.name)));
+  }
 
   if (url === '/api/site/threads' && req.method === 'GET') {
     const ts = await threadsFor(ctx);
@@ -263,4 +274,4 @@ async function handle(req, res, url, user, ctx) {
 
   return false;
 }
-module.exports = { handle };
+module.exports = { handle, sweep: attendance.sweep };

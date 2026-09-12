@@ -21,6 +21,10 @@
       "schedule": "0 5 * * *"
     },
     {
+      "path": "/api/cron/site-days",
+      "schedule": "55 20 * * *"
+    },
+    {
       "path": "/api/cron/wise",
       "schedule": "30 4 * * *"
     },

@@ -700,6 +700,22 @@ const handler = async (req, res) => {
   }
 
   // Ajaltoun Odoo snapshot (vercel.json cron, every 30 min) — keeps the page instant. Same guard.
+  // 23:55 Beirut (20:55 UTC): the site days with a Start and no Finish get their suggestion line
+  if (url === '/api/cron/site-days') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const secret = process.env.CRON_SECRET;
+    const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || q.get('key') || '';
+    if (!secret || given !== secret) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return; }
+    try {
+      const out = await site.sweep({ db, admin, TEAM_ID, odooCall });
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, days: out }));
+    } catch (e) {
+      console.error('site-days cron:', e);
+      res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) }));
+    }
+    return;
+  }
+
   if (url === '/api/cron/ajaltoun') {
     const q = new URL(req.url, 'http://x').searchParams;
     const secret = process.env.CRON_SECRET;

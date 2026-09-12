@@ -87,6 +87,17 @@
   .sheet .t{font-size:.78rem;color:var(--sub);text-align:center;padding:4px 8px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .sheet button{border:0;border-radius:12px;padding:13px;font:inherit;font-size:1rem;background:var(--base);color:var(--text);cursor:pointer;}
   .sheet button.del{color:var(--red);font-weight:600;}
+  /* attendance card (worker chat): Start / Finish with the phone's location */
+  .att{margin:10px 12px 0;background:var(--mantle);border-radius:14px;padding:10px 12px;box-shadow:0 1px .5px rgba(11,20,26,.13);}
+  .att .row{display:flex;gap:10px;} .att .big{flex:1;border:0;border-radius:12px;padding:14px 8px;font:inherit;font-size:1.05rem;font-weight:700;cursor:pointer;color:#fff;}
+  .att .big.start{background:#00a884;} .att .big.finish{background:#c0392b;} .att .big:disabled{opacity:.35;cursor:default;}
+  .att .st{font-size:.8rem;color:var(--sub);margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+  .att .st a{color:var(--blue);text-decoration:none;font-size:.78rem;}
+  .att .lineState{font-size:.72rem;padding:2px 8px;border-radius:8px;background:#fff3d6;color:#8a5a00;} .att .lineState.accepted{background:#dcf8c6;color:#0b6b2c;} .att .lineState.dismissed{background:#fde2e4;color:#b3261e;}
+  .post.tap{align-self:center;background:#fff;color:var(--sub);font-size:.8rem;padding:6px 12px;border-radius:10px;max-width:96%;text-align:center;} .post.tap b{color:var(--text);}
+  .sheet .frm{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 0 8px;} .sheet .frm label{display:flex;flex-direction:column;gap:3px;font-size:.74rem;color:var(--sub);} .sheet .frm input,.sheet .frm select{font:inherit;font-size:.95rem;padding:8px;border:1px solid var(--surface0);border-radius:8px;background:var(--base);color:var(--text);}
+  .sheet .frm label.w{grid-column:1/-1;}
+  .sheet .list{max-height:40vh;overflow:auto;} .sheet .list .it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--surface0);font-size:.86rem;} .sheet .list .it small{display:block;color:var(--sub);}
   .pull{display:none;height:0;overflow:hidden;text-align:center;font-size:.74rem;color:var(--sub);line-height:48px;transition:height .15s;}
 </style></head>
 <body>
@@ -100,6 +111,7 @@
   </section>
   <section class="pane chat" id="chatpane">
     <div class="chatbar" id="chatbar"></div>
+    <div class="att" id="att" hidden></div>
     <div class="feed" id="feed"><div class="empty">Pick a chat</div></div>
   </section>
 </main>
@@ -161,7 +173,89 @@ function drawChatBar() {
   el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'}</div></div>`;
 }
 function showList() { document.body.classList.remove('in-chat'); history.replaceState(null, '', location.pathname); }
-function open_(id) { cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts(); }
+function open_(id) { cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts(); loadDay(); }
+
+// ── attendance: Start / Finish with location (part 2) ─────────────────────────
+let day = null;
+const isWorkerChat = () => { const t = threads.find(x => x.id === cur); return !!(t && t.kind === 'worker'); };
+async function loadDay() {
+  if (!isWorkerChat()) { el('att').hidden = true; return; }
+  try { day = await Admin.api('GET', `/api/site/${cur}/day`); } catch { day = null; }
+  drawDay();
+}
+function drawDay() {
+  const a = el('att'); if (!isWorkerChat() || !day) { a.hidden = true; return; }
+  a.hidden = false;
+  const started = !!day.start, finished = !!day.finish;
+  a.innerHTML = `<div class="row">
+      <button class="big start" ${started ? 'disabled' : ''} onclick="tap('start')">▶ Start${started ? ' ' + esc(day.arrived) : ''}</button>
+      <button class="big finish" ${finished ? 'disabled' : ''} onclick="tap('finish')">■ Finish${finished ? ' ' + esc(day.finished) : ''}</button></div>
+    <div class="st"><span>${started ? (day.start.siteName ? '📍 ' + esc(day.start.siteName) : '📍 no site') + (day.hours ? ' · ' + day.hours + ' h' : '') : 'Tap Start when you arrive on site'}</span>
+      <span>${day.line ? `<span class="lineState ${esc(day.line.state)}" title="${esc(day.line.description || '')}">day ${day.line.state === 'waiting' ? 'sent — waiting for Mario’s ✓' : day.line.state}</span> ` : ''}<a href="#" onclick="forgotTap();return false;">forgot a tap?</a>${me.admin ? ' · <a href="#" onclick="sitesSheet();return false;">sites</a>' : ''}</span></div>`;
+}
+function getLoc() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }), () => res(null), { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+  });
+}
+async function tap(kind, extra = {}) {
+  const btn = document.querySelector('.att .big.' + kind); if (btn) { btn.disabled = true; btn.textContent = '📍 locating…'; }
+  const loc = extra.manual ? null : await getLoc();
+  try {
+    const r = await Admin.api('POST', `/api/site/${cur}/tap`, { kind, loc, ...extra });
+    replacePost(r.post); draw(); await loadDay(); loadThreads();
+  } catch (e) {
+    if (e.data && e.data.pick) return pickSite(kind, e.data.sites, e.data.error, extra);
+    alert(e.message); drawDay();
+  }
+}
+function pickSite(kind, sites, why, extra) {
+  closeSheet();
+  const sh = document.createElement('div'); sh.className = 'sheet'; sh.id = 'sheet';
+  sh.innerHTML = `<div class="card"><div class="t">${esc(why || 'Which site?')}</div>${sites.map(s => `<button onclick="closeSheet();tap('${esc(kind)}', ${esc(JSON.stringify({ ...extra, siteId: s.id }))})">📍 ${esc(s.name)}</button>`).join('')}<button onclick="closeSheet();drawDay()">Cancel</button></div>`;
+  sh.onclick = e => { if (e.target === sh) { closeSheet(); drawDay(); } };
+  document.body.appendChild(sh);
+}
+// a tap he forgot: today or yesterday with the time he types (Mario: any day). It is marked "entered by hand".
+function forgotTap() {
+  closeSheet();
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Beirut' }), yest = new Date(Date.now() - 864e5).toLocaleDateString('en-CA', { timeZone: 'Asia/Beirut' });
+  const sh = document.createElement('div'); sh.className = 'sheet'; sh.id = 'sheet';
+  sh.innerHTML = `<div class="card"><div class="t">Enter a tap by hand — it will show as “entered by hand”</div>
+    <div class="frm"><label>Which<select id="ft-kind"><option value="start">Start</option><option value="finish">Finish</option></select></label>
+      <label>Day${me.admin ? `<input id="ft-date" type="date" value="${today}">` : `<select id="ft-date"><option value="${today}">Today</option><option value="${yest}">Yesterday</option></select>`}</label>
+      <label class="w">Time<input id="ft-time" type="time" required></label></div>
+    <button class="del" style="color:var(--green)" onclick="submitForgot()">Save</button><button onclick="closeSheet()">Cancel</button></div>`;
+  sh.onclick = e => { if (e.target === sh) closeSheet(); };
+  document.body.appendChild(sh);
+}
+async function submitForgot() {
+  const kind = el('ft-kind').value, date = el('ft-date').value, time = el('ft-time').value;
+  if (!date || !time) return alert('day and time');
+  closeSheet(); await tap(kind, { manual: { date, time } });
+}
+// Mario: the sites and their radius; the analytic account is the project the day is charged to
+async function sitesSheet() {
+  closeSheet();
+  const [sites, analytics] = await Promise.all([Admin.api('GET', '/api/site/sites'), Admin.api('GET', '/api/site/analytics')]);
+  const sh = document.createElement('div'); sh.className = 'sheet'; sh.id = 'sheet';
+  sh.innerHTML = `<div class="card"><div class="t">Sites — a Start inside the circle sets the day’s project</div>
+    <div class="list">${sites.map(s => `<div class="it"><div><b>${esc(s.name)}</b><small>${esc(s.analyticName || 'no project')} · ${s.radiusM} m · ${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</small></div><a href="#" style="color:var(--red)" onclick="delSite('${esc(s.id)}');return false;">remove</a></div>`).join('') || '<div class="it" style="color:var(--overlay0)">No site yet</div>'}</div>
+    <div class="frm"><label class="w">Name<input id="s-name" placeholder="Ajaltoun 4193"></label>
+      <label class="w">Project (Odoo analytic)<select id="s-an"><option value="">—</option>${analytics.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></label>
+      <label>Latitude<input id="s-lat" type="number" step="any"></label><label>Longitude<input id="s-lng" type="number" step="any"></label>
+      <label>Radius (m)<input id="s-r" type="number" value="150"></label><label>&nbsp;<button onclick="useHere()" style="font:inherit;padding:8px;border-radius:8px;border:1px solid var(--surface0);background:var(--base)">📍 use my position</button></label></div>
+    <button class="del" style="color:var(--green)" onclick="saveSite()">Add site</button><button onclick="closeSheet()">Close</button></div>`;
+  sh.onclick = e => { if (e.target === sh) closeSheet(); };
+  document.body.appendChild(sh);
+}
+async function useHere() { const l = await getLoc(); if (!l) return alert('no location from this browser'); el('s-lat').value = l.lat.toFixed(6); el('s-lng').value = l.lng.toFixed(6); }
+async function saveSite() {
+  const an = el('s-an'); const body = { name: el('s-name').value, analyticId: an.value || null, analyticName: an.value ? an.options[an.selectedIndex].text : '', lat: el('s-lat').value, lng: el('s-lng').value, radiusM: el('s-r').value };
+  try { await Admin.api('POST', '/api/site/sites', body); sitesSheet(); } catch (e) { alert(e.message); }
+}
+async function delSite(id) { if (!confirm('Remove this site?')) return; await Admin.api('DELETE', '/api/site/sites/' + id); sitesSheet(); }
 function replacePost(d) { const i = posts.findIndex(p => p.id === d.id); if (i >= 0) posts[i] = d; else posts.push(d); }
 async function digestOne(thread, id) {
   try { const d = await Admin.api('POST', `/api/site/${thread}/posts/${id}/digest`, {}); if (thread === cur) { replacePost(d); draw(); } }
@@ -189,7 +283,7 @@ async function retry(id) {
   document.querySelector('main').prepend(hint);
   addEventListener('touchstart', e => { y0 = scrollY <= 0 ? e.touches[0].clientY : null; pulled = 0; }, { passive: true });
   addEventListener('touchmove', e => { if (y0 == null) return; pulled = e.touches[0].clientY - y0; hint.style.height = Math.min(48, Math.max(0, pulled / 2)) + 'px'; hint.textContent = pulled > 90 ? '↻ release to refresh' : '↓ pull to refresh'; }, { passive: true });
-  addEventListener('touchend', async () => { const go = pulled > 90; y0 = null; pulled = 0; hint.style.height = go ? '48px' : '0'; if (go) { hint.textContent = 'refreshing…'; await Promise.all([loadThreads(), loadPosts()]); } hint.style.height = '0'; });
+  addEventListener('touchend', async () => { const go = pulled > 90; y0 = null; pulled = 0; hint.style.height = go ? '48px' : '0'; if (go) { hint.textContent = 'refreshing…'; await Promise.all([loadThreads(), loadPosts(), loadDay()]); } hint.style.height = '0'; });
 })();
 async function loadPosts() {
   if (!cur) { el('feed').innerHTML = '<div class="empty">No thread is open to your account yet. Ask Mario.</div>'; setComposerEnabled(false); return; }
@@ -212,15 +306,16 @@ function draw() {
   if (!posts.length) { el('feed').innerHTML = '<div class="empty">Nothing here yet. Write what happened, send a photo, or record.</div>'; return; }
   let lastDay = '';
   el('feed').innerHTML = posts.map(p => {
-    const day = p.date !== lastDay ? `<div class="day">${esc(dayLabel(p.date))}</div>` : ''; lastDay = p.date;
+    const dayHdr = p.date !== lastDay ? `<div class="day">${esc(dayLabel(p.date))}</div>` : ''; lastDay = p.date;
     const mine = p.by === me.email;
-    if (p.deleted) return `${day}<div class="post ${mine ? 'me' : ''} gone" data-id="${esc(p.id)}">🚫 This message was deleted<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
+    if (p.deleted) return `${dayHdr}<div class="post ${mine ? 'me' : ''} gone" data-id="${esc(p.id)}">🚫 This message was deleted<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
+    if (p.kind === 'start' || p.kind === 'finish') return `${dayHdr}<div class="post tap" data-id="${esc(p.id)}">${p.kind === 'start' ? '▶' : '■'} <b>${p.kind === 'start' ? 'Started' : 'Finished'} ${hhmm(p.at)}</b>${p.siteName ? ' · 📍 ' + esc(p.siteName) : p.loc ? ' · outside every site' : ' · no location'}${p.distanceM != null ? ` <span title="from the site’s centre">(${p.distanceM} m)</span>` : ''}${p.manual ? ` · entered by hand at ${hhmm(p.enteredAt)}` : ''}${p.noStart ? ' · ⚠ no Start before it' : ''}</div>`;
     const body = p.kind === 'photo' ? `<img src="/api/site/${cur}/posts/${p.id}/file" loading="lazy">`
       : p.kind === 'video' ? `<video src="/api/site/${cur}/posts/${p.id}/file" controls preload="metadata"></video>`
       : p.kind === 'voice' ? `<audio src="/api/site/${cur}/posts/${p.id}/file" controls></audio>${p.parsed && p.parsed.transcript ? `<div style="margin-top:6px;font-style:italic">${esc(p.parsed.transcript)}</div>` : ''}`
       : esc(p.text);
     const canDel = mine || me.admin;
-    return `${day}<div class="post ${mine ? 'me' : ''}" data-id="${esc(p.id)}" ${canDel ? `oncontextmenu="event.preventDefault();askDelete('${esc(p.id)}')" ontouchstart="pressStart(event,'${esc(p.id)}')" ontouchend="pressEnd()" ontouchmove="pressEnd()"` : ''}>${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
+    return `${dayHdr}<div class="post ${mine ? 'me' : ''}" data-id="${esc(p.id)}" ${canDel ? `oncontextmenu="event.preventDefault();askDelete('${esc(p.id)}')" ontouchstart="pressStart(event,'${esc(p.id)}')" ontouchend="pressEnd()" ontouchmove="pressEnd()"` : ''}>${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
   }).join('');
   const pane = el('chatpane'); pane.scrollTop = pane.scrollHeight; window.scrollTo(0, document.body.scrollHeight);
 }
