@@ -88,7 +88,7 @@
   .vstatus{color:var(--overlay0);font-size:.85rem;text-align:center;padding:40px 0;}
   /* tabs, plan table, edit dialog */
   /* the tabs live in the sticky header (saves vertical space, always reachable while scrolling) */
-  .tabs{display:flex;gap:2px;margin:0 auto;}
+  .tabs{display:flex;gap:2px;margin:0 auto 0 28px;}   /* right after the wordmark; the right side stays free for more items */
   .tabs a{padding:8px 14px;color:var(--sub);text-decoration:none;font-size:.88rem;border-radius:8px;white-space:nowrap;}
   .tabs a.on{color:var(--amber);background:rgba(242,169,59,.1);font-weight:600;} .tabs a:hover{color:var(--text);}
   @media (max-width:700px){.tabs a{padding:6px 9px;font-size:.8rem;}}
