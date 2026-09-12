@@ -361,9 +361,13 @@ async function odooCheck(odooCall, txs, opts = {}) {
     for (const l of lines) {
       if (l.date < lo || l.date > hi) continue;
       // statement debit (money out) = credit on the Odoo cash account, and vice versa
+      // the currency-amount fallback must keep the direction too: a $200 customer receipt was tied to $200
+      // going out to Anthony because only the absolute value was compared (Mario, 2026-09-13)
       const sameAmount = Math.abs((t.debit ? l.credit : l.debit) - want) < 0.011
-        || (l.amount_currency && Math.abs(Math.abs(l.amount_currency) - want) < 0.011);
+        || (l.amount_currency && (t.debit ? l.amount_currency < 0 : l.amount_currency > 0) && Math.abs(Math.abs(l.amount_currency) - want) < 0.011);
       if (!sameAmount) continue;
+      // a match Mario untied by hand stays untied
+      if (((t.odoo || {}).rejected || []).includes(l.move_id[0])) continue;
       const why = [];
       let score = 4 - days(t.date, l.date);                       // exact date 4 → 3 days away 1
       if (!days(t.date, l.date)) why.push('same date');
