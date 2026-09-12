@@ -1372,10 +1372,17 @@ const cents = n => Math.round(Number(n || 0) * 100) / 100;
 function adHocRule(t) {
   if (t.src === 'odoo' || t.kind === 'transfer' || t.nature === 'transfer' || t.bookedMove || t.booked) return null;
   if (t.odoo && (t.odoo.matches || []).some(x => x.chosen)) return null;
-  if (!t.partnerId || partnerShown(t) === '' || !companyOf(t) || companyOf(t) === 'Personal') return null;
-  const co = companyOf(t);
+  // a partner or company that is only SUGGESTED (↳) still gets a Pay: pressing it accepts the suggestion
+  // and books in one go (Mario, 2026-09-13: "for all the transactions … suggest to pay, same as Anthony and Kamal")
+  let partnerId = t.partnerId, partnerName = partnerShown(t), co = companyOf(t), suggested = false;
+  if ((!partnerId || !co) && !t.suggestSkip) {
+    const sg = sugFor(t);
+    if (!partnerId && sg.partner && sg.partner.id) { partnerId = sg.partner.id; partnerName = sg.partner.name; suggested = true; }
+    if (!co && sg.company && sg.company !== 'Personal') { co = sg.company; suggested = true; }
+  }
+  if (!partnerId || !partnerName || !co || co === 'Personal') return null;
   const j = (account && (account.odooJournals || []).find(x => x.company === co)) || null;
-  return { id: 'adhoc', book: 'payment', partnerId: t.partnerId, partnerName: partnerShown(t), companyName: co, analyticId: t.analyticId, analyticName: t.analyticName || '',
+  return { id: 'adhoc', book: 'payment', suggested, partnerId, partnerName, companyName: co, analyticId: t.analyticId, analyticName: t.analyticName || '',
     paymentJournalName: j ? j.name : ((account && account.odooJournalWord) ? `the ${account.odooJournalWord} journal of ${co}` : 'the cash journal') };
 }
 function ruleFor(t) {
@@ -1396,7 +1403,7 @@ function bookButton(t) {
   const what = [r.partnerName, r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · ');
   // classify-only: the answers are filled in, but the bill has to come from the document
   if (r.book === false) return `<span class="odoo-no" title="${esc((r.description || 'This rule fills the answers in but does not book.') + ' — ' + what)}">needs the bill</span>`;
-  if (r.book === 'payment') return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('A vendor payment to ' + r.partnerName + ' from ' + (r.paymentJournalName || 'the cash journal') + ' — no bill; it reconciles against his own bills later')}">📗 Pay</button>`;
+  if (r.book === 'payment') return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('A ' + (t.debit ? 'vendor' : 'customer') + ' payment ' + (t.debit ? 'to ' : 'from ') + r.partnerName + ' (' + r.companyName + ') on ' + (r.paymentJournalName || 'the cash journal') + ' — no bill; it reconciles against ' + (t.debit ? 'bills' : 'invoices') + ' later' + (r.suggested ? '. The suggested partner / company is accepted first.' : ''))}">📗 Pay${r.suggested ? ' ↳' : ''}</button>`;
   return `<button class="btn book" onclick="bookRow('${t.id}', this)" title="${esc('Create the bill, post it and pay it from ' + (r.paymentJournalName || 'the cash journal') + ':\n' + what)}">${bk ? '📗 Post & pay' : '📗 Book'}</button>`;
 }
 // Every line's amount can be corrected here, on any account (Mario, 2026-09-07). An Odoo line mirrors
@@ -3349,9 +3356,10 @@ async function bookOne(id, btn) {
 async function bookRow(id, btn) {
   const t = tx.find(x => x.id === id), r = t && (ruleFor(t) || adHocRule(t)); if (!r) return;
   const amt = fmt(t.debit || t.credit);
-  if (r.book === 'payment' ? !confirm(`Record ${amt} of ${t.date} in Odoo as a payment to ${r.partnerName} (${r.companyName}) from ${r.paymentJournalName || 'the cash journal'}?\n\nNo bill is created: it is money against his own bills, to reconcile there.`) : !confirm(`Book ${amt} of ${t.date} in Odoo?\n\n${r.partnerName} · ${r.companyName}\n${r.accountCode}${r.analyticName ? '\n' + r.analyticName : ''}\n\nThe bill is created, posted and paid from ${r.paymentJournalName || 'the cash journal'} on that date.`)) return;
+  if (r.book === 'payment' ? !confirm(`Record ${amt} of ${t.date} in Odoo as a ${t.debit ? 'payment to' : 'payment from'} ${r.partnerName} (${r.companyName}) on ${r.paymentJournalName || 'the cash journal'}?${r.suggested ? ' The suggested partner / company is written on the line first.' : ''}\n\nNo bill is created: it is money against his own bills, to reconcile there.`) : !confirm(`Book ${amt} of ${t.date} in Odoo?\n\n${r.partnerName} · ${r.companyName}\n${r.accountCode}${r.analyticName ? '\n' + r.analyticName : ''}\n\nThe bill is created, posted and paid from ${r.paymentJournalName || 'the cash journal'} on that date.`)) return;
   btn.disabled = true; btn.textContent = 'Booking…';
   try {
+    if (r.suggested) await acceptRow(id);   // the ↳ partner / company become the line's own before Odoo sees it
     const one = await bookLine(id);
     say(`${one.move} posted` + (one.payment ? ` and paid by ${one.payment.name}` : ''));
   } catch (e) { btn.disabled = false; btn.textContent = '📗 Book'; say('Could not book: ' + e.message, 'err'); }
@@ -3612,7 +3620,9 @@ async function bookQueued(id, btn) {
 // a line with a rule goes the rules way; any other typed line the way ✓ accept books it (book-row)
 async function bookAny(id) {
   const t = tx.find(x => x.id === id);
-  if (t && (ruleFor(t) || adHocRule(t))) return bookLine(id);   // a rule, or partner + company → a payment
+  const ad = t && !ruleFor(t) && adHocRule(t);
+  if (ad && ad.suggested) await acceptRow(id);
+  if (t && (ruleFor(t) || ad)) return bookLine(id);   // a rule, or partner + company (own or suggested) → a payment
   const r = await Admin.api('POST', `/api/accounting/accounts/${acc}/book-row`, { txId: id });
   await reloadTx(); render();
   return { move: r.move || '', kind: r.kind, already: r.already };
