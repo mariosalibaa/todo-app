@@ -186,7 +186,7 @@
   .months td,.months th{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top;} .months th{text-align:left;font-size:12px;color:var(--sub);} .months .num{text-align:right;font-variant-numeric:tabular-nums;}
   .sug-why{font-size:10.5px;color:var(--auto);font-style:italic;margin-right:4px;}
   .c-type{width:7%;} .c-type select{width:100%;font-size:12px;}
-  .locked{color:var(--muted);}
+  .locked{color:var(--muted);} td.c-partner .locked,td.c-cash .locked{display:block;border-bottom:1px dashed var(--line);padding:2px 4px;text-align:center;}
   td select:has(option[value=""]:checked){color:var(--auto);font-style:italic;} td input::placeholder{color:var(--auto);font-style:italic;}
   .desc-in{border:none;background:transparent;color:inherit;font:inherit;width:calc(100% - 40px);padding:0;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere;display:inline-block;vertical-align:top;} .desc-in:hover{background:var(--surface0);} .desc-in:focus{outline:none;border-bottom:1px solid var(--blue);background:var(--crust);}
   /* the day is always written the same way (Su 2026-09-07); on rows you may move, the native
@@ -1621,7 +1621,7 @@ function render() {
       <td class="num debit${t.debit ? '' : ' zero'}">${amountCell(t, 'debit')}</td>
       <td class="num credit${t.credit ? '' : ' zero'}">${amountCell(t, 'credit')}</td>
       <td class="num c-bal">${fmt(st ? t.balance : t._bal)}</td>
-      <td class="c-partner ${srcClass(t.partnerName ? (t.partnerSrc || 'manual') : '')}" title="${t.partnerSrc === 'odoo' ? 'From the matched Odoo payment' : sg.partner ? esc('Suggested: ' + sg.partner.name + ' — ' + sg.partner.why) : ''}">
+      ${cashOf(t) && !partnerShown(t) ? `<td class="c-partner"><span class="locked" title="A deposit, cash-out or transfer: justified by the cash or bank side — clear it (✕) to name a partner instead">—</span></td>` : `<td class="c-partner ${srcClass(partnerShown(t) ? (t.partnerSrc || 'manual') : '')}" title="${t.partnerSrc === 'odoo' ? 'From the matched Odoo payment' : sg.partner ? esc('Suggested: ' + sg.partner.name + ' — ' + sg.partner.why) : ''}">
         <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(partnerShown(t) || t.partnerText || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : unjustified(t) ? 'partner or cash?' : 'partner'}"
           oninput="pickFilter('pp-${t.id}')" onkeydown="pickKey(event,'pp-${t.id}')" onblur="pickBlur('pp-${t.id}')">
           <input type="hidden" id="pp-${t.id}" value="${esc(t.partnerId || '')}" data-row="${t.id}"><div class="pick-list" id="pp-${t.id}-list"></div></div>
@@ -1629,8 +1629,8 @@ function render() {
           ? `<div class="sug-act typed" title="${esc('You typed "' + t.partnerText + '" — the closest Odoo partner is ' + pr.name)}"><span class="sug-why">typed</span> <button class="yes" onclick="takeTyped('${t.id}','partner',true)">✓ ${esc(pr.name)}</button><button class="no" title="Leave it as you typed it" onclick="takeTyped('${t.id}','partner',false)">✕</button></div>`
           : t.partnerText ? `<div class="sug-skip" title="Typed on the phone; nothing in Odoo looks like it">typed · no Odoo match</div>` : ''; })()}
         ${(() => { const w = t.odoo && (t.odoo.matches || []).find(x => x.chosen); return w && w.partner && (t.nature === 'vendor' || t.nature === 'refund' || !t.nature) && t.partnerSrc !== 'odoo' && similarity(w.partner, t.partnerName || '') < 0.95 ? `<div class="odoo-partner" title="The partner on the Odoo entry this row matches">${esc(w.partner)}</div>` : ''; })()}
-      </td>
-      ${(() => { const cj = cashOf(t); return `<td class="c-cash ${cj ? (cj.derived ? 'src-auto' : 'src-manual') : ''}" title="${cj ? esc('The cash or bank journal on the other side of this payment' + (cj.derived ? ' — taken from the account this transfer named' : '')) : 'A transfer between our own accounts: pick the Odoo cash/bank journal the money went to or came from'}">
+      </td>`}
+      ${(() => { const cj = cashOf(t); if (partnerShown(t) && !cj) return `<td class="c-cash"><span class="locked" title="This payment is justified by its partner — clear the partner to make it a transfer to a cash or bank account">—</span></td>`; return `<td class="c-cash ${cj ? (cj.derived ? 'src-auto' : 'src-manual') : ''}" title="${cj ? esc('The cash or bank journal on the other side of this payment' + (cj.derived ? ' — taken from the account this transfer named' : '')) : 'A transfer between our own accounts: pick the Odoo cash/bank journal the money went to or came from'}">
         <div class="pick"><input type="text" id="cj-${t.id}-txt" autocomplete="off" value="${esc(cj ? cj.name : '')}" placeholder="${unjustified(t) ? 'partner or cash?' : 'cash / bank'}"
           oninput="cjFilter('cj-${t.id}')" onkeydown="cjKey(event,'cj-${t.id}')" onblur="cjBlur('cj-${t.id}')">
           <input type="hidden" id="cj-${t.id}" value="${esc(cj && cj.id || '')}" data-row="${t.id}"><div class="pick-list" id="cj-${t.id}-list"></div></div>
