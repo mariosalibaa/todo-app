@@ -68,7 +68,7 @@ async function load() {
 function render() {
   const T = D.totals;
   document.getElementById('msg').textContent = '';
-  document.getElementById('at').textContent = 'Odoo read ' + D.at.replace('T', ' ').slice(0, 16) + ' UTC';
+  document.getElementById('at').textContent = 'Odoo read ' + new Date(D.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
   document.getElementById('kpis').innerHTML = `
     <div class="kpi cash"><div class="v">$ ${f(T.collected)}</div><div class="l">Collected in total — ${f(T.paidOdoo)} booked in Odoo${T.pendingHub ? ` + ${f(T.pendingHub)} on Whish not yet booked` : ''}</div></div>
     ${D.collectors.map(c => `<div class="kpi in"><div class="v">$ ${f(c.amount + (c.pending || 0))}</div><div class="l">by ${esc(c.key)} — ${c.n} payment${c.n === 1 ? '' : 's'}${c.pending ? ` + ${c.pendingN} pending (${f(c.pending)})` : ''}</div></div>`).join('')}

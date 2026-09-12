@@ -90,6 +90,8 @@ const f2 = n => (Math.abs(n) < 0.005 ? '' : n.toLocaleString('en-US', { minimumF
 const f0 = n => (Math.abs(n) < 0.5 ? '' : Math.round(n).toLocaleString('en-US'));
 const f2z = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const f0z = n => Math.round(n).toLocaleString('en-US');
+// times shown in Beirut, not UTC (Mario, 2026-09-13)
+const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // compact line → object
 const L = r => ({ id: r[0], date: r[1], moveId: r[2], move: r[3], journal: r[4], partner: r[5], label: r[6], ref: r[7], acc: r[8], debit: r[9], credit: r[10], lbp: r[11], rate: r[12] });
@@ -106,7 +108,7 @@ async function load(fresh) {
   try {
     D = await Admin.api('GET', '/api/reports/sarl-lbp' + (fresh ? '?fresh=1' : ''));
     D.L = D.lines.map(L);
-    document.getElementById('msg').innerHTML = `${D.L.length.toLocaleString('en-US')} posted lines · ${Object.keys(D.accounts).length} accounts · Odoo read ${esc(D.pulledAt.replace('T', ' ').slice(0, 16))} UTC${D.cached ? ' (cached, refreshed every 15 min)' : ''} · latest rate <b>${D.rates.length ? D.rates[D.rates.length - 1].rate.toLocaleString('en-US') : '?'}</b> LBP/USD`;
+    document.getElementById('msg').innerHTML = `${D.L.length.toLocaleString('en-US')} posted lines · ${Object.keys(D.accounts).length} accounts · Odoo read ${esc(when(D.pulledAt))}${D.cached ? ' (kept 15 min — ↻ Pull now re-reads)' : ' (just now)'} · latest rate <b>${D.rates.length ? D.rates[D.rates.length - 1].rate.toLocaleString('en-US') : '?'}</b> LBP/USD`;
     render();
   } catch (e) { document.getElementById('msg').innerHTML = `<span style="color:var(--red)">Could not load: ${esc(e.message || String(e))}</span>`; }
 }
@@ -152,7 +154,7 @@ function render() {
   const R = compute();
   const per = `${R.from || 'start'} → ${R.to}`;
   document.getElementById('ptitle').textContent = `${D.company.name} — ${tab === 'tb' ? 'Trial balance' : tab === 'gl' ? 'General ledger' : 'LBP rates'} in LBP at historical rates`;
-  document.getElementById('psub').textContent = `Period ${per}${R.q ? ' · filter "' + R.q + '"' : ''} · Odoo read ${D.pulledAt.slice(0, 10)} · printed ${today()}`;
+  document.getElementById('psub').textContent = `Period ${per}${R.q ? ' · filter "' + R.q + '"' : ''} · Odoo read ${when(D.pulledAt)} · printed ${when(new Date().toISOString())}`;
   const gap = R.T.closeDrLBP - R.T.closeCrLBP;
   document.getElementById('kpis').innerHTML = `
     <div class="kpi usd"><div class="v">${f2z(R.T.drUSD)}</div><div class="l">Period debits, USD (credits ${f2z(R.T.crUSD)})</div></div>
