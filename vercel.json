@@ -4,7 +4,12 @@
     "todo-app": {
       "root": ".",
       "runtime": "node",
-      "entrypoint": "server.js"
+      "entrypoint": "server.js",
+      "functions": {
+        "server.js": {
+          "maxDuration": 60
+        }
+      }
     }
   },
   "rewrites": [
@@ -32,10 +37,5 @@
       "path": "/api/cron/ajaltoun",
       "schedule": "0 5 * * *"
     }
-  ],
-  "functions": {
-    "server.js": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
