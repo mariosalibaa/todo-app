@@ -41,7 +41,16 @@
   .addrow label{font-size:.8rem;color:var(--sub);display:flex;align-items:center;gap:5px;}
   .admin-badge{font-size:.62rem;background:var(--surface0);color:var(--amber);padding:2px 6px;border-radius:5px;margin-left:6px;letter-spacing:.08em;}
   .note{font-size:.74rem;color:var(--overlay0);margin-top:10px;line-height:1.5;}
-  @media (max-width:600px){header{padding:14px 16px;}main{padding:22px 14px;}td.c,th.c{width:70px;}}
+  .twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;} body{overflow-x:hidden;}
+  .tile .ico svg{display:block;}
+  /* phone (Mario, 2026-09-12): the page must be the phone's width, and every app on the first screen — one compact row per app */
+  @media (max-width:600px){
+    header{padding:12px 16px;} main{padding:14px 12px 40px;} h2{margin:6px 0 10px;} td.c,th.c{width:70px;}
+    .tiles{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
+    .tile{display:grid;grid-template-columns:44px 1fr;grid-template-rows:auto auto;column-gap:12px;align-items:center;padding:10px 12px;border-radius:12px;}
+    .tile .ico{grid-row:1/3;font-size:1.5rem;margin:0;width:44px;text-align:center;} .tile .ico svg{margin:0 auto;width:30px;height:30px;}
+    .tile .name{font-size:.95rem;} .tile .desc{margin-top:1px;font-size:.72rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+  }
 </style>
 </head>
 <body>
@@ -54,10 +63,10 @@
   <div class="tiles" id="tiles"></div>
   <section id="members" style="display:none;">
     <h2>Members &amp; access</h2>
-    <table>
+    <div class="twrap"><table>
       <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th class="c">Daily</th><th class="c">WhatsApp</th><th>Ledger</th><th>Projects</th><th style="width:40px"></th></tr></thead>
       <tbody id="member-rows"></tbody>
-    </table>
+    </table></div>
     <div class="addrow">
       <input type="email" id="new-email" placeholder="name@gmail.com" style="max-width:280px" onkeydown="if(event.key==='Enter')addMember()">
       <label><input type="checkbox" id="new-todo" checked> To-Do</label>
@@ -81,7 +90,7 @@ const APPS = [
   { id: 'partners', ico: '🤝', name: 'Partners', desc: 'Agreements, fee frameworks and proposals shared with a partner', href: '/partners' },
   { id: 'ajaltoun', ico: '🏗️', name: 'Ajaltoun 4193', desc: 'Project accounts from Odoo — cash flow, costs by section and villa, each partner share', href: '/ajaltoun' },
   { id: 'daily', ico: '📋', name: 'Day report', desc: 'Who worked on your project each day, what he did and what it cost.', href: '/accounting/daily' },
-  { id: 'site', ico: '💬', name: 'Shift WhatsApp', desc: 'The site chat: text, photos, a voice note — receipts become ledger lines. Start and Finish with your location.', href: '/site' },
+  { id: 'site', ico: `<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#25D366"/><path fill="#fff" d="M12 4.6a7.3 7.3 0 0 0-6.3 11l-1 3.7 3.8-1a7.3 7.3 0 1 0 3.5-13.7zm0 1.3a6 6 0 1 1-3.1 11.2l-.2-.1-2.2.6.6-2.1-.2-.3A6 6 0 0 1 12 5.9zm-2.4 2.6c-.2 0-.5.1-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 5 4.3 2.5 1 3 .8 3.5.7.5 0 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.4-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2 0-.4 0-.5L10.4 9c-.2-.5-.4-.5-.6-.5h-.2z"/></svg>`, name: 'Shift WhatsApp', desc: 'The site chat: text, photos, a voice note — receipts become ledger lines. Start and Finish with your location.', href: '/site' },
 ];
 const esc = Admin.esc;
 // Mario, 2026-09-12: an app id isn't always its own URL (daily lives under /accounting/daily) —
