@@ -1,13 +1,14 @@
 // Ajaltoun 4193 app — the project's accounts, read straight out of Odoo.
 // Mounted by server.js under /api/ajaltoun/*; needs ctx = { db, TEAM_ID, odooCall, access }.
 //
-//   GET  /api/ajaltoun/data[?fresh=1]   everything the page shows, from the Odoo SNAPSHOT (fresh = admin re-pull now)
+//   GET  /api/ajaltoun/data[?fresh=1|refresh=1]   everything the page shows, from the Odoo SNAPSHOT (fresh = admin re-pull now; refresh = pull only if stale)
 //
 // Speed (Mario, 2026-09-12): the hub runs on Vercel, so a memory cache dies with the instance and every visit
 // used to re-pull Odoo (9 calls in a row, 10-30 s). The pull now lands in Firestore (ajaltounMeta/snapshot +
 // ajaltounSnap/<n> chunks) and the page renders from there at once. The snapshot is refreshed by the cron
 // (/api/cron/ajaltoun, see server.js + vercel.json), in the background when a visitor finds it older than
-// SNAP_TTL, or on demand with ?fresh=1. Review states and section rules stay live from Firestore.
+// SNAP_TTL (the page renders the stale copy at once, then asks again with ?refresh=1 and swaps the result in), or on
+// demand with ?fresh=1. Review states and section rules stay live from Firestore.
 //   GET  /api/ajaltoun/file/<attId>      an Odoo attachment (the bill scan), streamed for the viewer
 //   POST /api/ajaltoun/section           { lineId, section, forPartner? }  admin: classify a line (or its whole supplier)
 //   POST /api/ajaltoun/qty                { section, qty, unit }   admin: quantity done so far in a section (for $/unit)
@@ -225,14 +226,17 @@ async function handle(req, res, url, user, ctx) {
   if (url.startsWith('/api/ajaltoun/plan')) return plan.handle(req, res, url, user, ctx);
 
   if (url === '/api/ajaltoun/data' && req.method === 'GET') {
+    // fresh=1 (admin "pull now") and refresh=1 (the page, when told the snapshot is stale) both pull Odoo before answering.
+    // The page-driven second call is what keeps the data current: the Vercel cron is daily only (Hobby plan) and a
+    // fire-and-forget pull after the reply is not guaranteed to finish on serverless.
     const fresh = /[?&]fresh=1/.test(req.url || '') && access.admin;
-    if (fresh) await refresh(odooCall, db, TEAM_ID);
-    else if (!cache.data) {                                    // cold instance: the stored snapshot, or the first pull ever
+    const wantRefresh = /[?&]refresh=1/.test(req.url || '');
+    if (!cache.data) {                                         // cold instance: the stored snapshot, or the first pull ever
       const snap = await loadSnapshot(db, TEAM_ID);
       if (snap) cache = snap; else await refresh(odooCall, db, TEAM_ID);
     }
+    if (fresh || (wantRefresh && Date.now() - cache.at > SNAP_TTL)) await refresh(odooCall, db, TEAM_ID);
     const stale = Date.now() - cache.at > SNAP_TTL;
-    if (stale && !refreshing) refresh(odooCall, db, TEAM_ID).catch(e => console.error('ajaltoun refresh:', e));   // serve now, refresh behind
     const [mt, vsnap] = await Promise.all([meta(db, TEAM_ID), db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get()]);
     const ver = {}; for (const d of vsnap.docs) { const x = d.data(); ver[d.id] = x.state ? { approved: null, verified: x.state === 'verified' ? x : null, flag: x.state === 'flagged' ? x : null } : x; }   // (old one-field shape)
     const lines = cache.data.lines.map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));

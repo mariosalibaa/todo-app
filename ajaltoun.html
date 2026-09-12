@@ -157,9 +157,15 @@ Admin.require('ajaltoun', async me => {
 });
 // the snapshot time in Beirut local time, never the raw ISO/UTC string
 function fmtWhen(iso) { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+// The snapshot renders at once; if the server says it is stale, a second call pulls Odoo and the numbers swap in.
 async function load(fresh) {
   if (fresh) { const h = document.querySelector('#app h2 .muted'); if (h) h.textContent = 'Pulling from Odoo…'; }
-  try { [D] = await Promise.all([Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')), Plan.load()]); window.D = D; if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved'; render(); }   // the partner opens on what waits for him
+  try {
+    [D] = await Promise.all([Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')), Plan.load()]); window.D = D;
+    if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved';   // the partner opens on what waits for him
+    render();
+    if (D.stale && !fresh) { try { D = await Admin.api('GET', '/api/ajaltoun/data?refresh=1'); window.D = D; render(); } catch (e) { console.warn('refresh failed', e); } }
+  }
   catch (e) { document.getElementById('app').innerHTML = `<p style="color:var(--red)">Could not read Odoo: ${esc(e.message)}</p>`; }
 }
 
