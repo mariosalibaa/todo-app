@@ -59,7 +59,7 @@ async function writeLine(ctx, ws, post, target, fields) {
   const a = await acc.resolve(ws, target);
   if (!a) throw new Error('no ledger ' + target);
   const id = 'site-' + post.id;
-  const t = { id, src: 'site', postId: post.id, thread: post.thread, date: post.date, ref: '', service: 'Site', phone: '',
+  const t = { id, src: 'site', postId: post.id, thread: post.thread, date: post.date, ref: '', service: 'Shift WhatsApp', phone: '',
     description: String(fields.description || post.text || '').slice(0, 160),
     debit: fields.side === 'debit' ? money(fields.amount) : 0, credit: fields.side === 'credit' ? money(fields.amount) : 0,
     analyticId: fields.analytic ? fields.analytic.id : null, analyticName: fields.analytic ? fields.analytic.name : '', analyticSrc: fields.analytic ? 'site' : '',
@@ -197,6 +197,27 @@ async function handle(req, res, url, user, ctx) {
     if (!d.exists || !d.data().file) return json(res, 404, { error: 'no file' });
     await files.streamFile(ctx, d.data().file, res, req);
     return true;
+  }
+
+  // delete a message the WhatsApp way (Mario, 2026-09-12): the post stays as "This message was deleted" — text, file
+  // and parse are wiped, the file is removed from storage, and a suggested ledger line that was never accepted goes
+  // with it. An accepted line is real accounting: the post is refused until Mario undoes it on the ledger.
+  if ((m = url.match(/^\/api\/site\/([\w-]+)\/posts\/([\w-]+)$/)) && req.method === 'DELETE') {
+    if (!(await threadsFor(ctx)).some(t => t.id === m[1])) return json(res, 403, { error: 'not your thread' });
+    const ref = ws.collection('site').doc(m[1]).collection('posts').doc(m[2]);
+    const d = await ref.get(); if (!d.exists) return json(res, 404, { error: 'no post' });
+    const post = d.data();
+    if (post.by !== who && !ctx.access.admin) return json(res, 403, { error: 'only your own messages' });
+    if (post.line) {
+      const a = await acc.resolve(ws, post.line.accountId);
+      const t = a ? (await acc.txCol(a).doc(post.line.txId).get()).data() : null;
+      if (t && t.waAccepted) return json(res, 409, { error: 'this message became an accepted ledger line — undo it on the ledger first' });
+      if (t) await acc.txCol(a).doc(post.line.txId).delete().catch(() => {});
+    }
+    if (post.file) await files.deleteFile(ctx, post.file).catch(() => {});
+    const gone = { id: post.id, thread: post.thread, by: post.by, at: post.at, date: post.date, kind: 'deleted', deleted: true, deletedAt: now(), deletedBy: who };
+    await ref.set(gone);
+    return json(res, 200, gone);
   }
 
   // read the fresh Claude parse for a post again, synchronously — the caller waits for the answer

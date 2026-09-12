@@ -49,4 +49,9 @@ async function streamFile(ctx, doc, res, req) {
   res.writeHead(200, { ...head, 'Content-Length': buf.length });
   res.end(buf);
 }
-module.exports = { saveFile, streamFile };
+async function deleteFile(ctx, doc) {
+  const { admin, db, TEAM_ID } = ctx;
+  if (doc.store === 'firestore') await db.collection('workspaces').doc(TEAM_ID).collection('txDocs').doc(doc.id).delete();
+  else await admin.storage().bucket().file(doc.key).delete({ ignoreNotFound: true });
+}
+module.exports = { saveFile, streamFile, deleteFile };

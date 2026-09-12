@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#f0f2f5"><title>Site · Shift Hub</title>
+<meta name="theme-color" content="#f0f2f5"><title>Shift WhatsApp · Shift Hub</title>
 <link rel="icon" href="/icons/icon-192.png"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><link rel="manifest" href="/manifest.json">
 <style>
   /* Light, WhatsApp-like palette (Mario, 2026-09-12): the site chat replaces the WhatsApp groups, so it should feel like them */
@@ -54,10 +54,17 @@
   .composer button.send{background:#00a884;color:#fff;}
   .composer button.rec{background:var(--red);color:#fff;}
   .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
+  .post.gone{font-style:italic;color:var(--overlay0);}
+  .post{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;} .post.gone,.post .line{user-select:text;}
+  .sheet{position:fixed;inset:0;z-index:950;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;}
+  .sheet .card{width:min(520px,100%);background:var(--mantle);border-radius:16px 16px 0 0;padding:12px 12px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;}
+  .sheet .t{font-size:.78rem;color:var(--sub);text-align:center;padding:4px 8px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sheet button{border:0;border-radius:12px;padding:13px;font:inherit;font-size:1rem;background:var(--base);color:var(--text);cursor:pointer;}
+  .sheet button.del{color:var(--red);font-weight:600;}
   .pull{height:0;overflow:hidden;text-align:center;font-size:.74rem;color:var(--sub);line-height:48px;transition:height .15s;}
 </style></head>
 <body>
-<header><div class="hleft"><span id="crumbs"></span><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>SITE</small></a><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Site']]));</script></div><div class="who" id="who"></div></header>
+<header><div class="hleft"><span id="crumbs"></span><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>WHATSAPP</small></a><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Shift WhatsApp']]));</script></div><div class="who" id="who"></div></header>
 <main>
   <div class="threads" id="threads" hidden></div>
   <div class="feed" id="feed"><div class="empty">Loading…</div></div>
@@ -168,13 +175,34 @@ function draw() {
   el('feed').innerHTML = posts.map(p => {
     const day = p.date !== lastDay ? `<div class="day">${esc(dayLabel(p.date))}</div>` : ''; lastDay = p.date;
     const mine = p.by === me.email;
+    if (p.deleted) return `${day}<div class="post ${mine ? 'me' : ''} gone" data-id="${esc(p.id)}">🚫 This message was deleted<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
     const body = p.kind === 'photo' ? `<img src="/api/site/${cur}/posts/${p.id}/file" loading="lazy">`
       : p.kind === 'video' ? `<video src="/api/site/${cur}/posts/${p.id}/file" controls preload="metadata"></video>`
       : p.kind === 'voice' ? `<audio src="/api/site/${cur}/posts/${p.id}/file" controls></audio>${p.parsed && p.parsed.transcript ? `<div style="margin-top:6px;font-style:italic">${esc(p.parsed.transcript)}</div>` : ''}`
       : esc(p.text);
-    return `${day}<div class="post ${mine ? 'me' : ''}" data-id="${esc(p.id)}">${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
+    const canDel = mine || me.admin;
+    return `${day}<div class="post ${mine ? 'me' : ''}" data-id="${esc(p.id)}" ${canDel ? `oncontextmenu="event.preventDefault();askDelete('${esc(p.id)}')" ontouchstart="pressStart(event,'${esc(p.id)}')" ontouchend="pressEnd()" ontouchmove="pressEnd()"` : ''}>${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
   }).join('');
   window.scrollTo(0, document.body.scrollHeight);
+}
+// long-press a message (or right-click on the laptop) → Delete, the WhatsApp way
+let pressT = null;
+function pressStart(e, id) { pressEnd(); pressT = setTimeout(() => { pressT = null; if (navigator.vibrate) navigator.vibrate(15); askDelete(id); }, 550); }
+function pressEnd() { if (pressT) clearTimeout(pressT); pressT = null; }
+function askDelete(id) {
+  const p = posts.find(x => x.id === id); if (!p || p.deleted) return;
+  closeSheet();
+  const sh = document.createElement('div'); sh.className = 'sheet'; sh.id = 'sheet';
+  sh.innerHTML = `<div class="card"><div class="t">${esc(p.kind === 'text' ? (p.text || '').slice(0, 80) : p.kind)}</div>
+    <button class="del" onclick="doDelete('${esc(id)}')">🗑 Delete message</button><button onclick="closeSheet()">Cancel</button></div>`;
+  sh.onclick = e => { if (e.target === sh) closeSheet(); };
+  document.body.appendChild(sh);
+}
+function closeSheet() { const s = document.getElementById('sheet'); if (s) s.remove(); }
+async function doDelete(id) {
+  closeSheet();
+  try { const gone = await Admin.api('DELETE', `/api/site/${cur}/posts/${id}`); replacePost(gone); draw(); }
+  catch (e) { alert(e.message); }
 }
 async function sendText() {
   const t = el('text').value.trim(); if (!t || !cur) return;
