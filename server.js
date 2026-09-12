@@ -648,7 +648,7 @@ const handler = async (req, res) => {
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
-    '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/accounting/excavation': 'excavation.html' };
+    '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html' };
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
@@ -817,7 +817,6 @@ const handler = async (req, res) => {
       const handled = url.startsWith('/api/accounting/budget/') ? await budget.handle(req, res, url, user, ctx)
         : url.startsWith('/api/accounting/wise/') ? await wise.handle(req, res, url, user, ctx)
         : await whishRules.handle(req, res, aurl, user, ctx)     // rules first: it only claims its own routes
-          || await excavation.handle(req, res, url, user, ctx)
           || await accounts.handle(req, res, aurl, user, ctx)
           || await accounting.handle(req, res, url, user, ctx);
       if (handled === false) { res.writeHead(404); res.end('not found'); }
@@ -842,7 +841,8 @@ const handler = async (req, res) => {
   if (url.startsWith('/api/ajaltoun/')) {
     if (!access.apps.includes('ajaltoun')) return noApp('ajaltoun');
     try {
-      const handled = await ajaltoun.handle(req, res, url, user, { db, TEAM_ID, odooCall, access });
+      const handled = await excavation.handle(req, res, url, user, { db, TEAM_ID, odooCall, access })
+        || await ajaltoun.handle(req, res, url, user, { db, TEAM_ID, odooCall, access });
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {
       console.error('ajaltoun error:', e);

@@ -10,7 +10,9 @@
   :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
   *{box-sizing:border-box;} body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
-  .hleft{display:flex;align-items:center;gap:16px;} .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;} .hback:hover{background:var(--surface0);}
+  .hleft{display:flex;align-items:center;gap:16px;min-width:0;}
+  .tabs{display:flex;gap:2px;margin:0 auto 0 28px;} .tabs a{padding:8px 14px;color:var(--sub);text-decoration:none;font-size:.88rem;border-radius:8px;white-space:nowrap;}
+  .tabs a.on{color:var(--amber);background:rgba(242,169,59,.1);font-weight:600;} .tabs a:hover{color:var(--text);} @media (max-width:700px){.tabs a{padding:6px 9px;font-size:.8rem;}}
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;} .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
   .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;}
   main{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
@@ -32,7 +34,11 @@
 </head>
 <body>
 <header>
-  <div class="hleft"><a class="hback" href="/accounting">‹ Accounting</a><div class="wordmark">SHIFT <span>GROUP</span><small>EXCAVATION</small></div></div>
+  <div class="hleft">
+    <span id="crumbs"></span>
+    <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
+  </div>
+  <nav class="tabs"><a href="/ajaltoun#accounts">Accounts</a><a href="/ajaltoun#budget">Budget (BOQ)</a><a href="/ajaltoun#plan">Cashflow plan</a><a class="on" href="/ajaltoun/excavation">Excavation</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -57,12 +63,13 @@
 <script>
 const esc = Admin.esc; let D = null;
 const f = n => (+n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-Admin.require('accounting', me => {
+Admin.require('ajaltoun', me => {
+  Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#accounts'], ['Excavation']]);
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   load();
 });
 async function load() {
-  try { D = await Admin.api('GET', '/api/accounting/excavation'); render(); }
+  try { D = await Admin.api('GET', '/api/ajaltoun/excavation'); render(); }
   catch (e) { document.getElementById('msg').innerHTML = `<span class="bad">Could not load: ${esc(e.message || e)}</span>`; }
 }
 function render() {
@@ -82,7 +89,7 @@ function render() {
   const bRows = D.bills.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_move_in_invoice_type/${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${kind[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('');
   document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${bRows}</tbody><tfoot><tr class="tot"><td colspan="4">Total · ${D.bills.length} bills</td><td class="n">${f(T.bills)}</td><td class="n">${f(T.bills - T.open - T.retentionOpen)}</td><td class="n">${f(T.open + T.retentionOpen)}</td></tr></tfoot>`;
   renderPays();
-  document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from the Accounts page (📗 Pay).`;
+  document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from Accounting → Accounts (📗 Pay).`;
 }
 function renderPays() {
   const open = document.getElementById('only-open').checked;

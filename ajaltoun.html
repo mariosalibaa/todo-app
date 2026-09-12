@@ -202,7 +202,7 @@ function compute() {
 function render() {
   const root = document.getElementById('app');
   Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#accounts'], [{ accounts: 'Accounts', budget: 'Budget (BOQ)', plan: 'Cashflow plan' }[TAB] || TAB]]);
-  document.getElementById('tabs').innerHTML = [['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('');
+  document.getElementById('tabs').innerHTML = [['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('') + '<a href="/ajaltoun/excavation" title="Georges EL Hajj: what was collected, by whom, from which account, against his certificates">Excavation</a>';
   root.innerHTML = `<div id="tab"></div>`;
   history.replaceState(null, '', '#' + TAB);
   const app = document.getElementById('tab');

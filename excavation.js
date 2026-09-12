@@ -1,8 +1,8 @@
 // Excavation collections — Georges EL Hajj on Ajaltoun 4193 (Mario, 2026-09-13: "a dashboard showing the amount
 // collected, by Dib Mokhtar, by Anthony, and from which cash or bank account").
-// Mounted by server.js in the accounting chain; needs ctx = { db, TEAM_ID, odooCall }.
+// Mounted by server.js in the Ajaltoun chain (app 'ajaltoun'); needs ctx = { db, TEAM_ID, odooCall }.
 //
-//   GET /api/accounting/excavation   { bills, payments, collectors, journals, pending, totals }
+//   GET /api/ajaltoun/excavation   { bills, payments, collectors, journals, pending, totals }
 //
 // Money reaches Georges three ways: Anthony Khalil (+96171800980) and Dib Mokhtar (+96171324324) collect through
 // Whish, and cash goes out of the Neo / Mario cash boxes. The Odoo payment says WHICH ACCOUNT paid (its journal);
@@ -66,7 +66,7 @@ async function build(ctx) {
 }
 
 async function handle(req, res, url, user, ctx) {
-  if (url.split('?')[0] === '/api/accounting/excavation' && req.method === 'GET') return json(res, 200, await build(ctx));
+  if (url.split('?')[0] === '/api/ajaltoun/excavation' && req.method === 'GET') return json(res, 200, await build(ctx));
   return false;
 }
 module.exports = { handle };
