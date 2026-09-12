@@ -1627,6 +1627,13 @@ function render() {
     if (sg.any && !t.suggestSkip) pending++;
     const cp = t.phone ? esc(t.phone.replace(/^961/, '0')) : '';
     const sugTxt = [sg.partner && sg.partner.name, sg.company].filter(Boolean).join(' / ');
+    // ✓ / ✕ / ✓n sit under the Partner cell when a partner is suggested, under Company otherwise (Mario, 2026-09-13)
+    const sugBlock = sg.any ? (t.suggestSkip
+          ? `<div class="sug-skip">skipped · <a onclick="skipRow('${t.id}', false)">undo</a></div>`
+          : (() => { const k = sameKey(t), n = (groups[k] || []).length;
+              return `<div class="sug-act"><button class="yes" title="Apply to this line only: ${esc(sugTxt)}" onclick="acceptRow('${t.id}')">✓</button><button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button>${n > 1 ? (n > SAME_CAP
+                ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
+                : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : '';
     const st = isStatement(), own = account && (account.owner || 'mario');
     const paidFlag = t.paidBy && t.paidBy !== own ? `<div class="flag" title="${esc('Physically paid by ' + cap(t.paidBy) + (t.paidBySrc === 'odoo' ? ' — read from the Odoo attachment / memo' : ''))}">⚑ paid by ${esc(cap(t.paidBy))}</div>` : '';
     const natChip = t.nature ? `<span class="src nat-${t.nature}" title="${esc({ transfer: 'Money moved between him and one of our accounts — never a bill', labour: 'His own work — booked in the month\'s bill from him, account Sub Contractor', expense: 'Unofficial spending he fronted — booked in the month\'s bill from him', refund: 'Money back from a supplier — keeps the supplier and the project', vendor: 'An official supplier: its own bill, paid through Settlement by him' }[t.nature] || '')}">${esc(t.nature)}</span>` : '';
@@ -1683,6 +1690,7 @@ function render() {
         <div class="pick"><input type="text" id="pp-${t.id}-txt" autocomplete="off" value="${esc(partnerShown(t) || t.partnerText || '')}" placeholder="${sg.partner && !t.suggestSkip ? '↳ ' + esc(sg.partner.name) + '?' : unjustified(t) ? 'partner or cash?' : 'partner'}"
           oninput="pickFilter('pp-${t.id}')" onkeydown="pickKey(event,'pp-${t.id}')" onblur="pickBlur('pp-${t.id}')">
           <input type="hidden" id="pp-${t.id}" value="${esc(t.partnerId || '')}" data-row="${t.id}"><div class="pick-list" id="pp-${t.id}-list"></div></div>
+        ${sg.partner ? sugBlock : ''}
         ${(() => { const pr = partnerProposal(t); return pr
           ? `<div class="sug-act typed" title="${esc('You typed "' + t.partnerText + '" — the closest Odoo partner is ' + pr.name)}"><span class="sug-why">typed</span> <button class="yes" onclick="takeTyped('${t.id}','partner',true)">✓ ${esc(pr.name)}</button><button class="no" title="Leave it as you typed it" onclick="takeTyped('${t.id}','partner',false)">✕</button></div>`
           : t.partnerText ? `<div class="sug-skip" title="Typed on the phone; nothing in Odoo looks like it">typed · no Odoo match</div>` : ''; })()}
@@ -1699,12 +1707,7 @@ function render() {
         <option ${co === 'Personal' ? 'selected' : ''}>Personal</option>
         ${companies.map(x => `<option ${co === x.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
         ${co && co !== 'Personal' && !companies.some(x => x.name === co) ? `<option selected>${esc(co)}</option>` : ''}</select>
-        ${sg.any ? (t.suggestSkip
-          ? `<div class="sug-skip">skipped · <a onclick="skipRow('${t.id}', false)">undo</a></div>`
-          : (() => { const k = sameKey(t), n = (groups[k] || []).length;
-              return `<div class="sug-act"><button class="yes" title="Apply to this line only: ${esc(sugTxt)}" onclick="acceptRow('${t.id}')">✓</button><button class="no" title="Not this one — hide the suggestion" onclick="skipRow('${t.id}', true)">✕</button>${n > 1 ? (n > SAME_CAP
-                ? `<button class="many over" disabled title="${n} pending lines from this number carry this same answer — too many to take in one click. Filter the view down first, then use ✓ on what is left.">✓${n}</button>`
-                : `<button class="many" title="Apply the same answer to all ${n} pending lines from this number" onclick="acceptSame('${t.id}')">✓${n}</button>`) : ''}<span class="what" title="Suggested: ${esc(sugTxt)}">${esc(sugTxt)}</span></div>`; })()) : ''}
+        ${sg.any && !sg.partner ? sugBlock : ''}
       </td>`}
             ${isTr ? `<td class="c-proj"><span class="locked" title="A transfer has no project — change the type to give it one">—</span></td>` : `<td class="c-proj ${srcClass(t.analyticName ? (t.analyticSrc || 'manual') : '')}${isSplit(t) ? ' split' : ''}" title="${t.analyticSrc === 'odoo' ? esc('From Odoo: ' + (t.analyticFrom || 'the reconciled invoice')) : t.analyticSrc === 'manual' ? 'Chosen by hand' : t.analyticSrc === 'excel' ? esc(t.projectFrom ? 'No project on this row: taken from the ' + t.projectFrom + (t.project ? ' (' + t.project + ')' : '') : 'The project written in the sheet' + (t.project ? ': ' + t.project : '')) : ''}">
         <div class="pick"><input type="text" id="an-${t.id}-txt" autocomplete="off" value="${esc(t.analyticName || t.analyticText || '')}" placeholder="${t.src === 'excel' ? '? which project' : 'analytic'}"
