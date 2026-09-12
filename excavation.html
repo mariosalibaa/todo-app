@@ -37,7 +37,7 @@
 </header>
 <main>
   <h1>Excavation — Georges EL Hajj · Ajaltoun 4193</h1>
-  <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil and Dib Mokhtar through Whish, or cash to Georges himself), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
+  <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
   <div id="msg" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
   <h2>Collected by <span class="r muted" id="at"></span></h2>
@@ -82,7 +82,7 @@ function render() {
   const bRows = D.bills.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_move_in_invoice_type/${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${kind[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('');
   document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${bRows}</tbody><tfoot><tr class="tot"><td colspan="4">Total · ${D.bills.length} bills</td><td class="n">${f(T.bills)}</td><td class="n">${f(T.bills - T.open - T.retentionOpen)}</td><td class="n">${f(T.open + T.retentionOpen)}</td></tr></tfoot>`;
   renderPays();
-  document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Georges. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from the Accounts page (📗 Pay).`;
+  document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from the Accounts page (📗 Pay).`;
 }
 function renderPays() {
   const open = document.getElementById('only-open').checked;

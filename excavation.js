@@ -10,7 +10,9 @@
 // Whish lines not yet booked in Odoo are listed as pending, so the dashboard never hides money already sent.
 
 const PARTNER = 313, COMPANY = 10;
-const COLLECTORS = { '96171800980': 'Anthony Khalil', '96171324324': 'Dib Mokhtar' };
+// Mario, 2026-09-13: Whish lines are named by the phone that received them; cash out of the Neo / Mario boxes goes to Anthony in hand
+const COLLECTORS = { '96171800980': 'Anthony Khalil (Whish)', '96171324324': 'Dib Mokhtar (Whish)' };
+const CASH_COLLECTOR = 'Anthony Khalil (cash)';
 const CTX = { allowed_company_ids: [COMPANY] };
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const r2 = n => Math.round((+n || 0) * 100) / 100;
@@ -40,7 +42,7 @@ async function build(ctx) {
     const hub = byMove[p.move_id ? p.move_id[0] : 0] || byName[p.name] || null;
     const memo = String(p.memo || '');
     // who collected: the hub line's phone when tied; else the memo's word (diesel = Dib Mokhtar, anthony = Anthony); else cash to Georges
-    const collector = hub ? hub.collector : /diesel/i.test(memo) ? 'Dib Mokhtar' : /anthony|whish ms/i.test(memo) ? 'Anthony Khalil' : 'Georges (cash)';
+    const collector = hub ? hub.collector : /diesel/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony|whish ms/i.test(memo) ? 'Anthony Khalil (Whish)' : CASH_COLLECTOR;
     return { id: p.id, name: p.name, date: p.date, amount: r2(p.amount), memo, journal: p.journal_id ? p.journal_id[1] : '', journalId: p.journal_id ? p.journal_id[0] : null,
       reconciled: !!(p.reconciled_bill_ids || []).length, bills: (p.reconciled_bill_ids || []).length, collector, hubLine: hub ? hub.id : null, project: p.x_studio_project ? p.x_studio_project[1] : '' };
   });
