@@ -49,7 +49,7 @@
   .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
 </style></head>
 <body>
-<header><div class="hleft"><a class="hback" href="/admin?stay" title="Back">&lsaquo; Back</a><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>SITE</small></a></div><div class="who" id="who"></div></header>
+<header><div class="hleft"><span id="crumbs"></span><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>SITE</small></a><script>Admin.crumbs([['Site']]);</script></div><div class="who" id="who"></div></header>
 <main>
   <div class="threads" id="threads" hidden></div>
   <div class="feed" id="feed"><div class="empty">Loading…</div></div>

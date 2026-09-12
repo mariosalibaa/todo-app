@@ -105,7 +105,7 @@
 <body>
 <header>
   <div class="hleft">
-    <a class="hback" href="/admin?stay">&lsaquo; Back</a>
+    <span id="crumbs"></span>
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
   </div>
   <nav class="tabs" id="tabs"></nav>
@@ -194,6 +194,7 @@ function compute() {
 
 function render() {
   const root = document.getElementById('app');
+  Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#accounts'], [{ accounts: 'Accounts', budget: 'Budget (BOQ)', plan: 'Cashflow plan' }[TAB] || TAB]]);
   document.getElementById('tabs').innerHTML = [['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('');
   root.innerHTML = `<div id="tab"></div>`;
   history.replaceState(null, '', '#' + TAB);

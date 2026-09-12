@@ -96,7 +96,7 @@
 </head>
 <body>
 <header>
-  <div class="hleft"><a class="hback" href="/accounting" title="Back">&lsaquo; Back</a><div class="wordmark">SHIFT <span>GROUP</span><small>DAY REPORT</small></div></div>
+  <div class="hleft"><span id="crumbs"></span><div class="wordmark">SHIFT <span>GROUP</span><small>DAY REPORT</small></div><script>Admin.crumbs([['Accounting', '/accounting'], ['Day report']]);</script></div>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -387,7 +387,7 @@ async function load() {
 Admin.require(null, async me => {
   if (!me.apps.includes('accounting') && !me.apps.includes('daily')) { document.body.innerHTML = '<p style="padding:40px;color:#a6adc8">This page is not open to your account.</p>'; return; }
   READ_ONLY = !me.admin && !me.apps.includes('accounting');
-  if (READ_ONLY) document.querySelector('.hback').href = '/admin?stay';   // a partner has no /accounting page to go back to
+  if (READ_ONLY) Admin.crumbs([['Day report']]);   // a partner has no /accounting page to go back to
   if (READ_ONLY) document.body.classList.add('ro');
   el('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   if (!READ_ONLY) HubHistory.mount({ into: '#hh-host', area: 'daily', reload: load });

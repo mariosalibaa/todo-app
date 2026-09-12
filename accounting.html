@@ -337,11 +337,7 @@
 </head>
 <body>
 <div class="top">
-  <a class="hback" href="/accounting" title="Accounting">&lsaquo; Back</a>
-  <a href="/admin" title="Shift Hub">⌂</a>
-  <span class="brand">Accounting</span>
-  <span style="opacity:.6">›</span>
-  <span id="crumb">Accounts</span>
+  <span id="crumbs"></span>
   <span style="opacity:.6;margin-left:10px">|</span>
   <a href="/accounting/transfers" style="opacity:.7">Transfers</a>
   <a href="/accounting/wise" style="opacity:.7">Wise</a>
@@ -525,6 +521,11 @@
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// Hub › Accounting › Accounts › <account> — the whole path is clickable (Admin.crumbs, shared with every hub page)
+function setCrumb(leaf) { const grid = location.pathname.endsWith('/whish') ? ['Whish', '/accounting/whish'] : ['Accounts', '/accounting/accounts']; Admin.crumbs([['Accounting', '/accounting'], ...(leaf ? [grid, [leaf]] : [[grid[0]]])]); }
+setCrumb(null);
+</script>
 <script>
 const esc = Admin.esc;
 // 'We 2026-09-03': the weekday in front of every date, as the sheets write it
@@ -733,7 +734,7 @@ async function selectAccount(a) {
                       'btn-contacts', 'btn-months', 'btn-timesheet', 'btn-projects', 'btn-statement'])
       able(id, false, ALLWHY);
     document.getElementById('btn-edit').style.display = 'none';
-    document.getElementById('crumb').textContent = 'Everything';
+    setCrumb('Everything');
     document.getElementById('lg-src').innerHTML = '<i style="background:#fff"></i>Every account’s lines in one grid. The Account column says where each one lives — click it to open that account on its own. No running balance: twelve wallets in four currencies have no single one.';
     document.getElementById('empty-hint').textContent = 'No lines in this period.';
     srcOff = new Set();
@@ -754,7 +755,7 @@ async function selectAccount(a) {
   able('btn-timesheet', !!account.timesheet, 'Only an account whose workbook keeps a timesheet');
   able('btn-projects', isExcelKept(), 'Projects come from an Excel ledger');
   document.getElementById('btn-edit').style.display = st ? 'none' : '';
-  document.getElementById('crumb').textContent = account ? account.name : 'Accounts';
+  setCrumb(account ? account.name : null);
   document.getElementById('lg-src').innerHTML = st ? '<i style="background:#fff"></i>Date, service, description, amounts: the Whish statement as printed'
     : isExcelKept() ? '<i style="background:#fff"></i>The Excel ledger <span class="src">excel</span> is the account; Odoo entries are matched onto its rows (✓ in the Odoo column) and never counted on their own. WhatsApp <span class="src">whatsapp</span> adds what the Excel missed once accepted.'
     : '<i style="background:#fff"></i>Lines from Odoo <span class="src">odoo</span>, HomeBudget <span class="src">budget</span>, the Excel ledger <span class="src">excel</span>, the WhatsApp group <span class="src">whatsapp</span>, typed here <span class="src">manual</span> or transfers <span class="src">transfer</span>';
