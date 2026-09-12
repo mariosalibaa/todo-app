@@ -77,6 +77,7 @@
   .c-proj .splitlink{font-size:10.5px;color:var(--muted);cursor:pointer;visibility:hidden;} td.c-proj:hover .splitlink{visibility:visible;}
   td.c-proj.split .pick,td.c-proj.split .plan{display:none;}
   td.num{white-space:nowrap;} .c-date .ref{overflow-wrap:anywhere;}
+  .c-date .wa-when{color:var(--green);font-variant-numeric:tabular-nums;}
   .c-desc .svc{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-right:4px;}
   .c-desc .who{font-size:11.5px;color:var(--muted);cursor:pointer;margin-top:1px;}
   .c-desc .who:hover{text-decoration:underline;}
@@ -1467,6 +1468,9 @@ function render() {
     const natChip = t.nature ? `<span class="src nat-${t.nature}" title="${esc({ transfer: 'Money moved between him and one of our accounts — never a bill', labour: 'His own work — booked in the month\'s bill from him, account Sub Contractor', expense: 'Unofficial spending he fronted — booked in the month\'s bill from him', refund: 'Money back from a supplier — keeps the supplier and the project', vendor: 'An official supplier: its own bill, paid through Settlement by him' }[t.nature] || '')}">${esc(t.nature)}</span>` : '';
     const refTxt = st ? 'tr:' + t.ref : (t.ref ? esc(t.ref) : '') + (t.src && t.src !== 'manual' ? `<span class="src">${esc(t.src)}</span>` : '')
       + (t.period ? `<span class="src per-${t.period}" title="${t.period === 'old' ? 'On a statement he already received (column A of the sheet says old)' : 'Not yet on a statement — it goes on the next one (column A says new)'}">${t.period}</span>` : '');
+    // when the message behind the line was sent (Beirut time), and by whom
+    const waWhen = t.waAt ? (d => { const b = new Date(d.getTime() + 3 * 3600e3); const hm = b.toISOString().slice(11, 16), dy = b.toISOString().slice(0, 10);
+      return `<div class="ref wa-when" title="WhatsApp message of ${dy} ${hm} (Beirut)${t.waFrom ? ', ' + (t.waFrom === 'mario' ? 'from you' : 'from him') : ''}">💬 ${dy === t.date ? '' : dy.slice(5) + ' '}${hm}${t.waFrom ? ' · ' + (t.waFrom === 'mario' ? 'Mario' : 'him') : ''}</div>`; })(new Date(t.waAt)) : '';
     const isTr = t.nature === 'transfer';
     const typeCell = !isExcelKept() ? '' : t.src === 'excel'
       ? `<td class="c-type ${t.natureSrc === 'manual' ? 'src-manual' : ''}" title="${esc(TYPE_TIP[t.nature] || '')}"><select onchange="saveType('${t.id}', this.value, this)"><option value="" ${!t.nature ? 'selected' : ''}>? which type</option>${TYPES.map(k => `<option value="${k}" ${t.nature === k ? 'selected' : ''}>${k}</option>`).join('')}</select>${t.retype ? '<div class="hint" title="The type changed after this row was booked: press Rewrite on its month in Book months">↻ rebook month</div>' : ''}</td>`
@@ -1495,7 +1499,7 @@ function render() {
         // receipt is often photographed days after it was paid (Mario, 2026-09-09)
         // a /site post is a proposal the same way (2026-09-12)
         : ['manual', 'telegram', 'whatsapp', 'budget', 'site'].includes(t.src) && !t.bookedMove ? datePick(t, "The day this line falls on. Change it and the line moves to that day.", `saveDate('${t.id}', this.value, this.parentNode)`)
-        : dayDate(t.date)}<div class="ref">${refTxt}</div><div class="acts">${acts}</div></td>
+        : dayDate(t.date)}<div class="ref">${refTxt}</div>${waWhen}<div class="acts">${acts}</div></td>
       ${!isAll() ? '' : `<td class="c-acct"><a onclick="selectAccount('${esc(t._acc || '')}')" title="Open ${esc(t._accName || '')} on its own">${esc(t._accName || '')}</a>${t._accCur ? `<div class="ref">${esc(t._accCur)}</div>` : ''}</td>`}
       <td class="c-desc" title="${esc(t.description)}">
         <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : esc(t.description)}</div>

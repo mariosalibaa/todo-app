@@ -91,6 +91,10 @@ const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'company
   'partnerText', 'analyticText',
   // asked for from the phone, booked from the laptop after you look at it
   'bookWanted', 'bookWantedAt', 'bookWantedBy',
+  // when the WhatsApp message behind the line was sent, and by whom — every line born from a
+  // message carries it, typed by hand or read by the importer (Mario, 2026-09-12: "record on
+  // what time on whatsapp this was done")
+  'waAt', 'waFrom',
   // ☑ Reviewed: a person looked at the line; the server stamps when and who (Mario, 2026-09-09)
   'reviewed', 'reviewedAt', 'reviewedBy',
   // ⛽ a benzine line: which car it went into, the odometer at the pump, the litres
@@ -137,6 +141,13 @@ async function resolve(ws, id) {
   return null;
 }
 const txCol = a => a.ref.collection('tx');
+// "09:05", "2026-09-07 09:05" or an ISO instant → ISO instant; a bare time is Beirut time on the line's day
+function waInstant(v, day) {
+  v = String(v || '').trim(); let m;
+  if ((m = v.match(/^(\d{1,2}):(\d{2})$/)) && day) v = `${day} ${m[1].padStart(2, '0')}:${m[2]}`;
+  if ((m = v.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::\d{2})?$/))) return new Date(`${m[1]}T${m[2]}:00+03:00`).toISOString();
+  const d = new Date(v); return isNaN(d) ? null : d.toISOString();
+}
 
 const { LOG_AREAS, logCol, diffOf, hubLog } = require('./hub-log');
 const dailyAccess = require('./daily-access');
@@ -977,6 +988,7 @@ async function handle(req, res, url, user, ctx) {
     const t = { id, src: b.src === 'telegram' ? 'telegram' : 'manual', date: b.date, ref: String(b.ref || ''), service: '', phone: '',
       description: String(b.description || '').trim(), debit, credit, createdAt: now(), createdBy: who, updatedAt: now(), updatedBy: who };
     for (const k of ANNOT) if (k in b) t[k] = b[k];
+    if (t.waAt) t.waAt = waInstant(t.waAt, t.date);
     if (t.company) { t.companySrc = t.companySrc || 'manual'; t.kind = t.company === 'Personal' ? 'personal' : 'work'; t.kindSrc = 'manual'; }
     if (t.partnerName) t.partnerSrc = t.partnerSrc || 'manual';
     if (t.analyticName) t.analyticSrc = t.analyticSrc || 'manual';
@@ -995,6 +1007,7 @@ async function handle(req, res, url, user, ctx) {
     if (!cur) return json(res, 404, { error: 'no such line' });
     const data = {};
     for (const k of ANNOT) if (k in body) data[k] = body[k];
+    if (data.waAt) data.waAt = waInstant(data.waAt, body.date || cur.date);
     // the line itself may be edited only when a person wrote it
     // a person wrote it, or it is a row of the workbook — which is corrected in the sheet below
     // a /site post is a proposal the same way (2026-09-12)
