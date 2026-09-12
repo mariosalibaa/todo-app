@@ -40,6 +40,7 @@
   select,input{background:var(--base);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 8px;font-size:.8rem;}
   .pill{font-size:.66rem;padding:2px 7px;border-radius:5px;background:var(--surface0);color:var(--sub);white-space:nowrap;}
   .pill.eq{background:rgba(137,180,250,.15);color:var(--blue);}
+.pill.pay{background:#fff3cd;color:#7a5200;border-color:#f2c55c}
   .ok{color:var(--green);} .flag{color:var(--red);}
   .btn{background:none;border:1px solid var(--surface1);color:var(--text);border-radius:6px;padding:3px 9px;font-size:.74rem;cursor:pointer;white-space:nowrap;} .btn:hover{border-color:var(--amber);color:var(--amber);}
   .btn.ok:hover{border-color:var(--green);color:var(--green);} .btn.flag:hover{border-color:var(--red);color:var(--red);}
@@ -390,7 +391,7 @@ function renderDetail() {
       <td><span class="pill">${esc(l.villa)}</span></td>
       <td>${D.admin ? `<button class="secbtn" onclick="openSecPop(${l.id}, this)" title="Change the section"><span>${esc(secName(l.section))}</span><i>▾</i></button>
         <div class="small"><a href="#" class="muted" onclick="setSection(${l.id}, null, true);return false;">whole supplier →</a></div>` : `<span class="pill ${(D.sections.find(s => s.id === l.section) || {}).equipment ? 'eq' : ''}">${esc(secName(l.section))}</span>`}</td>
-      <td class="small">${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
+      <td class="small">${l.payment ? `<span class="pill pay" title="Paid to the supplier, bill not booked in Odoo yet. Book/match the bill and this line becomes the bill's own analytic line.">payment · no bill</span> ` : ''}${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
       <td class="n">${usd2(l.amount)}</td>
       <td>${marioCell(l)}</td><td>${antoineCell(l)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">Nothing matches.</td></tr>'}
     <tr class="tot"><td colspan="${D.admin ? 7 : 6}">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td><td></td></tr></tbody></table>`;

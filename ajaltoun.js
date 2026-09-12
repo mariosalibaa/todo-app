@@ -36,6 +36,7 @@ const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'appli
 const now = () => new Date().toISOString();
 const CTX = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
 const SDEV = 10;
+const PAY_ID_BASE = 1e9;   // hub line id of an unbooked payment = 1e9 + account.payment id (analytic line ids stay far below)
 const VILLAS = { 69: 'Common', 59: 'U1', 60: 'U2', 61: 'U3', 62: 'D1', 63: 'D2', 64: 'D3' };
 // sections = the BOQ trades (so budget / spent / remaining line up) + the project-level ones
 const SECTIONS = [
@@ -175,6 +176,23 @@ async function pullCosts(odooCall) {
       villa: VILLAS[l.account_id[0]] || l.account_id[1], moveId: move ? move.id : null, moveName: move ? move.name : '', moveRef: move ? move.ref : '',
       paid: move ? move.payment_state : '', files: move ? (attsOf[move.id] || []) : [] });
   }
+  // 3. payments tagged with an Ajaltoun project (payment field "Project", x_studio_project) that are not yet
+  // matched to a bill: money already out for a bill that does not exist in Odoo yet, so it is a real cost the
+  // analytic lines cannot show. The moment the payment is reconciled it leaves this set and the bill's own
+  // analytic line takes over — counted once, by construction (Mario, 2026-09-12).
+  const pays = await odooCall('account.payment', 'search_read', [[['x_studio_project', 'in', Object.keys(VILLAS).map(Number)], ['is_reconciled', '=', false],
+    ['payment_type', '=', 'outbound'], ['state', 'in', ['paid', 'posted', 'in_process']]]],
+    { fields: ['name', 'date', 'memo', 'partner_id', 'amount_company_currency_signed', 'company_id', 'journal_id', 'x_studio_project'], context: CTX, limit: 2000, order: 'date, id' });
+  const pAtts = pays.length ? await odooCall('ir.attachment', 'search_read', [[['res_model', '=', 'account.payment'], ['res_id', 'in', pays.map(p => p.id)]]], { fields: ['res_id', 'name', 'mimetype'], context: CTX, limit: 2000 }) : [];
+  const pAttsOf = {}; for (const a of pAtts) (pAttsOf[a.res_id] = pAttsOf[a.res_id] || []).push({ id: a.id, name: a.name, mime: a.mimetype });
+  for (const p of pays) {
+    lines.push({ id: PAY_ID_BASE + p.id, payment: true, date: p.date, name: p.memo || p.name, amount: -p.amount_company_currency_signed,
+      partner: p.partner_id ? p.partner_id[1] : '', partnerId: p.partner_id ? p.partner_id[0] : null,
+      account: 'Payment, bill not booked yet', company: p.company_id ? p.company_id[1] : '', companyId: p.company_id ? p.company_id[0] : null,
+      villa: VILLAS[p.x_studio_project[0]] || p.x_studio_project[1], moveId: null, moveName: p.name, moveRef: p.journal_id ? p.journal_id[1] : '',
+      paid: 'paid', files: pAttsOf[p.id] || [] });
+  }
+  lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id);
   return { lines };
 }
 
@@ -347,4 +365,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, refresh };
+module.exports = { handle, refresh, _pullCosts: pullCosts };
