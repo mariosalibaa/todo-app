@@ -708,7 +708,7 @@ function cashOf(t) {
 function reconOf(t) {
   const won = t.odoo && (t.odoo.matches || []).find(x => x.chosen);
   if (won) return (won.docs || []).some(d => !/^P(CSH|SETT|BNK)/.test(d)) ? 'yes' : 'no';
-  if (t.bookedMove && t.bookedMove.id) return t.bookedMove.paymentState === 'paid' || t.bookedMove.paymentState === 'in_payment' ? 'yes' : 'no';
+  if (t.bookedMove && t.bookedMove.id) return t.bookedMove.paymentState === 'paid' || t.bookedMove.paymentState === 'in_payment' || (t.bookedMove.paidBy || []).length ? 'yes' : 'no';
   return '';
 }
 const unjustified = t => !t.excluded && !!(t.debit || t.credit) && !partnerShown(t) && !t.partnerText && !cashOf(t);
@@ -1370,6 +1370,8 @@ const cents = n => Math.round(Number(n || 0) * 100) / 100;
 // No rule, but a partner and a company on the row: it can still be paid as a vendor / customer payment on this
 // account's journal of that company (Mario, 2026-09-13: "where there is no payment, we should see Pay")
 function adHocRule(t) {
+  // a worker ledger books its rows its own way (bills settled by the worker): never a cash-journal payment
+  if (isExcelKept() || (account && account.odooPartner && account.odooPartner.id) || t.nature) return null;
   if (t.src === 'odoo' || t.kind === 'transfer' || t.nature === 'transfer' || t.bookedMove || t.booked) return null;
   if (t.odoo && (t.odoo.matches || []).some(x => x.chosen)) return null;
   // a partner or company that is only SUGGESTED (↳) still gets a Pay: pressing it accepts the suggestion
@@ -1387,6 +1389,7 @@ function adHocRule(t) {
 }
 function ruleFor(t) {
   if (t.src === 'odoo' || t.kind === 'transfer') return null;   // already in the books / not a purchase
+  if (isExcelKept() || (account && account.odooPartner && account.odooPartner.id)) return null;   // Whish rules are for statement accounts, not worker ledgers
   return rules.find(r => r.active !== false
     && (!r.accountId || r.accountId === acc)
     && (r.phone || r.contains)
@@ -1481,6 +1484,10 @@ function odooCell(t) {
   if (!won && t.bookedMove && t.bookedMove.id) {
     const b = t.bookedMove;
     const tip = ['Booked by the hub' + (b.at ? ' on ' + String(b.at).slice(0, 10) : ''), b.kind || '', b.state || '', b.paymentState || ''].filter(Boolean).join(' · ');
+    // the money side first — what settled the bill — then the bill under it (Mario, 2026-09-13)
+    const pays = (b.paidBy || []).filter(x => x.name);
+    if (pays.length) return pays.map(x => `<a class="odoo-ok" target="_blank" href="${ODOO}${x.moveId || b.id}" title="${esc('Settled ' + fmt(x.amount) + (x.date ? ' on ' + x.date : '') + (x.ref ? ' — ' + x.ref : ''))}">✓ ${esc(x.name)}</a>`).join('<br>')
+      + `<div class="odoo-doc"><a target="_blank" href="${ODOO}${b.id}" title="${esc(tip)}">${esc(b.name || '')}</a>${b.ref && b.ref !== b.name ? ' (' + esc(b.ref) + ')' : ''}</div>` + fileLinks(t);
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}" title="${esc(tip)}">✓ ${esc(b.name || '')}</a>`
       + (b.ref && b.ref !== b.name ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(b.ref)}</div>` : '')
       + fileLinks(t);

@@ -61,6 +61,9 @@ function fits(rule, t) {
 // Whish account, which has none — the company's cash/bank journal whose name carries the account's word ("whish").
 let _coCache = { at: 0, list: [] };
 async function adHocPaymentRule(odooCall, account, t) {
+  // a worker ledger (Excel-kept, or following a partner's payable) books its rows its own way — bills settled by
+  // the worker — never as a payment on a cash journal (2026-09-13: Abed's Attal row hit his archived SARL journal)
+  if ((account.excel && account.excel.file) || (account.odooPartner && account.odooPartner.id) || t.nature) return null;
   if (!t.partnerId || !t.company || t.company === 'Personal') return null;
   if (Date.now() - _coCache.at > 600000) _coCache = { at: Date.now(), list: await odooCall('res.company', 'search_read', [[]], { fields: ['id', 'name'] }) };
   const co = _coCache.list.find(c => c.name === t.company);
