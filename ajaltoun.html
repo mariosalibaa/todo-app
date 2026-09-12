@@ -262,7 +262,7 @@ function renderAccounts(app) {
       <select onchange="F.review=this.value;F._touched=1;pageNo=0;renderDetail()"><option value="">All lines</option><option value="booked" ${F.review === 'booked' ? 'selected' : ''}>Booked — to approve (Mario)</option><option value="approved" ${F.review === 'approved' ? 'selected' : ''}>Approved — waiting for the partner</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
       <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;pageNo=0;renderDetail()" style="min-width:200px">
       ${D.admin ? '<span class="bulk" id="bulk"></span>' : ''}
-      <button class="btn ${PV.on ? 'on' : ''}" onclick="togglePreview()" title="Show the bill scan next to the list when you click a line">🖼 Preview</button>
+      <button class="btn ${PV.on ? 'on' : ''}" onclick="togglePreview()" title="Bill scan next to the list — click any line to open it">🖼 Preview ${PV.on ? 'on' : 'off'}</button>
       <span class="pager" id="pager">${D.admin ? `<input type="number" min="10" max="500" step="10" value="${PAGE_SIZE()}" title="Lines per page — saved for every user" style="width:56px;padding:1px 6px;margin-right:6px" onchange="setPageSize(this.value)">` : ''}<span id="pg-range"></span><button class="btn" onclick="pageBy(-1)" id="pg-prev" title="Previous page">‹</button><button class="btn" onclick="pageBy(1)" id="pg-next" title="Next page">›</button></span>
     </div>
     <div class="dsplit ${PV.on ? 'on' : ''}"><div class="card"><div class="wrap" id="detail"></div></div><aside class="card" id="prev"></aside></div>
@@ -383,7 +383,7 @@ function renderDetail() {
   PV.rows = page.map(l => l.id);
   document.getElementById('detail').innerHTML = `<table>
     <thead><tr>${D.admin ? `<th class="ck"><input type="checkbox" onchange="tickAll(this.checked)" ${page.length && page.every(l => SEL.has(l.id)) ? 'checked' : ''}></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Mario</th><th>Antoine</th></tr></thead>
-    <tbody>${page.map(l => `<tr class="${PV.on ? 'selectable' : ''} ${PV.line === l.id ? 'sel' : ''}" data-line="${l.id}" onclick="rowClick(event, ${l.id})">
+    <tbody>${page.map(l => `<tr class="selectable ${PV.line === l.id ? 'sel' : ''}" data-line="${l.id}" onclick="rowClick(event, ${l.id})">
       ${D.admin ? `<td class="ck"><input type="checkbox" ${SEL.has(l.id) ? 'checked' : ''} onchange="tick(${l.id}, this.checked)"></td>` : ''}
       <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
       <td>${esc(l.partner || '—')}</td>
@@ -546,7 +546,9 @@ async function openFile(id, name, mime) {
 const PV = { on: (() => { try { return localStorage.getItem('ajPreview') === '1'; } catch { return false; } })(), line: null, idx: 0, rows: [] };
 function togglePreview() { PV.on = !PV.on; try { localStorage.setItem('ajPreview', PV.on ? '1' : '0'); } catch {} render(); }
 function rowClick(e, id) {
-  if (!PV.on || e.target.closest('button, a, input, select, .secbtn, #secpop')) return;
+  if (e.target.closest('button, a, input, select, .secbtn, #secpop')) return;
+  if (window.getSelection && String(window.getSelection()).length) return;   // the user was selecting text, not picking a line
+  if (!PV.on) { PV.on = true; try { localStorage.setItem('ajPreview', '1'); } catch {} PV.line = id; render(); return; }   // first click opens the pane
   selectLine(id);
 }
 function selectLine(id) {
