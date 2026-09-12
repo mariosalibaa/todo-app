@@ -1,5 +1,6 @@
-// One file, stored once: the Storage bucket when it exists, else a Firestore document of its
-// own (never on a line — the grids read lines by the thousand). Lifted from the tx docs route
+// One file, stored once: the Storage bucket (todo-app-f5c0d.firebasestorage.app, live since
+// 2026-09-12); only if the bucket call fails, a Firestore document of its own (never on a
+// line — the grids read lines by the thousand). Lifted from the tx docs route
 // (accounts.js) for the site page; both keep the same { key, store } record.
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const now = () => new Date().toISOString();
@@ -15,10 +16,10 @@ async function saveFile(ctx, { buf, mime, name, key, who, meta }) {
     if (!live) throw new Error('bucket not created');
     await bk.file(key).save(buf, { contentType: mime, resumable: false, metadata: { metadata: { ...(meta || {}), by: who } } });
   } catch (e) {
-    if (buf.length > 700e3) throw new Error('Firebase Storage is not enabled for this project, so a file must stay under 700 KB. Enable Storage in the Firebase console and any size will work.');
+    if (buf.length > 700e3) throw new Error('The Storage bucket did not answer (' + e.message + '); the Firestore fallback only takes files under 700 KB. Try again in a moment.');
     await ws.collection('txDocs').doc(id).set({ ...(meta || {}), mime, name: String(name || '').slice(0, 120), b64: buf.toString('base64'), at: now(), by: who });
     store = 'firestore';
-    console.warn('file kept in Firestore (Storage not enabled):', e.message);
+    console.warn('file kept in Firestore (bucket call failed):', e.message);
   }
   return { id, name: String(name || '').slice(0, 120), mime, size: buf.length, key, store, at: now(), by: who };
 }

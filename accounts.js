@@ -899,9 +899,9 @@ async function handle(req, res, url, user, ctx) {
     const ext = (String(b.name || '').match(/\.([a-z0-9]{1,5})$/i) || [, mime.split('/')[1] || 'bin'])[1].toLowerCase();
     const docId = newId();
     const key = `tx-docs/${a.id}/${m[2]}/${docId}.${ext}`;
-    // The bucket is the right home for these. Firebase Storage is not switched on for this
-    // project yet, so until it is, the bytes go in a document of their own — never on the
-    // line itself, which the grid reads by the thousand (Mario, 2026-09-07).
+    // The bucket is live (2026-09-12). Only if the bucket call fails do the bytes go in a
+    // document of their own — never on the line itself, which the grid reads by the
+    // thousand (Mario, 2026-09-07).
     let store = 'bucket';
     try {
       const bk = admin.storage().bucket();
@@ -909,10 +909,10 @@ async function handle(req, res, url, user, ctx) {
       if (!live) throw new Error('bucket not created');
       await bk.file(key).save(buf, { contentType: mime, resumable: false, metadata: { metadata: { account: a.id, tx: m[2], by: who } } });
     } catch (e) {
-      if (buf.length > 700e3) return json(res, 400, { error: 'Firebase Storage is not enabled for this project, so a file must stay under 700 KB. Enable Storage in the Firebase console and any size will work.' });
+      if (buf.length > 700e3) return json(res, 400, { error: 'The Storage bucket did not answer (' + e.message + '); the Firestore fallback only takes files under 700 KB. Try again in a moment.' });
       await ws.collection('txDocs').doc(docId).set({ account: a.id, tx: m[2], mime, name: String(b.name || '').slice(0, 120), b64: buf.toString('base64'), at: now(), by: who });
       store = 'firestore';
-      console.warn('tx doc kept in Firestore (Storage not enabled):', e.message);
+      console.warn('tx doc kept in Firestore (bucket call failed):', e.message);
     }
     const doc = { id: docId, name: String(b.name || ('photo.' + ext)).slice(0, 120), mime, size: buf.length,
       key, store, at: now(), by: who, from: String(b.from || 'upload').slice(0, 20) };   // camera | upload | scan

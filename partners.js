@@ -5,8 +5,9 @@
 //   partnersFiles/<id>   { id, name, group, order, mime, size, sha1, b64, mtime, updatedAt, updatedBy }
 //
 // The bytes live in Firestore, never in the repo or the Vercel bundle: these are signed
-// agreements, and the project's Storage bucket is not switched on. Firestore caps a
-// document at 1 MiB, so a file must stay under ~700 KB — the whole folder is 1.4 MB today.
+// agreements, and this app predates the Storage bucket (live since 2026-09-12; moving it
+// over is optional). Firestore caps a document at 1 MiB, so a file must stay under
+// ~700 KB — the whole folder is 1.4 MB today.
 // The laptop keeps the files current with partners-sync.mjs (Dropbox folder → here);
 // the page only ever reads. Every route sits behind the 'partners' app gate in server.js;
 // uploads and deletes additionally need an admin.
