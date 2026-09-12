@@ -718,6 +718,9 @@ async function importWhatsapp(ctx, account, who) {
 // The doc id is `wal-<WhatsApp key_id>` whichever way the message arrived, so the archive
 // re-import and the nightly live read land on the same row instead of doubling it.
 function waLine(id, m, owner, lbpRate, skipped) {
+  // Mario's own statement captions ("due to khoder 157.31$", "حساب عبد محدّث …") carry a
+  // balance, not a movement — they must never become a line (Mario, 2026-09-12)
+  if (m.me && /^\s*(due to|due from|balance|statement|حساب|رصيد)(\s|$)/i.test(String(m.text || ''))) { skipped.statement = (skipped.statement || 0) + 1; return null; }
   const p = parseMoney(m.text, owner, !!m.me, lbpRate);
   if (!p) return null;
   if (p.skip) { skipped[p.skip] = (skipped[p.skip] || 0) + 1; return null; }
@@ -755,7 +758,11 @@ async function absorbWaLines(ctx, account, who, lines) {
   const col = txCol(account);
   const cur = await col.get();
   const existing = {}; cur.docs.forEach(d => { existing[d.id] = d.data(); });
-  const targets = cur.docs.map(d => d.data()).filter(t => (t.src === 'odoo' || t.src === 'excel' || t.src === 'manual' || t.src === 'telegram') && !t.excluded);
+  // A twin is any counted line Mario stands behind — including a WhatsApp/site proposal he has
+  // already accepted or booked (Khoder's days are born from WhatsApp): without those, every
+  // hourly read proposed "200$ from mario" again next to the booked one (Mario, 2026-09-12).
+  const owned = t => !!(t.waAccepted || t.reviewed || t.reviewedAt || t.ref || t.bookedMove || t.dupSrc === 'manual');
+  const targets = cur.docs.map(d => d.data()).filter(t => !t.excluded && (['odoo', 'excel', 'manual', 'telegram'].includes(t.src) || ((t.src === 'whatsapp' || t.src === 'site') && owned(t))));
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines, targets, { taken, maxDays: 4, loose: true });
   let added = 0, updated = 0, linked = 0, review = 0, accepted = 0, kept = 0;
