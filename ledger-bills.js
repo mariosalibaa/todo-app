@@ -1091,13 +1091,13 @@ async function pushAnalytic(ctx, account, t) {
   ].filter(Number.isInteger);
   if (!candidates.length) return out.ok ? { ...out, move: out.payments.map(p => p.name).join(', '), note: 'payment only — nothing reconciled yet' } : { skipped: 'the row is not booked in Odoo' };
 
-  const found = await odooCall('account.move', 'read', [[...new Set(candidates)], ['name', 'state', 'move_type', 'company_id', 'invoice_line_ids', 'line_ids', 'payment_id']], { context: ctxO });
+  const found = await odooCall('account.move', 'read', [[...new Set(candidates)], ['name', 'state', 'move_type', 'company_id', 'invoice_line_ids', 'line_ids', 'origin_payment_id']], { context: ctxO });
   const label = (chosen && chosen.label) || '';
   const amount = money(t.debit || t.credit);
   const same = v => Math.abs(v - amount) < 0.02;
   const skippedWhy = [];
   for (const mv of found) {
-    if (mv.state === 'cancel' || mv.payment_id) continue;   // a payment's own entry: handled above, no project line in it
+    if (mv.state === 'cancel' || mv.origin_payment_id) continue;   // a payment's own entry: handled above, no project line in it
     let lineIds = [];
     if (['in_invoice', 'in_refund', 'out_invoice', 'out_refund'].includes(mv.move_type) && (mv.invoice_line_ids || []).length) {
       const lines = await odooCall('account.move.line', 'read', [mv.invoice_line_ids, ['name', 'price_subtotal', 'analytic_distribution', 'display_type']], { context: ctxO });
