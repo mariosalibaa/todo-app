@@ -57,6 +57,25 @@ function fits(rule, t) {
   return true;
 }
 
+// The journal of this hub account inside one Odoo company: the account's own journal list first, else — for the
+// Whish account, which has none — the company's cash/bank journal whose name carries the account's word ("whish").
+let _coCache = { at: 0, list: [] };
+async function adHocPaymentRule(odooCall, account, t) {
+  if (!t.partnerId || !t.company || t.company === 'Personal') return null;
+  if (Date.now() - _coCache.at > 600000) _coCache = { at: Date.now(), list: await odooCall('res.company', 'search_read', [[]], { fields: ['id', 'name'] }) };
+  const co = _coCache.list.find(c => c.name === t.company);
+  if (!co) return { book: 'payment', partnerId: t.partnerId, error: `no Odoo company called "${t.company}"` };
+  let j = (account.odooJournals || []).find(x => +x.companyId === co.id || x.company === co.name);
+  let journalId = j ? +j.id : null;
+  if (!journalId) {
+    const word = account.odooJournalWord || account.provider || '';
+    const rows = word ? await odooCall('account.journal', 'search_read', [[['company_id', '=', co.id], ['type', 'in', ['bank', 'cash']], ['name', 'ilike', word]]], { fields: ['id', 'name'], context: { allowed_company_ids: [co.id] }, limit: 2 }) : [];
+    if (rows.length === 1) { journalId = rows[0].id; j = { id: rows[0].id, name: rows[0].name }; }
+    else return { book: 'payment', partnerId: t.partnerId, companyId: co.id, error: rows.length ? `${rows.length} "${word}" journals in ${co.name} — put the right one on the account (⚙)` : `no "${word}" cash/bank journal in ${co.name} — add it on the account (⚙)` };
+  }
+  return { id: 'adhoc', book: 'payment', label: 'payment by partner + company', partnerId: t.partnerId, partnerName: t.partnerName, companyId: co.id, companyName: co.name,
+    paymentJournalId: journalId, paymentJournalName: j ? j.name : '', analyticId: t.analyticId || null, analyticName: t.analyticName || '' };
+}
 const alreadyInOdoo = t => !!(t.odoo && (t.odoo.matches || []).some(x => x.chosen));
 
 async function handle(req, res, url, user, ctx) {
@@ -148,8 +167,10 @@ async function handle(req, res, url, user, ctx) {
       const snap = await col.doc(id).get();
       if (!snap.exists) { out.push({ id, error: 'no such line' }); continue; }
       const t = snap.data();
-      const rule = rules.find(r => fits(r, t));
-      if (!rule) { out.push({ id, error: 'no rule matches this line any more' }); continue; }
+      // no rule: a line that names a partner and a company is still bookable as a PAYMENT on this account's Odoo
+      // journal of that company — in or out by its direction (Mario, 2026-09-13: "where there is no payment, Pay")
+      const rule = rules.find(r => fits(r, t)) || await adHocPaymentRule(odooCall, account, t);
+      if (!rule) { out.push({ id, error: 'no rule matches this line, and it has no partner + company to pay as' }); continue; }
       if (alreadyInOdoo(t)) { out.push({ id, error: 'Odoo already has this payment' }); continue; }
       // book:false = the rule only classifies. Astro and Solaris need the official
       // bill in hand (and attached) before anything is posted.
@@ -158,7 +179,7 @@ async function handle(req, res, url, user, ctx) {
       // on their own — Georges' excavation certificates (Mario, 2026-09-13). A vendor payment on the rule's cash
       // journal, memo WHISH-<id> as the idempotency key, the Project field carrying the line's analytic account.
       if (rule.book === 'payment') {
-        if (!rule.partnerId || !rule.paymentJournalId || !rule.companyId) { out.push({ id, error: 'the rule is missing the partner, company or cash journal' }); continue; }
+        if (!rule.partnerId || !rule.paymentJournalId || !rule.companyId) { out.push({ id, error: rule.error || 'the rule is missing the partner, company or cash journal' }); continue; }
         const ref = REF(t, account);
         const pctx = { allowed_company_ids: [rule.companyId], company_id: rule.companyId };
         try {
@@ -166,7 +187,7 @@ async function handle(req, res, url, user, ctx) {
           let payId = dup.length ? dup[0].id : null, already = !!payId;
           const analyticId = t.analyticId || rule.analyticId || null;
           if (!payId) {
-            const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: 'supplier', partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
+            const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: t.debit ? 'supplier' : 'customer', partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
               company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: ref };
             if (analyticId) vals.x_studio_project = analyticId;
             const [method] = await odooCall('account.payment.method.line', 'search_read', [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', vals.payment_type]]], { fields: ['id'], context: pctx, limit: 1 });
