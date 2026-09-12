@@ -51,7 +51,7 @@
   tr.mrow{cursor:pointer;} tr.mrow:hover td{background:rgba(255,255,255,.03);} tr.mdet td{background:rgba(0,0,0,.18);padding:4px 8px 4px 28px;font-size:.78rem;color:var(--sub);}
   td.qin input{width:90px;} td.qin{white-space:nowrap;}
   tr.editing td{background:rgba(242,169,59,.07);vertical-align:top;} tr.editing input,tr.editing select{padding:3px 6px;font-size:.76rem;} tr.editing input[type=checkbox]{width:auto;}
-  tr.div td{background:var(--mantle);font-weight:600;color:var(--amber);border-top:1px solid var(--surface1);} tr.div a{color:var(--sub);font-weight:400;margin-left:8px;text-decoration:none;} tr.div a:hover{color:var(--amber);}
+  tr.div td{background:var(--mantle);font-weight:600;color:var(--amber);border-top:1px solid var(--surface1);} tr.div a{color:var(--sub);font-weight:400;margin-left:8px;text-decoration:none;} tr.div a:hover{color:var(--amber);} tr.div .caret{display:inline-block;width:14px;color:var(--sub);font-size:.8rem;} tr.div:hover td{background:var(--surface0);}
   .fanar{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 14px;padding:4px 0;} .fanar a{color:var(--text);text-decoration:none;font-size:.8rem;padding:4px 6px;border-radius:6px;} .fanar a:hover{background:var(--surface0);color:var(--amber);} .fanar b{color:var(--sub);font-weight:500;margin-right:4px;}
   .warn{color:var(--amber);} tr.logw td{background:rgba(242,169,59,.07);}
   .secbtn{display:inline-flex;align-items:center;gap:6px;background:var(--base);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 8px;font-size:.8rem;cursor:pointer;max-width:200px;} .secbtn:hover,.secbtn.open{border-color:var(--amber);} .secbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .secbtn i{font-style:normal;color:var(--overlay0);font-size:.7rem;}
@@ -124,16 +124,26 @@ let TAB = (location.hash || '').replace('#', '') || 'accounts';   // accounts ·
 const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
 let LOG = null, logAll = false;
 const SEL = new Set();   // ticked lines, for bulk approval
-// Odoo style: 80 lines a page, "1-80 / 279" with ‹ › — as on the accounting grid
-const PAGE = 80; let pageNo = 0;
+// Odoo style paging, "1-50 / 279" with ‹ › — the page size is a shared setting (ajaltounMeta/plan.pageSize, default 50)
+// that Mario changes from the pager box; it applies to everyone who opens the page.
+let pageNo = 0;
+const PAGE_SIZE = () => Math.max(10, Math.min(500, +((window.Plan && Plan.P && Plan.P.settings.pageSize) || 50)));
 function pageBy(d) { pageNo += d; renderDetail(); }
+async function setPageSize(v) {
+  v = Math.max(10, Math.min(500, Math.round(+v) || 50));
+  try { await Admin.api('POST', '/api/ajaltoun/plan/settings', { settings: { pageSize: v } }); Plan.P.settings.pageSize = v; pageNo = 0; renderDetail(); }
+  catch (e) { alert('Could not save: ' + e.message); }
+}
 
 Admin.require('ajaltoun', async me => {
   ME = me;
   document.getElementById('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   await load();
 });
+// the snapshot time in Beirut local time, never the raw ISO/UTC string
+function fmtWhen(iso) { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
 async function load(fresh) {
+  if (fresh) { const h = document.querySelector('#app h2 .muted'); if (h) h.textContent = 'Pulling from Odoo…'; }
   try { [D] = await Promise.all([Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')), Plan.load()]); window.D = D; if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved'; render(); }   // the partner opens on what waits for him
   catch (e) { document.getElementById('app').innerHTML = `<p style="color:var(--red)">Could not read Odoo: ${esc(e.message)}</p>`; }
 }
@@ -233,14 +243,14 @@ function renderAccounts(app) {
       </div>
     </div>
 
-    <h2>Detail <span class="r muted">${c.lines.length} lines · Odoo pulled ${esc((D.cachedAt || '').replace('T', ' ').slice(0, 16))}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">re-pull</a>` : ''}</span></h2>
+    <h2>Detail <span class="r muted">${c.lines.length} lines · Odoo as of ${esc(fmtWhen(D.cachedAt))}${D.stale ? ' · refreshing…' : ''}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">pull now</a>` : ''}</span></h2>
     <div class="filters">
       <select onchange="F.section=this.value;pageNo=0;renderDetail()"><option value="">All sections</option>${D.sections.map(s => `<option value="${s.id}" ${F.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
       <select onchange="F.villa=this.value;pageNo=0;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <select onchange="F.review=this.value;F._touched=1;pageNo=0;renderDetail()"><option value="">All lines</option><option value="booked" ${F.review === 'booked' ? 'selected' : ''}>Booked — to approve (Mario)</option><option value="approved" ${F.review === 'approved' ? 'selected' : ''}>Approved — waiting for the partner</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
       <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;pageNo=0;renderDetail()" style="min-width:200px">
       ${D.admin ? '<span class="bulk" id="bulk"></span>' : ''}
-      <span class="pager" id="pager"><span id="pg-range"></span><button class="btn" onclick="pageBy(-1)" id="pg-prev" title="Previous page">‹</button><button class="btn" onclick="pageBy(1)" id="pg-next" title="Next page">›</button></span>
+      <span class="pager" id="pager">${D.admin ? `<input type="number" min="10" max="500" step="10" value="${PAGE_SIZE()}" title="Lines per page — saved for every user" style="width:56px;padding:1px 6px;margin-right:6px" onchange="setPageSize(this.value)">` : ''}<span id="pg-range"></span><button class="btn" onclick="pageBy(-1)" id="pg-prev" title="Previous page">‹</button><button class="btn" onclick="pageBy(1)" id="pg-next" title="Next page">›</button></span>
     </div>
     <div class="card"><div class="wrap" id="detail"></div></div>
 
@@ -350,6 +360,7 @@ function renderDetail() {
   const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
     .sort((a, b) => b.date.localeCompare(a.date));
   const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
+  const PAGE = PAGE_SIZE();
   const last = Math.max(0, Math.ceil(rows.length / PAGE) - 1);
   pageNo = Math.min(Math.max(0, pageNo), last);
   const page = rows.slice(pageNo * PAGE, pageNo * PAGE + PAGE);

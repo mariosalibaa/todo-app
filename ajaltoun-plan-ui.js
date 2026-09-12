@@ -15,6 +15,7 @@
   const divName = b => DIVISIONS[b] || (b ? 'Bill ' + b : 'Other');
   const THIS_YEAR = new Date().getFullYear();
   let P = null, tab = 'U', scenario = 'expected', editing = null;
+  const openDivs = new Set();   // divisions unfolded on the BOQ grid (key type:bill); everything starts collapsed
 
   const secName = id => ((window.D && D.sections.find(s => s.id === id)) || { name: id }).name;
   const isEquip = id => !!((window.D && D.sections.find(s => s.id === id)) || {}).equipment;
@@ -135,23 +136,23 @@
         </tbody></table></div>
         <div class="note">A trade with spend but no budget line (e.g. Topo, Site & general) shows a negative remaining — add a budget line for it, or reclassify the lines on the Accounts tab.</div>
       </div>
-      <h2>BOQ lines <span class="r"><span class="lang"><button class="${tab === 'U' ? 'on' : ''}" onclick="Plan.setTab('U')">Villa U — up 333</button><button class="${tab === 'D' ? 'on' : ''}" onclick="Plan.setTab('D')">Villa D — down</button></span>${P.admin ? ` &nbsp; <button class="btn ap" onclick="Plan.edit(null)">+ Add a line</button>` : ''}</span></h2>
+      <h2>BOQ lines <span class="r"><span class="lang"><button class="${tab === 'U' ? 'on' : ''}" onclick="Plan.setTab('U')">Villa U — up 333</button><button class="${tab === 'D' ? 'on' : ''}" onclick="Plan.setTab('D')">Villa D — down</button></span> &nbsp; <button class="btn" onclick="Plan.foldAll(true)" title="Open every division">Expand all</button><button class="btn" onclick="Plan.foldAll(false)" title="Close every division">Collapse all</button>${P.admin ? ` &nbsp; <button class="btn ap" onclick="Plan.edit(null)">+ Add a line</button>` : ''}</span></h2>
       <div class="card"><div class="wrap"><table>
-        <thead><tr><th>Bill</th><th>Item</th><th>Trade</th><th>Phase</th><th>Unit</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Jul 2026 ref</th><th class="n">Total</th><th></th></tr></thead>
-        <tbody>${groups.map(g => `<tr class="div"><td class="muted small">${g.bill ?? ''}</td><td colspan="7">${esc(divName(g.bill))}${g.bill >= 1 && g.bill <= 14 ? ` <a class="small" href="${fanarPdf(g.bill)}" target="_blank" title="Fanar 212 reference BOQ — ${esc(DIVISIONS[g.bill])}" onclick="event.stopPropagation()">📄 Fanar ref</a>` : ''}</td><td class="n">${usd(sum(g.items, i => i.total || 0))}</td><td></td></tr>` + g.items.map(i => editing === i.id ? editRow(i) : `<tr ${P.admin ? `style="cursor:pointer" onclick="Plan.edit('${i.id}')"` : ''}>
+        <thead><tr><th>Bill</th><th>Item</th><th>Trade</th><th>Phase</th><th>Unit</th><th class="n">Qty</th><th class="n">Unit price</th>${P.admin ? '<th class="n">Jul 2026 ref</th>' : ''}<th class="n">Total</th><th></th></tr></thead>
+        <tbody>${groups.map(g => { const key = tab + ':' + g.bill, open = openDivs.has(key) || g.items.some(i => i.id === editing); return `<tr class="div ${open ? 'open' : ''}" onclick="Plan.toggleDiv('${key}')" style="cursor:pointer"><td class="muted small">${g.bill ?? ''}</td><td colspan="${P.admin ? 7 : 6}"><span class="caret">${open ? '▾' : '▸'}</span>${esc(divName(g.bill))} <span class="small muted" style="font-weight:400">· ${g.items.length} line${g.items.length > 1 ? 's' : ''}</span>${P.admin && g.bill >= 1 && g.bill <= 14 ? ` <a class="small" href="${fanarPdf(g.bill)}" target="_blank" title="Fanar 212 reference BOQ — ${esc(DIVISIONS[g.bill])}" onclick="event.stopPropagation()">📄 Fanar ref</a>` : ''}</td><td class="n">${usd(sum(g.items, i => i.total || 0))}</td><td></td></tr>` + (open ? g.items : []).map(i => editing === i.id ? editRow(i) : `<tr ${P.admin ? `style="cursor:pointer" onclick="Plan.edit('${i.id}')"` : ''}>
           <td class="muted small">${i.bill ?? ''}</td>
           <td>${esc(i.name)}${i.review ? ' <span class="pill" title="Imported from the 2022–2024 BOQ — to review">2022 prices</span>' : ''}${i.note ? `<div class="small muted">${esc(i.note)}</div>` : ''}${(i.history || []).length ? `<div class="small muted" title="${esc(i.history.map(h => h.at.slice(0, 10) + ' ' + h.by + ': ' + h.changes.map(c => c.f + ' ' + c.from + ' → ' + c.to).join(', ')).join('\n'))}">🕘 ${i.history.length} change${i.history.length > 1 ? 's' : ''} · last ${esc(i.history[i.history.length - 1].at.slice(0, 10))} by ${esc(i.history[i.history.length - 1].by)}</div>` : ''}</td>
           <td><span class="pill">${esc(secName(i.trade))}</span></td><td class="small muted">${PHASES[i.phase] || ''}</td>
-          <td class="small muted">${esc(i.unit || '')}</td><td class="n">${i.qty ?? ''}</td><td class="n">${i.price != null ? usd(i.price) : ''}</td><td class="n">${refCell(i)}</td><td class="n">${usd(i.total || 0)}</td>
-          <td class="small muted" title="${esc(i.source || '')}">${i.source ? '📄' : ''}</td></tr>`).join('')).join('')}
+          <td class="small muted">${esc(i.unit || '')}</td><td class="n">${i.qty ?? ''}</td><td class="n">${i.price != null ? usd(i.price) : ''}</td>${P.admin ? `<td class="n">${refCell(i)}</td>` : ''}<td class="n">${usd(i.total || 0)}</td>
+          <td class="small muted" title="${esc(i.source || '')}">${i.source ? '📄' : ''}</td></tr>`).join(''); }).join('')}
         ${editing === '' ? editRow({ type: tab, phase: 'finishing', trade: 'general', review: false }) : ''}
-        <tr class="tot"><td></td><td>Total per villa ${tab}</td><td colspan="6"></td><td class="n">${usd(B.perVilla[tab])}</td><td></td></tr></tbody></table></div>
-        <div class="note">Quantities come from the take-off sheets in <i>0. EXCEL boq</i> (Dropbox); this is the summary that becomes the budget. Click a line to edit it in place (Enter saves, Esc cancels) — every change is kept with who and when.</div>
+        <tr class="tot"><td></td><td>Total per villa ${tab}</td><td colspan="${P.admin ? 6 : 5}"></td><td class="n">${usd(B.perVilla[tab])}</td><td></td></tr></tbody></table></div>
+        <div class="note">Quantities come from the take-off sheets in <i>0. EXCEL boq</i> (Dropbox); this is the summary that becomes the budget. Click a division to open it, a line to edit it in place (Enter saves, Esc cancels) — every change is kept with who and when.</div>
       </div>
-      <h2>Reference · Fanar 212 BOQ <span class="r muted">Sayed Saadeh, July 2026 — the rates in the “Jul 2026 ref” column come from here</span></h2>
+      ${P.admin ? `<h2>Reference · Fanar 212 BOQ <span class="r muted">Sayed Saadeh, July 2026 — the rates in the “Jul 2026 ref” column come from here</span></h2>
       <div class="card"><div class="fanar">${DIVISIONS.slice(0, 15).map((d, n) => `<a href="${fanarPdf(n)}" target="_blank">📄 <b>${String(n).padStart(2, '0')}</b> ${esc(d)}</a>`).join('')}<a href="/api/ajaltoun/plan/fanar/specs" target="_blank">📘 Specifications (7-22-2026)</a></div>
-        <div class="note">One PDF per division; the same numbering as our bill column. Private to this app — the links open in a new tab.</div>
-      </div>`;
+        <div class="note">One PDF per division; the same numbering as our bill column. Mario only — the links open in a new tab.</div>
+      </div>` : ''}`;
     const first = el.querySelector('tr.editing input'); if (first) { first.focus(); first.select(); }
   }
 
@@ -183,7 +184,7 @@
       <td><input id="e-unit" value="${esc(i.unit || '')}" placeholder="unit" style="width:52px"></td>
       <td class="n"><input id="e-qty" type="number" step="any" value="${i.qty ?? ''}" placeholder="qty" style="width:72px;text-align:right" oninput="Plan.liveTotal()"></td>
       <td class="n"><input id="e-price" type="number" step="any" value="${i.price ?? ''}" placeholder="$/unit" style="width:76px;text-align:right" oninput="Plan.liveTotal()"></td>
-      <td class="n">${i.id ? refCell(i) : ''}</td>
+      ${P.admin ? `<td class="n">${i.id ? refCell(i) : ''}</td>` : ''}
       <td class="n"><input id="e-amount" type="number" step="any" value="${i.amount ?? ''}" placeholder="fixed $" title="Fixed amount, if no qty × price" style="width:84px;text-align:right"><div id="e-total" class="small muted"></div></td>
       <td style="white-space:nowrap"><button class="btn ok" onclick="Plan.save('${id}')" title="Save (Enter)">✓</button> <button class="btn" onclick="Plan.closeEdit()" title="Cancel (Esc)">✕</button>${id ? ` <button class="btn flag" onclick="Plan.remove('${id}')" title="Delete this line">🗑</button>` : ''}</td>
     </tr>`;
@@ -284,5 +285,7 @@
   function yearOut() { if (!P) return null; const R = plan(); const o = {}; for (const y of R.years) o[y] = R.tot(R.out, y); return o; }
   window.Plan = { load, renderBudget, renderPlan, yearOut, get P() { return P; },
     setTab: t => { tab = t; window.renderTab && renderTab(); }, setScenario: s => { scenario = s; window.renderTab && renderTab(); },
-    edit: id => { editing = id || ''; window.renderTab && renderTab(); }, useRef, closeEdit, editKey, liveTotal, save, remove, saveSettings };
+    edit: id => { editing = id || ''; window.renderTab && renderTab(); },
+    toggleDiv: k => { openDivs.has(k) ? openDivs.delete(k) : openDivs.add(k); window.renderTab && renderTab(); },
+    foldAll: on => { for (const i of P.items) { const k = i.type + ':' + (i.bill == null || i.bill === '' ? null : +i.bill); on ? openDivs.add(k) : openDivs.delete(k); } window.renderTab && renderTab(); }, useRef, closeEdit, editKey, liveTotal, save, remove, saveSettings };
 })();

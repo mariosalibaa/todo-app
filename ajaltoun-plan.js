@@ -4,7 +4,7 @@
 //   GET  /api/ajaltoun/plan                       { items, settings }
 //   POST /api/ajaltoun/plan/item                  admin: { item } upsert (history stamped) · { id, delete: true }
 //   POST /api/ajaltoun/plan/settings              admin: { settings } (merged)
-//   GET  /api/ajaltoun/plan/fanar/<00..14|specs>  the Fanar 212 reference BOQ (Sayed Saadeh, Jul 2026), one PDF per division
+//   GET  /api/ajaltoun/plan/fanar/<00..14|specs>  admin: the Fanar 212 reference BOQ (Sayed Saadeh, Jul 2026), one PDF per division
 //
 // One model, three views (Mario, 2026-09-12): the BOQ summary lines are the BUDGET (per villa TYPE — U = "up 333",
 // D = "down" — quantity × unit price, or a fixed amount); each item carries a trade (= the section the Odoo lines are
@@ -27,6 +27,7 @@ function readBody(req, limit = 1e6) {
 
 // Defaults until Mario edits them on the page. Jean's U2 schedule comes from Odoo, not from here.
 const DEFAULT_SETTINGS = {
+  pageSize: 50,                   // lines per page on the Accounts grid — one value for everyone, changed from the pager
   years: [2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032],
   siteYear: 2026,                 // excavation, stone walls, site works: done once for the whole plot
   land: 650000,                   // agreed value between the partners (D3 agreement)
@@ -51,7 +52,19 @@ async function handle(req, res, url, user, ctx) {
   const setRef = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('plan');
   const who = user.name || user.displayName || user.email || '';
 
-  // Fanar 212 BOQ — private partner document, so it sits behind the app gate, not in the static whitelist
+  if (url === '/api/ajaltoun/plan' && req.method === 'GET') {
+    const [snap, s] = await Promise.all([col.get(), setRef.get()]);
+    const items = snap.docs.map(d => d.data()).sort((a, b) => (a.type + String(a.bill || 0).padStart(3, '0') + (a.order || 0)).localeCompare(b.type + String(b.bill || 0).padStart(3, '0') + (b.order || 0)));
+    const saved = s.data() || {};
+    const settings = { ...DEFAULT_SETTINGS, ...saved, villas: { ...DEFAULT_SETTINGS.villas, ...(saved.villas || {}) }, fee: { ...DEFAULT_SETTINGS.fee, ...(saved.fee || {}) } };
+    // Antoine never sees the Fanar reference: no ref rates, and the note fragments that quote Fanar are dropped
+    const out = access.admin ? items : items.map(({ ref, ...i }) => ({ ...i, note: (i.note || '').split(' · ').filter(t => !/fanar/i.test(t)).join(' · ') || undefined, history: (i.history || []).map(h => ({ ...h, changes: h.changes.map(c => ({ ...c, from: /fanar/i.test(c.from) ? '…' : c.from, to: /fanar/i.test(c.to) ? '…' : c.to })) })) }));
+    return json(res, 200, { items: out, settings, admin: !!access.admin });
+  }
+
+  if (!access.admin) return json(res, 403, { error: 'admin only' });
+
+  // Fanar 212 BOQ — private partner document — Mario only (below the admin gate), never in the static whitelist
   const fanar = url.match(/^\/api\/ajaltoun\/plan\/fanar\/(\d\d|specs)$/);
   if (fanar && req.method === 'GET') {
     const f = path.join(__dirname, 'ajaltoun-fanar', fanar[1] + '.pdf');
@@ -60,15 +73,6 @@ async function handle(req, res, url, user, ctx) {
     res.end(fs.readFileSync(f)); return true;
   }
 
-  if (url === '/api/ajaltoun/plan' && req.method === 'GET') {
-    const [snap, s] = await Promise.all([col.get(), setRef.get()]);
-    const items = snap.docs.map(d => d.data()).sort((a, b) => (a.type + String(a.bill || 0).padStart(3, '0') + (a.order || 0)).localeCompare(b.type + String(b.bill || 0).padStart(3, '0') + (b.order || 0)));
-    const saved = s.data() || {};
-    const settings = { ...DEFAULT_SETTINGS, ...saved, villas: { ...DEFAULT_SETTINGS.villas, ...(saved.villas || {}) }, fee: { ...DEFAULT_SETTINGS.fee, ...(saved.fee || {}) } };
-    return json(res, 200, { items, settings, admin: !!access.admin });
-  }
-
-  if (!access.admin) return json(res, 403, { error: 'admin only' });
 
   if (url === '/api/ajaltoun/plan/item' && req.method === 'POST') {
     const b = await readBody(req);
