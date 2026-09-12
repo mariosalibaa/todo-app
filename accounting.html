@@ -3715,7 +3715,6 @@ function deckShow() {
     : kind === 'ask' ? esc(t.ask.text || 'A question on this line')
     : 'A partner / project suggestion is waiting on this line.';
   const askBtns = kind === 'ask' ? `<div class="deck-ask">${(t.ask.options || []).map((o, i) => `<button class="btn" onclick="deckAnswer('${t.id}', ${i})">${esc(o.label || o.text || o)}</button>`).join('')}<button class="btn" onclick="deckAct('fix')">✎ other…</button></div>` : '';
-  const foot = document.getElementById('deck-foot');
   foot.querySelector('.deck-yes').textContent = kind === 'guess' ? '✓ Keep' : '✓ Accept';
   foot.querySelector('.deck-no').textContent = kind === 'guess' ? '⊘ Clear' : '⊘ Not counted';
   foot.querySelector('.deck-yes').style.display = foot.querySelector('.deck-no').style.display = kind === 'ask' ? 'none' : '';
