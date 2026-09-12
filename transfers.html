@@ -3,39 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#714B67">
+<meta name="theme-color" content="#1e1e2e">
 <title>Accounting · Transfers</title>
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <style>
-  :root{--odoo:#714B67;--odoo2:#875A7B;--line:#dee2e6;--muted:#6c757d;--bg:#f8f9fa;--text:#212529;--green:#28a745;--red:#dc3545;}
+  :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;--odoo:var(--amber);--odoo2:var(--amber);--line:var(--surface0);--muted:var(--overlay0);--bg:var(--mantle);--auto:var(--blue);--manual-bg:rgba(166,227,161,.10);--link:var(--amber);--ink:var(--text);}
   *{box-sizing:border-box;}
   html,body{height:100%;}
-  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:#fff;display:flex;flex-direction:column;overflow:hidden;}
-  .top .hback{color:var(--amber,#F2A93B);text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px;opacity:1;} .top .hback:hover{background:rgba(255,255,255,.1);}
-  .top{background:var(--odoo);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;flex:none;}
-  .top a{color:#fff;text-decoration:none;opacity:.85;} .top .brand{font-weight:600;font-size:14px;} .top .sp{flex:1;} .top .who{font-size:12px;opacity:.85;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;color:var(--text);background:var(--base);display:flex;flex-direction:column;overflow:hidden;}
+  .top .hback{color:var(--amber,#F2A93B);text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;padding:5px 10px;border:1px solid var(--surface0);border-radius:8px;opacity:1;} .top .hback:hover{background:var(--surface0);}
+  .top{background:var(--base);color:var(--text);border-bottom:1px solid var(--surface0);display:flex;align-items:center;gap:14px;padding:0 14px;height:46px;flex:none;}
+  .top a{color:var(--sub);text-decoration:none;} .top .brand{font-weight:600;font-size:14px;color:var(--amber);} .top .sp{flex:1;} .top .who{font-size:12px;opacity:.85;}
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg);flex:none;}
-  .bar select,.bar input{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13px;background:#fff;height:30px;}
-  .btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:0 10px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
-  .btn.primary{background:var(--odoo);border-color:var(--odoo);color:#fff;} .btn:disabled{opacity:.5;cursor:default;}
+  .bar select,.bar input{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13px;background:var(--crust);height:30px;}
+  .btn{border:1px solid var(--line);background:var(--crust);border-radius:4px;padding:0 10px;height:30px;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .btn.primary{background:var(--amber);border-color:var(--amber);color:var(--crust);font-weight:600;} .btn:disabled{opacity:.5;cursor:default;}
   .btn.sm{height:22px;padding:0 6px;font-size:11.5px;}
   .msg{padding:6px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);display:none;flex:none;}
   .msg.err{color:var(--red);display:block;} .msg.ok{color:var(--green);display:block;}
   .wrap{flex:1;min-height:0;overflow:auto;}
   table{border-collapse:separate;border-spacing:0;width:100%;min-width:760px;}
-  thead th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;height:30px;border-bottom:2px solid var(--line);white-space:nowrap;font-size:12px;color:#495057;z-index:2;}
-  td{padding:5px 8px;border-bottom:1px solid #eef0f2;vertical-align:middle;white-space:nowrap;}
-  tr:hover td{background:#f5f2f7;}
+  thead th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:600;padding:0 8px;height:30px;border-bottom:2px solid var(--line);white-space:nowrap;font-size:12px;color:var(--sub);z-index:2;}
+  td{padding:5px 8px;border-bottom:1px solid var(--surface0);vertical-align:middle;white-space:nowrap;}
+  tr:hover td{background:rgba(255,255,255,.035);}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
   td.desc{white-space:normal;color:var(--muted);}
   .acc a{color:var(--odoo);text-decoration:none;} .acc a:hover{text-decoration:underline;}
   .linked{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;}
   tfoot td{font-weight:600;background:var(--bg);border-top:2px solid var(--line);}
   .empty{padding:60px 20px;text-align:center;color:var(--muted);} .empty b{display:block;font-size:15px;color:var(--text);margin-bottom:6px;}
-  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;}
   .sheet[hidden]{display:none;}
-  .sheet-box{background:#fff;border-radius:8px;width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3);}
+  .sheet-box{background:var(--mantle);border:1px solid var(--surface1);border-radius:8px;width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3);}
   .sheet-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);}
   .sheet-body{overflow:auto;padding:12px 14px;}
   .sheet-foot{display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--line);align-items:center;}
@@ -45,6 +45,12 @@
   .hint{color:var(--muted);font-size:12px;}
   .arrow{color:var(--muted);padding:0 6px;}
   @media (max-width:700px){.form{grid-template-columns:1fr;}}
+  input,select,textarea{color-scheme:dark;} select option{background:var(--mantle);color:var(--text);}
+  /* hub base: what the browser would otherwise paint black or link-blue on the dark ground */
+  a{color:var(--blue);} button,.btn,input,select,textarea{color:var(--text);font-family:inherit;}
+  .btn,button.btn{background:var(--surface0);border-color:var(--surface1);} .btn:hover:not(:disabled){border-color:var(--amber);}
+  .btn.primary,button.primary{background:var(--amber);border-color:var(--amber);color:var(--crust);}
+  ::placeholder{color:var(--overlay0);} hr{border-color:var(--surface0);}
 </style>
 </head>
 <body>
