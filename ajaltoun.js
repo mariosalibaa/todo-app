@@ -343,9 +343,23 @@ async function handle(req, res, url, user, ctx) {
     const ref = vcol.doc(String(b.lineId));
     const cur = (await ref.get()).data() || { approved: null, verified: null, flag: null };
     let next, action, extra = null;
+    // Mario, 2026-09-13: "Antoine cannot withdraw his approval on any line without my approval" — once verified,
+    // the partner can only ASK to withdraw (a note lands on the line); Mario releases it, and the release is logged.
     if (access.admin) {
-      if (!(b.state === null && cur.flag)) return json(res, 403, { error: 'the project manager cannot verify his own expenses — a partner must' });
-      next = { ...cur, flag: null }; action = 'flag answered'; extra = { note: cur.flag.note || '' };
+      if (b.state === null && cur.verified) {
+        next = { ...cur, verified: null, flag: null, withdrawRequest: null, withdrawn: [...(cur.withdrawn || []), { ...cur.verified, undoneAt: now(), releasedBy: access.email, requested: cur.withdrawRequest || null }] };
+        action = cur.withdrawRequest ? 'verification released (on the partner\'s request)' : 'verification released by the project manager'; extra = { undid: cur.verified, note: (cur.withdrawRequest || {}).note || '' };
+      } else if (b.state === 'keep' && cur.withdrawRequest) {
+        next = { ...cur, withdrawRequest: null }; action = 'withdrawal refused — the verification stands'; extra = { note: cur.withdrawRequest.note || '' };
+      } else {
+        if (!(b.state === null && cur.flag)) return json(res, 403, { error: 'the project manager cannot verify his own expenses — a partner must' });
+        next = { ...cur, flag: null }; action = 'flag answered'; extra = { note: cur.flag.note || '' };
+      }
+    } else if (cur.verified && (b.state === null || b.state === 'flagged')) {
+      return json(res, 403, { error: 'this line is verified — a verification stands until Mario releases it. Use "ask to withdraw" and say why.' });
+    } else if (b.state === 'withdraw-request') {
+      if (!cur.verified) return json(res, 400, { error: 'nothing to withdraw: the line is not verified' });
+      next = { ...cur, withdrawRequest: { ...stamp(), note: String(b.note || '').slice(0, 500) } }; action = 'asked to withdraw the verification'; extra = { note: next.withdrawRequest.note };
     } else if (b.state === 'verified') {
       if (!cur.approved) return json(res, 400, { error: 'not approved by the project manager yet' });
       next = { ...cur, verified: stamp(), flag: null }; action = cur.flag ? 'verified (flag lifted)' : 'verified';

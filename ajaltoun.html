@@ -294,12 +294,12 @@ async function loadLog() {
 }
 function renderLog() {
   const el = document.getElementById('log'); if (!el || !LOG) return;
-  const bad = LOG.filter(e => /withdrawn|was verified/.test(e.action));
+  const bad = LOG.filter(e => /withdrawn|was verified|released|asked to withdraw/.test(e.action));
   document.getElementById('log-sub').innerHTML = `${LOG.length} events${bad.length ? ` · <span class="warn">${bad.length} verification${bad.length > 1 ? 's' : ''} taken back</span>` : ''}${LOG.length > 30 ? ` · <a href="#" style="color:var(--amber)" onclick="logAll=!logAll;renderLog();return false;">${logAll ? 'show last 30' : 'show all'}</a>` : ''}`;
   const rows = (logAll ? LOG : LOG.slice(0, 30));
-  el.innerHTML = rows.length ? `<table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Line</th><th class="n">Amount</th></tr></thead><tbody>${rows.map(e => `<tr class="${/withdrawn|was verified/.test(e.action) ? 'logw' : ''}">
+  el.innerHTML = rows.length ? `<table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Line</th><th class="n">Amount</th></tr></thead><tbody>${rows.map(e => `<tr class="${/withdrawn|was verified|released|asked to withdraw/.test(e.action) ? 'logw' : ''}">
     <td class="muted small" style="white-space:nowrap">${esc((e.at || '').replace('T', ' ').slice(0, 16))}</td><td>${esc(e.by || e.email || '')}</td>
-    <td class="${/withdrawn|was verified/.test(e.action) ? 'warn' : /^verified/.test(e.action) ? 'ok' : /^approved/.test(e.action) ? 'ap' : /flag/.test(e.action) ? 'flag' : ''}">${esc(e.action)}${e.undid ? `<div class="stamp">undid the verification by ${esc(e.undid.by)} of ${esc((e.undid.at || '').replace('T', ' ').slice(0, 16))}</div>` : ''}${e.note ? `<div class="stamp">“${esc(e.note)}”</div>` : ''}</td>
+    <td class="${/withdrawn|was verified|released|asked to withdraw/.test(e.action) ? 'warn' : /^verified/.test(e.action) ? 'ok' : /^approved/.test(e.action) ? 'ap' : /flag/.test(e.action) ? 'flag' : ''}">${esc(e.action)}${e.undid ? `<div class="stamp">undid the verification by ${esc(e.undid.by)} of ${esc((e.undid.at || '').replace('T', ' ').slice(0, 16))}</div>` : ''}${e.note ? `<div class="stamp">“${esc(e.note)}”</div>` : ''}</td>
     <td class="small">${esc(e.date || '')} · ${esc(e.partner || '')}<div class="muted">${esc((e.name || '').replace(/^Ajaltoun 4193\s*/i, '').slice(0, 60))}</div></td><td class="n">${usd2(e.amount || 0)}</td></tr>`).join('')}</tbody></table>`
     : '<p class="muted small">No review actions yet.</p>';
 }
@@ -412,8 +412,10 @@ const stampOf = (cls, label, s) => `<div class="${cls}">${label}</div><div class
 function marioCell(l) {
   const r = l.review || {}; let html = '';
   if (r.approved) html += stampOf('ap', '✓ Approved', r.approved);
+  if (r.withdrawRequest) html += `<div class="stamp warn" title="${esc(r.withdrawRequest.note || '')}">↩ ${esc(r.withdrawRequest.by || 'the partner')} asks to withdraw his verification${r.withdrawRequest.note ? ': ' + esc(r.withdrawRequest.note) : ''}</div>`;
   if (D.admin) {
     if (r.flag) html += `<button class="btn" onclick="review(${l.id}, null)" title="Clear the flag once you have answered it">answered</button> `;
+    if (r.verified) html += `<button class="btn" onclick="review(${l.id}, null)" title="Release the partner's verification so he can look at the line again — logged">release verification</button> ${r.withdrawRequest ? `<button class="btn" onclick="review(${l.id}, 'keep')" title="Refuse: the verification stands">keep it</button> ` : ''}`;
     html += r.approved ? `<button class="btn" onclick="approve([${l.id}], false)">withdraw</button>` : `<button class="btn ap" onclick="approve([${l.id}], true)">✓ Approve</button>`;
   }
   return html || '<span class="stamp">booked · not yet approved</span>';
@@ -425,8 +427,11 @@ function antoineCell(l) {
   for (const w of (r.withdrawn || [])) html += `<div class="stamp warn" title="A verification that was taken back">↩ verification by ${esc(w.by)} (${esc(whenOf(w))}) withdrawn ${esc((w.undoneAt || '').replace('T', ' ').slice(0, 16))}</div>`;
   if (D.canVerify) {
     if (r.approved && !r.verified) html += `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> `;
-    if (r.approved && !r.flag) html += `<button class="btn flag" onclick="review(${l.id}, 'flagged')">⚑ Flag</button>`;
-    if (r.verified || r.flag) html += ` <button class="btn" onclick="review(${l.id}, null)">undo</button>`;
+    if (r.approved && !r.flag && !r.verified) html += `<button class="btn flag" onclick="review(${l.id}, 'flagged')">⚑ Flag</button>`;
+    if (r.flag) html += ` <button class="btn" onclick="review(${l.id}, null)">undo</button>`;
+    // a verification stands until Mario releases it (Mario, 2026-09-13): the partner can only ask
+    if (r.verified && !r.withdrawRequest) html += ` <button class="btn" onclick="review(${l.id}, 'withdraw-request')" title="Your verification stays until Mario releases it — say why you want it back">ask to withdraw</button>`;
+    if (r.verified && r.withdrawRequest) html += ` <span class="stamp muted">waiting for Mario</span>`;
   }
   if (!html) return r.approved ? '<span class="stamp">— waiting</span>' : '<span class="stamp muted">—</span>';
   return html;
@@ -450,6 +455,7 @@ async function approve(ids, on) {
 async function review(lineId, state) {
   let note = '';
   if (state === 'flagged') { note = prompt('What is wrong with this line? (a short note for Mario)'); if (note === null) return; }
+  if (state === 'withdraw-request') { note = prompt('Why do you want to withdraw your verification? (Mario decides)'); if (note === null) return; }
   try {
     const r = await Admin.api('POST', '/api/ajaltoun/verify', { lineId, state, note });
     const l = D.lines.find(x => x.id === lineId); l.review = r.review; render();
