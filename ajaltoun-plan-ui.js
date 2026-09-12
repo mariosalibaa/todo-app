@@ -19,7 +19,7 @@
   let P = null, tab = 'U', scenario = 'expected', editing = null;
   const openDivs = new Set();   // divisions unfolded on the BOQ grid (key type:bill); everything starts collapsed
   const BF = { q: '', phase: '', review: false };
-  let showFanar = true; try { showFanar = localStorage.getItem('aj-fanar') !== '0'; } catch {}   // Fanar column/links on or off (Mario's own choice, per browser)
+  let showFanar = false; try { showFanar = localStorage.getItem('aj-fanar') === '1'; } catch {}   // Fanar column/links off by default; the toggle is remembered per browser
   const fanarOn = () => !!(P && P.admin && showFanar);   // BOQ filter: text · phase · only "2022 prices" lines; a filter opens the matching divisions
 
   const secName = id => ((window.D && D.sections.find(s => s.id === id)) || { name: id }).name;
