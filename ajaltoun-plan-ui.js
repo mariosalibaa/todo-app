@@ -8,6 +8,11 @@
   const usd0 = n => Math.abs(n) < 0.5 ? '' : usd(n);
   const VILLAS = ['U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
   const PHASES = { site: 'Site works', structure: 'Structure', finishing: 'Finishing' };
+  // the 14 divisions of the Fanar 212 BOQ (Sayed Saadeh, Jul 2026) — our bill numbers follow them; 00 = summary
+  const DIVISIONS = ['Summary', 'Excavation', 'Concrete', 'Block work', 'Waterproofing', 'Wood work', 'Metal & aluminium', 'Plaster work', 'Tiling & cladding', 'Painting', 'Suspended ceiling', 'Plumbing', 'Electrical', 'Ventilation', 'Lift',
+    'Lift (ours)', 'Pool', 'Kitchen', 'General — permits, connections, insurance', , 'Landscape'];   // 15+ = our own bills beyond Fanar's 14
+  const fanarPdf = n => `/api/ajaltoun/plan/fanar/${String(n).padStart(2, '0')}`;
+  const divName = b => DIVISIONS[b] || (b ? 'Bill ' + b : 'Other');
   const THIS_YEAR = new Date().getFullYear();
   let P = null, tab = 'U', scenario = 'expected', editing = null;
 
@@ -110,6 +115,8 @@
     const totB = sum(rows, r => r.b), totS = sum(rows, r => r.s);
     const equipRows = ids.filter(isEquip).map(id => ({ id, s: B.spent[id] || 0 }));
     const items = B.byType[tab];
+    const groups = []; for (const i of items) { const b = i.bill == null || i.bill === '' ? null : +i.bill; let g = groups.find(x => x.bill === b); if (!g) groups.push(g = { bill: b, items: [] }); g.items.push(i); }
+    groups.sort((a, b) => (a.bill ?? 99) - (b.bill ?? 99));
     el.innerHTML = `
       <div class="kpis">
         <div class="kpi"><div class="v">${usd(B.perVilla.U)}</div><div class="l">budget per U villa (up 333) · ${B.byType.U.length} lines</div></div>
@@ -131,17 +138,21 @@
       <h2>BOQ lines <span class="r"><span class="lang"><button class="${tab === 'U' ? 'on' : ''}" onclick="Plan.setTab('U')">Villa U — up 333</button><button class="${tab === 'D' ? 'on' : ''}" onclick="Plan.setTab('D')">Villa D — down</button></span>${P.admin ? ` &nbsp; <button class="btn ap" onclick="Plan.edit(null)">+ Add a line</button>` : ''}</span></h2>
       <div class="card"><div class="wrap"><table>
         <thead><tr><th>Bill</th><th>Item</th><th>Trade</th><th>Phase</th><th>Unit</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Jul 2026 ref</th><th class="n">Total</th><th></th></tr></thead>
-        <tbody>${items.map(i => `<tr ${P.admin ? `style="cursor:pointer" onclick="Plan.edit('${i.id}')"` : ''}>
+        <tbody>${groups.map(g => `<tr class="div"><td class="muted small">${g.bill ?? ''}</td><td colspan="7">${esc(divName(g.bill))}${g.bill >= 1 && g.bill <= 14 ? ` <a class="small" href="${fanarPdf(g.bill)}" target="_blank" title="Fanar 212 reference BOQ — ${esc(DIVISIONS[g.bill])}" onclick="event.stopPropagation()">📄 Fanar ref</a>` : ''}</td><td class="n">${usd(sum(g.items, i => i.total || 0))}</td><td></td></tr>` + g.items.map(i => editing === i.id ? editRow(i) : `<tr ${P.admin ? `style="cursor:pointer" onclick="Plan.edit('${i.id}')"` : ''}>
           <td class="muted small">${i.bill ?? ''}</td>
           <td>${esc(i.name)}${i.review ? ' <span class="pill" title="Imported from the 2022–2024 BOQ — to review">2022 prices</span>' : ''}${i.note ? `<div class="small muted">${esc(i.note)}</div>` : ''}${(i.history || []).length ? `<div class="small muted" title="${esc(i.history.map(h => h.at.slice(0, 10) + ' ' + h.by + ': ' + h.changes.map(c => c.f + ' ' + c.from + ' → ' + c.to).join(', ')).join('\n'))}">🕘 ${i.history.length} change${i.history.length > 1 ? 's' : ''} · last ${esc(i.history[i.history.length - 1].at.slice(0, 10))} by ${esc(i.history[i.history.length - 1].by)}</div>` : ''}</td>
           <td><span class="pill">${esc(secName(i.trade))}</span></td><td class="small muted">${PHASES[i.phase] || ''}</td>
           <td class="small muted">${esc(i.unit || '')}</td><td class="n">${i.qty ?? ''}</td><td class="n">${i.price != null ? usd(i.price) : ''}</td><td class="n">${refCell(i)}</td><td class="n">${usd(i.total || 0)}</td>
-          <td class="small muted" title="${esc(i.source || '')}">${i.source ? '📄' : ''}</td></tr>`).join('')}
+          <td class="small muted" title="${esc(i.source || '')}">${i.source ? '📄' : ''}</td></tr>`).join('')).join('')}
+        ${editing === '' ? editRow({ type: tab, phase: 'finishing', trade: 'general', review: false }) : ''}
         <tr class="tot"><td></td><td>Total per villa ${tab}</td><td colspan="6"></td><td class="n">${usd(B.perVilla[tab])}</td><td></td></tr></tbody></table></div>
-        <div class="note">Quantities come from the take-off sheets in <i>0. EXCEL boq</i> (Dropbox); this is the summary that becomes the budget. Click a line to change its quantity, price, trade or phase — every change is kept with who and when.</div>
+        <div class="note">Quantities come from the take-off sheets in <i>0. EXCEL boq</i> (Dropbox); this is the summary that becomes the budget. Click a line to edit it in place (Enter saves, Esc cancels) — every change is kept with who and when.</div>
       </div>
-      <div id="plan-edit"></div>`;
-    if (editing !== null) renderEdit();
+      <h2>Reference · Fanar 212 BOQ <span class="r muted">Sayed Saadeh, July 2026 — the rates in the “Jul 2026 ref” column come from here</span></h2>
+      <div class="card"><div class="fanar">${DIVISIONS.slice(0, 15).map((d, n) => `<a href="${fanarPdf(n)}" target="_blank">📄 <b>${String(n).padStart(2, '0')}</b> ${esc(d)}</a>`).join('')}<a href="/api/ajaltoun/plan/fanar/specs" target="_blank">📘 Specifications (7-22-2026)</a></div>
+        <div class="note">One PDF per division; the same numbering as our bill column. Private to this app — the links open in a new tab.</div>
+      </div>`;
+    const first = el.querySelector('tr.editing input'); if (first) { first.focus(); first.select(); }
   }
 
   // Fanar 212 (Sayed Saadeh, Jul 2026) rate next to ours; "use" adopts it, stamped in the line's history
@@ -158,29 +169,34 @@
     try { const r = await Admin.api('POST', '/api/ajaltoun/plan/item', { item }); const k = P.items.findIndex(x => x.id === r.item.id); P.items[k] = r.item; window.renderTab && renderTab(); } catch (e) { alert('Could not save: ' + e.message); }
   }
 
-  function renderEdit() {
-    const i = editing && P.items.find(x => x.id === editing) || { type: tab, phase: 'finishing', trade: 'general', review: false };
-    const el = document.getElementById('plan-edit'); if (!el) return;
-    const opt = (list, val, f) => list.map(x => `<option value="${x[0]}" ${x[0] === val ? 'selected' : ''}>${esc(x[1])}</option>`).join('');
-    el.innerHTML = `<div class="modal" onclick="if(event.target===this)Plan.closeEdit()"><div class="dlg">
-      <h3 style="margin:0 0 12px">${i.id ? 'Edit line' : 'New line'} · villa ${esc(i.type)}</h3>
-      <div class="frm">
-        <label>Item<input id="e-name" value="${esc(i.name || '')}"></label>
-        <label>Bill no.<input id="e-bill" type="number" value="${i.bill ?? ''}"></label>
-        <label>Trade<select id="e-trade">${opt(D.sections.map(s => [s.id, s.name]), i.trade)}</select></label>
-        <label>Phase<select id="e-phase">${opt(Object.entries(PHASES), i.phase || 'finishing')}</select></label>
-        <label>Unit<input id="e-unit" value="${esc(i.unit || '')}"></label>
-        <label>Quantity<input id="e-qty" type="number" step="any" value="${i.qty ?? ''}"></label>
-        <label>Unit price ($)<input id="e-price" type="number" step="any" value="${i.price ?? ''}"></label>
-        <label>Fixed amount ($) <span class="small muted">if no qty × price</span><input id="e-amount" type="number" step="any" value="${i.amount ?? ''}"></label>
-        <label style="grid-column:1/-1">Note<input id="e-note" value="${esc(i.note || '')}"></label>
-        <label class="row"><input type="checkbox" id="e-review" ${i.review ? 'checked' : ''}> still at 2022–2024 prices (to review)</label>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-        ${i.id ? `<button class="btn flag" onclick="Plan.remove('${i.id}')">Delete</button>` : ''}
-        <button class="btn" onclick="Plan.closeEdit()">Cancel</button><button class="btn ap" onclick="Plan.save('${i.id || ''}')">Save</button>
-      </div></div></div>`;
+  // the line being edited, drawn in place of its grid row (Enter saves, Esc cancels); ids e-* are read back by save()
+  function editRow(i) {
+    const opt = (list, val) => list.map(x => `<option value="${x[0]}" ${x[0] === val ? 'selected' : ''}>${esc(x[1])}</option>`).join('');
+    const id = i.id || '';
+    return `<tr class="editing" onkeydown="Plan.editKey(event, '${id}')">
+      <td><input id="e-bill" type="number" value="${i.bill ?? ''}" placeholder="bill" style="width:46px"></td>
+      <td><input id="e-name" value="${esc(i.name || '')}" placeholder="item" style="width:100%;min-width:170px;box-sizing:border-box">
+        <input id="e-note" value="${esc(i.note || '')}" placeholder="note" class="small" style="width:100%;box-sizing:border-box;margin-top:4px">
+        <label class="small muted" style="display:flex;align-items:center;gap:5px;margin-top:4px;cursor:pointer;white-space:nowrap"><input type="checkbox" id="e-review" ${i.review ? 'checked' : ''}> still at 2022–2024 prices</label></td>
+      <td><select id="e-trade">${opt(D.sections.map(s => [s.id, s.name]), i.trade)}</select></td>
+      <td><select id="e-phase">${opt(Object.entries(PHASES), i.phase || 'finishing')}</select></td>
+      <td><input id="e-unit" value="${esc(i.unit || '')}" placeholder="unit" style="width:52px"></td>
+      <td class="n"><input id="e-qty" type="number" step="any" value="${i.qty ?? ''}" placeholder="qty" style="width:72px;text-align:right" oninput="Plan.liveTotal()"></td>
+      <td class="n"><input id="e-price" type="number" step="any" value="${i.price ?? ''}" placeholder="$/unit" style="width:76px;text-align:right" oninput="Plan.liveTotal()"></td>
+      <td class="n">${i.id ? refCell(i) : ''}</td>
+      <td class="n"><input id="e-amount" type="number" step="any" value="${i.amount ?? ''}" placeholder="fixed $" title="Fixed amount, if no qty × price" style="width:84px;text-align:right"><div id="e-total" class="small muted"></div></td>
+      <td style="white-space:nowrap"><button class="btn ok" onclick="Plan.save('${id}')" title="Save (Enter)">✓</button> <button class="btn" onclick="Plan.closeEdit()" title="Cancel (Esc)">✕</button>${id ? ` <button class="btn flag" onclick="Plan.remove('${id}')" title="Delete this line">🗑</button>` : ''}</td>
+    </tr>`;
   }
+  function liveTotal() {
+    const q = +document.getElementById('e-qty').value, p = +document.getElementById('e-price').value, t = document.getElementById('e-total');
+    if (t) t.textContent = q && p ? '= ' + usd(q * p) : '';
+  }
+  function editKey(e, id) {
+    if (e.key === 'Escape') { e.preventDefault(); closeEdit(); }
+    else if (e.key === 'Enter' && e.target.tagName !== 'SELECT') { e.preventDefault(); save(id); }
+  }
+  function closeEdit() { editing = null; window.renderTab && renderTab(); }
 
   async function save(id) {
     const g = k => document.getElementById('e-' + k).value;
@@ -268,5 +284,5 @@
   function yearOut() { if (!P) return null; const R = plan(); const o = {}; for (const y of R.years) o[y] = R.tot(R.out, y); return o; }
   window.Plan = { load, renderBudget, renderPlan, yearOut, get P() { return P; },
     setTab: t => { tab = t; window.renderTab && renderTab(); }, setScenario: s => { scenario = s; window.renderTab && renderTab(); },
-    edit: id => { editing = id || ''; renderEdit(); }, useRef, closeEdit: () => { editing = null; const el = document.getElementById('plan-edit'); if (el) el.innerHTML = ''; }, save, remove, saveSettings };
+    edit: id => { editing = id || ''; window.renderTab && renderTab(); }, useRef, closeEdit, editKey, liveTotal, save, remove, saveSettings };
 })();

@@ -4,6 +4,7 @@
 //   GET  /api/ajaltoun/plan                       { items, settings }
 //   POST /api/ajaltoun/plan/item                  admin: { item } upsert (history stamped) · { id, delete: true }
 //   POST /api/ajaltoun/plan/settings              admin: { settings } (merged)
+//   GET  /api/ajaltoun/plan/fanar/<00..14|specs>  the Fanar 212 reference BOQ (Sayed Saadeh, Jul 2026), one PDF per division
 //
 // One model, three views (Mario, 2026-09-12): the BOQ summary lines are the BUDGET (per villa TYPE — U = "up 333",
 // D = "down" — quantity × unit price, or a fixed amount); each item carries a trade (= the section the Odoo lines are
@@ -41,6 +42,7 @@ const DEFAULT_SETTINGS = {
   },
 };
 
+const fs = require('fs'), path = require('path');
 const FIELDS = ['type', 'bill', 'trade', 'name', 'unit', 'qty', 'price', 'amount', 'phase', 'note', 'source', 'review', 'ref'];   // ref = the 2026 reference rate (Fanar), kept across edits
 
 async function handle(req, res, url, user, ctx) {
@@ -48,6 +50,15 @@ async function handle(req, res, url, user, ctx) {
   const col = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounBoq');
   const setRef = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('plan');
   const who = user.name || user.displayName || user.email || '';
+
+  // Fanar 212 BOQ — private partner document, so it sits behind the app gate, not in the static whitelist
+  const fanar = url.match(/^\/api\/ajaltoun\/plan\/fanar\/(\d\d|specs)$/);
+  if (fanar && req.method === 'GET') {
+    const f = path.join(__dirname, 'ajaltoun-fanar', fanar[1] + '.pdf');
+    if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="Fanar 212 - ' + fanar[1] + '.pdf"', 'Cache-Control': 'private, max-age=3600' });
+    res.end(fs.readFileSync(f)); return true;
+  }
 
   if (url === '/api/ajaltoun/plan' && req.method === 'GET') {
     const [snap, s] = await Promise.all([col.get(), setRef.get()]);
