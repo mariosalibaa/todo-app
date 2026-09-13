@@ -77,13 +77,6 @@ async function build(ctx) {
   // days not volume — both shown apart, outside the per-m³ figures.
   // the commission (retention) is part of the main contract price (Mario, 2026-09-13): $4 + $0.50 on the first 3,500 m³, $5 after
   const contractAll = r2(totals.excavation + totals.retention);
-  const cost = m3 ? {
-    m3, contract: contractAll, contractPerM3: r2(contractAll / m3), anthony: totals.excavation, anthonyPerM3: r2(totals.excavation / m3),
-    dieselDiff: totals.diesel, real: r2(contractAll + totals.diesel), realPerM3: r2((contractAll + totals.diesel) / m3),
-    litres: Math.round(litres), litresPerM3: r2(litres / m3), dieselPaid: r2(dieselPaid), avgPerL: litres ? r2(dieselPaid / litres) : 0, dieselAt080: r2(litres * 0.8),
-    retention: totals.retention, retentionPerM3: r2(totals.retention / m3), days: totals.days,
-    allIn: r2(contractAll + totals.diesel + totals.days), allInPerM3: r2((contractAll + totals.diesel + totals.days) / m3),
-  } : null;
   // Per cycle (Mario, 2026-09-13): m³, diesel above $0.80 → $/m³ and L/m³, Anthony's cost, Shift's cost. Cycle 1 (till 13-3,
   // 2,500 m³): Anthony paid the diesel himself, at or below $0.80/L — no diesel bill, litres unknown.
   const cyc = {};
@@ -125,6 +118,17 @@ async function build(ctx) {
     // lines Odoo counts that are not the excavation's bills or payments (another company, another account…)
     others: ll.filter(l => !known.has(l.move_id[0])).map(l => ({ date: l.date, name: l.move_id[1], company: l.company_id[1], account: l.account_id[1], debit: l.debit, credit: l.credit, label: l.name || '' })),
   };
+  const firstFuel = Math.min(...cycles.filter(c => c.litres > 0).map(c => c.n));   // a later cycle may carry no bill of its own (fills billed with its neighbour) but Shift still fuelled it
+  const m3Shift = cycles.filter(c => c.n >= firstFuel).reduce((t, c) => t + c.m3, 0);
+  const cost = m3 ? {
+    m3, contract: contractAll, contractPerM3: r2(contractAll / m3), anthony: totals.excavation, anthonyPerM3: r2(totals.excavation / m3),
+    dieselDiff: totals.diesel, real: r2(contractAll + totals.diesel), realPerM3: r2((contractAll + totals.diesel) / m3),
+    // litres are known only where Shift bought the diesel (from cycle 2 on): L/m³ and the diesel $/m³ are over THOSE m³, not the 7,000 (Mario, 2026-09-13)
+    litres: Math.round(litres), m3Shift, litresPerM3: m3Shift ? r2(litres / m3Shift) : 0, dieselPaid: r2(dieselPaid), avgPerL: litres ? r2(dieselPaid / litres) : 0, dieselAt080: r2(litres * 0.8),
+    dieselAt080PerM3: m3Shift ? r2(litres * 0.8 / m3Shift) : 0, dieselDiffPerM3: m3Shift ? r2(totals.diesel / m3Shift) : 0, m3Anthony: r2(m3 - m3Shift),
+    retention: totals.retention, retentionPerM3: r2(totals.retention / m3), days: totals.days,
+    allIn: r2(contractAll + totals.diesel + totals.days), allInPerM3: r2((contractAll + totals.diesel + totals.days) / m3),
+  } : null;
   return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch };
 }
 
