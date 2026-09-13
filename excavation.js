@@ -75,12 +75,14 @@ async function build(ctx) {
   // Cost per m³ (Mario, 2026-09-13): Anthony charges $4/$5 per m³ with diesel at $0.80/L inside his price; Shift pays the
   // diesel above $0.80/L on top. Retention is Georges' commission (he holds the contract, Anthony digs) and the day rate is
   // days not volume — both shown apart, outside the per-m³ figures.
+  // the commission (retention) is part of the main contract price (Mario, 2026-09-13): $4 + $0.50 on the first 3,500 m³, $5 after
+  const contractAll = r2(totals.excavation + totals.retention);
   const cost = m3 ? {
-    m3, contract: totals.excavation, contractPerM3: r2(totals.excavation / m3),
-    dieselDiff: totals.diesel, real: r2(totals.excavation + totals.diesel), realPerM3: r2((totals.excavation + totals.diesel) / m3),
+    m3, contract: contractAll, contractPerM3: r2(contractAll / m3), anthony: totals.excavation, anthonyPerM3: r2(totals.excavation / m3),
+    dieselDiff: totals.diesel, real: r2(contractAll + totals.diesel), realPerM3: r2((contractAll + totals.diesel) / m3),
     litres: Math.round(litres), litresPerM3: r2(litres / m3), dieselPaid: r2(dieselPaid), avgPerL: litres ? r2(dieselPaid / litres) : 0, dieselAt080: r2(litres * 0.8),
     retention: totals.retention, retentionPerM3: r2(totals.retention / m3), days: totals.days,
-    allIn: r2(totals.excavation + totals.diesel + totals.retention + totals.days), allInPerM3: r2((totals.excavation + totals.diesel + totals.retention + totals.days) / m3),
+    allIn: r2(contractAll + totals.diesel + totals.days), allInPerM3: r2((contractAll + totals.diesel + totals.days) / m3),
   } : null;
   // Per cycle (Mario, 2026-09-13): m³, diesel above $0.80 → $/m³ and L/m³, Anthony's cost, Shift's cost. Cycle 1 (till 13-3,
   // 2,500 m³): Anthony paid the diesel himself, at or below $0.80/L — no diesel bill, litres unknown.
@@ -103,11 +105,11 @@ async function build(ctx) {
     const upTo = i === sorted.length - 1 ? '9999-12-31' : c.certDate || '9999-12-31';
     const paid = r2(payments.filter(p => p.date > prevDate && p.date <= upTo).reduce((t, p) => t + p.amount, 0));
     prevDate = c.certDate || prevDate;
-    const billed = r2(c.contract + c.diesel);
+    const billed = r2(c.contract + c.retention + c.diesel);
     pos = r2(pos + billed - paid);
-    return { ...c, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
+    return { ...c, contractPerM3: c.m3 ? r2((c.contract + c.retention) / c.m3) : 0, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
       dieselAt080PerM3: c.m3 ? r2(c.litres * 0.8 / c.m3) : 0, anthonyNetPerM3: c.m3 ? r2((c.contract - c.litres * 0.8) / c.m3) : 0,
-      shiftPerM3: c.m3 ? r2((c.contract + c.diesel) / c.m3) : 0, paid, billed, position: pos,
+      shiftPerM3: c.m3 ? r2((c.contract + c.retention + c.diesel) / c.m3) : 0, paid, billed, position: pos,
       note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }; });
   return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles };
 }
