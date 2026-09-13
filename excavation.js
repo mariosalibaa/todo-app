@@ -45,7 +45,8 @@ async function build(ctx) {
     const memo = String(p.memo || '');
     // who collected: the hub line's phone when tied; else the memo's word (diesel = Dib Mokhtar, anthony = Anthony); else cash to Georges
     const collector = hub ? hub.collector : /dib mokhtar/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony khalil \(cash\)/i.test(memo) ? CASH_COLLECTOR : /anthony khalil/i.test(memo) ? 'Anthony Khalil (Whish)' : /diesel/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony|whish ms/i.test(memo) ? 'Anthony Khalil (Whish)' : CASH_COLLECTOR;
-    return { id: p.id, name: p.name, date: p.date, amount: r2(p.amount), memo, journal: p.journal_id ? p.journal_id[1] : '', journalId: p.journal_id ? p.journal_id[0] : null,
+    // money back from the collector (an inbound payment) counts against what was collected (Mario, 2026-09-13: 33,472 vs 35,608)
+    return { id: p.id, name: p.name, date: p.date, amount: r2(p.payment_type === 'inbound' ? -p.amount : p.amount), memo, journal: p.journal_id ? p.journal_id[1] : '', journalId: p.journal_id ? p.journal_id[0] : null,
       reconciled: !!(p.reconciled_bill_ids || []).length, bills: (p.reconciled_bill_ids || []).length, collector, hubLine: hub ? hub.id : null, project: p.x_studio_project ? p.x_studio_project[1] : '' };
   });
   const pending = lines.filter(l => !l.moveId && !byName[l.payName]).filter(l => !pays.some(p => p.name === l.payName));
