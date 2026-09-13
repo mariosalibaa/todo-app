@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excavation summary · Ajaltoun 4193 · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<style>
+  /* One A4 page, built live from the same figures as the dashboard (Mario, 2026-09-13: "add it to the bottom of the hub
+     page and update it when data updates"). Print or "Save as PDF" from the button; nothing is stored. */
+  @page { size: A4; margin: 12mm 13mm; }
+  body { font: 10.2pt/1.35 "Segoe UI", Arial, sans-serif; color: #1c1c1c; margin: 0; background: #e9e9ee; }
+  .page { background: #fff; width: 210mm; min-height: 297mm; margin: 18px auto; padding: 12mm 13mm; box-shadow: 0 2px 14px rgba(0,0,0,.18); }
+  .bar { width: 210mm; margin: 14px auto 0; display: flex; gap: 8px; align-items: center; font-size: 9.5pt; color: #555; }
+  .bar button { font: inherit; padding: 6px 12px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; } .bar button:hover { border-color: #F2A93B; }
+  .bar a { color: #555; }
+  @media print { body { background: #fff; } .page { box-shadow: none; margin: 0; padding: 0; width: auto; min-height: 0; } .bar { display: none; } }
+  h1 { font: 600 17pt "Century Gothic", "Segoe UI", sans-serif; margin: 0 0 2px; letter-spacing: .02em; }
+  .sub { color: #666; margin: 0 0 10px; font-size: 9.4pt; }
+  .brand { float: right; text-align: right; font: 600 9pt "Century Gothic", "Segoe UI", sans-serif; letter-spacing: .28em; color: #F2A93B; }
+  .brand small { display: block; letter-spacing: .18em; color: #999; font-size: 7pt; }
+  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 8px 0 10px; }
+  .kpi { border: 1px solid #ddd; border-radius: 6px; padding: 7px 9px; }
+  .kpi .v { font-size: 14pt; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 8.4pt; color: #555; line-height: 1.25; }
+  h2 { font-size: 8.4pt; letter-spacing: .14em; text-transform: uppercase; color: #888; margin: 10px 0 4px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.9pt; font-variant-numeric: tabular-nums; }
+  th, td { padding: 2.5px 5px; border-bottom: 1px solid #e6e6e6; text-align: left; vertical-align: top; }
+  th { font-size: 7.6pt; letter-spacing: .06em; text-transform: uppercase; color: #777; font-weight: 600; }
+  td.n, th.n { text-align: right; white-space: nowrap; } table.led td:first-child { width: 34%; } table.led { font-size: 8.4pt; } table.cyc td:nth-child(2) { white-space: nowrap; }
+  tr.tot td { font-weight: 600; border-top: 1.5px solid #bbb; background: #faf6ee; }
+  .muted { color: #777; } .red { color: #b3261e; } .green { color: #1b7f3b; } .amber { color: #b8751a; }
+  ul { margin: 3px 0 0 16px; padding: 0; } li { margin: 1px 0; }
+  .foot { margin-top: 9px; font-size: 8.2pt; color: #777; border-top: 1px solid #ddd; padding-top: 5px; }
+  #overlay { position: fixed; inset: 0; background: #1e1e2e; color: #cdd6f4; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; z-index: 9; }
+</style>
+</head>
+<body>
+<div class="bar"><button onclick="window.print()">🖨 Print / Save as PDF</button><a href="/ajaltoun/excavation">← back to the dashboard</a><span id="at" style="margin-left:auto"></span></div>
+<div class="page" id="page"></div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc;
+const f = (v, d = 2) => (Math.round((+v || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const f0 = v => f(v, 0);
+const dm = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? `${+m[1]} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m[2] - 1]}` : s; };
+const JN = { 'Cash Mario USD': 'Cash Mario', 'Cash NEO_MS USD S_DEV': 'Cash NEO_MS', 'Cash NEO_TRS USD S_DEV': 'Cash NEO_TRS', 'Cash Whish Mario USD - S_DEV': 'Whish MS' };
+Admin.require(['ajaltoun', 'excavation'], async me => {
+  const D = await Admin.api('GET', '/api/ajaltoun/excavation');
+  const T = D.totals, C = D.cost, FC = C.forecast, M = D.odooMatch, L = M.ledgerAll, CY = D.cycles;
+  const open = T.open + T.retentionOpen, refunds = D.payments.filter(p => p.amount < 0).reduce((a, p) => a - p.amount, 0), mistake = Math.round((L.debit - M.paymentsTotal) * 100) / 100;
+  const closedM3 = CY.filter(c => !c.open).reduce((a, c) => a + c.m3, 0), openCy = CY.filter(c => c.open);
+  const lastClosed = CY.filter(c => !c.open).slice(-1)[0];
+  const byWho = {}; for (const p of D.payments) { const w = /anthony/i.test(p.collector) ? 'Anthony Khalil' : /dib/i.test(p.collector) ? 'Dib Mokhtar (diesel)' : p.collector; const j = JN[p.journal] || p.journal; const x = (byWho[w] ||= { amount: 0, j: {} }); x.amount += p.amount; (x.j[j] ||= { amount: 0, n: 0 }).amount += p.amount; x.j[j].n++; }
+  const whos = Object.entries(byWho).sort((a, b) => b[1].amount - a[1].amount);
+  const jrows = Math.max(...whos.map(([, x]) => Object.keys(x.j).length));
+  const dieselBills = D.bills.filter(b => b.kind === 'diesel').length;
+  const at = new Date(D.at).toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('at').textContent = 'Odoo read ' + at;
+  document.getElementById('page').innerHTML = `
+<div class="brand">SHIFT GROUP<small>AJALTOUN 4193</small></div>
+<h1>Excavation — where we stand</h1>
+<p class="sub">Georges EL Hajj (contract holder) · Anthony Khalil (excavator) · Dib Mokhtar (diesel) · figures from Odoo on ${at} · live at hub.shift-group.co/ajaltoun/excavation</p>
+<div class="kpis">
+  <div class="kpi"><div class="v">${f0(C.m3)} m³</div><div class="l">contract volume · ${f0(closedM3)} m³ certified${lastClosed ? ' to ' + dm(lastClosed.till) : ''}${openCy.length ? `, the last ${f0(FC.m3Open)} m³ in progress (certificate ${openCy.map(c => c.n).join(', ')}, till ${openCy.map(c => dm(c.till)).join(', ')})` : ''}</div></div>
+  <div class="kpi"><div class="v">$ ${f(T.bills)}</div><div class="l">total billed by Georges: excavation ${f0(T.excavation)} + commission ${f0(T.retention)} + diesel above $0.80 ${f(T.diesel)}${T.days ? ' + day rate ' + f0(T.days) : ''}</div></div>
+  <div class="kpi"><div class="v">$ ${f(M.paymentsTotal)}</div><div class="l">paid by Shift, ${M.paymentsCount} payments: ${whos.map(([w, x]) => `${w.split(' ')[0]}${/dib/i.test(w) ? ' (diesel)' : ''} ${f0(x.amount)}`).join(' + ')}</div></div>
+  <div class="kpi"><div class="v red">$ ${f(open)}</div><div class="l">open: ${f(T.open)} due now + ${f0(T.retentionOpen)} commission held until the project ends</div></div>
+  <div class="kpi"><div class="v">$ ${f(C.allInPerM3)} /m³</div><div class="l">all-in cost on ${f0(C.m3)} m³: contract ${f(C.contractPerM3)} + Shift's diesel share ${f(T.diesel / C.m3)}${T.days ? ' + day rate ' + f(T.days / C.m3) : ''}</div></div>
+</div>
+<div class="cols">
+<div>
+<h2>The deal</h2>
+<ul>
+  <li><b>Price:</b> $4/m³ on the first 3,500 m³, $5/m³ after — ${f0(C.anthony)} for ${f0(C.m3)} m³. Diesel at $0.80/L is inside Anthony's price.</li>
+  <li><b>Georges' commission:</b> $0.50/m³ on the first 3,500 m³ = ${f0(C.retention)}, billed with the certificates and held as retention until the end.</li>
+  <li><b>Diesel above $0.80/L</b> is Shift's: each Whish fill by Dib is billed at (price − 0.80) × litres = ${f(C.dieselDiff)} so far (${dieselBills} bills). Up to ${dm(CY[0].till)} (first ${f0(C.m3Anthony)} m³) Anthony fuelled himself.</li>
+  ${T.days ? `<li><b>Day rate</b> ${f(T.days / 300, 1)} days × $300 = ${f0(T.days)}, outside the per-m³ price.</li>` : ''}
+  ${FC.m3Open ? `<li><b>Diesel to finish:</b> finished cycles ran ${f(C.rateClosed)} L/m³; the last ${f0(FC.m3Open)} m³ need ≈ ${f0(FC.litresExpected)} L, ${f0(FC.litresOpen)} L bought → ≈ ${f0(FC.litresStill)} L to buy ≈ $${f0(FC.costStill)} at the last rate $${f(FC.lastPerL)}/L, of which ≈ $${f0(FC.diffStill)} is Shift's share.</li>` : ''}
+</ul>
+<h2>Odoo partner ledger — reconciled</h2>
+<table class="led">
+  <tr><th></th><th class="n">Debit (paid)</th><th class="n">Credit (billed)</th><th class="n">Balance</th></tr>
+  <tr class="tot"><td>Odoo partner ledger</td><td class="n">${f(L.debit)}</td><td class="n">${f(L.credit)}</td><td class="n ${L.balance < 0 ? 'red' : 'green'}">${f(L.balance).replace('-', '−')}</td></tr>
+  ${mistake || refunds ? `<tr><td class="muted">$${f0(refunds)} mistake, returned (no bill)</td><td class="n muted">${f(mistake)}</td><td class="n muted">${f(refunds)}</td><td class="n muted">${f(mistake - refunds)}</td></tr>` : ''}
+  <tr><td>Payments / bills</td><td class="n">${f(M.paymentsTotal)}</td><td class="n">${f(M.billsTotal)}</td><td class="n red">${f(M.paymentsTotal - M.billsTotal).replace('-', '−')}</td></tr>
+  <tr><td class="muted">of which</td><td class="n muted">${whos.map(([w, x]) => `${w.split(' ')[0]} ${f0(x.amount)}`).join('<br>')}</td><td class="n muted">due ${f(M.billsTotal - T.retention)}<br>commission ${f0(T.retention)}</td><td class="n muted">due −${f(T.open)}<br>held −${f0(T.retentionOpen)}</td></tr>
+</table>
+<h2>Paid from which account</h2>
+<table>
+  <tr>${whos.map(([w, x]) => `<th>${esc(w)}</th><th class="n">${f(x.amount)}</th>`).join('')}</tr>
+  ${Array.from({ length: jrows }, (_, i) => `<tr>${whos.map(([, x]) => { const e = Object.entries(x.j).sort((a, b) => b[1].amount - a[1].amount)[i]; return e ? `<td class="muted">${esc(e[0])} · ${e[1].n}</td><td class="n">${f(e[1].amount)}</td>` : '<td></td><td></td>'; }).join('')}</tr>`).join('')}
+</table>
+</div>
+<div>
+<h2>Cycle by cycle (certificates)</h2>
+<table class="cyc">
+  <tr><th>#</th><th>Till</th><th class="n">m³</th><th class="n">Anthony $</th><th class="n">Comm.</th>${T.days ? '<th class="n">Days</th>' : ''}<th class="n">Diesel L</th><th class="n">&gt;$0.80</th><th class="n">Paid</th><th class="n">Owed</th></tr>
+  ${CY.map(c => `<tr><td>${c.n}</td><td>${dm(c.till)}${c.open ? ' <span class="amber">open</span>' : ''}</td><td class="n">${f0(c.m3)}</td><td class="n">${f0(c.contract)}</td><td class="n">${c.retention ? f0(c.retention) : ''}</td>${T.days ? `<td class="n">${c.days ? f0(c.days) : ''}</td>` : ''}<td class="n ${c.litres ? '' : 'muted'}">${c.litres ? f0(c.litres) : '—'}</td><td class="n ${c.diesel ? '' : 'muted'}">${c.diesel ? f(c.diesel) : '—'}</td><td class="n">${f0(c.paid)}</td><td class="n ${c.position > 0 ? 'red' : 'green'}">${f(c.position)}</td></tr>`).join('')}
+  <tr class="tot"><td colspan="2">All</td><td class="n">${f0(C.m3)}</td><td class="n">${f0(C.anthony)}</td><td class="n">${f0(C.retention)}</td>${T.days ? `<td class="n">${f0(T.days)}</td>` : ''}<td class="n">${f0(C.litres)}</td><td class="n">${f(C.dieselDiff)}</td><td class="n">${f0(M.paymentsTotal)}</td><td class="n red">${f(CY[CY.length - 1].position)}</td></tr>
+</table>
+<p class="muted" style="font-size:8.2pt;margin:3px 0 0">Owed = bills up to that cycle (Anthony + commission + diesel${T.days ? ' + day rate' : ''}) − payments up to it; the last one is the ${f(open)} open on the ledger. Cycle 1: diesel paid by Anthony.${CY.some(c => c.n > 1 && !c.litres) ? ` Cycle ${CY.filter(c => c.n > 1 && !c.litres).map(c => c.n).join(', ')}: no fills of its own.` : ''}</p>
+<h2>Cost per m³</h2>
+<table>
+  <tr><td>Anthony's price</td><td class="n">${f0(C.anthony)} ÷ ${f0(C.m3)}</td><td class="n"><b>$ ${f(C.anthonyPerM3)}</b></td></tr>
+  <tr><td>Contract price (Anthony + Georges' commission)</td><td class="n">${f0(C.contract)} ÷ ${f0(C.m3)}</td><td class="n"><b>$ ${f(C.contractPerM3)}</b></td></tr>
+  <tr><td>Shift's real cost (+ diesel above $0.80)</td><td class="n">${f(C.real)} ÷ ${f0(C.m3)}</td><td class="n"><b>$ ${f(C.realPerM3)}</b></td></tr>
+  <tr class="tot"><td>All in${T.days ? ' (+ day rate)' : ''} = total bills</td><td class="n">${f(C.allIn)} ÷ ${f0(C.m3)}</td><td class="n">$ ${f(C.allInPerM3)}</td></tr>
+  <tr><td class="muted">Diesel burned on the ${f0(C.m3Shift)} m³ Shift fuelled</td><td class="n muted">${f0(C.litres)} L · $${f(C.avgPerL)}/L avg</td><td class="n muted">${f(C.litresPerM3)} L/m³</td></tr>
+</table>
+</div>
+</div>
+<div class="foot">Every figure above is read from Odoo (SHIFT DEVELOPMENT, project Ajaltoun 4193, partner Georges EL Hajj) and reconciles with its Partner Ledger to the cent. Prepared by Mario Saliba · Shift Group · mario@shift-group.co · www.shift-group.co</div>`;
+});
+</script>
+</body>
+</html>

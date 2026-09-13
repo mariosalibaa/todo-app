@@ -68,6 +68,8 @@
   <h2 class="tog" onclick="toggleFold('pays')"><span class="arrow" data-for="pays">▸</span> Payments <span class="r" onclick="event.stopPropagation()"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderLists()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
   <div class="card"><table id="pays" class="folded"></table></div>
   <div class="note" id="foot"></div>
+  <h2>One-page summary <span class="r muted">built from the figures above each time it opens — print it or save it as PDF</span></h2>
+  <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><a class="btn" href="/ajaltoun/excavation/summary" target="_blank" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📄 Open the one-page summary</a><span class="small muted">the same page Antoine sees: headline figures, the deal, the partner ledger reconciled, who was paid from which account, cycle by cycle, cost per m³</span></div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
