@@ -57,7 +57,7 @@
   <div id="cycles"></div>
   <h2>For Anthony <span class="r muted">each cycle in the terms of Mario's messages to him: fuel at $0.80/L counts as paid to him, the rest is cash</span></h2>
   <div class="card"><table class="cyc" id="anth"></table>
-    <p class="small muted" style="margin:6px 0 0"><b>Counted to Anthony</b> = cash paid to him + litres × $0.80 (the diesel inside his price). <b>Covered</b> = that ÷ his $/m³ of the cycle. <b>Left for him</b> = what the cycle's m³ are worth − counted; on the open cycle it is what remains once the m³ are done. Cycle 1: he fuelled himself, so only cash counts.</p></div>
+    <p class="small muted" style="margin:6px 0 0"><b>Counted to Anthony</b> = cash paid to him + litres × $0.80 (the diesel inside his price). <b>Covered</b> = (that − the day rate, which is not per m³) ÷ his $/m³ of the cycle. <b>Left for him</b> = the cycle's m³ × $/m³ + day rate − counted; on the open cycle it is what remains once the m³ are done. Cycle 1: he fuelled himself, so only cash counts.</p></div>
   <h2>Message to Anthony <span class="r"><select id="msg-cycle" onchange="renderMsg()"></select> <button onclick="copyMsg()">⎘ Copy</button></span></h2>
   <div class="card"><pre id="msg" style="margin:0;white-space:pre-wrap;font:.82rem/1.45 ui-monospace,Consolas,monospace;color:var(--text)"></pre>
     <p class="small muted" style="margin:6px 0 0">Built from the figures above each time the page opens. Nothing is sent from here: copy it, read it, then paste it into WhatsApp.</p></div>
@@ -163,15 +163,15 @@ const N = x => String(Math.round(x));   // plain numbers, the way Mario types th
 function anthonyRows() {
   return (D.cycles || []).map(c => {
     const at080 = c.n === 1 ? 0 : Math.round(c.litres * 0.8), counted = c.paidAnthony + at080, price = c.m3 ? c.contract / c.m3 : 0;
-    const covered = price ? Math.round(counted / price) : 0, left = Math.round((c.contract - counted) * 100) / 100;
+    const days = c.days || 0, worth = c.contract + days, covered = price ? Math.round((counted - days) / price) : 0, left = Math.round((worth - counted) * 100) / 100;
     const fillCash = (c.fillList || []).reduce((t, x) => t + x.amount, 0);
-    return { ...c, at080, counted, price, covered, left, fillCash, perT: c.litres ? Math.round(fillCash / c.litres * 1000) : 0 };
+    return { ...c, at080, counted, price, covered, left, fillCash, worth, daysAmt: days, perT: c.litres ? Math.round(fillCash / c.litres * 1000) : 0 };
   });
 }
 function renderAnthony() {
-  const R = anthonyRows(), tot = R.reduce((a, r) => ({ m3: a.m3 + r.m3, litres: a.litres + r.litres, fillCash: a.fillCash + r.fillCash, paidA: a.paidA + r.paidAnthony, at080: a.at080 + r.at080, counted: a.counted + r.counted, contract: a.contract + r.contract, covered: a.covered + r.covered, left: a.left + r.left }), { m3: 0, litres: 0, fillCash: 0, paidA: 0, at080: 0, counted: 0, contract: 0, covered: 0, left: 0 });
-  document.getElementById('anth').innerHTML = `<thead><tr><th>#</th><th>Period</th><th class="n">m³</th><th class="n">$/m³</th><th class="n">Worth to him</th><th class="n">Diesel L</th><th class="n" title="what Dib was paid for the fills">Diesel $</th><th class="n">$/T</th><th class="n">Cash to Anthony</th><th class="n">Diesel × 0.80</th><th class="n">Counted to him</th><th class="n">m³ covered</th><th class="n">Left for him</th></tr></thead><tbody>
-    ${R.map(c => `<tr><td>${c.n}${c.open ? ' ⏳' : ''}</td><td>${esc(c.fills || ('till ' + c.till))}</td><td class="n">${f(c.m3, 0)}</td><td class="n">${f(c.price)}</td><td class="n">${f(c.contract, 0)}</td><td class="n">${c.litres ? f(c.litres, 0) : '—'}</td><td class="n">${c.fillCash ? f(c.fillCash, 0) : '—'}</td><td class="n">${c.perT ? f(c.perT, 0) : '—'}</td><td class="n">${f(c.paidAnthony, 0)}</td><td class="n">${c.at080 ? f(c.at080, 0) : '—'}</td><td class="n"><b>${f(c.counted, 0)}</b></td><td class="n">${f(c.covered, 0)}${c.open ? ` <span class="of">of ${f(c.m3, 0)}</span>` : ''}</td><td class="n ${c.left > 0.5 ? 'warn' : c.left < -0.5 ? 'bad' : 'ok'}">${f(c.left)}</td></tr>`).join('')}</tbody>
+  const R = anthonyRows(), tot = R.reduce((a, r) => ({ m3: a.m3 + r.m3, litres: a.litres + r.litres, fillCash: a.fillCash + r.fillCash, paidA: a.paidA + r.paidAnthony, at080: a.at080 + r.at080, counted: a.counted + r.counted, contract: a.contract + r.worth, covered: a.covered + r.covered, left: a.left + r.left }), { m3: 0, litres: 0, fillCash: 0, paidA: 0, at080: 0, counted: 0, contract: 0, covered: 0, left: 0 });
+  document.getElementById('anth').innerHTML = `<thead><tr><th>#</th><th>Period</th><th class="n">m³</th><th class="n">$/m³</th><th class="n" title="m³ × his $/m³, plus the day rate when there is one">Worth to him</th><th class="n">Diesel L</th><th class="n" title="what Dib was paid for the fills">Diesel $</th><th class="n">$/T</th><th class="n">Cash to Anthony</th><th class="n">Diesel × 0.80</th><th class="n">Counted to him</th><th class="n">m³ covered</th><th class="n">Left for him</th></tr></thead><tbody>
+    ${R.map(c => `<tr><td>${c.n}${c.open ? ' ⏳' : ''}</td><td>${esc(c.fills || ('till ' + c.till))}</td><td class="n">${f(c.m3, 0)}</td><td class="n">${f(c.price)}</td><td class="n">${f(c.worth, 0)}${c.daysAmt ? ` <span class="of">incl. ${f(c.daysAmt, 0)} days</span>` : ''}</td><td class="n">${c.litres ? f(c.litres, 0) : '—'}</td><td class="n">${c.fillCash ? f(c.fillCash, 0) : '—'}</td><td class="n">${c.perT ? f(c.perT, 0) : '—'}</td><td class="n">${f(c.paidAnthony, 0)}</td><td class="n">${c.at080 ? f(c.at080, 0) : '—'}</td><td class="n"><b>${f(c.counted, 0)}</b></td><td class="n">${f(c.covered, 0)}${c.open ? ` <span class="of">of ${f(c.m3, 0)}</span>` : ''}</td><td class="n ${c.left > 0.5 ? 'warn' : c.left < -0.5 ? 'bad' : 'ok'}">${f(c.left)}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="tot"><td colspan="2">All</td><td class="n">${f(tot.m3, 0)}</td><td></td><td class="n">${f(tot.contract, 0)}</td><td class="n">${f(tot.litres, 0)}</td><td class="n">${f(tot.fillCash, 0)}</td><td></td><td class="n">${f(tot.paidA, 0)}</td><td class="n">${f(tot.at080, 0)}</td><td class="n">${f(tot.counted, 0)}</td><td class="n">${f(tot.covered, 0)}</td><td class="n">${f(tot.left)}</td></tr></tfoot>`;
   const sel = document.getElementById('msg-cycle'); const cur = sel.value;
   sel.innerHTML = R.map(c => `<option value="${c.n}">cycle ${c.n} · ${esc(c.fills || 'till ' + c.till)}${c.open ? ' (open)' : ''}</option>`).join('');
@@ -190,8 +190,9 @@ function renderMsg() {
   else if (c.n === 1) L.push(`${k++}. diesel paid by Anthony himself in this cycle`, '');
   L.push(`${k++}. ${N(c.paidAnthony)}$ paid to anthony`); for (const p of c.anthonyPays || []) L.push(`- ${N(p.amount)}$ ${dmy(p.date)}`); L.push('');
   if (c.at080) { L.push(`${k++}. ${N(c.litres)}L * 0.8$/L = ${N(c.at080)}$`, ''); L.push(`${k++}. total paid to anthony ${N(c.at080)}$ + ${N(c.paidAnthony)}$ = ${N(c.counted)}$`, ''); }
-  L.push(`${k++}. ${N(c.counted)}$ / ${c.price}$/m3 = ${N(c.covered)}m3 covered`);
-  L.push(c.open ? `   this cycle ${N(c.m3)}m3 → ${N(Math.max(0, c.m3 - c.covered))}m3 remaining = ${N(Math.max(0, c.left))}$` : `   this cycle ${N(c.m3)}m3 = ${N(c.contract)}$ → ${c.left > 0.5 ? N(c.left) + '$ still due to anthony' : c.left < -0.5 ? N(-c.left) + '$ paid ahead' : 'settled'}`, '');
+  if (c.daysAmt) L.push(`${k++}. day rate ${N(c.daysAmt / 300 * 10) / 10} days * 300$ = ${N(c.daysAmt)}$ (apart from the m3)`, '');
+  L.push(`${k++}. ${c.daysAmt ? `(${N(c.counted)}$ - ${N(c.daysAmt)}$ day rate) ` : N(c.counted) + '$ '}/ ${c.price}$/m3 = ${N(c.covered)}m3 covered`);
+  L.push(c.open ? `   this cycle ${N(c.m3)}m3 → ${N(Math.max(0, c.m3 - c.covered))}m3 remaining = ${N(Math.max(0, c.left))}$${c.daysAmt ? ' (day rate included)' : ''}` : `   this cycle ${N(c.m3)}m3 = ${N(c.contract)}$ → ${c.left > 0.5 ? N(c.left) + '$ still due to anthony' : c.left < -0.5 ? N(-c.left) + '$ paid ahead' : 'settled'}`, '');
   if (c.open) L.push(`${k++}. total job: ${N(doneBefore)}m3 certified till ${from} + ${N(c.covered)}m3 = ${N(doneBefore + c.covered)}m3 of ${N(total)}m3`, `   remaining to finish: ${N(Math.max(0, total - doneBefore - c.covered))}m3`);
   document.getElementById('msg').textContent = L.join('\n');
 }
