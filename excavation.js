@@ -101,13 +101,16 @@ async function build(ctx) {
   let prevDate = '', pos = 0;
   const cycles = sorted.map((c, i) => {
     const upTo = i === sorted.length - 1 ? '9999-12-31' : c.certDate || '9999-12-31';
-    const paid = r2(payments.filter(p => p.date > prevDate && p.date <= upTo).reduce((t, p) => t + p.amount, 0));
+    const inCyc = payments.filter(p => p.date > prevDate && p.date <= upTo);
+    const paid = r2(inCyc.reduce((t, p) => t + p.amount, 0));
+    // who Shift paid in the cycle: Anthony (his price) and Dib (the diesel) — Mario, 2026-09-13
+    const paidAnthony = r2(inCyc.filter(p => /anthony/i.test(p.collector)).reduce((t, p) => t + p.amount, 0)), paidDib = r2(paid - paidAnthony);
     // the day-rate bill falls in the cycle its date belongs to, so the table ends on the ledger's open figure (Mario, 2026-09-13)
     const days = r2(B.filter(b => b.kind === 'days' && b.date > prevDate && b.date <= upTo).reduce((t, b) => t + b.total, 0));
     prevDate = c.certDate || prevDate;
     const billed = r2(c.contract + c.retention + c.diesel + days);
     pos = r2(pos + billed - paid);
-    return { ...c, days, contractPerM3: c.m3 ? r2((c.contract + c.retention) / c.m3) : 0, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
+    return { ...c, days, paidAnthony, paidDib, contractPerM3: c.m3 ? r2((c.contract + c.retention) / c.m3) : 0, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
       dieselAt080PerM3: c.m3 ? r2(c.litres * 0.8 / c.m3) : 0, anthonyNetPerM3: c.m3 ? r2((c.contract - c.litres * 0.8) / c.m3) : 0,
       shiftPerM3: c.m3 ? r2((c.contract + c.retention + c.diesel) / c.m3) : 0, paid, billed, position: pos,
       open: tillDate(c.till) > todayBeirut(),   // the cycle is still being dug: its m³ are billed but not yet executed (Mario, 2026-09-13)
