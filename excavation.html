@@ -46,6 +46,7 @@
   <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
   <div id="msg" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
+  <div id="cost"></div>
   <h2>Collected by <span class="r muted" id="at"></span></h2>
   <div class="grid2">
     <div class="card"><table id="collectors"></table></div>
@@ -79,13 +80,25 @@ function render() {
   document.getElementById('kpis').innerHTML = `
     <div class="kpi cash"><div class="v">$ ${f(T.collected)}</div><div class="l">Collected in total — ${f(T.paidOdoo)} booked in Odoo${T.pendingHub ? ` + ${f(T.pendingHub)} on Whish not yet booked` : ''}</div></div>
     ${D.collectors.map(c => `<div class="kpi in"><div class="v">$ ${f(c.amount + (c.pending || 0))}</div><div class="l">by ${esc(c.key)} — ${c.n} payment${c.n === 1 ? '' : 's'}${c.pending ? ` + ${c.pendingN} pending (${f(c.pending)})` : ''}</div></div>`).join('')}
-    <div class="kpi out"><div class="v">$ ${f(T.excavation + T.diesel)}</div><div class="l">His bills so far: excavation ${f(T.excavation)} + diesel difference ${f(T.diesel)}</div></div>
-    <div class="kpi eq"><div class="v">$ ${f(T.retentionOpen)}</div><div class="l">Retention held (${f(T.retention)} booked) — released at project end, less the ${f(T.unmatched)} he is ahead</div></div>`;
+    <div class="kpi out"><div class="v">$ ${f(T.excavation + T.diesel)}</div><div class="l">His bills so far: excavation ${f(T.excavation)} + diesel difference ${f(T.diesel)}${T.days ? ` (+ ${f(T.days)} day rate apart)` : ''}</div></div>
+    <div class="kpi eq"><div class="v">$ ${f(T.retentionOpen)}</div><div class="l">Georges' commission (retention) still held of ${f(T.retention)} — released at project end</div></div>`;
+  const C = D.cost;
+  document.getElementById('cost').innerHTML = !C ? '' : `<h2>Cost per m³ <span class="r muted">${f(C.m3)} m³ excavated (the total on the last certificate)</span></h2>
+    <div class="kpis">
+      <div class="kpi in"><div class="v">$ ${f(C.contractPerM3)} /m³</div><div class="l"><b>Anthony's price</b> — diesel at $0.80/L is inside it. ${f(C.contract)} on ${f(C.m3)} m³ ($4 up to 3,500 m³, $5 after)</div></div>
+      <div class="kpi cash"><div class="v">$ ${f(C.realPerM3)} /m³</div><div class="l"><b>Shift's real cost</b> — Anthony's price + the diesel above $0.80/L that Shift pays: ${f(C.contract)} + ${f(C.dieselDiff)} = ${f(C.real)}</div></div>
+      <div class="kpi"><div class="v">${f(C.litres)} L</div><div class="l">diesel burned · ${f(C.litresPerM3)} L/m³ · paid ${f(C.dieselPaid)} = $${f(C.avgPerL)}/L on average, of which ${f(C.dieselAt080)} at $0.80/L is Anthony's and ${f(C.dieselDiff)} above it is Shift's</div></div>
+    </div>
+    <div class="kpis" style="margin-top:10px">
+      <div class="kpi eq"><div class="v">$ ${f(C.retention)}</div><div class="l"><b>Georges' commission</b> (retention, apart) — $0.50/m³ on the first 3,500 m³, held to project end · ${f(C.retentionPerM3)}/m³ over the whole job</div></div>
+      <div class="kpi eq"><div class="v">$ ${f(C.days)}</div><div class="l"><b>Day rate</b> (apart) — excavator days at $300/day, not per m³</div></div>
+      <div class="kpi out"><div class="v">$ ${f(C.allInPerM3)} /m³</div><div class="l"><b>All in</b> — real cost + commission + days: ${f(C.allIn)} on ${f(C.m3)} m³</div></div>
+    </div>`;
   const cRows = D.collectors.map(c => `<tr><td>${esc(c.key)}</td><td class="n">${f(c.amount)}</td><td class="n muted">${c.pending ? f(c.pending) : ''}</td><td class="n">${c.n}</td><td><div class="bar"><i style="width:${Math.round(100 * (c.amount + (c.pending || 0)) / Math.max(1, T.collected))}%"></i></div></td></tr>`).join('');
   document.getElementById('collectors').innerHTML = `<thead><tr><th>Collected by</th><th class="n">In Odoo</th><th class="n">Pending</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${cRows}</tbody><tfoot><tr class="tot"><td>Total</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${T.pendingHub ? f(T.pendingHub) : ''}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
   const jRows = D.journals.map(j => `<tr><td>${esc(j.key)}</td><td class="n">${f(j.amount)}</td><td class="n">${j.n}</td><td><div class="bar"><i style="width:${Math.round(100 * j.amount / Math.max(1, T.paidOdoo))}%"></i></div></td></tr>`).join('');
   document.getElementById('journals').innerHTML = `<thead><tr><th>From which cash / bank account</th><th class="n">Amount</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${jRows}</tbody><tfoot><tr class="tot"><td>Total in Odoo</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
-  const kind = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Retention' };
+  const kind = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate' };
   const bRows = D.bills.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_move_in_invoice_type/${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${kind[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('');
   document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${bRows}</tbody><tfoot><tr class="tot"><td colspan="4">Total · ${D.bills.length} bills</td><td class="n">${f(T.bills)}</td><td class="n">${f(T.bills - T.open - T.retentionOpen)}</td><td class="n">${f(T.open + T.retentionOpen)}</td></tr></tfoot>`;
   renderPays();

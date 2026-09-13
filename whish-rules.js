@@ -186,7 +186,7 @@ async function handle(req, res, url, user, ctx) {
         const ref = REF(t, account);
         const pctx = { allowed_company_ids: [rule.companyId], company_id: rule.companyId };
         try {
-          const dup = await odooCall('account.payment', 'search_read', [[['memo', '=', ref], ['company_id', '=', rule.companyId]]], { fields: ['id', 'name', 'state', 'move_id'], context: pctx, limit: 1 });
+          const dup = await odooCall('account.payment', 'search_read', [[['memo', 'ilike', ref], ['company_id', '=', rule.companyId]]], { fields: ['id', 'name', 'state', 'move_id'], context: pctx, limit: 1 });
           let payId = dup.length ? dup[0].id : null, already = !!payId;
           const analyticId = t.analyticId || rule.analyticId || null;
           if (!payId) {
@@ -195,7 +195,8 @@ async function handle(req, res, url, user, ctx) {
             const [pr] = await odooCall('res.partner', 'read', [[rule.partnerId], ['supplier_rank', 'customer_rank']], { context: pctx });
             const vendorish = pr && (pr.supplier_rank || 0) >= (pr.customer_rank || 0) && (pr.supplier_rank || 0) > 0;
             const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: t.debit ? 'supplier' : (vendorish ? 'supplier' : 'customer'), partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
-              company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: ref };
+              // memo = who / what · WHISH ref, so the Odoo payments list says which payment is Anthony's and which is Dib's diesel (Mario, 2026-09-13)
+              company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: [rule.label || rule.partnerName || '', t.note || '', ref].filter(Boolean).join(' · ') };
             if (analyticId) vals.x_studio_project = analyticId;
             const [method] = await odooCall('account.payment.method.line', 'search_read', [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', vals.payment_type]]], { fields: ['id'], context: pctx, limit: 1 });
             if (method) vals.payment_method_line_id = method.id;
