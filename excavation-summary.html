@@ -38,7 +38,7 @@
 </head>
 <body>
 <div class="bar"><button onclick="window.print()">🖨 Print / Save as PDF</button><a href="/ajaltoun/excavation">← back to the dashboard</a><span id="at" style="margin-left:auto"></span></div>
-<div class="page" id="page"></div>
+<div class="page" id="page"><p class="muted" style="text-align:center;margin-top:120px">Reading Odoo… this takes a few seconds.</p></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
@@ -49,7 +49,7 @@ const f0 = v => f(v, 0);
 const dm = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? `${+m[1]} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m[2] - 1]}` : s; };
 const JN = { 'Cash Mario USD': 'Cash Mario', 'Cash NEO_MS USD S_DEV': 'Cash NEO_MS', 'Cash NEO_TRS USD S_DEV': 'Cash NEO_TRS', 'Cash Whish Mario USD - S_DEV': 'Whish MS' };
 Admin.require(['ajaltoun', 'excavation'], async me => {
-  const D = await Admin.api('GET', '/api/ajaltoun/excavation');
+  let D; try { D = await Admin.api('GET', '/api/ajaltoun/excavation'); } catch (e) { document.getElementById('page').innerHTML = '<p class="red" style="text-align:center;margin-top:120px">Could not read Odoo: ' + esc(e.message) + ' — <a href="" onclick="location.reload();return false">try again</a></p>'; return; }
   const T = D.totals, C = D.cost, FC = C.forecast, M = D.odooMatch, L = M.ledgerAll, CY = D.cycles;
   const open = T.open + T.retentionOpen, refunds = D.payments.filter(p => p.amount < 0).reduce((a, p) => a - p.amount, 0), mistake = Math.round((L.debit - M.paymentsTotal) * 100) / 100;
   const closedM3 = CY.filter(c => !c.open).reduce((a, c) => a + c.m3, 0), openCy = CY.filter(c => c.open);
