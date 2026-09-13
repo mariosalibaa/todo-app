@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Decision · Shift Hub</title>
+<link rel="icon" href="/icons/icon-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic","URW Gothic",sans-serif;letter-spacing:.28em;font-weight:600;font-size:.95rem;} .wordmark span{color:var(--amber);}
+  .who{font-size:.78rem;color:var(--sub);} .who a{color:var(--overlay0);text-decoration:none;margin-left:10px;}
+  main{max-width:640px;margin:0 auto;padding:22px 18px 60px;}
+  h1{font-size:1.35rem;margin:0 0 6px;} .amount{font-size:2rem;font-weight:600;color:var(--amber);margin:4px 0 14px;font-variant-numeric:tabular-nums;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:18px;margin-bottom:14px;}
+  ul{margin:8px 0 0 18px;padding:0;line-height:1.6;} .muted{color:var(--sub);font-size:.9rem;} .small{font-size:.8rem;color:var(--overlay0);}
+  textarea{width:100%;min-height:76px;background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:10px;font:inherit;margin-top:8px;}
+  .btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;} button{font:inherit;font-weight:600;padding:12px 18px;border-radius:12px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);cursor:pointer;flex:1;min-width:140px;}
+  button.ok{background:rgba(166,227,161,.16);border-color:var(--green);color:var(--green);} button.hold{background:rgba(243,139,168,.12);border-color:var(--red);color:var(--red);} button:disabled{opacity:.5;cursor:default;}
+  .done{border-color:var(--green);} .done.held{border-color:var(--red);} .status{font-weight:600;font-size:1.05rem;} .status.ok{color:var(--green);} .status.held{color:var(--red);}
+</style>
+</head>
+<body>
+<header><div class="wordmark">SHIFT <span>GROUP</span></div><div class="who" id="who"></div></header>
+<main id="main"><p class="muted">Loading…</p></main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = Admin.esc, ID = location.pathname.split('/').pop();
+let ME = null, D = null;
+const money = (v, c) => (c === 'USD' ? '$ ' : c + ' ') + (+v || 0).toLocaleString('en-US');
+// any signed-in hub member may open the link; the server only answers if the decision is addressed to them
+Admin.require(null, async me => {
+  ME = me;
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  try { D = await Admin.api('GET', '/api/decisions/' + ID); render(); }
+  catch (e) { document.getElementById('main').innerHTML = `<div class="card"><b>Cannot open this decision.</b><p class="muted">${esc(e.message)}</p></div>`; }
+});
+function render() {
+  const d = D, done = d.status !== 'open', dec = d.decision || {};
+  const when = dec.at ? new Date(dec.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  document.getElementById('main').innerHTML = `
+    <p class="small">Mario asks ${esc(d.approverName || 'the partner')} to decide · ${new Date(d.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', year: 'numeric' })}</p>
+    <h1>${esc(d.title)}</h1>
+    ${d.amount ? `<div class="amount">${money(d.amount, d.currency)}</div>` : ''}
+    <div class="card">${d.lines.length ? `<ul>${d.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}${d.note ? `<p class="muted" style="margin:12px 0 0;white-space:pre-wrap">${esc(d.note)}</p>` : ''}</div>
+    ${done ? `<div class="card done ${dec.ok ? '' : 'held'}"><div class="status ${dec.ok ? 'ok' : 'held'}">${dec.ok ? '✅ Approved' : '⏸ On hold'}</div><p class="muted" style="margin:6px 0 0">by ${esc(dec.by || dec.email)} · ${esc(when)}${dec.note ? `<br>“${esc(dec.note)}”` : ''}</p><p class="small">Mario has been told by Telegram.</p></div>`
+      : `<div class="card"><b>Your answer</b><textarea id="note" placeholder="a word for Mario (optional)"></textarea>
+         <div class="btns"><button class="ok" onclick="decide(true)">✅ Approve — go ahead</button><button class="hold" onclick="decide(false)">⏸ Hold — let's talk first</button></div>
+         <p class="small">One tap sends Mario a Telegram with your answer.</p></div>`}`;
+}
+async function decide(ok) {
+  const note = document.getElementById('note').value.trim();
+  if (!confirm(ok ? 'Approve this purchase?' : 'Put it on hold?')) return;
+  for (const b of document.querySelectorAll('button')) b.disabled = true;
+  try { const r = await Admin.api('POST', `/api/decisions/${ID}/decide`, { ok, note }); D.status = r.status; D.decision = r.decision; render(); }
+  catch (e) { alert('Could not save: ' + e.message); for (const b of document.querySelectorAll('button')) b.disabled = false; }
+}
+</script>
+</body>
+</html>

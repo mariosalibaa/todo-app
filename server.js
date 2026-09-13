@@ -7,6 +7,7 @@ const budget = require('./budget');           // /api/accounting/budget/* (HomeB
 const wise = require('./wise');               // /api/accounting/wise/* (Wise statements)
 const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
 const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
+const decisions = require('./decisions');      // /api/decisions/* (a question to a partner, answered from a link; Telegram to Mario)
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
@@ -645,6 +646,7 @@ const handler = async (req, res) => {
     'reports.html': path.join(__dirname, 'reports.html'),
     'excavation.html': path.join(__dirname, 'excavation.html'),
     'excavation-summary.html': path.join(__dirname, 'excavation-summary.html'),
+    'decision.html': path.join(__dirname, 'decision.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
@@ -652,6 +654,8 @@ const handler = async (req, res) => {
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
     '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html' };
+  // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
+  if (/^\/decide\/[\w-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['decision.html'], 'utf8')); return; }
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
@@ -865,6 +869,11 @@ const handler = async (req, res) => {
       console.error('site error:', e);
       res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e && e.message || e) }));
     }
+    return;
+  }
+  if (url.startsWith('/api/decisions')) {
+    try { const handled = await decisions.handle(req, res, url, user, { db, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
+    catch (e) { console.error('decisions error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   if (url.startsWith('/api/partners/')) {
