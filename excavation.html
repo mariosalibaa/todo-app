@@ -104,7 +104,7 @@ function render() {
   document.getElementById('odoo-match').innerHTML = !M ? '' : `<h2>Match with Odoo <span class="r muted">the same figures Odoo shows on the Bills list, the Vendor Payments list and the Partner Ledger</span></h2>
     <div class="kpis">
       <div class="kpi out"><div class="v">$ ${f(M.billsTotal)}</div><div class="l"><b>Bills list</b> — ${M.billsCount} vendor bills of Georges, total</div></div>
-      <div class="kpi in"><div class="v">$ ${f(M.paymentsTotal)}</div><div class="l"><b>Vendor Payments list</b> — ${M.paymentsCount} payments out, total</div></div>
+      <div class="kpi in"><div class="v">$ ${f(M.paymentsTotal)}</div><div class="l"><b>Vendor Payments list</b> — ${M.paymentsCount} payments, money out net of refunds</div></div>
       <div class="kpi"><div class="v">${f(M.ledgerYear.debit)} / ${f(M.ledgerYear.credit)}</div><div class="l"><b>Partner Ledger ${M.year}</b> — debit / credit for the year${M.ledgerYear.opening ? ` · opening ${f(M.ledgerYear.opening)} from before` : ''}</div></div>
       <div class="kpi ${M.ledgerAll.balance < 0 ? 'out' : 'in'}"><div class="v">$ ${f(M.ledgerAll.balance)}</div><div class="l"><b>Partner Ledger balance</b> — all time: debit ${f(M.ledgerAll.debit)} − credit ${f(M.ledgerAll.credit)}${M.ledgerAll.balance < 0 ? ' · Shift owes Georges' : ' · Georges is ahead'}</div></div>
     </div>

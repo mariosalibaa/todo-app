@@ -120,7 +120,8 @@ async function build(ctx) {
   const sumL = arr => ({ debit: r2(arr.reduce((t, l) => t + l.debit, 0)), credit: r2(arr.reduce((t, l) => t + l.credit, 0)) });
   const allL = sumL(ll), yearL = sumL(ll.filter(l => l.date >= `${year}-01-01`)), before = sumL(ll.filter(l => l.date < `${year}-01-01`));
   const odooMatch = {
-    year, billsTotal: r2(B.reduce((t, b) => t + b.total, 0)), billsCount: B.length, paymentsTotal: r2(pays.filter(p => p.payment_type === 'outbound').reduce((t, p) => t + p.amount, 0)), paymentsCount: pays.filter(p => p.payment_type === 'outbound').length,
+    year, billsTotal: r2(B.reduce((t, b) => t + b.total, 0)), billsCount: B.length, // Odoo's Vendor Payments list nets a vendor refund (money back) against the money out — 35,608 − 636 = 34,972 (Mario, 2026-09-13)
+    paymentsTotal: r2(pays.reduce((t, p) => t + (p.payment_type === 'outbound' ? p.amount : -p.amount), 0)), paymentsCount: pays.length,
     ledgerYear: { ...yearL, opening: r2(before.debit - before.credit), balance: r2(allL.debit - allL.credit) },
     ledgerAll: { ...allL, balance: r2(allL.debit - allL.credit) },
     // lines Odoo counts that are not the excavation's bills or payments (another company, another account…)
