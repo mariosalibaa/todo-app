@@ -62,7 +62,10 @@ async function build(ctx) {
   const dieselIds = bills.filter(b => isDiesel(b.ref)).flatMap(b => b.invoice_line_ids || []);
   const dl = dieselIds.length ? await odooCall('account.move.line', 'read', [dieselIds, ['name', 'quantity', 'price_unit', 'price_subtotal']], { context: CTX }) : [];
   let litres = 0, dieselPaid = 0;
-  for (const l of dl) { const L = +l.quantity || 0; const m = (l.name || '').match(/L\s*\*\s*-?([\d.]+)/i); const perL = m ? +m[1] : (+l.price_unit + 0.8); litres += L; dieselPaid += L * perL; }
+  let lastFill = null;   // the most recent fill (its date is on the line, "d-m diesel …"): the rate to project the rest of the job at
+  for (const l of dl) { const L = +l.quantity || 0; const m = (l.name || '').match(/L\s*\*\s*-?([\d.]+)/i); const perL = m ? +m[1] : (+l.price_unit + 0.8); litres += L; dieselPaid += L * perL;
+    const d = (l.name || '').match(/^(\d{1,2})-(\d{1,2})/); const key = d ? `${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}` : '';
+    if (key && (!lastFill || key >= lastFill.key)) lastFill = { key, date: `${d[1]}-${d[2]}`, litres: L, perL }; }
   // the excavated volume: the largest "N m3 total" written on a certificate
   const m3 = Math.max(0, ...B.map(b => +(((b.ref.match(/of\s*([\d,\.]+)\s*m3/) || b.ref.match(/([\d,\.]+)\s*m3 total/) || [])[1] || '0').replace(/,/g, ''))));
   const totals = {
@@ -129,7 +132,8 @@ async function build(ctx) {
   const m3Closed = closed.reduce((t, c) => t + c.m3, 0), litresClosed = closed.reduce((t, c) => t + c.litres, 0), rate = m3Closed ? litresClosed / m3Closed : 0;
   const avgPerL = litres ? dieselPaid / litres : 0;
   const m3Open = openC.reduce((t, c) => t + c.m3, 0), litresOpen = openC.reduce((t, c) => t + c.litres, 0), litresStill = Math.max(0, m3Open * rate - litresOpen);
-  const forecast = { m3Open, litresOpen, litresExpected: Math.round(m3Open * rate), litresStill: Math.round(litresStill), costStill: r2(litresStill * avgPerL), diffStill: r2(litresStill * Math.max(0, avgPerL - 0.8)), cycles: openC.map(c => c.n), closedCycles: closed.map(c => c.n) };
+  const forecast = { m3Open, litresOpen, litresExpected: Math.round(m3Open * rate), litresStill: Math.round(litresStill), lastPerL: lastFill ? lastFill.perL : avgPerL, lastFillDate: lastFill ? lastFill.date : '', lastFillLitres: lastFill ? lastFill.litres : 0,
+    costStill: r2(litresStill * (lastFill ? lastFill.perL : avgPerL)), diffStill: r2(litresStill * Math.max(0, (lastFill ? lastFill.perL : avgPerL) - 0.8)), cycles: openC.map(c => c.n), closedCycles: closed.map(c => c.n) };
   const cost = m3 ? {
     m3, contract: contractAll, contractPerM3: r2(contractAll / m3), anthony: totals.excavation, anthonyPerM3: r2(totals.excavation / m3),
     dieselDiff: totals.diesel, real: r2(contractAll + totals.diesel), realPerM3: r2((contractAll + totals.diesel) / m3),
