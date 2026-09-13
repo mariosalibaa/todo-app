@@ -194,6 +194,9 @@ function renderMsg() {
   L.push(`${k++}. ${c.daysAmt ? `(${N(c.counted)}$ - ${N(c.daysAmt)}$ day rate) ` : N(c.counted) + '$ '}/ ${c.price}$/m3 = ${N(c.covered)}m3 covered`);
   L.push(c.open ? `   this cycle ${N(c.m3)}m3 → ${N(Math.max(0, c.m3 - c.covered))}m3 remaining = ${N(Math.max(0, c.left))}$${c.daysAmt ? ' (day rate included)' : ''}` : `   this cycle ${N(c.m3)}m3 = ${N(c.contract)}$ → ${c.left > 0.5 ? N(c.left) + '$ still due to anthony' : c.left < -0.5 ? N(-c.left) + '$ paid ahead' : 'settled'}`, '');
   if (c.open) L.push(`${k++}. total job: ${N(doneBefore)}m3 certified till ${from} + ${N(c.covered)}m3 = ${N(doneBefore + c.covered)}m3 of ${N(total)}m3`, `   remaining to finish: ${N(Math.max(0, total - doneBefore - c.covered))}m3`);
+  // the diesel those remaining m³ will take, at the L/m³ of the finished cycles and the last rate paid: his part at 0.80, Shift's above
+  const rem = Math.max(0, total - doneBefore - c.covered), rate = (D.cost && D.cost.rateClosed) || 0, perL = (D.cost && D.cost.forecast && D.cost.forecast.lastPerL) || 0;
+  if (c.open && rem && rate && perL) { const Lr = Math.round(rem * rate), cost = Math.round(Lr * perL), at080 = Math.round(Lr * 0.8); L.push('', `${k++}. diesel expected for the remaining ${N(rem)}m3 at ${rate}L/m3 = ${N(Lr)}L`, `   at ${perL}$/L = ${N(cost)}$ → ${N(at080)}$ at 0.8$/L counted to anthony + ${N(cost - at080)}$ above 0.8 paid by shift`, `   so the remaining ${N(rem)}m3 = ${N(rem * c.price)}$ − ${N(at080)}$ diesel = ${N(rem * c.price - at080)}$ cash to anthony${c.daysAmt ? ` + ${N(c.daysAmt)}$ day rate` : ''}`); }
   document.getElementById('msg').textContent = L.join('\n');
 }
 async function copyMsg() { try { await navigator.clipboard.writeText(document.getElementById('msg').textContent); alert('Copied — paste it in WhatsApp.'); } catch (e) { alert('Select the text and copy it.'); } }
