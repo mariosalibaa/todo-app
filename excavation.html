@@ -84,7 +84,7 @@ const DEFAULT_W = { pays: [96, 150, 150, 170, null, 90, 100], stmt: [96, 150, nu
 function applyCols(id) {
   const t = document.getElementById(id); if (!t || !t.tHead) return;
   const ths = [...t.tHead.rows[0].cells];
-  const w = (D && D.layout && D.layout[id]) || DEFAULT_W[id] || [];
+  const saved = D && D.layout && D.layout[id]; const w = (saved && saved.some(x => x)) ? saved : (DEFAULT_W[id] || []);
   const fixed = w.some(x => x);
   t.style.tableLayout = fixed ? 'fixed' : '';
   ths.forEach((th, i) => { th.style.width = w[i] ? w[i] + 'px' : ''; th.classList.add('rs'); if (!th.querySelector('.grip')) { const g = document.createElement('span'); g.className = 'grip'; g.title = 'drag to resize' + (ME && ME.admin ? ' — saved for everyone' : ''); g.onmousedown = e => startResize(e, id, i); th.appendChild(g); } });
