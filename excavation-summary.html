@@ -10,21 +10,28 @@
      page and update it when data updates"). Print or "Save as PDF" from the button; nothing is stored. */
   @page { size: A4; margin: 12mm 13mm; }
   body { font: 10.2pt/1.35 "Segoe UI", Arial, sans-serif; color: #1c1c1c; margin: 0; background: #e9e9ee; }
-  .page { background: #fff; width: 210mm; min-height: 297mm; margin: 18px auto; padding: 12mm 13mm; box-shadow: 0 2px 14px rgba(0,0,0,.18); }
-  .bar { width: 210mm; margin: 14px auto 0; display: flex; gap: 8px; align-items: center; font-size: 9.5pt; color: #555; }
+  .page { background: #fff; width: auto; max-width: 210mm; margin: 18px auto; padding: 12mm 13mm; box-shadow: 0 2px 14px rgba(0,0,0,.18); }
+  .bar { max-width: 210mm; margin: 14px auto 0; padding: 0 8px; flex-wrap: wrap; display: flex; gap: 8px; align-items: center; font-size: 9.5pt; color: #555; }
   .bar button { font: inherit; padding: 6px 12px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; } .bar button:hover { border-color: #F2A93B; }
   .bar a { color: #555; }
-  @media print { body { background: #fff; } .page { box-shadow: none; margin: 0; padding: 0; width: auto; min-height: 0; } .bar { display: none; } }
+  /* phone: one fluid column, the wide tables scroll inside their own box; print keeps the A4 layout (Mario, 2026-09-13) */
+  html { -webkit-text-size-adjust: 100%; }
+  @media screen and (max-width: 700px) {
+    .page { margin: 8px; padding: 14px 12px; }
+    .brand { float: none; text-align: left; margin-bottom: 4px; }
+    .scroll table { min-width: 560px; }
+    body { font-size: 11pt; } table { font-size: 9.6pt; } .kpi .v { font-size: 15pt; }
+  }
   h1 { font: 600 17pt "Century Gothic", "Segoe UI", sans-serif; margin: 0 0 2px; letter-spacing: .02em; }
   .sub { color: #666; margin: 0 0 10px; font-size: 9.4pt; }
   .brand { float: right; text-align: right; font: 600 9pt "Century Gothic", "Segoe UI", sans-serif; letter-spacing: .28em; color: #F2A93B; }
   .brand small { display: block; letter-spacing: .18em; color: #999; font-size: 7pt; }
-  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 8px 0 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 7px; margin: 8px 0 10px; }
   .kpi { border: 1px solid #ddd; border-radius: 6px; padding: 7px 9px; }
   .kpi .v { font-size: 14pt; font-weight: 600; font-variant-numeric: tabular-nums; }
   .kpi .l { font-size: 8.4pt; color: #555; line-height: 1.25; }
   h2 { font-size: 8.4pt; letter-spacing: .14em; text-transform: uppercase; color: #888; margin: 10px 0 4px; }
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; } .cols > div { min-width: 0; } .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { border-collapse: collapse; width: 100%; font-size: 8.9pt; font-variant-numeric: tabular-nums; }
   th, td { padding: 2.5px 5px; border-bottom: 1px solid #e6e6e6; text-align: left; vertical-align: top; }
   th { font-size: 7.6pt; letter-spacing: .06em; text-transform: uppercase; color: #777; font-weight: 600; }
@@ -34,6 +41,7 @@
   ul { margin: 3px 0 0 16px; padding: 0; } li { margin: 1px 0; }
   .foot { margin-top: 9px; font-size: 8.2pt; color: #777; border-top: 1px solid #ddd; padding-top: 5px; }
   #overlay { position: fixed; inset: 0; background: #1e1e2e; color: #cdd6f4; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; z-index: 9; }
+  @media print { body { background: #fff; } .page { box-shadow: none; margin: 0; padding: 0; max-width: none; } .bar { display: none; } .kpis { grid-template-columns: repeat(5, 1fr); } .cols { grid-template-columns: 1fr 1fr; } .scroll { overflow: visible; } .cols > div { min-width: 0; } .cols { grid-template-columns: 1fr auto; gap: 9px; } .cols > div:last-child { width: max-content; max-width: 400px; } table.cyc { font-size: 7.4pt; } table.cyc th, table.cyc td { padding: 2px 3px; } table.cyc th { white-space: normal; line-height: 1.1; vertical-align: bottom; } table { font-size: 8.4pt; } .kpi .l { font-size: 8pt; } table.led td:first-child { width: 26%; } table.led th, table.led td { white-space: normal; padding-left: 3px; padding-right: 3px; } }
 </style>
 </head>
 <body>
@@ -97,11 +105,11 @@ Admin.require(['ajaltoun', 'excavation'], async me => {
 </div>
 <div>
 <h2>Cycle by cycle (certificates)</h2>
-<table class="cyc">
+<div class="scroll"><table class="cyc">
   <tr><th>#</th><th>Till</th><th class="n">m³</th><th class="n">Anthony $</th><th class="n">Comm.</th>${T.days ? '<th class="n">Days</th>' : ''}<th class="n">Diesel L</th><th class="n">&gt;$0.80</th><th class="n">Paid</th><th class="n">Owed</th></tr>
   ${CY.map(c => `<tr><td>${c.n}</td><td>${dm(c.till)}${c.open ? ' <span class="amber">open</span>' : ''}</td><td class="n">${f0(c.m3)}</td><td class="n">${f0(c.contract)}</td><td class="n">${c.retention ? f0(c.retention) : ''}</td>${T.days ? `<td class="n">${c.days ? f0(c.days) : ''}</td>` : ''}<td class="n ${c.litres ? '' : 'muted'}">${c.litres ? f0(c.litres) : '—'}</td><td class="n ${c.diesel ? '' : 'muted'}">${c.diesel ? f(c.diesel) : '—'}</td><td class="n">${f0(c.paid)}</td><td class="n ${c.position > 0 ? 'red' : 'green'}">${f(c.position)}</td></tr>`).join('')}
   <tr class="tot"><td colspan="2">All</td><td class="n">${f0(C.m3)}</td><td class="n">${f0(C.anthony)}</td><td class="n">${f0(C.retention)}</td>${T.days ? `<td class="n">${f0(T.days)}</td>` : ''}<td class="n">${f0(C.litres)}</td><td class="n">${f(C.dieselDiff)}</td><td class="n">${f0(M.paymentsTotal)}</td><td class="n red">${f(CY[CY.length - 1].position)}</td></tr>
-</table>
+</table></div>
 <p class="muted" style="font-size:8.2pt;margin:3px 0 0">Owed = bills up to that cycle (Anthony + commission + diesel${T.days ? ' + day rate' : ''}) − payments up to it; the last one is the ${f(open)} open on the ledger. Cycle 1: diesel paid by Anthony.${CY.some(c => c.n > 1 && !c.litres) ? ` Cycle ${CY.filter(c => c.n > 1 && !c.litres).map(c => c.n).join(', ')}: no fills of its own.` : ''}</p>
 <h2>Cost per m³</h2>
 <table>
