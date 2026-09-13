@@ -78,6 +78,26 @@
     </div>
     <div class="note">Each app has its own list: a member sees only the tiles ticked here, and the server refuses the others. Changes apply within a minute. Admins (Mario) always have every app.</div>
   </section>
+  <!-- Decisions (2026-09-13): a question to a partner, answered from its own link; Mario gets a Telegram on the answer -->
+  <section id="decisions" style="display:none;">
+    <h2>Decisions <span style="font-weight:400;font-size:.8rem;letter-spacing:0;text-transform:none;color:var(--overlay0)">— a question to a partner, answered from a link · you get a Telegram when it is answered</span></h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Decision</th><th>Asked to</th><th class="c">Amount</th><th>Status</th><th>Link</th><th style="width:40px"></th></tr></thead>
+      <tbody id="dec-rows"><tr><td colspan="6" style="color:var(--overlay0)">Loading…</td></tr></tbody>
+    </table></div>
+    <div class="addrow" style="flex-wrap:wrap;align-items:flex-start;gap:10px">
+      <input id="dec-title" placeholder="What to decide, e.g. Buy the excavator: Cat 305.5E2" style="flex:2;min-width:260px">
+      <input id="dec-amount" type="number" placeholder="amount $" style="max-width:130px">
+      <input id="dec-name" placeholder="his name, e.g. Antoine" style="max-width:170px">
+      <select id="dec-who" multiple size="3" title="who may answer — Ctrl-click to pick both accounts of the same person" style="min-width:240px;background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:8px;padding:6px"></select>
+    </div>
+    <div class="addrow" style="flex-wrap:wrap;align-items:flex-start;gap:10px">
+      <textarea id="dec-lines" placeholder="the points, one per line" style="flex:1;min-width:260px;min-height:84px;background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:8px;padding:8px;font:inherit"></textarea>
+      <textarea id="dec-note" placeholder="a note for him (optional)" style="flex:1;min-width:260px;min-height:84px;background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:8px;padding:8px;font:inherit"></textarea>
+      <button onclick="addDecision()">Post it</button>
+    </div>
+    <div class="note">The link opens only for the person it is asked to (and you). He taps Approve or Hold, may leave a word, and you get it on Telegram at once. Copy the link and send it to him on WhatsApp.</div>
+  </section>
 </main>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -109,9 +129,41 @@ Admin.require(null, me => {
     <a class="tile ${me.apps.includes(a.id) ? '' : 'off'}" href="${a.href}">
       <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
     </a>`).join('');
-  if (me.admin) { document.getElementById('members').style.display = ''; loadMembers(); }
+  if (me.admin) { document.getElementById('members').style.display = ''; loadMembers(); document.getElementById('decisions').style.display = ''; loadDecisions(); }
 });
 
+let DEC_MEMBERS = [];
+async function loadDecisions() {
+  const rows = document.getElementById('dec-rows');
+  try {
+    const [list, members] = await Promise.all([Admin.api('GET', '/api/decisions'), Admin.api('GET', '/api/allowlist')]);
+    DEC_MEMBERS = members.filter(m => !m.admin).sort((a, b) => a.email.localeCompare(b.email));
+    const who = document.getElementById('dec-who');
+    if (!who.options.length) who.innerHTML = DEC_MEMBERS.map(m => `<option value="${esc(m.email)}">${esc(m.email)}</option>`).join('');
+    const when = at => at ? new Date(at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    rows.innerHTML = list.map(d => {
+      const url = 'https://hub.shift-group.co/decide/' + d.id, dec = d.decision || {};
+      const st = d.status === 'approved' ? `<span style="color:var(--green,#a6e3a1)">✅ approved</span> <span class="small" style="color:var(--overlay0)">by ${esc(dec.by || '')} · ${when(dec.at)}${dec.note ? ' · “' + esc(dec.note) + '”' : ''}</span>`
+        : d.status === 'held' ? `<span style="color:var(--red)">⏸ on hold</span> <span class="small" style="color:var(--overlay0)">by ${esc(dec.by || '')} · ${when(dec.at)}${dec.note ? ' · “' + esc(dec.note) + '”' : ''}</span>`
+        : `<span style="color:var(--amber)">⏳ waiting</span> <span class="small" style="color:var(--overlay0)">since ${when(d.createdAt)}</span>`;
+      return `<tr><td><b>${esc(d.title)}</b>${d.lines && d.lines.length ? `<div class="small" style="color:var(--overlay0)">${esc(d.lines.join(' · '))}</div>` : ''}</td><td>${esc(d.approverName || (d.approvers || []).join(', '))}</td><td class="c">${d.amount ? (d.currency === 'USD' ? '$ ' : d.currency + ' ') + d.amount.toLocaleString('en-US') : ''}</td><td>${st}</td>
+        <td><a href="${url}" target="_blank" style="color:var(--amber)">open</a> · <a href="#" onclick="navigator.clipboard.writeText('${url}').then(() => alert('Link copied — paste it in WhatsApp.'));return false;" style="color:var(--sub)">copy link</a></td>
+        <td>${d.status === 'open' ? `<button class="ghost" title="Delete" onclick="delDecision('${esc(d.id)}')">✕</button>` : ''}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" style="color:var(--overlay0)">No decision yet</td></tr>';
+  } catch (e) { rows.innerHTML = `<tr><td colspan="6" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
+}
+async function addDecision() {
+  const title = document.getElementById('dec-title').value.trim(), approvers = [...document.getElementById('dec-who').selectedOptions].map(o => o.value);
+  if (!title) return alert('Write what is to be decided.'); if (!approvers.length) return alert('Choose who decides (Ctrl-click for both accounts of one person).');
+  const body = { title, amount: +document.getElementById('dec-amount').value || 0, approvers, approverName: document.getElementById('dec-name').value.trim() || approvers[0].split('@')[0],
+    lines: document.getElementById('dec-lines').value.split('\n').map(s => s.trim()).filter(Boolean), note: document.getElementById('dec-note').value.trim() };
+  try {
+    const r = await Admin.api('POST', '/api/decisions', body);
+    for (const id of ['dec-title', 'dec-amount', 'dec-lines', 'dec-note', 'dec-name']) document.getElementById(id).value = '';
+    loadDecisions(); try { await navigator.clipboard.writeText(r.url); alert('Posted. The link is copied — paste it in WhatsApp:\n' + r.url); } catch (e) { alert('Posted: ' + r.url); }
+  } catch (e) { alert('Could not post: ' + e.message); }
+}
+async function delDecision(id) { if (!confirm('Delete this decision?')) return; try { await Admin.api('DELETE', '/api/decisions/' + id); loadDecisions(); } catch (e) { alert(e.message); } }
 async function loadMembers() {
   const rows = document.getElementById('member-rows');
   try {
