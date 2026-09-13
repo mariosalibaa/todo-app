@@ -93,11 +93,22 @@ async function build(ctx) {
     const mm = b.ref.match(/([\d,\.]+)\s*m3 of ([\d,\.]+)\s*m3/); if (mm) { row.m3 = +mm[1].replace(/,/g, ''); row.totalM3 = +mm[2].replace(/,/g, ''); }
     if (c.kind === 'D') { row.diesel += b.total; row.litres += litresOf[b.id] || 0; row.fills = (b.ref.match(/\(([\d\-]+\.\.[\d\-]+)/) || [])[1] || ''; }
     else if (c.kind === 'R') row.retention += b.total;
-    else { row.contract += b.total; row.till = (b.ref.match(/till\s+([\d\-]+)/) || [])[1] || ''; }
+    else { row.contract += b.total; row.till = (b.ref.match(/till\s+([\d\-]+)/) || [])[1] || ''; row.certDate = b.date; }
   }
-  const cycles = Object.values(cyc).sort((a, b) => a.n - b.n).map(c => ({ ...c,
-    anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
-    shiftPerM3: c.m3 ? r2((c.contract + c.diesel) / c.m3) : 0, note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }));
+  // Mario's hand summary per cycle (2026-09-13): litres → L/m³ × $0.80 = what diesel eats out of Anthony's $5 (his net is the rest);
+  // and the cash Mario paid inside the cycle (diesel + Anthony) against the cycle's bills → position after each cycle
+  const sorted = Object.values(cyc).sort((a, b) => a.n - b.n);
+  let prevDate = '', pos = 0;
+  const cycles = sorted.map((c, i) => {
+    const upTo = i === sorted.length - 1 ? '9999-12-31' : c.certDate || '9999-12-31';
+    const paid = r2(payments.filter(p => p.date > prevDate && p.date <= upTo).reduce((t, p) => t + p.amount, 0));
+    prevDate = c.certDate || prevDate;
+    const billed = r2(c.contract + c.diesel);
+    pos = r2(pos + billed - paid);
+    return { ...c, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
+      dieselAt080PerM3: c.m3 ? r2(c.litres * 0.8 / c.m3) : 0, anthonyNetPerM3: c.m3 ? r2((c.contract - c.litres * 0.8) / c.m3) : 0,
+      shiftPerM3: c.m3 ? r2((c.contract + c.diesel) / c.m3) : 0, paid, billed, position: pos,
+      note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }; });
   return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles };
 }
 
