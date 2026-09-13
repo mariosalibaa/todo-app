@@ -17,6 +17,7 @@
   .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;}
   main{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
   h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 18px;line-height:1.5;}
+  h2.tog{cursor:pointer;color:var(--text);} h2.tog:hover{color:var(--amber);}
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:26px 0 10px;font-weight:600;display:flex;align-items:center;gap:10px;} h2 .r{margin-left:auto;font-weight:400;letter-spacing:0;text-transform:none;font-size:.74rem;}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
   .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px;} .kpi .v{font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;} .kpi .l .eq{font-variant-numeric:tabular-nums;color:var(--text);} .kpi .l .t{color:var(--text);} .kpi .tnote{margin-top:4px;color:var(--amber);} .kpi .pen{margin-left:6px;color:var(--overlay0);text-decoration:none;opacity:.5;} .kpi:hover .pen{opacity:1;}
@@ -56,6 +57,8 @@
     <div class="card"><table id="collectors"></table></div>
     <div class="card"><table id="journals"></table></div>
   </div>
+  <h2 class="tog" onclick="toggleFold()"><span id="fold-arrow">▸</span> Statement, bills and payments <span class="r muted" id="fold-hint">click to show the detailed lists</span></h2>
+  <div class="fold" id="fold-lists" hidden>
   <h2>Period <span class="r"><label class="small muted">from <input type="date" id="from" onchange="renderLists()"></label> <label class="small muted">to <input type="date" id="to" onchange="renderLists()"></label>
     <select id="preset" onchange="preset(this.value)"><option value="">period…</option><option value="all">all time</option><option value="y">this year</option><option value="q">this quarter</option><option value="m">this month</option></select>
     <select id="order" onchange="renderLists()"><option value="desc">newest first</option><option value="asc">oldest first</option></select></span></h2>
@@ -63,15 +66,25 @@
   <div class="card"><table id="stmt"></table></div>
   <h2>Against his bills</h2>
   <div class="card"><table id="bills"></table></div>
+  </div>
+  <div class="fold" id="fold-pays" hidden>
   <h2>Payments <span class="r"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderLists()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
   <div class="card"><table id="pays"></table></div>
   <div class="note" id="foot"></div>
+  </div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script>
 const esc = Admin.esc; let D = null, ME = null;
+function toggleFold(force) {
+  const open = force !== undefined ? force : document.getElementById('fold-lists').hidden;
+  for (const id of ['fold-lists', 'fold-pays']) document.getElementById(id).hidden = !open;
+  document.getElementById('fold-arrow').textContent = open ? '▾' : '▸';
+  document.getElementById('fold-hint').textContent = open ? 'click to hide' : 'click to show the detailed lists';
+  try { localStorage.setItem('excav-fold', open ? '1' : '0'); } catch (e) {}
+}
 // A card = big number + wording. The wording has a title Mario can rename and a note he can add (✎, admin only);
 // the numbers stay live (Mario, 2026-09-13: "name it total payment by shift / allow me to adjust text")
 function card(cls, value, key, title, detail) {
@@ -120,6 +133,7 @@ Admin.require(['ajaltoun', 'excavation'], me => {
   load();
 });
 async function load() {
+  try { if (localStorage.getItem('excav-fold') === '1') toggleFold(true); } catch (e) {}
   try { D = await Admin.api('GET', '/api/ajaltoun/excavation'); render(); }
   catch (e) { document.getElementById('msg').innerHTML = `<span class="bad">Could not load: ${esc(e.message || e)}</span>`; }
 }
@@ -178,10 +192,18 @@ function render() {
   document.getElementById('cycles').innerHTML = !CY.length ? '' : `<h2>Per cycle <span class="r muted">each certificate: what Anthony charged, the diesel above $0.80/L Shift paid on top, and the two costs per m³</span></h2>
     <div class="card"><table class="cyc"><thead><tr><th>#</th><th>Till</th><th class="n" title="this cycle, and the running total">m³</th><th class="n">Anthony $</th><th class="n">Comm. $</th><th class="n" title="Anthony + commission, per m³">Contract $/m³</th><th class="n">Diesel L</th><th class="n">L/m³</th><th class="n" title="diesel above $0.80/L, paid by Shift">&gt;$0.80 $</th><th class="n">$/m³</th><th class="n" title="contract + diesel above $0.80/L">Shift $/m³</th><th class="n" title="the diesel Anthony pays for, inside his price: litres × $0.80 ÷ m³">Anthony's diesel $/m³</th><th class="n" title="what stays with Anthony per m³: his price − his diesel at $0.80/L">Anthony keeps $/m³</th><th class="n" title="all payments dated after the previous certificate up to this one (diesel + Anthony)">Paid</th><th class="n" title="still owed to Georges after this cycle: all bills up to here (contract + commission + diesel) minus all payments up to here; red = Shift owes, green = paid ahead. The day rate is apart.">Owed</th></tr></thead><tbody>
     ${CY.map(c => `<tr><td>${c.n}${c.open ? '<span class="i" title="open cycle: billed, still being dug — litres are part-way">⏳</span>' : ''}${c.note || c.fills ? `<span class="i" title="${esc([c.note, c.fills ? 'fills ' + c.fills : ''].filter(Boolean).join(' · '))}">ⓘ</span>` : ''}</td><td>${esc(c.till)}</td><td class="n">${f(c.m3)} <span class="of">of ${f(c.totalM3)}</span></td><td class="n">${f(c.contract)}</td><td class="n muted">${c.retention ? f(c.retention) : ''}</td><td class="n ok">${f(c.contractPerM3)}</td><td class="n">${c.litres ? f(c.litres) : '—'}</td><td class="n">${c.litres ? f(c.litresPerM3) : '—'}</td><td class="n">${c.diesel ? f(c.diesel) : '—'}</td><td class="n">${c.diesel ? f(c.dieselPerM3) : '—'}</td><td class="n warn"><b>${f(c.shiftPerM3)}</b></td><td class="n">${c.litres ? f(c.dieselAt080PerM3) : '—'}</td><td class="n">${c.litres ? f(c.anthonyNetPerM3) : '—'}</td><td class="n">${f(c.paid)}</td><td class="n ${c.position > 0.005 ? 'bad' : 'ok'}">${f(c.position)}</td></tr>`).join('')}
-    </tbody><tfoot><tr class="tot"><td colspan="2">All</td><td class="n">${f(tot.m3)}</td><td class="n">${f(tot.contract)}</td><td class="n">${f(tot.retention)}</td><td class="n">${f(tot.m3 ? (tot.contract + tot.retention) / tot.m3 : 0)}</td><td class="n">${f(tot.litres)}</td><td class="n" title="over the ${f(FD.m3)} m³ of finished cycles Shift fuelled">${f(FD.m3 ? FD.litres / FD.m3 : 0)}</td><td class="n">${f(tot.diesel)}</td><td class="n" title="over the ${f(F.m3)} m³ Shift fuelled">${f(F.m3 ? F.diesel / F.m3 : 0)}</td><td class="n">${f(tot.m3 ? (tot.contract + tot.retention + tot.diesel) / tot.m3 : 0)}</td><td class="n" title="over the ${f(F.m3)} m³ Shift fuelled">${f(F.m3 ? F.litres * 0.8 / F.m3 : 0)}</td><td class="n" title="over the ${f(F.m3)} m³ Shift fuelled">${f(F.m3 ? (F.contract - F.litres * 0.8) / F.m3 : 0)}</td><td class="n">${f(CY.reduce((a, c) => a + c.paid, 0))}</td><td class="n">${f(CY.length ? CY[CY.length - 1].position : 0)}</td></tr></tfoot></table>
-    <p class="small muted" style="margin:6px 0 0"><b>Owed</b> = bills up to that cycle (contract + commission + diesel) − payments up to it; the last one + the ${f(D.totals.days)} day rate = the ${f(D.totals.open + D.totals.retentionOpen)} open on the ledger. Cycle 1: diesel paid by Anthony at or below $0.80/L. Cycle 3: no fills. In the All row L/m³ is over the ${f(FD.m3)} m³ of finished cycles Shift fuelled; $/m³, @0.80 and Anth. net over the ${f(F.m3)} m³ fuelled (⏳ = open cycle, still being dug), not the ${f(tot.m3)}. <b>Anthony's diesel</b> = litres × $0.80 ÷ m³, the fuel he pays for inside his price; <b>Anthony keeps</b> = his $/m³ − that. Hover ⓘ for the fills of a cycle.</p></div>`;
-  const cRows = D.collectors.map(c => `<tr><td>${esc(c.key)}</td><td class="n">${f(c.amount)}</td><td class="n muted">${c.pending ? f(c.pending) : ''}</td><td class="n">${c.n}</td><td><div class="bar"><i style="width:${Math.round(100 * (c.amount + (c.pending || 0)) / Math.max(1, T.collected))}%"></i></div></td></tr>`).join('');
-  document.getElementById('collectors').innerHTML = `<thead><tr><th>Collected by</th><th class="n">In Odoo</th><th class="n">Pending</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${cRows}</tbody><tfoot><tr class="tot"><td>Total</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${T.pendingHub ? f(T.pendingHub) : ''}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
+    </tbody><tfoot><tr class="tot"><td colspan="2">All</td><td class="n">${f(tot.m3)}</td><td class="n">${f(tot.contract)}</td><td class="n">${f(tot.retention)}</td><td class="n">${f(tot.m3 ? (tot.contract + tot.retention) / tot.m3 : 0)}</td><td class="n">${f(tot.litres)}</td><td class="n" title="over the ${f(FD.m3)} m³ of finished cycles Shift fuelled">${f(FD.m3 ? FD.litres / FD.m3 : 0)}</td><td class="n">${f(tot.diesel)}</td><td class="n" title="over all ${f(tot.m3)} m³, so that contract + this = Shift $/m³">${f(tot.m3 ? tot.diesel / tot.m3 : 0)}</td><td class="n">${f(tot.m3 ? (tot.contract + tot.retention + tot.diesel) / tot.m3 : 0)}</td><td class="n" title="over the ${f(F.m3)} m³ Shift fuelled">${f(F.m3 ? F.litres * 0.8 / F.m3 : 0)}</td><td class="n" title="over the ${f(F.m3)} m³ Shift fuelled">${f(F.m3 ? (F.contract - F.litres * 0.8) / F.m3 : 0)}</td><td class="n">${f(CY.reduce((a, c) => a + c.paid, 0))}</td><td class="n">${f(CY.length ? CY[CY.length - 1].position : 0)}</td></tr></tfoot></table>
+    <p class="small muted" style="margin:6px 0 0"><b>Owed</b> = bills up to that cycle (contract + commission + diesel) − payments up to it; the last one + the ${f(D.totals.days)} day rate = the ${f(D.totals.open + D.totals.retentionOpen)} open on the ledger. Cycle 1: diesel paid by Anthony at or below $0.80/L. Cycle 3: no fills. In the All row: the diesel $/m³ is over all ${f(tot.m3)} m³, so contract $/m³ + diesel $/m³ = Shift $/m³; L/m³ is over the ${f(FD.m3)} m³ of finished cycles Shift fuelled; Anthony's diesel and Anthony keeps over the ${f(F.m3)} m³ fuelled (⏳ = open cycle, still being dug), not the ${f(tot.m3)}. <b>Anthony's diesel</b> = litres × $0.80 ÷ m³, the fuel he pays for inside his price; <b>Anthony keeps</b> = his $/m³ − that. Hover ⓘ for the fills of a cycle.</p></div>`;
+  const byP = {}; let pendN = 0;
+  for (const q of D.payments) { const w = who(q.collector), j = JN[q.journal] || q.journal; const x = (byP[w] ||= { key: w, amount: 0, n: 0, pending: 0, pendingN: 0, j: {} }); x.amount += q.amount; x.n++; (x.j[j] ||= { amount: 0, n: 0 }).amount += q.amount; x.j[j].n++; }
+  for (const q of D.pending || []) { const w = who(q.collector); const x = (byP[w] ||= { key: w, amount: 0, n: 0, pending: 0, pendingN: 0, j: {} }); x.pending += q.amount; x.pendingN++; pendN++; }
+  const bar = v => `<div class="bar"><i style="width:${Math.round(100 * v / Math.max(1, T.collected))}%"></i></div>`;
+  const cRows = Object.values(byP).sort((a, b) => b.amount - a.amount).map(x => {
+    const js = Object.entries(x.j).filter(([, v]) => v.amount).sort((a, b) => b[1].amount - a[1].amount);
+    const main = `<tr><td><b>${esc(x.key)}</b>${js.length === 1 ? ` <span class="muted small">· ${esc(js[0][0])}</span>` : ' <span class="muted small">in total</span>'}</td><td class="n">${f(x.amount)}</td><td class="n muted">${x.pending ? f(x.pending) : ''}</td><td class="n">${x.n}</td><td>${bar(x.amount + x.pending)}</td></tr>`;
+    return main + (js.length > 1 ? js.map(([j, v]) => `<tr><td class="small muted" style="padding-left:22px">${esc(x.key.split(' ')[0])} · ${esc(j)}</td><td class="n muted small">${f(v.amount)}</td><td></td><td class="n muted small">${v.n}</td><td>${bar(v.amount)}</td></tr>`).join('') : '');
+  }).join('');
+  document.getElementById('collectors').innerHTML = `<thead><tr><th>Collected by · from which account</th><th class="n">In Odoo</th><th class="n">Pending</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${cRows}</tbody><tfoot><tr class="tot"><td>Total</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${T.pendingHub ? f(T.pendingHub) : ''}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
   const jRows = D.journals.map(j => `<tr><td>${esc(j.key)}</td><td class="n">${f(j.amount)}</td><td class="n">${j.n}</td><td><div class="bar"><i style="width:${Math.round(100 * j.amount / Math.max(1, T.paidOdoo))}%"></i></div></td></tr>`).join('');
   document.getElementById('journals').innerHTML = `<thead><tr><th>From which cash / bank account</th><th class="n">Amount</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${jRows}</tbody><tfoot><tr class="tot"><td>Total in Odoo</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
   renderLists();
