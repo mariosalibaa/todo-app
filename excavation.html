@@ -17,7 +17,8 @@
   .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;}
   main{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
   h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 18px;line-height:1.5;}
-  h2.tog{cursor:pointer;color:var(--text);} h2.tog:hover{color:var(--amber);}
+  h2.tog{cursor:pointer;color:var(--text);} h2.tog:hover{color:var(--amber);} h2.tog .r{cursor:default;}
+  table.folded tbody{display:none;} table.folded tfoot .arrow{display:inline;} tfoot .arrow{display:none;margin-right:6px;} tfoot tr.tot{cursor:pointer;}
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:26px 0 10px;font-weight:600;display:flex;align-items:center;gap:10px;} h2 .r{margin-left:auto;font-weight:400;letter-spacing:0;text-transform:none;font-size:.74rem;}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
   .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px;} .kpi .v{font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;} .kpi .l .eq{font-variant-numeric:tabular-nums;color:var(--text);} .kpi .l .t{color:var(--text);} .kpi .tnote{margin-top:4px;color:var(--amber);} .kpi .pen{margin-left:6px;color:var(--overlay0);text-decoration:none;opacity:.5;} .kpi:hover .pen{opacity:1;}
@@ -57,34 +58,29 @@
     <div class="card"><table id="collectors"></table></div>
     <div class="card"><table id="journals"></table></div>
   </div>
-  <h2 class="tog" onclick="toggleFold()"><span id="fold-arrow">▸</span> Statement, bills and payments <span class="r muted" id="fold-hint">click to show the detailed lists</span></h2>
-  <div class="fold" id="fold-lists" hidden>
   <h2>Period <span class="r"><label class="small muted">from <input type="date" id="from" onchange="renderLists()"></label> <label class="small muted">to <input type="date" id="to" onchange="renderLists()"></label>
     <select id="preset" onchange="preset(this.value)"><option value="">period…</option><option value="all">all time</option><option value="y">this year</option><option value="q">this quarter</option><option value="m">this month</option></select>
     <select id="order" onchange="renderLists()"><option value="desc">newest first</option><option value="asc">oldest first</option></select></span></h2>
-  <h2>Statement — bills and payments, like Odoo's partner ledger <span class="r muted">balance negative = Shift owes Georges</span></h2>
-  <div class="card"><table id="stmt"></table></div>
-  <h2>Against his bills</h2>
-  <div class="card"><table id="bills"></table></div>
-  </div>
-  <div class="fold" id="fold-pays" hidden>
-  <h2>Payments <span class="r"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderLists()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
-  <div class="card"><table id="pays"></table></div>
+  <h2 class="tog" onclick="toggleFold('stmt')"><span class="arrow" data-for="stmt">▸</span> Statement — bills and payments, like Odoo's partner ledger <span class="r muted">balance negative = Shift owes Georges</span></h2>
+  <div class="card"><table id="stmt" class="folded"></table></div>
+  <h2 class="tog" onclick="toggleFold('bills')"><span class="arrow" data-for="bills">▸</span> Against his bills</h2>
+  <div class="card"><table id="bills" class="folded"></table></div>
+  <h2 class="tog" onclick="toggleFold('pays')"><span class="arrow" data-for="pays">▸</span> Payments <span class="r" onclick="event.stopPropagation()"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderLists()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
+  <div class="card"><table id="pays" class="folded"></table></div>
   <div class="note" id="foot"></div>
-  </div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script>
 const esc = Admin.esc; let D = null, ME = null;
-function toggleFold(force) {
-  const open = force !== undefined ? force : document.getElementById('fold-lists').hidden;
-  for (const id of ['fold-lists', 'fold-pays']) document.getElementById(id).hidden = !open;
-  document.getElementById('fold-arrow').textContent = open ? '▾' : '▸';
-  document.getElementById('fold-hint').textContent = open ? 'click to hide' : 'click to show the detailed lists';
-  try { localStorage.setItem('excav-fold', open ? '1' : '0'); } catch (e) {}
+function toggleFold(id, force) {
+  const t = document.getElementById(id), open = force !== undefined ? force : t.classList.contains('folded');
+  t.classList.toggle('folded', !open);
+  for (const a of document.querySelectorAll(`.arrow[data-for="${id}"]`)) a.textContent = open ? '▾' : '▸';
+  try { localStorage.setItem('excav-fold-' + id, open ? '1' : '0'); } catch (e) {}
 }
+function foldState() { for (const id of ['stmt', 'bills', 'pays']) { try { if (localStorage.getItem('excav-fold-' + id) === '1') toggleFold(id, true); } catch (e) {} } }
 // A card = big number + wording. The wording has a title Mario can rename and a note he can add (✎, admin only);
 // the numbers stay live (Mario, 2026-09-13: "name it total payment by shift / allow me to adjust text")
 function card(cls, value, key, title, detail) {
@@ -133,7 +129,7 @@ Admin.require(['ajaltoun', 'excavation'], me => {
   load();
 });
 async function load() {
-  try { if (localStorage.getItem('excav-fold') === '1') toggleFold(true); } catch (e) {}
+  foldState();
   try { D = await Admin.api('GET', '/api/ajaltoun/excavation'); render(); }
   catch (e) { document.getElementById('msg').innerHTML = `<span class="bad">Could not load: ${esc(e.message || e)}</span>`; }
 }
@@ -215,7 +211,7 @@ function renderBills() {
   const rows = ordered(D.bills.filter(b => inPeriod(b.date)).map((b, i) => ({ ...b, seq: i })));
   const T = rows.reduce((a, b) => ({ t: a.t + b.total, p: a.p + (b.total - b.residual), o: a.o + b.residual }), { t: 0, p: 0, o: 0 });
   document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${rows.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="${ODOO_BILL}${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${KIND[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="tot"><td colspan="4">Total · ${rows.length} bills</td><td class="n">${f(T.t)}</td><td class="n">${f(T.p)}</td><td class="n">${f(T.o)}</td></tr></tfoot>`;
+    <tfoot><tr class="tot" onclick="toggleFold('bills')" title="click to unfold the lines"><td colspan="4"><span class="arrow" data-for="bills">▸</span>Total · ${rows.length} bills</td><td class="n">${f(T.t)}</td><td class="n">${f(T.p)}</td><td class="n">${f(T.o)}</td></tr></tfoot>`;
 }
 // bills (credit: what Shift owes) and payments (debit: what Shift paid) in one running balance, the way Odoo's partner
 // ledger shows Georges — the balance runs from the very first entry whatever the period shown (Mario, 2026-09-13)
@@ -228,7 +224,7 @@ function renderStatement() {
   const rows = ordered(all.filter(r => inPeriod(r.date)));
   const T = rows.reduce((a, r) => ({ d: a.d + r.debit, c: a.c + r.credit }), { d: 0, c: 0 });
   document.getElementById('stmt').innerHTML = `<thead><tr><th>Date</th><th>Entry</th><th>What</th><th>Kind</th><th class="n">Debit (paid)</th><th class="n">Credit (billed)</th><th class="n">Balance</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.date)}</td><td><a target="_blank" href="${r.href}">${esc(r.name)}</a></td><td class="small">${esc(r.what)}</td><td class="small muted">${esc(r.kind)}</td><td class="n">${r.debit ? f(r.debit) : ''}</td><td class="n">${r.credit ? f(r.credit) : ''}</td><td class="n ${r.bal < -0.005 ? 'bad' : 'ok'}">${f(r.bal)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="tot"><td colspan="4">${rows.length} entries in the period</td><td class="n">${f(T.d)}</td><td class="n">${f(T.c)}</td><td class="n">${f(bal)} at the end</td></tr></tfoot>`;
+    <tfoot><tr class="tot" onclick="toggleFold('stmt')" title="click to unfold the lines"><td colspan="4"><span class="arrow" data-for="stmt">▸</span>${rows.length} entries in the period</td><td class="n">${f(T.d)}</td><td class="n">${f(T.c)}</td><td class="n">${f(bal)} at the end</td></tr></tfoot>`;
 }
 function renderPays() {
   const open = document.getElementById('only-open').checked;
@@ -238,7 +234,7 @@ function renderPays() {
   document.getElementById('pays').innerHTML = `<thead><tr><th>Date</th><th>Payment</th><th>Collected by</th><th>From account</th><th>Memo</th><th class="n">Amount</th><th>Reconciled</th></tr></thead><tbody>${rows.map(p => `<tr>
     <td>${esc(p.date)}</td><td>${p.pending ? '<span class="warn">pending</span>' : `<a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_account_payments_payable/${p.id}">${esc(p.name)}</a>`}</td><td>${esc(p.collector)}</td><td>${esc(p.journal)}</td><td class="small muted">${esc(p.memo)}</td><td class="n">${f(p.amount)}</td>
     <td>${p.pending ? '<span class="muted">—</span>' : p.reconciled ? '<span class="ok">✓ ' + p.bills + ' bill' + (p.bills > 1 ? 's' : '') + '</span>' : '<span class="warn">○ open</span>'}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="tot"><td colspan="5">${rows.length} payments</td><td class="n">${f(rows.reduce((s, p) => s + p.amount, 0))}</td><td></td></tr></tfoot>`;
+    <tfoot><tr class="tot" onclick="toggleFold('pays')" title="click to unfold the lines"><td colspan="5"><span class="arrow" data-for="pays">▸</span>${rows.length} payments</td><td class="n">${f(rows.reduce((s, p) => s + p.amount, 0))}</td><td></td></tr></tfoot>`;
 }
 function csv() {
   const rows = [['Date', 'Payment', 'Collected by', 'From account', 'Memo', 'Amount', 'Reconciled'], ...D.payments.map(p => [p.date, p.name, p.collector, p.journal, p.memo, p.amount, p.reconciled ? 'yes' : 'no']), ...D.pending.map(l => [l.date, 'not in Odoo', l.collector, 'Whish (hub)', l.desc, l.amount, ''])];
