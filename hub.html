@@ -42,6 +42,14 @@
   .admin-badge{font-size:.62rem;background:var(--surface0);color:var(--amber);padding:2px 6px;border-radius:5px;margin-left:6px;letter-spacing:.08em;}
   .note{font-size:.74rem;color:var(--overlay0);margin-top:10px;line-height:1.5;}
   .twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;} body{overflow-x:hidden;}
+  /* members on the phone (Mario, 2026-09-13): pick the account in a dropdown, then one line per app to tick */
+  #member-phone{display:none;} #member-phone select{width:100%;font:inherit;font-size:1rem;padding:10px 12px;border-radius:10px;border:1px solid var(--surface1);background:var(--mantle);color:var(--text);}
+  #member-phone .apps{margin-top:12px;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;overflow:hidden;}
+  #member-phone label.app{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--surface0);font-size:.95rem;} #member-phone label.app:last-child{border-bottom:0;}
+  #member-phone label.app input[type=checkbox]{width:20px;height:20px;accent-color:var(--amber);} #member-phone label.app .d{display:block;font-size:.72rem;color:var(--overlay0);margin-top:1px;}
+  #member-phone .fld{display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-bottom:1px solid var(--surface0);font-size:.8rem;color:var(--sub);} #member-phone .fld input{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--surface1);background:var(--base);color:var(--text);}
+  #member-phone .rm{margin-top:10px;width:100%;background:transparent;border:1px solid var(--surface1);color:var(--red);font:inherit;padding:10px;border-radius:10px;}
+  @media (max-width:700px){ #members .twrap{display:none;} #member-phone{display:block;} }
   .tile .ico svg{display:block;}
   /* phone (Mario, 2026-09-12): the page must be the phone's width, and every app on the first screen — one compact row per app */
   @media (max-width:600px){
@@ -67,6 +75,7 @@
       <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th class="c">Daily</th><th class="c">WhatsApp</th><th class="c">Reports</th><th class="c" title="The Ajaltoun excavation dashboard alone (Georges / Anthony / Dib), without the project's accounts, budget and cash flow">Excavation</th><th>Ledger</th><th>Projects</th><th style="width:40px"></th></tr></thead>
       <tbody id="member-rows"></tbody>
     </table></div>
+    <div id="member-phone"><select id="mp-who" onchange="renderMemberPhone()"></select><div id="mp-apps"></div></div>
     <div class="addrow">
       <input type="email" id="new-email" placeholder="name@gmail.com" style="max-width:280px" onkeydown="if(event.key==='Enter')addMember()">
       <label><input type="checkbox" id="new-todo" checked> To-Do</label>
@@ -169,11 +178,32 @@ async function addDecision() {
   } catch (e) { alert('Could not post: ' + e.message); }
 }
 async function delDecision(id) { if (!confirm('Delete this decision?')) return; try { await Admin.api('DELETE', '/api/decisions/' + id); loadDecisions(); } catch (e) { alert(e.message); } }
+const ALL_APPS = [['todo', 'To-Do', ''], ['accounting', 'Accounting', ''], ['partners', 'Partners', ''], ['ajaltoun', 'Ajaltoun', ''], ['daily', 'Daily', 'the Day report — only the lines of his projects'], ['site', 'WhatsApp', 'may post on /site — his own thread'], ['reports', 'Reports', 'the accountant: SARL trial balance and ledger in LBP'], ['excavation', 'Excavation', 'the excavation dashboard alone, without the rest of Ajaltoun']];
+let MEMBERS = [];
+// phone: the same allowlist as a dropdown of accounts + one line per app
+function renderMemberPhone() {
+  const sel = document.getElementById('mp-who'), box = document.getElementById('mp-apps');
+  const want = sel.value || (MEMBERS[0] || {}).email;
+  sel.innerHTML = MEMBERS.map(m => `<option value="${esc(m.email)}" ${m.email === want ? 'selected' : ''}>${esc(m.email)}${m.admin ? ' (admin)' : ''}</option>`).join('');
+  const m = MEMBERS.find(x => x.email === sel.value); if (!m) { box.innerHTML = ''; return; }
+  const apps = m.admin ? ALL_APPS.map(a => a[0]) : (Array.isArray(m.apps) ? m.apps : ['todo']);
+  box.innerHTML = `<div class="apps">${ALL_APPS.map(([id, name, d]) => `<label class="app"><input type="checkbox" ${apps.includes(id) ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="phoneToggle('${esc(m.email)}','${id}',this)"><span>${name}${d ? `<span class="d">${d}</span>` : ''}</span></label>`).join('')}
+    <div class="fld">Ledger account<input value="${esc(m.account || '')}" placeholder="ledger id, e.g. khodr-cash" onchange="setField('${esc(m.email)}','account',this.value)"></div>
+    <div class="fld">Projects (analytic ids)<input value="${esc((m.projects || []).join(','))}" placeholder="69,59,60" onchange="setField('${esc(m.email)}','projects',this.value)"></div></div>
+    ${m.admin ? '' : `<button class="rm" onclick="removeMember('${esc(m.email)}')">Remove ${esc(m.email)}</button>`}`;
+}
+async function phoneToggle(email, app, cb) {
+  const m = MEMBERS.find(x => x.email === email); if (!m) return;
+  const apps = (Array.isArray(m.apps) ? m.apps : ['todo']).filter(a => a !== app); if (cb.checked) apps.push(app);
+  try { await Admin.api('POST', '/api/allowlist', { email, apps }); m.apps = apps; loadMembers(); }
+  catch (e) { alert('Could not save: ' + e.message); cb.checked = !cb.checked; }
+}
 async function loadMembers() {
   const rows = document.getElementById('member-rows');
   try {
     const list = await Admin.api('GET', '/api/allowlist');
     list.sort((a, b) => a.email.localeCompare(b.email));
+    MEMBERS = list; renderMemberPhone();
     rows.innerHTML = list.map(m => {
       const apps = m.admin ? ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation'] : (Array.isArray(m.apps) ? m.apps : ['todo']);
       return `<tr data-email="${esc(m.email)}">
