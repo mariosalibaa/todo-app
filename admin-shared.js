@@ -84,8 +84,9 @@
       const me = pre ? await pre : await A.api('GET', '/api/me');
       if (me instanceof Error) throw me;
       A.me = me;
-      if (A.app && !(me.apps || []).includes(A.app)) {
-        overlay(card(`${esc(me.email)} is signed in but has no access to <b>${esc(A.app)}</b> yet. Ask Mario to enable it.`, false,
+      const need = Array.isArray(A.app) ? A.app : A.app ? [A.app] : [];
+      if (need.length && !need.some(k => (me.apps || []).includes(k))) {
+        overlay(card(`${esc(me.email)} is signed in but has no access to <b>${esc(need.join(' / '))}</b> yet. Ask Mario to enable it.`, false,
           '<a href="/admin">← Back to the hub</a> &nbsp;·&nbsp; <a href="#" onclick="Admin.signOut();return false;">Sign out</a>'));
         return true;
       }
@@ -112,7 +113,7 @@
       const cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
       if (cfg.authDisabled) {   // local machine: no sign-in, everything open
         A.disabled = true;
-        A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports'], admin: true, local: true };
+        A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation'], admin: true, local: true };
         ready = true; overlay(''); onReady(A.me); return;
       }
       overlay(card('Checking session…'));

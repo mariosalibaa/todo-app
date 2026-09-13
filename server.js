@@ -394,7 +394,8 @@ async function executeSyncPlan(direction, odoo, app) {
 // daily = may READ the Day report (a partner, filtered to his projects); site = may post on /site
 // (a worker: his own thread only). Neither opens anything else.
 // reports = the accountant: SARL trial balance / general ledger in LBP at historical rates, read-only, nothing else
-const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports'];
+// 'excavation' = the Ajaltoun excavation dashboard on its own, shareable with a partner before the rest of /ajaltoun is ready (Mario, 2026-09-13)
+const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation'];
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
@@ -841,7 +842,8 @@ const handler = async (req, res) => {
     return;
   }
   if (url.startsWith('/api/ajaltoun/')) {
-    if (!access.apps.includes('ajaltoun')) return noApp('ajaltoun');
+    const excavOnly = url.split('?')[0] === '/api/ajaltoun/excavation' && access.apps.includes('excavation');
+    if (!access.apps.includes('ajaltoun') && !excavOnly) return noApp('ajaltoun');
     try {
       const handled = await excavation.handle(req, res, url, user, { db, TEAM_ID, odooCall, access })
         || await ajaltoun.handle(req, res, url, user, { db, TEAM_ID, odooCall, access });

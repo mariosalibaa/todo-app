@@ -64,7 +64,7 @@
   <section id="members" style="display:none;">
     <h2>Members &amp; access</h2>
     <div class="twrap"><table>
-      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th class="c">Daily</th><th class="c">WhatsApp</th><th class="c">Reports</th><th>Ledger</th><th>Projects</th><th style="width:40px"></th></tr></thead>
+      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th class="c">Daily</th><th class="c">WhatsApp</th><th class="c">Reports</th><th class="c" title="The Ajaltoun excavation dashboard alone (Georges / Anthony / Dib), without the project's accounts, budget and cash flow">Excavation</th><th>Ledger</th><th>Projects</th><th style="width:40px"></th></tr></thead>
       <tbody id="member-rows"></tbody>
     </table></div>
     <div class="addrow">
@@ -73,6 +73,7 @@
       <label><input type="checkbox" id="new-acc"> Accounting</label>
       <label><input type="checkbox" id="new-partners"> Partners</label>
       <label><input type="checkbox" id="new-ajaltoun"> Ajaltoun</label>
+      <label><input type="checkbox" id="new-excavation"> Excavation only</label>
       <button onclick="addMember()">Add</button>
     </div>
     <div class="note">Each app has its own list: a member sees only the tiles ticked here, and the server refuses the others. Changes apply within a minute. Admins (Mario) always have every app.</div>
@@ -117,7 +118,7 @@ async function loadMembers() {
     const list = await Admin.api('GET', '/api/allowlist');
     list.sort((a, b) => a.email.localeCompare(b.email));
     rows.innerHTML = list.map(m => {
-      const apps = m.admin ? ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports'] : (Array.isArray(m.apps) ? m.apps : ['todo']);
+      const apps = m.admin ? ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation'] : (Array.isArray(m.apps) ? m.apps : ['todo']);
       return `<tr data-email="${esc(m.email)}">
         <td>${esc(m.email)}${m.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</td>
         <td class="c"><input type="checkbox" data-app="todo" ${apps.includes('todo') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
@@ -127,12 +128,13 @@ async function loadMembers() {
         <td class="c"><input type="checkbox" data-app="daily" ${apps.includes('daily') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="May read the Day report — only the lines of his projects"></td>
         <td class="c"><input type="checkbox" data-app="site" ${apps.includes('site') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="May post on /site — his own thread"></td>
         <td class="c"><input type="checkbox" data-app="reports" ${apps.includes('reports') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="The accountant: SARL trial balance and general ledger in LBP, read-only"></td>
+        <td class="c"><input type="checkbox" data-app="excavation" ${apps.includes('excavation') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="The Ajaltoun excavation dashboard alone — for a partner, before the rest of Ajaltoun is ready"></td>
         <td><input class="small" value="${esc(m.account || '')}" placeholder="ledger id" title="The worker's ledger account id, e.g. khodr-cash (site)" onchange="setField('${esc(m.email)}','account',this.value)"></td>
         <td><input class="small" value="${esc((m.projects || []).join(','))}" placeholder="analytic ids" title="Analytic account ids the partner may see on the Day report, e.g. 69,59,60,61,62,63,64" onchange="setField('${esc(m.email)}','projects',this.value)"></td>
         <td>${m.admin ? '' : `<button class="ghost" title="Remove" onclick="removeMember('${esc(m.email)}')">✕</button>`}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="11" style="color:var(--overlay0)">Nobody yet</td></tr>';
-  } catch (e) { rows.innerHTML = `<tr><td colspan="11" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
+    }).join('') || '<tr><td colspan="12" style="color:var(--overlay0)">Nobody yet</td></tr>';
+  } catch (e) { rows.innerHTML = `<tr><td colspan="12" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
 }
 async function toggleApp(cb) {
   const tr = cb.closest('tr');
@@ -155,7 +157,8 @@ async function addMember() {
   if (document.getElementById('new-acc').checked) apps.push('accounting');
   if (document.getElementById('new-partners').checked) apps.push('partners');
   if (document.getElementById('new-ajaltoun').checked) apps.push('ajaltoun');
-  try { await Admin.api('POST', '/api/allowlist', { email, apps }); inp.value = ''; document.getElementById('new-acc').checked = false; document.getElementById('new-partners').checked = false; document.getElementById('new-ajaltoun').checked = false; loadMembers(); }
+  if (document.getElementById('new-excavation').checked) apps.push('excavation');
+  try { await Admin.api('POST', '/api/allowlist', { email, apps }); inp.value = ''; document.getElementById('new-acc').checked = false; document.getElementById('new-partners').checked = false; document.getElementById('new-ajaltoun').checked = false; document.getElementById('new-excavation').checked = false; loadMembers(); }
   catch (e) { alert('Could not add: ' + e.message); }
 }
 async function removeMember(email) {

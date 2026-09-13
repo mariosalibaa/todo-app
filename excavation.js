@@ -140,11 +140,22 @@ async function build(ctx) {
     retention: totals.retention, retentionPerM3: r2(totals.retention / m3), days: totals.days,
     allIn: r2(contractAll + totals.diesel + totals.days), allInPerM3: r2((contractAll + totals.diesel + totals.days) / m3),
   } : null;
-  return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch };
+  // Mario's own wording on the cards (title + note per card; the numbers stay live) — Firestore settings/excavationText
+  const textDoc = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationText').get().catch(() => null);
+  const text = textDoc && textDoc.exists ? textDoc.data() : {};
+  return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
 }
 
+const readBody = req => new Promise((ok, no) => { let s = ''; req.on('data', d => s += d).on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { no(e); } }).on('error', no); });
 async function handle(req, res, url, user, ctx) {
   if (url.split('?')[0] === '/api/ajaltoun/excavation' && req.method === 'GET') return json(res, 200, await build(ctx));
+  if (url.split('?')[0] === '/api/ajaltoun/excavation/text' && req.method === 'PATCH') {   // Mario adjusts a card's wording (2026-09-13)
+    if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin only' });
+    const b = await readBody(req); const key = String(b.key || '').replace(/[^\w-]/g, '');
+    if (!key) return json(res, 400, { error: 'key' });
+    await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationText').set({ [key]: { title: String(b.title || '').slice(0, 120), note: String(b.note || '').slice(0, 400) } }, { merge: true });
+    return json(res, 200, { ok: true });
+  }
   return false;
 }
 module.exports = { handle };
