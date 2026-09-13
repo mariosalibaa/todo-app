@@ -207,7 +207,7 @@
     }
     // explanations fold to two lines on the phone; a tap opens them
     const fold = el => {
-      if (el.dataset.folded || !el.textContent.trim()) return; el.dataset.folded = '1';
+      if (el.dataset.folded || el.textContent.trim().length < 160) return; el.dataset.folded = '1';   // short notes stay as they are
       el.classList.add('fold-txt');
       const more = document.createElement('span'); more.className = 'fold-more'; more.textContent = 'more…';
       more.onclick = () => { const o = el.classList.toggle('open'); more.textContent = o ? 'less' : 'more…'; };
