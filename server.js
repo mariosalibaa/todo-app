@@ -647,13 +647,15 @@ const handler = async (req, res) => {
     'excavation.html': path.join(__dirname, 'excavation.html'),
     'excavation-summary.html': path.join(__dirname, 'excavation-summary.html'),
     'decision.html': path.join(__dirname, 'decision.html'),
+    'decisions.html': path.join(__dirname, 'decisions.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
-    '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html' };
+    '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
+    '/decide': 'decisions.html', '/decisions': 'decisions.html' };   // the member's own list of questions put to him
   // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
   if (/^\/decide\/[\w-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['decision.html'], 'utf8')); return; }
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
