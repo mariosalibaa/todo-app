@@ -46,6 +46,7 @@
   <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
   <div id="msg" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
+  <div id="odoo-match"></div>
   <div id="cost"></div>
   <div id="cycles"></div>
   <h2>Collected by <span class="r muted" id="at"></span></h2>
@@ -99,6 +100,15 @@ function render() {
     ${D.collectors.map(c => `<div class="kpi in"><div class="v">$ ${f(c.amount + (c.pending || 0))}</div><div class="l">by ${esc(c.key)} — ${c.n} payment${c.n === 1 ? '' : 's'}${c.pending ? ` + ${c.pendingN} pending (${f(c.pending)})` : ''}</div></div>`).join('')}
     <div class="kpi out"><div class="v">$ ${f(T.excavation + T.diesel)}</div><div class="l">His bills so far: excavation ${f(T.excavation)} + diesel difference ${f(T.diesel)}${T.days ? ` (+ ${f(T.days)} day rate apart)` : ''}</div></div>
     <div class="kpi eq"><div class="v">$ ${f(T.retentionOpen)}</div><div class="l">Georges' commission (retention) still held of ${f(T.retention)} — released at project end</div></div>`;
+  const M = D.odooMatch;
+  document.getElementById('odoo-match').innerHTML = !M ? '' : `<h2>Match with Odoo <span class="r muted">the same figures Odoo shows on the Bills list, the Vendor Payments list and the Partner Ledger</span></h2>
+    <div class="kpis">
+      <div class="kpi out"><div class="v">$ ${f(M.billsTotal)}</div><div class="l"><b>Bills list</b> — ${M.billsCount} vendor bills of Georges, total</div></div>
+      <div class="kpi in"><div class="v">$ ${f(M.paymentsTotal)}</div><div class="l"><b>Vendor Payments list</b> — ${M.paymentsCount} payments out, total</div></div>
+      <div class="kpi"><div class="v">${f(M.ledgerYear.debit)} / ${f(M.ledgerYear.credit)}</div><div class="l"><b>Partner Ledger ${M.year}</b> — debit / credit for the year${M.ledgerYear.opening ? ` · opening ${f(M.ledgerYear.opening)} from before` : ''}</div></div>
+      <div class="kpi ${M.ledgerAll.balance < 0 ? 'out' : 'in'}"><div class="v">$ ${f(M.ledgerAll.balance)}</div><div class="l"><b>Partner Ledger balance</b> — all time: debit ${f(M.ledgerAll.debit)} − credit ${f(M.ledgerAll.credit)}${M.ledgerAll.balance < 0 ? ' · Shift owes Georges' : ' · Georges is ahead'}</div></div>
+    </div>
+    ${M.others.length ? `<div class="note"><b>Odoo also counts ${M.others.length} line${M.others.length > 1 ? 's' : ''} that are not part of the excavation:</b> ${M.others.map(o => `${esc(o.date)} ${esc(o.name)} · ${esc(o.company)} · ${esc(o.account)} · ${o.debit ? 'debit ' + f(o.debit) : 'credit ' + f(o.credit)}${o.label ? ' · ' + esc(o.label) : ''}`).join('<br>')}<br>The ledger balance above includes them; the statement below does not.</div>` : ''}`;
   const C = D.cost;
   document.getElementById('cost').innerHTML = !C ? '' : `<h2>Cost per m³ <span class="r muted">${f(C.m3)} m³ excavated (the total on the last certificate)</span></h2>
     <div class="kpis">

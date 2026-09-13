@@ -111,7 +111,22 @@ async function build(ctx) {
       dieselAt080PerM3: c.m3 ? r2(c.litres * 0.8 / c.m3) : 0, anthonyNetPerM3: c.m3 ? r2((c.contract - c.litres * 0.8) / c.m3) : 0,
       shiftPerM3: c.m3 ? r2((c.contract + c.retention + c.diesel) / c.m3) : 0, paid, billed, position: pos,
       note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }; });
-  return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles };
+  // Match with Odoo (Mario, 2026-09-13): the partner ledger as Odoo sums it — every posted payable / receivable line of
+  // Georges in every company — so the hub shows the same debit, credit and balance as Reporting → Partner Ledger.
+  const year = new Date().getFullYear();
+  const ll = await odooCall('account.move.line', 'search_read', [[['partner_id', '=', PARTNER], ['account_id.account_type', 'in', ['liability_payable', 'asset_receivable']], ['parent_state', '=', 'posted']]],
+    { fields: ['date', 'debit', 'credit', 'move_id', 'company_id', 'account_id', 'name'], order: 'date, id', context: { allowed_company_ids: [2, 4, 7, 8, 9, 10] } });
+  const known = new Set([...bills.map(b => b.id), ...pays.map(p => p.move_id ? p.move_id[0] : 0)]);
+  const sumL = arr => ({ debit: r2(arr.reduce((t, l) => t + l.debit, 0)), credit: r2(arr.reduce((t, l) => t + l.credit, 0)) });
+  const allL = sumL(ll), yearL = sumL(ll.filter(l => l.date >= `${year}-01-01`)), before = sumL(ll.filter(l => l.date < `${year}-01-01`));
+  const odooMatch = {
+    year, billsTotal: r2(B.reduce((t, b) => t + b.total, 0)), billsCount: B.length, paymentsTotal: r2(pays.filter(p => p.payment_type === 'outbound').reduce((t, p) => t + p.amount, 0)), paymentsCount: pays.filter(p => p.payment_type === 'outbound').length,
+    ledgerYear: { ...yearL, opening: r2(before.debit - before.credit), balance: r2(allL.debit - allL.credit) },
+    ledgerAll: { ...allL, balance: r2(allL.debit - allL.credit) },
+    // lines Odoo counts that are not the excavation's bills or payments (another company, another account…)
+    others: ll.filter(l => !known.has(l.move_id[0])).map(l => ({ date: l.date, name: l.move_id[1], company: l.company_id[1], account: l.account_id[1], debit: l.debit, credit: l.credit, label: l.name || '' })),
+  };
+  return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch };
 }
 
 async function handle(req, res, url, user, ctx) {
