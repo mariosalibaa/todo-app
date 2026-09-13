@@ -152,7 +152,10 @@ async function build(ctx) {
   // Mario's own wording on the cards (title + note per card; the numbers stay live) — Firestore settings/excavationText
   const textDoc = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationText').get().catch(() => null);
   const text = textDoc && textDoc.exists ? textDoc.data() : {};
-  return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
+  // column widths Mario dragged on the tables, saved for every viewer — settings/excavationLayout { table: [px…] }
+  const layDoc = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationLayout').get().catch(() => null);
+  const layout = layDoc && layDoc.exists ? layDoc.data() : {};
+  return { layout, at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
 }
 
 const readBody = req => new Promise((ok, no) => { let s = ''; req.on('data', d => s += d).on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { no(e); } }).on('error', no); });
@@ -163,6 +166,14 @@ async function handle(req, res, url, user, ctx) {
     const b = await readBody(req); const key = String(b.key || '').replace(/[^\w-]/g, '');
     if (!key) return json(res, 400, { error: 'key' });
     await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationText').set({ [key]: { title: String(b.title || '').slice(0, 120), note: String(b.note || '').slice(0, 400) } }, { merge: true });
+    return json(res, 200, { ok: true });
+  }
+  if (url.split('?')[0] === '/api/ajaltoun/excavation/layout' && req.method === 'PATCH') {   // column widths, for all users (2026-09-13)
+    if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin only' });
+    const b = await readBody(req); const table = String(b.table || '').replace(/[^\w-]/g, '');
+    if (!table || !Array.isArray(b.widths)) return json(res, 400, { error: 'table / widths' });
+    const widths = b.widths.slice(0, 40).map(w => w === null ? null : Math.max(30, Math.min(900, Math.round(+w || 0))) || null);
+    await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationLayout').set({ [table]: widths }, { merge: true });
     return json(res, 200, { ok: true });
   }
   return false;

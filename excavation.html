@@ -17,6 +17,8 @@
   .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;}
   main{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
   h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 18px;line-height:1.5;}
+  th.rs{position:relative;} th.rs .grip{position:absolute;top:0;right:-3px;width:7px;height:100%;cursor:col-resize;user-select:none;} th.rs .grip:hover{background:rgba(242,169,59,.35);}
+  table[style*="fixed"] td{overflow:hidden;text-overflow:ellipsis;} table[style*="fixed"] td:first-child{white-space:nowrap;}
   h2.tog{cursor:pointer;color:var(--text);} h2.tog:hover{color:var(--amber);} h2.tog .r{cursor:default;}
   table.folded tbody{display:none;} table.folded tfoot .arrow{display:inline;} tfoot .arrow{display:none;margin-right:6px;} tfoot tr.tot{cursor:pointer;}
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:26px 0 10px;font-weight:600;display:flex;align-items:center;gap:10px;} h2 .r{margin-left:auto;font-weight:400;letter-spacing:0;text-transform:none;font-size:.74rem;}
@@ -76,6 +78,35 @@
 <script src="/admin-shared.js"></script>
 <script>
 const esc = Admin.esc; let D = null, ME = null;
+// Column widths (Mario, 2026-09-13: "allow to adjust col width inside the hub and save the adjust for all users"):
+// drag the right edge of a header; the widths go to the server (admin) and every viewer gets them on the next load.
+const DEFAULT_W = { pays: [96, 150, 150, 170, null, 90, 100], stmt: [96, 150, null, 150, 100, 100, 100], bills: [96, 150, null, 150, 90, 90, 90] };
+function applyCols(id) {
+  const t = document.getElementById(id); if (!t || !t.tHead) return;
+  const ths = [...t.tHead.rows[0].cells];
+  const w = (D && D.layout && D.layout[id]) || DEFAULT_W[id] || [];
+  const fixed = w.some(x => x);
+  t.style.tableLayout = fixed ? 'fixed' : '';
+  ths.forEach((th, i) => { th.style.width = w[i] ? w[i] + 'px' : ''; th.classList.add('rs'); if (!th.querySelector('.grip')) { const g = document.createElement('span'); g.className = 'grip'; g.title = 'drag to resize' + (ME && ME.admin ? ' — saved for everyone' : ''); g.onmousedown = e => startResize(e, id, i); th.appendChild(g); } });
+}
+let RS = null;
+function startResize(e, id, i) {
+  e.preventDefault(); e.stopPropagation();
+  const t = document.getElementById(id), th = t.tHead.rows[0].cells[i];
+  RS = { id, i, x0: e.clientX, w0: th.getBoundingClientRect().width };
+  t.style.tableLayout = 'fixed';
+  [...t.tHead.rows[0].cells].forEach(c => { if (!c.style.width) c.style.width = c.getBoundingClientRect().width + 'px'; });
+  document.body.style.cursor = 'col-resize';
+  const move = ev => { const w = Math.max(30, RS.w0 + ev.clientX - RS.x0); th.style.width = w + 'px'; };
+  const up = async () => {
+    document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.cursor = '';
+    const widths = [...t.tHead.rows[0].cells].map(c => Math.round(parseFloat(c.style.width)) || null);
+    (D.layout ||= {})[id] = widths;
+    if (ME && ME.admin) { try { await Admin.api('PATCH', '/api/ajaltoun/excavation/layout', { table: id, widths }); } catch (err) { console.warn('layout not saved', err.message); } }
+    RS = null;
+  };
+  document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+}
 function toggleFold(id, force) {
   const t = document.getElementById(id), open = force !== undefined ? force : t.classList.contains('folded');
   t.classList.toggle('folded', !open);
@@ -119,7 +150,7 @@ function preset(v) {
 }
 const inPeriod = date => { const a = document.getElementById('from').value, b = document.getElementById('to').value; return (!a || date >= a) && (!b || date <= b); };
 const ordered = rows => { const asc = document.getElementById('order').value === 'asc'; return rows.sort((x, y) => (asc ? 1 : -1) * (x.date.localeCompare(y.date) || (x.seq || 0) - (y.seq || 0)) * (asc ? 1 : 1)); };
-function renderLists() { renderStatement(); renderBills(); renderPays(); }
+function renderLists() { renderStatement(); renderBills(); renderPays(); for (const id of ['stmt', 'bills', 'pays']) applyCols(id); }
 const f = n => (+n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // the page opens with the full Ajaltoun key or with 'excavation' alone (a partner sees this dashboard and nothing else of the project)
 Admin.require(['ajaltoun', 'excavation'], me => {
