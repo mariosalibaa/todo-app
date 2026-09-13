@@ -17,7 +17,7 @@ const CTX = { allowed_company_ids: [COMPANY] };
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const r2 = n => Math.round((+n || 0) * 100) / 100;
 // bill refs (Mario, 2026-09-13, short form): AJ4193-EXC-n (till d-m · Xm3 of Ym3) · -nD = diesel (fills · N L · …) · -nR = retention · -DAYS
-const isDiesel = ref => /diesel/i.test(ref || '') || /EXC(?:AVATION)?-\d+D/i.test(ref || '');
+const isDiesel = ref => /diesel/i.test(ref || '') || /EXC(?:AVATION)?-\d+D\b/i.test(ref || '');
 
 async function build(ctx) {
   const { odooCall, db, TEAM_ID } = ctx;
