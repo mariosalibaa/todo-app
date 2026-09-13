@@ -16,6 +16,8 @@ const CASH_COLLECTOR = 'Anthony Khalil (cash)';
 const CTX = { allowed_company_ids: [COMPANY] };
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const r2 = n => Math.round((+n || 0) * 100) / 100;
+// bill refs (Mario, 2026-09-13, short form): AJ4193-EXC-n (till d-m · Xm3 of Ym3) · -nD = diesel (fills · N L · …) · -nR = retention · -DAYS
+const isDiesel = ref => /diesel/i.test(ref || '') || /EXC(?:AVATION)?-\d+D/i.test(ref || '');
 
 async function build(ctx) {
   const { odooCall, db, TEAM_ID } = ctx;
@@ -54,14 +56,14 @@ async function build(ctx) {
   for (const c of pending.filter(l => !collectors.some(c => c.key === l.collector))) collectors.push({ key: c.collector, amount: 0, n: 0, reconciled: 0, pending: sum(pending.filter(l => l.collector === c.collector)), pendingN: pending.filter(l => l.collector === c.collector).length });
   const journals = group(payments, 'journal');
   const B = bills.map(b => ({ id: b.id, name: b.name, ref: b.ref || '', date: b.date, due: b.invoice_date_due, total: r2(b.amount_total), residual: r2(b.amount_residual), state: b.payment_state,
-    kind: /retention/i.test(b.ref || '') ? 'retention' : /diesel/i.test(b.ref || '') ? 'diesel' : /DAYS|day rate/i.test(b.ref || '') ? 'days' : 'excavation' }));
+    kind: /retention/i.test(b.ref || '') ? 'retention' : isDiesel(b.ref) ? 'diesel' : /DAYS|day rate/i.test(b.ref || '') ? 'days' : 'excavation' }));
   // the diesel bills carry one line per fill "d-m diesel <L>L*<$/L>" priced at ($/L − 0.80): litres and the real price come from there
-  const dieselIds = bills.filter(b => /diesel/i.test(b.ref || '')).flatMap(b => b.invoice_line_ids || []);
+  const dieselIds = bills.filter(b => isDiesel(b.ref)).flatMap(b => b.invoice_line_ids || []);
   const dl = dieselIds.length ? await odooCall('account.move.line', 'read', [dieselIds, ['name', 'quantity', 'price_unit', 'price_subtotal']], { context: CTX }) : [];
   let litres = 0, dieselPaid = 0;
   for (const l of dl) { const L = +l.quantity || 0; const m = (l.name || '').match(/L\s*\*\s*-?([\d.]+)/i); const perL = m ? +m[1] : (+l.price_unit + 0.8); litres += L; dieselPaid += L * perL; }
   // the excavated volume: the largest "N m3 total" written on a certificate
-  const m3 = Math.max(0, ...B.map(b => +(((b.ref.match(/([\d,\.]+)\s*m3 total/) || [])[1] || '0').replace(/,/g, ''))));
+  const m3 = Math.max(0, ...B.map(b => +(((b.ref.match(/of\s*([\d,\.]+)\s*m3/) || b.ref.match(/([\d,\.]+)\s*m3 total/) || [])[1] || '0').replace(/,/g, ''))));
   const totals = {
     paidOdoo: sum(payments), pendingHub: sum(pending), collected: r2(sum(payments) + sum(pending)),
     bills: sum(B.map(b => ({ amount: b.total }))), excavation: sum(B.filter(b => b.kind === 'excavation').map(b => ({ amount: b.total }))), days: sum(B.filter(b => b.kind === 'days').map(b => ({ amount: b.total }))),
