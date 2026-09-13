@@ -47,6 +47,7 @@
   <div id="msg" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
   <div id="cost"></div>
+  <div id="cycles"></div>
   <h2>Collected by <span class="r muted" id="at"></span></h2>
   <div class="grid2">
     <div class="card"><table id="collectors"></table></div>
@@ -94,6 +95,12 @@ function render() {
       <div class="kpi eq"><div class="v">$ ${f(C.days)}</div><div class="l"><b>Day rate</b> (apart) — excavator days at $300/day, not per m³</div></div>
       <div class="kpi out"><div class="v">$ ${f(C.allInPerM3)} /m³</div><div class="l"><b>All in</b> — real cost + commission + days: ${f(C.allIn)} on ${f(C.m3)} m³</div></div>
     </div>`;
+  const CY = D.cycles || [];
+  const tot = CY.reduce((a, c) => ({ m3: a.m3 + c.m3, contract: a.contract + c.contract, diesel: a.diesel + c.diesel, litres: a.litres + c.litres, retention: a.retention + c.retention }), { m3: 0, contract: 0, diesel: 0, litres: 0, retention: 0 });
+  document.getElementById('cycles').innerHTML = !CY.length ? '' : `<h2>Per cycle <span class="r muted">each certificate: what Anthony charged, the diesel above $0.80/L Shift paid on top, and the two costs per m³</span></h2>
+    <div class="card"><table><thead><tr><th>Cycle</th><th>Till</th><th class="n">m³</th><th class="n">Total m³</th><th class="n">Anthony $</th><th class="n">Anthony $/m³</th><th class="n">Diesel L</th><th class="n">L/m³</th><th class="n">Diesel &gt;$0.80 $</th><th class="n">Diesel $/m³</th><th class="n">Shift $/m³</th><th class="n">Commission $</th><th>Note</th></tr></thead><tbody>
+    ${CY.map(c => `<tr><td>${c.n}</td><td>${esc(c.till)}</td><td class="n">${f(c.m3)}</td><td class="n muted">${f(c.totalM3)}</td><td class="n">${f(c.contract)}</td><td class="n ok">${f(c.anthonyPerM3)}</td><td class="n">${c.litres ? f(c.litres) : '—'}</td><td class="n">${c.litres ? f(c.litresPerM3) : '—'}</td><td class="n">${c.diesel ? f(c.diesel) : '—'}</td><td class="n">${c.diesel ? f(c.dieselPerM3) : '—'}</td><td class="n warn"><b>${f(c.shiftPerM3)}</b></td><td class="n muted">${c.retention ? f(c.retention) : ''}</td><td class="small muted">${esc(c.note)}${c.fills ? ' · fills ' + esc(c.fills) : ''}</td></tr>`).join('')}
+    </tbody><tfoot><tr class="tot"><td colspan="2">All cycles</td><td class="n">${f(tot.m3)}</td><td></td><td class="n">${f(tot.contract)}</td><td class="n">${f(tot.m3 ? tot.contract / tot.m3 : 0)}</td><td class="n">${f(tot.litres)}</td><td class="n">${f(tot.m3 ? tot.litres / tot.m3 : 0)}</td><td class="n">${f(tot.diesel)}</td><td class="n">${f(tot.m3 ? tot.diesel / tot.m3 : 0)}</td><td class="n">${f(tot.m3 ? (tot.contract + tot.diesel) / tot.m3 : 0)}</td><td class="n">${f(tot.retention)}</td><td class="small">commission and day rate stay outside the per-m³ figures</td></tr></tfoot></table></div>`;
   const cRows = D.collectors.map(c => `<tr><td>${esc(c.key)}</td><td class="n">${f(c.amount)}</td><td class="n muted">${c.pending ? f(c.pending) : ''}</td><td class="n">${c.n}</td><td><div class="bar"><i style="width:${Math.round(100 * (c.amount + (c.pending || 0)) / Math.max(1, T.collected))}%"></i></div></td></tr>`).join('');
   document.getElementById('collectors').innerHTML = `<thead><tr><th>Collected by</th><th class="n">In Odoo</th><th class="n">Pending</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${cRows}</tbody><tfoot><tr class="tot"><td>Total</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${T.pendingHub ? f(T.pendingHub) : ''}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
   const jRows = D.journals.map(j => `<tr><td>${esc(j.key)}</td><td class="n">${f(j.amount)}</td><td class="n">${j.n}</td><td><div class="bar"><i style="width:${Math.round(100 * j.amount / Math.max(1, T.paidOdoo))}%"></i></div></td></tr>`).join('');

@@ -81,7 +81,23 @@ async function build(ctx) {
     retention: totals.retention, retentionPerM3: r2(totals.retention / m3), days: totals.days,
     allIn: r2(totals.excavation + totals.diesel + totals.retention + totals.days), allInPerM3: r2((totals.excavation + totals.diesel + totals.retention + totals.days) / m3),
   } : null;
-  return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost };
+  // Per cycle (Mario, 2026-09-13): m³, diesel above $0.80 → $/m³ and L/m³, Anthony's cost, Shift's cost. Cycle 1 (till 13-3,
+  // 2,500 m³): Anthony paid the diesel himself, at or below $0.80/L — no diesel bill, litres unknown.
+  const cyc = {};
+  const cycOf = ref => { const m = (ref || '').match(/EXC(?:AVATION)?-(\d+)(R|D)?\b/i); return m ? { n: +m[1], kind: m[2] ? m[2].toUpperCase() : '' } : null; };
+  const litresOf = {}; for (const l of dl) { const b = bills.find(x => (x.invoice_line_ids || []).includes(l.id)); if (b) litresOf[b.id] = (litresOf[b.id] || 0) + (+l.quantity || 0); }
+  for (const b of B) {
+    const c = cycOf(b.ref); if (!c) continue;
+    const row = (cyc[c.n] ||= { n: c.n, till: '', m3: 0, totalM3: 0, contract: 0, retention: 0, diesel: 0, litres: 0, fills: '' });
+    const mm = b.ref.match(/([\d,\.]+)\s*m3 of ([\d,\.]+)\s*m3/); if (mm) { row.m3 = +mm[1].replace(/,/g, ''); row.totalM3 = +mm[2].replace(/,/g, ''); }
+    if (c.kind === 'D') { row.diesel += b.total; row.litres += litresOf[b.id] || 0; row.fills = (b.ref.match(/\(([\d\-]+\.\.[\d\-]+)/) || [])[1] || ''; }
+    else if (c.kind === 'R') row.retention += b.total;
+    else { row.contract += b.total; row.till = (b.ref.match(/till\s+([\d\-]+)/) || [])[1] || ''; }
+  }
+  const cycles = Object.values(cyc).sort((a, b) => a.n - b.n).map(c => ({ ...c,
+    anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
+    shiftPerM3: c.m3 ? r2((c.contract + c.diesel) / c.m3) : 0, note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }));
+  return { at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles };
 }
 
 async function handle(req, res, url, user, ctx) {
