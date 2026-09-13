@@ -29,6 +29,7 @@
   .bar{height:6px;background:var(--surface0);border-radius:3px;overflow:hidden;min-width:100px;} .bar i{display:block;height:100%;background:var(--amber);}
   .muted{color:var(--overlay0);} .small{font-size:.74rem;}
   table.cyc{font-size:.72rem;} table.cyc th,table.cyc td{padding:4px 5px;white-space:nowrap;} table.cyc th{font-size:.58rem;letter-spacing:.04em;} table.cyc td .of{color:var(--overlay0);font-size:.64rem;} table.cyc td .i{cursor:help;color:var(--amber);margin-left:3px;} .ok{color:var(--green);} .warn{color:var(--amber);} .bad{color:var(--red);}
+  table.ledger td:first-child{max-width:340px;white-space:normal;} table.ledger tr.tot td{font-weight:600;border-top:1px solid var(--surface1);}
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
   a{color:var(--amber);} button{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 10px;font-size:.78rem;cursor:pointer;} button:hover{border-color:var(--amber);}
 </style>
@@ -62,7 +63,6 @@
   <div class="card"><table id="stmt"></table></div>
   <h2>Against his bills</h2>
   <div class="card"><table id="bills"></table></div>
-  <div id="bills-bridge"></div>
   <h2>Payments <span class="r"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderLists()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
   <div class="card"><table id="pays"></table></div>
   <div class="note" id="foot"></div>
@@ -103,13 +103,18 @@ function render() {
     <div class="kpi out"><div class="v">$ ${f(T.bills)}</div><div class="l">His bills so far: excavation ${f(T.excavation)} + commission ${f(T.retention)} + diesel difference ${f(T.diesel)}${T.days ? ` + day rate ${f(T.days)}` : ''}</div></div>
     <div class="kpi eq"><div class="v">$ ${f(T.retentionOpen)}</div><div class="l">Georges' commission (retention) still held of ${f(T.retention)} — released at project end</div></div>`;
   const M = D.odooMatch;
-  document.getElementById('odoo-match').innerHTML = !M ? '' : `<h2>Match with Odoo <span class="r muted">the same figures Odoo shows on the Bills list, the Vendor Payments list and the Partner Ledger</span></h2>
-    <div class="kpis">
-      <div class="kpi out"><div class="v">$ ${f(M.billsTotal)}</div><div class="l"><b>Bills list</b> — ${M.billsCount} vendor bills of Georges, total</div></div>
-      <div class="kpi in"><div class="v">$ ${f(M.paymentsTotal)}</div><div class="l"><b>Vendor Payments list</b> — ${M.paymentsCount} payments, money out net of refunds</div></div>
-      <div class="kpi"><div class="v">${f(M.ledgerYear.debit)} / ${f(M.ledgerYear.credit)}</div><div class="l"><b>Partner Ledger ${M.year}</b> — debit / credit for the year${M.ledgerYear.opening ? ` · opening ${f(M.ledgerYear.opening)} from before` : ''}</div></div>
-      <div class="kpi ${M.ledgerAll.balance < 0 ? 'out' : 'in'}"><div class="v">$ ${f(M.ledgerAll.balance)}</div><div class="l"><b>Partner Ledger balance</b> — all time: debit ${f(M.ledgerAll.debit)} − credit ${f(M.ledgerAll.credit)}${M.ledgerAll.balance < 0 ? ' · Shift owes Georges' : ' · Georges is ahead'}</div></div>
-    </div>
+  // laid out the way Mario writes it by hand (2026-09-13): the ledger's three figures on top, then what each is made of
+  const Lg = M ? M.ledgerAll : null, refunds = D.payments.filter(p => p.amount < 0).reduce((a, p) => a - p.amount, 0);
+  const r2 = x => Math.round(x * 100) / 100, mistake = M ? r2(Lg.debit - M.paymentsTotal) : 0, dueBills = M ? r2(M.billsTotal - T.retention) : 0;
+  const coll = D.collectors.filter(c => c.amount).sort((a, b) => b.amount - a.amount);
+  const sub = (v, txt) => `<td class="n">${f(v)} <span class="small muted">${txt}</span></td>`;
+  document.getElementById('odoo-match').innerHTML = !M ? '' : `<h2>Partner Ledger — Georges EL Hajj <span class="r muted">all time, the same three figures as Odoo → Reporting → Partner Ledger</span></h2>
+    <div class="card"><table class="ledger"><thead><tr><th></th><th class="n">Debit (paid)</th><th class="n">Credit (billed)</th><th class="n">Balance</th></tr></thead><tbody>
+      <tr class="tot"><td>Odoo partner ledger</td><td class="n">${f(Lg.debit)}</td><td class="n">${f(Lg.credit)}</td><td class="n ${Lg.balance < 0 ? 'bad' : 'ok'}">${f(Lg.balance)} <span class="small muted">${Lg.balance < 0 ? 'Shift owes Georges' : 'Georges is ahead'}</span></td></tr>
+      ${mistake || refunds ? `<tr><td class="muted">of which the $${f(refunds)} sent to Anthony by mistake and returned — no bill behind it</td>${sub(mistake, 'paid by mistake')}${sub(refunds, 'returned')}<td class="n muted">${f(r2(mistake - refunds))}</td></tr>` : ''}
+      <tr class="tot"><td>Payments on bills / bills</td>${sub(M.paymentsTotal, M.paymentsCount + ' payments')}${sub(M.billsTotal, M.billsCount + ' bills')}<td class="n ${M.paymentsTotal < M.billsTotal ? 'bad' : 'ok'}">${f(r2(M.paymentsTotal - M.billsTotal))} <span class="small muted">open</span></td></tr>
+      ${coll.map((c, i) => `<tr><td class="small muted">${i === 0 ? 'made of' : ''}</td>${sub(c.amount, esc(c.key))}${i === 0 ? sub(dueBills, 'excavation + diesel + day rate') : i === 1 ? sub(T.retention, 'commission (retention)') : '<td></td>'}${i === 0 ? sub(-T.open, 'due now') : i === 1 ? sub(-T.retentionOpen, 'retention, held to project end') : '<td></td>'}</tr>`).join('')}
+    </tbody></table></div>
     ${M.others.length ? `<div class="note"><b>Odoo also counts ${M.others.length} line${M.others.length > 1 ? 's' : ''} that are not part of the excavation:</b> ${M.others.map(o => `${esc(o.date)} ${esc(o.name)} · ${esc(o.company)} · ${esc(o.account)} · ${o.debit ? 'debit ' + f(o.debit) : 'credit ' + f(o.credit)}${o.label ? ' · ' + esc(o.label) : ''}`).join('<br>')}<br>The ledger balance above includes them; the statement below does not.</div>` : ''}`;
   const C = D.cost;
   document.getElementById('cost').innerHTML = !C ? '' : `<h2>Cost per m³ <span class="r muted">${f(C.m3)} m³ excavated (the total on the last certificate)</span></h2>
@@ -144,15 +149,6 @@ function renderBills() {
   const T = rows.reduce((a, b) => ({ t: a.t + b.total, p: a.p + (b.total - b.residual), o: a.o + b.residual }), { t: 0, p: 0, o: 0 });
   document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${rows.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="${ODOO_BILL}${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${KIND[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="tot"><td colspan="4">Total · ${rows.length} bills</td><td class="n">${f(T.t)}</td><td class="n">${f(T.p)}</td><td class="n">${f(T.o)}</td></tr></tfoot>`;
-  // bridge to Odoo's partner ledger: it also carries money that never met a bill — refunds received (credit) and
-  // payments not applied to any bill (debit), e.g. the $636 sent by mistake and returned (Mario, 2026-09-13)
-  const M = D.odooMatch, all = !document.getElementById('from').value && !document.getElementById('to').value;
-  const refunds = D.payments.filter(p => p.amount < 0).reduce((a, p) => a - p.amount, 0);
-  const unapplied = M ? Math.round((M.ledgerAll.debit - T.p) * 100) / 100 : 0;
-  document.getElementById('bills-bridge').innerHTML = !M || !all ? '' : `<div class="note"><b>Bridge to Odoo's Partner Ledger.</b>
-    Credit ${f(M.ledgerAll.credit)} = bills ${f(T.t)}${refunds ? ` + ${f(refunds)} refund received (money back, no bill)` : ''}.
-    Debit ${f(M.ledgerAll.debit)} = paid on bills ${f(T.p)}${unapplied ? ` + ${f(unapplied)} paid without a bill (the ${f(refunds)} sent by mistake, matched against its refund)` : ''}.
-    Balance ${f(M.ledgerAll.balance)} = open on bills ${f(T.o)}${Math.abs(Math.abs(M.ledgerAll.balance) - T.o) > 0.005 ? ` — <span class="bad">does not agree, difference ${f(Math.abs(M.ledgerAll.balance) - T.o)}</span>` : ' — agrees'}.</div>`;
 }
 // bills (credit: what Shift owes) and payments (debit: what Shift paid) in one running balance, the way Odoo's partner
 // ledger shows Georges — the balance runs from the very first entry whatever the period shown (Mario, 2026-09-13)
