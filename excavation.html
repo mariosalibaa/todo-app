@@ -98,7 +98,7 @@ function render() {
   document.getElementById('kpis').innerHTML = `
     <div class="kpi cash"><div class="v">$ ${f(T.collected)}</div><div class="l">Collected in total — ${f(T.paidOdoo)} booked in Odoo${T.pendingHub ? ` + ${f(T.pendingHub)} on Whish not yet booked` : ''}</div></div>
     ${D.collectors.map(c => `<div class="kpi in"><div class="v">$ ${f(c.amount + (c.pending || 0))}</div><div class="l">by ${esc(c.key)} — ${c.n} payment${c.n === 1 ? '' : 's'}${c.pending ? ` + ${c.pendingN} pending (${f(c.pending)})` : ''}</div></div>`).join('')}
-    <div class="kpi out"><div class="v">$ ${f(T.excavation + T.diesel)}</div><div class="l">His bills so far: excavation ${f(T.excavation)} + diesel difference ${f(T.diesel)}${T.days ? ` (+ ${f(T.days)} day rate apart)` : ''}</div></div>
+    <div class="kpi out"><div class="v">$ ${f(T.bills)}</div><div class="l">His bills so far: excavation ${f(T.excavation)} + commission ${f(T.retention)} + diesel difference ${f(T.diesel)}${T.days ? ` + day rate ${f(T.days)}` : ''}</div></div>
     <div class="kpi eq"><div class="v">$ ${f(T.retentionOpen)}</div><div class="l">Georges' commission (retention) still held of ${f(T.retention)} — released at project end</div></div>`;
   const M = D.odooMatch;
   document.getElementById('odoo-match').innerHTML = !M ? '' : `<h2>Match with Odoo <span class="r muted">the same figures Odoo shows on the Bills list, the Vendor Payments list and the Partner Ledger</span></h2>
