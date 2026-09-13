@@ -164,8 +164,8 @@
     const full = [['Hub', '/admin?stay'], ...path];
     // Back = the nearest crumb that is another page; a crumb pointing at this same page (a tab, '#accounts') would
     // only change the hash and go nowhere (Mario, 2026-09-13: Back not working on mobile)
-    const here = location.pathname.replace(//$/, '');
-    const back = [...full.slice(0, -1)].reverse().find(c => (c[1] || '').split(/[?#]/)[0].replace(//$/, '') !== here) || full[0];
+    const here = location.pathname.replace(/\/$/, '');
+    const back = [...full.slice(0, -1)].reverse().find(c => (c[1] || '').split(/[?#]/)[0].replace(/\/$/, '') !== here) || full[0];
     el.className = 'crumbs';
     el.innerHTML = `<a class="hback" href="${esc(back[1])}" title="Back to ${esc(back[0])}">&lsaquo; Back</a>` +
       full.map((c, i) => (i ? '<span class="sep">›</span>' : '') + (i < full.length - 1 ? `<a href="${esc(c[1])}" title="${esc(c[0])}">${i === 0 ? '⌂ ' : ''}${esc(c[0])}</a>` : `<span class="cur">${esc(c[0])}</span>`)).join('');
