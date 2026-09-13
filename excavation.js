@@ -62,17 +62,22 @@ async function build(ctx) {
   const dieselIds = bills.filter(b => isDiesel(b.ref)).flatMap(b => b.invoice_line_ids || []);
   const dl = dieselIds.length ? await odooCall('account.move.line', 'read', [dieselIds, ['name', 'quantity', 'price_unit', 'price_subtotal']], { context: CTX }) : [];
   let litres = 0, dieselPaid = 0;
-  let lastFill = null;   // the most recent fill (its date is on the line, "d-m diesel …"): the rate to project the rest of the job at
+  let lastFill = null; const unpaidFills = [];   // the most recent fill (its date is on the line, "d-m diesel …"): the rate to project the rest of the job at
   for (const l of dl) { const L = +l.quantity || 0; const m = (l.name || '').match(/L\s*\*\s*-?([\d.]+)/i); const perL = m ? +m[1] : (+l.price_unit + 0.8); litres += L; dieselPaid += L * perL;
     const d = (l.name || '').match(/^(\d{1,2})-(\d{1,2})/); const key = d ? `${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}` : '';
-    if (key && (!lastFill || key >= lastFill.key)) lastFill = { key, date: `${d[1]}-${d[2]}`, litres: L, perL }; }
+    if (key && (!lastFill || key >= lastFill.key)) lastFill = { key, date: `${d[1]}-${d[2]}`, litres: L, perL };
+    // a fill Dib has not been paid for yet: no Dib payment memo says "filled d-m-yyyy" for that date (Mario, 2026-09-13)
+    if (d && !payments.some(p => /dib/i.test(p.collector) && new RegExp('filled ' + (+d[1]) + '-' + (+d[2]) + '-').test(p.memo || ''))) unpaidFills.push({ date: `${d[1]}-${d[2]}`, litres: L, perL, amount: Math.round(L * perL) }); }   // Whish fills are whole dollars (540 × 1.389 = 750)
   // the excavated volume: the largest "N m3 total" written on a certificate
   const m3 = Math.max(0, ...B.map(b => +(((b.ref.match(/of\s*([\d,\.]+)\s*m3/) || b.ref.match(/([\d,\.]+)\s*m3 total/) || [])[1] || '0').replace(/,/g, ''))));
   const totals = {
     paidOdoo: sum(payments), pendingHub: sum(pending), collected: r2(sum(payments) + sum(pending)),
     bills: sum(B.map(b => ({ amount: b.total }))), excavation: sum(B.filter(b => b.kind === 'excavation').map(b => ({ amount: b.total }))), days: sum(B.filter(b => b.kind === 'days').map(b => ({ amount: b.total }))),
     diesel: sum(B.filter(b => b.kind === 'diesel').map(b => ({ amount: b.total }))), retention: sum(B.filter(b => b.kind === 'retention').map(b => ({ amount: b.total }))),
-    open: sum(B.filter(b => b.kind !== 'retention').map(b => ({ amount: b.residual }))), retentionOpen: sum(B.filter(b => b.kind === 'retention').map(b => ({ amount: b.residual }))),
+    open: sum(B.filter(b => b.kind !== 'retention').map(b => ({ amount: b.residual }))),
+    // the open amount split: what Dib is owed for fills not yet paid (the full price of the diesel, Anthony's share included,
+    // since Shift pays Dib and holds Anthony's part back) and the rest, which is Anthony's / Georges' (Mario, 2026-09-13)
+    dueDib: r2(unpaidFills.reduce((t, x) => t + x.amount, 0)), unpaidFills, retentionOpen: sum(B.filter(b => b.kind === 'retention').map(b => ({ amount: b.residual }))),
     unmatched: r2(sum(payments) - sum(B.filter(b => b.kind !== 'retention').map(b => ({ amount: b.total - b.residual })))),
   };
   // Cost per m³ (Mario, 2026-09-13): Anthony charges $4/$5 per m³ with diesel at $0.80/L inside his price; Shift pays the
@@ -107,10 +112,12 @@ async function build(ctx) {
     const paidAnthony = r2(inCyc.filter(p => /anthony/i.test(p.collector)).reduce((t, p) => t + p.amount, 0)), paidDib = r2(paid - paidAnthony);
     // the day-rate bill falls in the cycle its date belongs to, so the table ends on the ledger's open figure (Mario, 2026-09-13)
     const days = r2(B.filter(b => b.kind === 'days' && b.date > prevDate && b.date <= upTo).reduce((t, b) => t + b.total, 0));
+    // Dib still to be paid for fills of this cycle (an unpaid fill dated inside the cycle window; the open cycle takes the rest)
+    const dueDib = unpaidFills.filter(x => { const m = x.date.match(/^(\d+)-(\d+)$/); const dt = `${new Date().getFullYear()}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; return dt > prevDate && (dt <= upTo); }).reduce((t, x) => t + x.amount, 0);
     prevDate = c.certDate || prevDate;
     const billed = r2(c.contract + c.retention + c.diesel + days);
     pos = r2(pos + billed - paid);
-    return { ...c, days, paidAnthony, paidDib, contractPerM3: c.m3 ? r2((c.contract + c.retention) / c.m3) : 0, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
+    return { ...c, days, paidAnthony, paidDib, dueDib, contractPerM3: c.m3 ? r2((c.contract + c.retention) / c.m3) : 0, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
       dieselAt080PerM3: c.m3 ? r2(c.litres * 0.8 / c.m3) : 0, anthonyNetPerM3: c.m3 ? r2((c.contract - c.litres * 0.8) / c.m3) : 0,
       shiftPerM3: c.m3 ? r2((c.contract + c.retention + c.diesel) / c.m3) : 0, paid, billed, position: pos,
       open: tillDate(c.till) > todayBeirut(),   // the cycle is still being dug: its m³ are billed but not yet executed (Mario, 2026-09-13)
