@@ -79,6 +79,8 @@ async function build(ctx) {
   const contractAll = r2(totals.excavation + totals.retention);
   // Per cycle (Mario, 2026-09-13): m³, diesel above $0.80 → $/m³ and L/m³, Anthony's cost, Shift's cost. Cycle 1 (till 13-3,
   // 2,500 m³): Anthony paid the diesel himself, at or below $0.80/L — no diesel bill, litres unknown.
+  const todayBeirut = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+  const tillDate = till => { const m = (till || '').match(/^(\d+)-(\d+)$/); return m ? `${new Date().getFullYear()}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''; };
   const cyc = {};
   const cycOf = ref => { const m = (ref || '').match(/EXC(?:AVATION)?-(\d+)(R|D)?\b/i); return m ? { n: +m[1], kind: m[2] ? m[2].toUpperCase() : '' } : null; };
   const litresOf = {}; for (const l of dl) { const b = bills.find(x => (x.invoice_line_ids || []).includes(l.id)); if (b) litresOf[b.id] = (litresOf[b.id] || 0) + (+l.quantity || 0); }
@@ -103,6 +105,7 @@ async function build(ctx) {
     return { ...c, contractPerM3: c.m3 ? r2((c.contract + c.retention) / c.m3) : 0, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
       dieselAt080PerM3: c.m3 ? r2(c.litres * 0.8 / c.m3) : 0, anthonyNetPerM3: c.m3 ? r2((c.contract - c.litres * 0.8) / c.m3) : 0,
       shiftPerM3: c.m3 ? r2((c.contract + c.retention + c.diesel) / c.m3) : 0, paid, billed, position: pos,
+      open: tillDate(c.till) > todayBeirut(),   // the cycle is still being dug: its m³ are billed but not yet executed (Mario, 2026-09-13)
       note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }; });
   // Match with Odoo (Mario, 2026-09-13): the partner ledger as Odoo sums it — every posted payable / receivable line of
   // Georges in every company — so the hub shows the same debit, credit and balance as Reporting → Partner Ledger.
@@ -120,12 +123,20 @@ async function build(ctx) {
   };
   const firstFuel = Math.min(...cycles.filter(c => c.litres > 0).map(c => c.n));   // a later cycle may carry no bill of its own (fills billed with its neighbour) but Shift still fuelled it
   const m3Shift = cycles.filter(c => c.n >= firstFuel).reduce((t, c) => t + c.m3, 0);
+  // L/m³ only means something on cycles Shift fuelled AND finished; the open cycle's m³ are not dug yet, so its litres are
+  // a part-way figure. From the finished ones, project what diesel the open cycle(s) still need (Mario, 2026-09-13)
+  const closed = cycles.filter(c => c.n >= firstFuel && !c.open), openC = cycles.filter(c => c.open);
+  const m3Closed = closed.reduce((t, c) => t + c.m3, 0), litresClosed = closed.reduce((t, c) => t + c.litres, 0), rate = m3Closed ? litresClosed / m3Closed : 0;
+  const avgPerL = litres ? dieselPaid / litres : 0;
+  const m3Open = openC.reduce((t, c) => t + c.m3, 0), litresOpen = openC.reduce((t, c) => t + c.litres, 0), litresStill = Math.max(0, m3Open * rate - litresOpen);
+  const forecast = { m3Open, litresOpen, litresExpected: Math.round(m3Open * rate), litresStill: Math.round(litresStill), costStill: r2(litresStill * avgPerL), diffStill: r2(litresStill * Math.max(0, avgPerL - 0.8)), cycles: openC.map(c => c.n), closedCycles: closed.map(c => c.n) };
   const cost = m3 ? {
     m3, contract: contractAll, contractPerM3: r2(contractAll / m3), anthony: totals.excavation, anthonyPerM3: r2(totals.excavation / m3),
     dieselDiff: totals.diesel, real: r2(contractAll + totals.diesel), realPerM3: r2((contractAll + totals.diesel) / m3),
     // litres are known only where Shift bought the diesel (from cycle 2 on): L/m³ and the diesel $/m³ are over THOSE m³, not the 7,000 (Mario, 2026-09-13)
     litres: Math.round(litres), m3Shift, litresPerM3: m3Shift ? r2(litres / m3Shift) : 0, dieselPaid: r2(dieselPaid), avgPerL: litres ? r2(dieselPaid / litres) : 0, dieselAt080: r2(litres * 0.8),
     dieselAt080PerM3: m3Shift ? r2(litres * 0.8 / m3Shift) : 0, dieselDiffPerM3: m3Shift ? r2(totals.diesel / m3Shift) : 0, m3Anthony: r2(m3 - m3Shift),
+    m3Closed, litresClosed: Math.round(litresClosed), rateClosed: r2(rate), forecast,
     retention: totals.retention, retentionPerM3: r2(totals.retention / m3), days: totals.days,
     allIn: r2(contractAll + totals.diesel + totals.days), allInPerM3: r2((contractAll + totals.diesel + totals.days) / m3),
   } : null;
