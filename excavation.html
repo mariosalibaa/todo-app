@@ -62,6 +62,7 @@
   <div class="card"><table id="stmt"></table></div>
   <h2>Against his bills</h2>
   <div class="card"><table id="bills"></table></div>
+  <div id="bills-bridge"></div>
   <h2>Payments <span class="r"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderLists()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
   <div class="card"><table id="pays"></table></div>
   <div class="note" id="foot"></div>
@@ -143,6 +144,15 @@ function renderBills() {
   const T = rows.reduce((a, b) => ({ t: a.t + b.total, p: a.p + (b.total - b.residual), o: a.o + b.residual }), { t: 0, p: 0, o: 0 });
   document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${rows.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="${ODOO_BILL}${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${KIND[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="tot"><td colspan="4">Total · ${rows.length} bills</td><td class="n">${f(T.t)}</td><td class="n">${f(T.p)}</td><td class="n">${f(T.o)}</td></tr></tfoot>`;
+  // bridge to Odoo's partner ledger: it also carries money that never met a bill — refunds received (credit) and
+  // payments not applied to any bill (debit), e.g. the $636 sent by mistake and returned (Mario, 2026-09-13)
+  const M = D.odooMatch, all = !document.getElementById('from').value && !document.getElementById('to').value;
+  const refunds = D.payments.filter(p => p.amount < 0).reduce((a, p) => a - p.amount, 0);
+  const unapplied = M ? Math.round((M.ledgerAll.debit - T.p) * 100) / 100 : 0;
+  document.getElementById('bills-bridge').innerHTML = !M || !all ? '' : `<div class="note"><b>Bridge to Odoo's Partner Ledger.</b>
+    Credit ${f(M.ledgerAll.credit)} = bills ${f(T.t)}${refunds ? ` + ${f(refunds)} refund received (money back, no bill)` : ''}.
+    Debit ${f(M.ledgerAll.debit)} = paid on bills ${f(T.p)}${unapplied ? ` + ${f(unapplied)} paid without a bill (the ${f(refunds)} sent by mistake, matched against its refund)` : ''}.
+    Balance ${f(M.ledgerAll.balance)} = open on bills ${f(T.o)}${Math.abs(Math.abs(M.ledgerAll.balance) - T.o) > 0.005 ? ` — <span class="bad">does not agree, difference ${f(Math.abs(M.ledgerAll.balance) - T.o)}</span>` : ' — agrees'}.</div>`;
 }
 // bills (credit: what Shift owes) and payments (debit: what Shift paid) in one running balance, the way Odoo's partner
 // ledger shows Georges — the balance runs from the very first entry whatever the period shown (Mario, 2026-09-13)
