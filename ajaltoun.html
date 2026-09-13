@@ -12,7 +12,7 @@
   *{box-sizing:border-box;}
   body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
-  .hleft{display:flex;align-items:center;gap:16px;}
+  .hleft{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;}
   .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
   .hback:hover{background:var(--surface0);}
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
@@ -106,8 +106,8 @@
 <body>
 <header>
   <div class="hleft">
-    <span id="crumbs"></span>
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
+    <span id="crumbs"></span>
   </div>
   <nav class="tabs" id="tabs"></nav>
   <div class="who" id="who"></div>

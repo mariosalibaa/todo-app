@@ -10,7 +10,7 @@
   :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
   *{box-sizing:border-box;} body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
-  .hleft{display:flex;align-items:center;gap:16px;min-width:0;}
+  .hleft{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;}
   .tabs{display:flex;gap:2px;margin:0 auto 0 28px;} .tabs a{padding:8px 14px;color:var(--sub);text-decoration:none;font-size:.88rem;border-radius:8px;white-space:nowrap;}
   .tabs a.on{color:var(--amber);background:rgba(242,169,59,.1);font-weight:600;} .tabs a:hover{color:var(--text);} @media (max-width:700px){.tabs a{padding:6px 9px;font-size:.8rem;}}
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;} .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
@@ -41,8 +41,8 @@
 <body>
 <header>
   <div class="hleft">
-    <span id="crumbs"></span>
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
+    <span id="crumbs"></span>
   </div>
   <nav class="tabs"><a href="/ajaltoun#accounts">Accounts</a><a href="/ajaltoun#budget">Budget (BOQ)</a><a href="/ajaltoun#plan">Cashflow plan</a><a class="on" href="/ajaltoun/excavation">Excavation</a></nav>
   <div class="who" id="who"></div>
@@ -50,7 +50,7 @@
 <main>
   <h1>Excavation — Georges EL Hajj · Ajaltoun 4193</h1>
   <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
-  <div id="msg" class="small muted">Loading…</div>
+  <div id="status" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
   <div id="odoo-match"></div>
   <div id="cost"></div>
@@ -214,11 +214,11 @@ Admin.require(['ajaltoun', 'excavation'], me => {
 async function load() {
   foldState();
   try { D = await Admin.api('GET', '/api/ajaltoun/excavation'); render(); }
-  catch (e) { document.getElementById('msg').innerHTML = `<span class="bad">Could not load: ${esc(e.message || e)}</span>`; }
+  catch (e) { document.getElementById('status').innerHTML = `<span class="bad">Could not load: ${esc(e.message || e)}</span>`; }
 }
 function render() {
   const T = D.totals;
-  document.getElementById('msg').textContent = '';
+  document.getElementById('status').textContent = '';
   document.getElementById('at').textContent = 'Odoo read ' + new Date(D.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
   document.getElementById('kpis').innerHTML = `
     ${K('cash', '$ ' + f(T.collected), 'total', 'Total payment by Shift', `${f(T.paidOdoo)} booked in Odoo${T.pendingHub ? ` + ${f(T.pendingHub)} on Whish not yet booked` : ''}${T.dueDib ? ` · <span class="bad">${f(T.dueDib)} due to Dib, may be transferred any time</span>` : ''}`)}
