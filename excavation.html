@@ -53,9 +53,14 @@
     <div class="card"><table id="collectors"></table></div>
     <div class="card"><table id="journals"></table></div>
   </div>
+  <h2>Period <span class="r"><label class="small muted">from <input type="date" id="from" onchange="renderLists()"></label> <label class="small muted">to <input type="date" id="to" onchange="renderLists()"></label>
+    <select id="preset" onchange="preset(this.value)"><option value="">period…</option><option value="all">all time</option><option value="y">this year</option><option value="q">this quarter</option><option value="m">this month</option></select>
+    <select id="order" onchange="renderLists()"><option value="desc">newest first</option><option value="asc">oldest first</option></select></span></h2>
+  <h2>Statement — bills and payments, like Odoo's partner ledger <span class="r muted">balance negative = Shift owes Georges</span></h2>
+  <div class="card"><table id="stmt"></table></div>
   <h2>Against his bills</h2>
   <div class="card"><table id="bills"></table></div>
-  <h2>Payments <span class="r"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderPays()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
+  <h2>Payments <span class="r"><label class="small muted"><input type="checkbox" id="only-open" onchange="renderLists()"> only not reconciled</label> · <button onclick="csv()">⬇ CSV</button> · <button onclick="window.print()">🖨 Print</button></span></h2>
   <div class="card"><table id="pays"></table></div>
   <div class="note" id="foot"></div>
 </main>
@@ -64,6 +69,17 @@
 <script src="/admin-shared.js"></script>
 <script>
 const esc = Admin.esc; let D = null;
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function preset(v) {
+  const d = new Date(), y = d.getFullYear(), m = d.getMonth();
+  const ymd = (yy, mm, dd) => `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  const set = (a, b) => { document.getElementById('from').value = a; document.getElementById('to').value = b; };
+  if (v === 'all') set('', ''); else if (v === 'y') set(ymd(y, 1, 1), ''); else if (v === 'q') set(ymd(y, Math.floor(m / 3) * 3 + 1, 1), ''); else if (v === 'm') set(ymd(y, m + 1, 1), '');
+  if (v) renderLists();
+}
+const inPeriod = date => { const a = document.getElementById('from').value, b = document.getElementById('to').value; return (!a || date >= a) && (!b || date <= b); };
+const ordered = rows => { const asc = document.getElementById('order').value === 'asc'; return rows.sort((x, y) => (asc ? 1 : -1) * (x.date.localeCompare(y.date) || (x.seq || 0) - (y.seq || 0)) * (asc ? 1 : 1)); };
+function renderLists() { renderStatement(); renderBills(); renderPays(); }
 const f = n => (+n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 Admin.require('ajaltoun', me => {
   Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#accounts'], ['Excavation']]);
@@ -105,16 +121,35 @@ function render() {
   document.getElementById('collectors').innerHTML = `<thead><tr><th>Collected by</th><th class="n">In Odoo</th><th class="n">Pending</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${cRows}</tbody><tfoot><tr class="tot"><td>Total</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${T.pendingHub ? f(T.pendingHub) : ''}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
   const jRows = D.journals.map(j => `<tr><td>${esc(j.key)}</td><td class="n">${f(j.amount)}</td><td class="n">${j.n}</td><td><div class="bar"><i style="width:${Math.round(100 * j.amount / Math.max(1, T.paidOdoo))}%"></i></div></td></tr>`).join('');
   document.getElementById('journals').innerHTML = `<thead><tr><th>From which cash / bank account</th><th class="n">Amount</th><th class="n">#</th><th>Share</th></tr></thead><tbody>${jRows}</tbody><tfoot><tr class="tot"><td>Total in Odoo</td><td class="n">${f(T.paidOdoo)}</td><td class="n">${D.payments.length}</td><td></td></tr></tfoot>`;
-  const kind = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate' };
-  const bRows = D.bills.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_move_in_invoice_type/${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${kind[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('');
-  document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${bRows}</tbody><tfoot><tr class="tot"><td colspan="4">Total · ${D.bills.length} bills</td><td class="n">${f(T.bills)}</td><td class="n">${f(T.bills - T.open - T.retentionOpen)}</td><td class="n">${f(T.open + T.retentionOpen)}</td></tr></tfoot>`;
-  renderPays();
+  renderLists();
   document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from Accounting → Accounts (📗 Pay).`;
+}
+const KIND = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate' };
+const ODOO_BILL = 'https://shift2.odoo.com/odoo/action-account.action_move_in_invoice_type/', ODOO_PAY = 'https://shift2.odoo.com/odoo/action-account.action_account_payments_payable/';
+function renderBills() {
+  const rows = ordered(D.bills.filter(b => inPeriod(b.date)).map((b, i) => ({ ...b, seq: i })));
+  const T = rows.reduce((a, b) => ({ t: a.t + b.total, p: a.p + (b.total - b.residual), o: a.o + b.residual }), { t: 0, p: 0, o: 0 });
+  document.getElementById('bills').innerHTML = `<thead><tr><th>Date</th><th>Bill</th><th>Reference</th><th>Kind</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Open</th></tr></thead><tbody>${rows.map(b => `<tr><td>${esc(b.date)}</td><td><a target="_blank" href="${ODOO_BILL}${b.id}">${esc(b.name)}</a></td><td>${esc(b.ref)}</td><td>${KIND[b.kind]}</td><td class="n">${f(b.total)}</td><td class="n">${f(b.total - b.residual)}</td><td class="n ${b.residual ? (b.kind === 'retention' ? 'warn' : 'bad') : 'ok'}">${b.residual ? f(b.residual) : '✓ paid'}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="tot"><td colspan="4">Total · ${rows.length} bills</td><td class="n">${f(T.t)}</td><td class="n">${f(T.p)}</td><td class="n">${f(T.o)}</td></tr></tfoot>`;
+}
+// bills (credit: what Shift owes) and payments (debit: what Shift paid) in one running balance, the way Odoo's partner
+// ledger shows Georges — the balance runs from the very first entry whatever the period shown (Mario, 2026-09-13)
+function renderStatement() {
+  const all = [
+    ...D.bills.map((b, i) => ({ date: b.date, seq: 1000 + i, name: b.name, what: b.ref, kind: KIND[b.kind], debit: 0, credit: b.total, href: ODOO_BILL + b.id })),
+    ...D.payments.map((p, i) => ({ date: p.date, seq: i, name: p.name, what: p.memo, kind: p.amount < 0 ? 'Money back' : p.collector, debit: p.amount > 0 ? p.amount : 0, credit: p.amount < 0 ? -p.amount : 0, href: ODOO_PAY + p.id })),
+  ].sort((x, y) => x.date.localeCompare(y.date) || x.seq - y.seq);
+  let bal = 0; for (const r of all) { bal += r.debit - r.credit; r.bal = bal; }
+  const rows = ordered(all.filter(r => inPeriod(r.date)));
+  const T = rows.reduce((a, r) => ({ d: a.d + r.debit, c: a.c + r.credit }), { d: 0, c: 0 });
+  document.getElementById('stmt').innerHTML = `<thead><tr><th>Date</th><th>Entry</th><th>What</th><th>Kind</th><th class="n">Debit (paid)</th><th class="n">Credit (billed)</th><th class="n">Balance</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.date)}</td><td><a target="_blank" href="${r.href}">${esc(r.name)}</a></td><td class="small">${esc(r.what)}</td><td class="small muted">${esc(r.kind)}</td><td class="n">${r.debit ? f(r.debit) : ''}</td><td class="n">${r.credit ? f(r.credit) : ''}</td><td class="n ${r.bal < -0.005 ? 'bad' : 'ok'}">${f(r.bal)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="tot"><td colspan="4">${rows.length} entries in the period</td><td class="n">${f(T.d)}</td><td class="n">${f(T.c)}</td><td class="n">${f(bal)} at the end</td></tr></tfoot>`;
 }
 function renderPays() {
   const open = document.getElementById('only-open').checked;
   const rows = [...D.payments.map(p => ({ ...p, pending: false })), ...D.pending.map(l => ({ id: 'hub-' + l.id, name: '— not in Odoo', date: l.date, amount: l.amount, memo: l.desc + (l.note ? ' · ' + l.note : ''), journal: 'Whish · Mario Saliba (hub)', collector: l.collector, reconciled: false, pending: true }))]
-    .filter(p => !open || !p.reconciled).sort((a, b) => b.date.localeCompare(a.date));
+    .filter(p => !open || !p.reconciled).filter(p => inPeriod(p.date));
+  ordered(rows);
   document.getElementById('pays').innerHTML = `<thead><tr><th>Date</th><th>Payment</th><th>Collected by</th><th>From account</th><th>Memo</th><th class="n">Amount</th><th>Reconciled</th></tr></thead><tbody>${rows.map(p => `<tr>
     <td>${esc(p.date)}</td><td>${p.pending ? '<span class="warn">pending</span>' : `<a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_account_payments_payable/${p.id}">${esc(p.name)}</a>`}</td><td>${esc(p.collector)}</td><td>${esc(p.journal)}</td><td class="small muted">${esc(p.memo)}</td><td class="n">${f(p.amount)}</td>
     <td>${p.pending ? '<span class="muted">—</span>' : p.reconciled ? '<span class="ok">✓ ' + p.bills + ' bill' + (p.bills > 1 ? 's' : '') + '</span>' : '<span class="warn">○ open</span>'}</td></tr>`).join('')}</tbody>
