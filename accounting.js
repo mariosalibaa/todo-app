@@ -270,7 +270,7 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
   const out = {};
   if (!moveIds.length) return out;
   const L = await odooCall('account.move.line', 'search_read', [[['move_id', 'in', moveIds]]],
-    { fields: ['id', 'move_id', 'analytic_distribution', 'matched_debit_ids', 'matched_credit_ids'], context: ctx, limit: 5000 });
+    { fields: ['id', 'move_id', 'analytic_distribution', 'matched_debit_ids', 'matched_credit_ids', 'reconciled'], context: ctx, limit: 5000 });
   const partialIds = [...new Set(L.flatMap(l => [...(l.matched_debit_ids || []), ...(l.matched_credit_ids || [])]))];
   const P = partialIds.length ? await odooCall('account.partial.reconcile', 'search_read', [[['id', 'in', partialIds]]],
     { fields: ['id', 'debit_move_id', 'credit_move_id', 'amount', 'debit_amount_currency', 'credit_amount_currency'], context: ctx, limit: 5000 }) : [];
@@ -293,6 +293,9 @@ async function analyticOfMoves(odooCall, moveIds, ctx) {
   for (const l of L) {
     const mv = l.move_id[0];
     const rec = out[mv] = out[mv] || { analytics: [], docs: [], docIds: {}, alloc: [] };
+    // fully reconciled payable/receivable line = settled, even when the counterpart is another payment
+    // (a refund against a payment, PCSH ↔ PCSH) and no bill appears in docs (Mario, 2026-09-14)
+    if (l.reconciled) rec.settled = true;
     // analytic straight on the payment (rare, but honour it)
     for (const k of Object.keys(l.analytic_distribution || {})) for (const p of k.split(',')) {
       const a = byId[+p]; if (a && !rec.analytics.some(x => x.id === a.id)) rec.analytics.push({ id: a.id, name: a.name, from: 'payment' });
@@ -346,7 +349,7 @@ async function odooCheck(odooCall, txs, opts = {}) {
       lineId: l.id, moveId: l.move_id[0], move: l.move_id[1], date: l.date,
       amount: l.debit || l.credit, partner: l.partner_id ? l.partner_id[1] : '', partnerId: l.partner_id ? l.partner_id[0] : null, label: l.name || l.ref || '',
       company: l.company_id ? l.company_id[1] : '', journal: l.journal_id ? l.journal_id[1] : '', state: l.parent_state,
-      docs: rec.docs, docIds: rec.docIds || {}, analytics: rec.analytics, score: Math.round(score * 10) / 10, why
+      docs: rec.docs, docIds: rec.docIds || {}, settled: !!rec.settled, analytics: rec.analytics, score: Math.round(score * 10) / 10, why
     };
   };
 

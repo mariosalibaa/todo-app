@@ -60,6 +60,15 @@ function fits(rule, t) {
 // The journal of this hub account inside one Odoo company: the account's own journal list first, else — for the
 // Whish account, which has none — the company's cash/bank journal whose name carries the account's word ("whish").
 let _coCache = { at: 0, list: [] };
+// Payment memo. Money out: who / what · WHISH ref (the payments list says whose payment it is). Money in
+// (customer receipts) stays short — about 30 characters — because Odoo's "Outstanding credits" box on the
+// invoice prints the memo untruncated under the amount (Mario, 2026-09-14): "Kamal (Whish) · WHISH-501894592".
+function memoFor(rule, t, ref) {
+  const who = rule.id === 'adhoc' ? (rule.partnerName || '') : (rule.label || rule.partnerName || '');
+  if (t.debit) return [who, t.note || '', ref].filter(Boolean).join(' · ');
+  const short = String(rule.partnerName || who).trim().split(/[\s·(]+/)[0];
+  return [short ? short + ' (Whish)' : '', ref].filter(Boolean).join(' · ');
+}
 async function adHocPaymentRule(odooCall, account, t) {
   // a worker ledger (Excel-kept, or following a partner's payable) books its rows its own way — bills settled by
   // the worker — never as a payment on a cash journal (2026-09-13: Abed's Attal row hit his archived SARL journal)
@@ -196,7 +205,7 @@ async function handle(req, res, url, user, ctx) {
             const vendorish = pr && (pr.supplier_rank || 0) >= (pr.customer_rank || 0) && (pr.supplier_rank || 0) > 0;
             const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: t.debit ? 'supplier' : (vendorish ? 'supplier' : 'customer'), partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
               // memo = who / what · WHISH ref, so the Odoo payments list says which payment is Anthony's and which is Dib's diesel (Mario, 2026-09-13)
-              company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: [rule.label || rule.partnerName || '', t.note || '', ref].filter(Boolean).join(' · ') };
+              company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: memoFor(rule, t, ref) };
             if (analyticId) vals.x_studio_project = analyticId;
             const [method] = await odooCall('account.payment.method.line', 'search_read', [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', vals.payment_type]]], { fields: ['id'], context: pctx, limit: 1 });
             if (method) vals.payment_method_line_id = method.id;

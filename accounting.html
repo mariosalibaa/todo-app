@@ -713,7 +713,7 @@ function cashOf(t) {
 // no = it sits in Odoo unreconciled; '' = not in Odoo at all
 function reconOf(t) {
   const won = t.odoo && (t.odoo.matches || []).find(x => x.chosen);
-  if (won) return (won.docs || []).some(d => !/^P(CSH|SETT|BNK)/.test(d)) ? 'yes' : 'no';
+  if (won) return won.settled || (won.docs || []).some(d => !/^P(CSH|SETT|BNK)/.test(d)) ? 'yes' : 'no';
   if (t.bookedMove && t.bookedMove.id) return t.bookedMove.paymentState === 'paid' || t.bookedMove.paymentState === 'in_payment' || (t.bookedMove.paidBy || []).length ? 'yes' : 'no';
   return '';
 }

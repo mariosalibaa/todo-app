@@ -350,7 +350,7 @@ async function importOdoo(odooCall, account, who) {
             chosen: true, lineId: l.id, moveId: m.id, move: m.name, date: l.date, amount: part.amount,
             billId: part.bill ? part.bill.id : null, partOf: split ? parts.length : 0,
             partner: counterparty ? counterparty[1] : '', partnerId: counterparty ? counterparty[0] : null, label: lineName,
-            company: j.company, journal: j.name, state: l.parent_state, docs: part.docs, docIds: part.docIds, odooRef: pDesc || (p && p.memo) || m.ref || '', analytics: part.analytics, score: 10, why: ['imported from Odoo'],
+            company: j.company, journal: j.name, state: l.parent_state, docs: part.docs, docIds: part.docIds, settled: !!rec.settled, odooRef: pDesc || (p && p.memo) || m.ref || '', analytics: part.analytics, score: 10, why: ['imported from Odoo'],
           }] },
         };
         // a question put to Mario on this Odoo entry, and his answer, live on the line across imports
