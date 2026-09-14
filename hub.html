@@ -129,6 +129,7 @@ const APPS = [
   { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide', everyone: true },
   { id: 'reports', ico: '📊', name: 'Reports', desc: 'SHIFT GROUP SARL trial balance and general ledger in LBP at historical rates — for the accountant', href: '/reports' },
   { id: 'daily', ico: '📋', name: 'Day report', desc: 'Who worked on your project each day, what he did and what it cost.', href: '/accounting/daily' },
+  { id: 'naccache', ico: '🏠', name: 'Naccache 900/4', desc: 'مايا — خطوات تسجيل الشقة + الأوراق (public link, no sign-in)', href: '/naccache', admin: true },
   { id: 'site', ico: `<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#25D366"/><path fill="#fff" d="M12 4.6a7.3 7.3 0 0 0-6.3 11l-1 3.7 3.8-1a7.3 7.3 0 1 0 3.5-13.7zm0 1.3a6 6 0 1 1-3.1 11.2l-.2-.1-2.2.6.6-2.1-.2-.3A6 6 0 0 1 12 5.9zm-2.4 2.6c-.2 0-.5.1-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 5 4.3 2.5 1 3 .8 3.5.7.5 0 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.4-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2 0-.4 0-.5L10.4 9c-.2-.5-.4-.5-.6-.5h-.2z"/></svg>`, name: 'Shift WhatsApp', desc: 'The site chat: text, photos, a voice note — receipts become ledger lines. Start and Finish with your location.', href: '/site' },
 ];
 const esc = Admin.esc;
@@ -144,8 +145,8 @@ Admin.require(null, me => {
     (me.local ? '<span style="color:var(--overlay0)">local</span>' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   // 'only' tiles show only to members who have that key and not the full app (Excavation without Ajaltoun);
   // 'everyone' tiles (Decisions) are open to every signed-in member — the server filters what each one sees
-  const on = a => a.everyone || me.apps.includes(a.id);
-  document.getElementById('tiles').innerHTML = APPS.filter(a => !a.only || (me.apps.includes(a.id) && !me.apps.includes('ajaltoun'))).map(a => `
+  const on = a => a.everyone || a.admin || me.apps.includes(a.id);   // 'admin' tiles: Mario-only hand-out pages, not an app key
+  document.getElementById('tiles').innerHTML = APPS.filter(a => (!a.admin || me.admin) && (!a.only || (me.apps.includes(a.id) && !me.apps.includes('ajaltoun')))).map(a => `
     <a class="tile ${on(a) ? '' : 'off'}" href="${a.href}">
       <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
     </a>`).join('');
