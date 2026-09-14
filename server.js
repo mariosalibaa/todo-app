@@ -126,6 +126,10 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
   fs.readFileSync(path.join(__dirname, 'phone-preview.js'));
   fs.readFileSync(path.join(__dirname, 'hub-history.js'));
+  fs.readFileSync(path.join(__dirname, 'naccache.html'));
+  fs.readFileSync(path.join(__dirname, 'public/naccache/taahod-3303-2024.pdf'));
+  fs.readFileSync(path.join(__dirname, 'public/naccache/shatb-istithmar-3300-2024.pdf'));
+  fs.readFileSync(path.join(__dirname, 'public/naccache/ifada-aqariya-2023.pdf'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
