@@ -104,7 +104,8 @@ async function handle(req, res, url, user, ctx) {
     const b = await readBody(req);
     const out = [];
     for (const lead of b.leads || []) { const r = await ingestLead(col, lead, b.source || 'wa-dev'); if (r) out.push(r); }
-    for (const r of out) if (r.isNew || r.fromThem) await telegram(`${r.isNew ? '🆕 New lead' : '💬 Lead'} on WhatsApp (Shift Development): ${r.name || r.phone}\n${(r.lastIn && r.lastIn.text || '').slice(0, 300)}\n${SITE}/crm/${r.id}`);
+    // the first import of a line (the history WhatsApp Web holds) is not news — no Telegram for it
+    if (!b.initial) for (const r of out) if (r.isNew || r.fromThem) await telegram(`${r.isNew ? '🆕 New lead' : '💬 Lead'} on WhatsApp (Shift Development): ${r.name || r.phone}\n${(r.lastIn && r.lastIn.text || '').slice(0, 300)}\n${SITE}/crm/${r.id}`);
     return json(res, 200, { ok: true, leads: out.length, added: out.reduce((s, r) => s + r.added, 0) });
   }
 
