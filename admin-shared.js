@@ -199,6 +199,8 @@
     document.addEventListener('touchend', () => { if (y0 !== null && pulled > 90) { ptr.textContent = '↻ reloading…'; reload(); } else ptr.classList.remove('on'); y0 = null; }, { passive: true });
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => A.refreshUI()); else A.refreshUI();
+  // the hub installs as its own app (Shift Hub, 2026-09-14): a service worker makes Android offer Install
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 
   A.mobileUI = function () {
     if (document.getElementById('mob-css')) return;

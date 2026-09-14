@@ -1,0 +1,14 @@
+{
+  "name": "Shift Hub",
+  "short_name": "Shift Hub",
+  "description": "Shift Group — accounting, projects, decisions",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1e1e2e",
+  "theme_color": "#1e1e2e",
+  "icons": [
+    { "src": "/icons/hub-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/hub-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

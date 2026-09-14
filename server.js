@@ -106,6 +106,10 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'icons/icon-192.png'));
   fs.readFileSync(path.join(__dirname, 'icons/icon-512.png'));
   fs.readFileSync(path.join(__dirname, 'icons/apple-touch-icon.png'));
+  fs.readFileSync(path.join(__dirname, 'hub-manifest.json'));
+  fs.readFileSync(path.join(__dirname, 'icons/hub-192.png'));
+  fs.readFileSync(path.join(__dirname, 'icons/hub-512.png'));
+  fs.readFileSync(path.join(__dirname, 'icons/hub-apple.png'));
   fs.readFileSync(path.join(__dirname, 'hub.html'));
   fs.readFileSync(path.join(__dirname, 'ajaltoun-plan-ui.js'));
   fs.readFileSync(path.join(__dirname, 'ajaltoun-plan.js'));
@@ -672,7 +676,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/hub-history.js', '/ajaltoun-plan-ui.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/hub-history.js', '/ajaltoun-plan-ui.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
