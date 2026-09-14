@@ -215,12 +215,15 @@
     if (document.getElementById('pwa-refresh')) return;
     const st = document.createElement('style');
     st.textContent = `#pwa-refresh{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:900;width:42px;height:42px;border-radius:50%;border:1px solid var(--surface1,#45475a);background:var(--mantle,#181825);color:var(--sub,#a6adc8);font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.4);cursor:pointer;}
+      /* in the header (next to ☰) it floats over nothing — the site chat's camera button was under it (Mario, 2026-09-14) */
+      header #pwa-refresh{position:static;width:40px;height:36px;border-radius:9px;box-shadow:none;background:transparent;color:inherit;font-size:1.2rem;border-color:rgba(128,128,128,.4);margin-left:8px;}
+      @media (max-width:700px){ header{grid-template-columns:1fr auto auto !important;} header #pwa-refresh{grid-column:2;grid-row:1;justify-self:end;margin:0;} header .mob-btn{grid-column:3;} }
       #pwa-refresh.spin{animation:pwa-spin .8s linear infinite;} @keyframes pwa-spin{to{transform:rotate(360deg)}}
       #ptr{position:fixed;top:0;left:0;right:0;text-align:center;font-size:.8rem;color:var(--amber,#F2A93B);padding:8px;z-index:901;pointer-events:none;opacity:0;transition:opacity .15s;background:var(--mantle,#181825);} #ptr.on{opacity:1;}`;
     document.head.appendChild(st);
     const btn = document.createElement('button'); btn.id = 'pwa-refresh'; btn.type = 'button'; btn.title = 'Reload'; btn.textContent = '↻';
     const reload = () => { btn.classList.add('spin'); location.reload(); };
-    btn.onclick = reload; document.body.appendChild(btn);
+    btn.onclick = reload; (document.querySelector('header') || document.body).appendChild(btn);
     const ptr = document.createElement('div'); ptr.id = 'ptr'; document.body.appendChild(ptr);
     // a real pull: 160px down and held at least 0.7 s — a short flick does nothing (Mario, 2026-09-14)
     const NEED = 160, HOLD = 700; let y0 = null, t0 = 0, pulled = 0;
