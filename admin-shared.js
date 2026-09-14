@@ -189,14 +189,16 @@
     const reload = () => { btn.classList.add('spin'); location.reload(); };
     btn.onclick = reload; document.body.appendChild(btn);
     const ptr = document.createElement('div'); ptr.id = 'ptr'; document.body.appendChild(ptr);
-    let y0 = null, pulled = 0;
+    // a real pull: 160px down and held at least 0.7 s — a short flick does nothing (Mario, 2026-09-14)
+    const NEED = 160, HOLD = 700; let y0 = null, t0 = 0, pulled = 0;
     const top = () => (document.scrollingElement || document.documentElement).scrollTop <= 0;
-    document.addEventListener('touchstart', e => { y0 = top() ? e.touches[0].clientY : null; pulled = 0; }, { passive: true });
+    document.addEventListener('touchstart', e => { y0 = top() ? e.touches[0].clientY : null; t0 = Date.now(); pulled = 0; }, { passive: true });
     document.addEventListener('touchmove', e => {
       if (y0 === null) return; pulled = e.touches[0].clientY - y0;
-      if (pulled > 20) { ptr.textContent = pulled > 90 ? '↻ release to reload' : '↓ pull to reload'; ptr.classList.add('on'); } else ptr.classList.remove('on');
+      const ready = pulled > NEED && Date.now() - t0 > HOLD;
+      if (pulled > 40) { ptr.textContent = ready ? '↻ release to reload' : pulled > NEED ? '… hold on' : '↓ keep pulling to reload'; ptr.classList.add('on'); } else ptr.classList.remove('on');
     }, { passive: true });
-    document.addEventListener('touchend', () => { if (y0 !== null && pulled > 90) { ptr.textContent = '↻ reloading…'; reload(); } else ptr.classList.remove('on'); y0 = null; }, { passive: true });
+    document.addEventListener('touchend', () => { if (y0 !== null && pulled > NEED && Date.now() - t0 > HOLD) { ptr.textContent = '↻ reloading…'; reload(); } else ptr.classList.remove('on'); y0 = null; }, { passive: true });
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => A.refreshUI()); else A.refreshUI();
   // the hub installs as its own app (Shift Hub, 2026-09-14): a service worker makes Android offer Install
