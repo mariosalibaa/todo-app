@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Clients · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--crust:#11111b;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--surface0);gap:12px;}
+  .hleft{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;} .wordmark{font-family:"Century Gothic","URW Gothic",sans-serif;letter-spacing:.28em;font-weight:600;font-size:.95rem;white-space:nowrap;} .wordmark span{color:var(--amber);}
+  .who{font-size:.78rem;color:var(--sub);white-space:nowrap;} .who a{color:var(--overlay0);text-decoration:none;margin-left:10px;}
+  main{max-width:1100px;margin:0 auto;padding:16px 16px 60px;}
+  h1{font-size:1.25rem;margin:0 0 4px;} .muted{color:var(--sub);font-size:.88rem;} .small{font-size:.78rem;color:var(--overlay0);}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0;}
+  .bar input,.bar select,select,input,textarea{font:inherit;background:var(--mantle);color:var(--text);border:1px solid var(--surface1);border-radius:9px;padding:8px 10px;}
+  .chip{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.72rem;border:1px solid var(--surface1);color:var(--sub);cursor:pointer;} .chip.on{border-color:var(--amber);color:var(--amber);background:rgba(242,169,59,.1);}
+  .lead{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;margin:8px 0;text-decoration:none;color:var(--text);}
+  .lead:hover{border-color:var(--amber);} .lead .av{width:44px;height:44px;border-radius:50%;background:var(--surface0);display:flex;align-items:center;justify-content:center;font-size:1.3rem;}
+  .lead .n{font-weight:600;} .lead .t{font-size:.82rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70vw;} .lead .r{text-align:right;font-size:.75rem;color:var(--overlay0);}
+  .badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--amber);color:var(--crust);font-weight:700;font-size:.72rem;line-height:18px;text-align:center;margin-left:6px;}
+  .st{display:inline-block;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--surface0);color:var(--sub);}
+  .st.new{color:var(--amber);} .st.won{color:var(--green);} .st.lost{color:var(--red);} .st.visit,.st.offer{color:var(--blue);}
+  /* one lead */
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;margin:10px 0;}
+  .kv{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;align-items:center;font-size:.9rem;} .kv b{color:var(--overlay0);font-weight:500;}
+  .kv input,.kv select,.kv textarea{width:100%;} .kv textarea{min-height:70px;}
+  .conv{display:flex;flex-direction:column;gap:6px;} .msg{max-width:78%;padding:8px 12px;border-radius:14px;font-size:.92rem;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
+  .msg.them{align-self:flex-start;background:var(--surface0);border-bottom-left-radius:4px;} .msg.us{align-self:flex-end;background:rgba(166,227,161,.14);border:1px solid rgba(166,227,161,.25);border-bottom-right-radius:4px;}
+  .msg small{display:block;color:var(--overlay0);font-size:.68rem;margin-top:3px;text-align:right;}
+  .day{align-self:center;font-size:.7rem;color:var(--overlay0);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 4px;}
+  button{font:inherit;padding:8px 14px;border-radius:9px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);cursor:pointer;} button.primary{background:var(--amber);color:var(--crust);border-color:var(--amber);font-weight:600;}
+  .empty{padding:30px;text-align:center;color:var(--overlay0);}
+  @media (max-width:700px){ main{padding:10px 10px 50px;} .kv{grid-template-columns:1fr;gap:4px;} .kv b{margin-top:6px;} .msg{max-width:88%;} }
+</style>
+</head>
+<body>
+<header><div class="hleft"><div class="wordmark">SHIFT <span>GROUP</span></div><span id="crumbs"></span></div><div class="who" id="who"></div></header>
+<main id="main"><p class="muted">Loading…</p></main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+const STAGES = ['new', 'contacted', 'visit', 'offer', 'won', 'lost'];
+const ICON = { whatsapp: '💬', instagram: '📸', facebook: '📘', website: '🌐' };
+const ID = (/^\/crm\/([\w+-]+)$/.exec(location.pathname) || [])[1] || '';
+const fmt = at => { if (!at) return ''; const d = new Date(at); const b = new Date(d.getTime() + 3 * 3600e3); return b.toISOString().slice(0, 16).replace('T', ' '); };
+const ago = at => { if (!at) return ''; const m = (Date.now() - new Date(at)) / 60000; return m < 60 ? Math.round(m) + ' min' : m < 1440 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' d'; };
+let ME = null, LEADS = [], filter = { stage: '', q: '' };
+Admin.require('crm', async me => {
+  ME = me;
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  try { if (ID) await showLead(); else await showList(); }
+  catch (e) { document.getElementById('main').innerHTML = `<p class="muted">Could not load: ${esc(e.message)}</p>`; }
+});
+async function showList() {
+  Admin.crumbs([['Clients']]);
+  LEADS = await Admin.api('GET', '/api/crm/leads');
+  renderList();
+}
+function renderList() {
+  const list = LEADS.filter(l => (!filter.stage || l.stage === filter.stage) && (!filter.q || (l.name + ' ' + l.phone + ' ' + (l.lastText || '') + ' ' + (l.interest || '')).toLowerCase().includes(filter.q)));
+  const waiting = LEADS.filter(l => l.unread > 0).length;
+  document.getElementById('main').innerHTML = `
+    <h1>Clients</h1>
+    <p class="muted">Every conversation with a client, from WhatsApp (70 165 168), Instagram and Messenger — read here, answered from the phone. ${waiting ? `<b style="color:var(--amber)">${waiting} waiting for an answer.</b>` : 'Nobody is waiting for an answer.'}</p>
+    <div class="bar"><input placeholder="search name, number, text…" value="${esc(filter.q)}" oninput="filter.q=this.value.toLowerCase();renderList()" style="flex:1;min-width:180px">
+      <span class="chip ${filter.stage ? '' : 'on'}" onclick="filter.stage='';renderList()">all</span>${STAGES.map(s => `<span class="chip ${filter.stage === s ? 'on' : ''}" onclick="filter.stage='${s}';renderList()">${s} ${LEADS.filter(l => l.stage === s).length || ''}</span>`).join('')}</div>
+    ${list.length ? list.map(l => `<a class="lead" href="/crm/${esc(l.id)}"><div class="av">${ICON[l.channel] || '👤'}</div>
+      <div><div class="n">${esc(l.name || l.phone || l.id)}${l.unread ? `<span class="badge">${l.unread}</span>` : ''} <span class="st ${esc(l.stage)}">${esc(l.stage)}</span>${l.interest ? ` <span class="small">· ${esc(l.interest)}</span>` : ''}</div>
+      <div class="t">${l.lastFrom === 'us' ? '↩ ' : ''}${esc(l.lastText || '')}</div>${l.next ? `<div class="small">→ ${esc(l.next)}${l.nextAt ? ' · ' + esc(l.nextAt) : ''}${l.owner ? ' · ' + esc(l.owner) : ''}</div>` : ''}</div>
+      <div class="r">${ago(l.lastAt)}<br>${esc(l.phone || '')}</div></a>`).join('')
+    : `<div class="empty">${LEADS.length ? 'Nothing matches.' : 'No conversation yet — the first message on the Shift Development line will appear here.'}</div>`}`;
+}
+let L = null;
+async function showLead() {
+  L = await Admin.api('GET', '/api/crm/leads/' + ID);
+  Admin.crumbs([['Clients', '/crm'], [L.name || L.phone || L.id]]);
+  renderLead();
+  if (L.unread) Admin.api('PATCH', '/api/crm/leads/' + ID, { unread: 0 }).catch(() => {});
+}
+function renderLead() {
+  let day = '';
+  const conv = L.messages.map(m => { const d = fmt(m.at).slice(0, 10); const h = d !== day ? `<div class="day">${d}</div>` : ''; day = d; return h + `<div class="msg ${m.from}">${esc(m.text || ('[' + (m.type || 'media') + ']'))}<small>${fmt(m.at).slice(11)}</small></div>`; }).join('');
+  const wa = L.phone ? `https://wa.me/${L.phone.replace(/\D/g, '')}` : '';
+  document.getElementById('main').innerHTML = `
+    <h1>${ICON[L.channel] || '👤'} ${esc(L.name || L.phone || L.id)} <span class="st ${esc(L.stage)}">${esc(L.stage)}</span></h1>
+    <p class="muted">${esc(L.channel)} · ${esc(L.phone || L.id)} · first ${fmt(L.firstAt)} · ${L.messages.length} messages${(L.labels || []).length ? ' · labels: ' + esc(L.labels.join(', ')) : ''}</p>
+    <div class="bar">${wa ? `<a href="${wa}" target="_blank"><button class="primary">💬 Answer on WhatsApp</button></a>` : ''}
+      ${L.odooLeadId ? `<a href="https://shift2.odoo.com/odoo/action-crm.crm_lead_action_pipeline/${L.odooLeadId}" target="_blank"><button>Odoo lead #${L.odooLeadId}</button></a>` : `<button onclick="toOdoo()">＋ Create the Odoo lead</button>`}</div>
+    <div class="card"><div class="kv">
+      <b>Name</b><input id="f-name" value="${esc(L.name || '')}" onchange="save({name:this.value})">
+      <b>Stage</b><select onchange="save({stage:this.value})">${STAGES.map(s => `<option ${L.stage === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      <b>Interest</b><input id="f-int" value="${esc(L.interest || '')}" placeholder="villa Ajaltoun · Hazmieh land · solar · steel…" onchange="save({interest:this.value})">
+      <b>Owner</b><input value="${esc(L.owner || '')}" placeholder="who follows this client" onchange="save({owner:this.value})">
+      <b>Next action</b><div style="display:flex;gap:8px"><input value="${esc(L.next || '')}" placeholder="call back · send brochure · site visit…" onchange="save({next:this.value})" style="flex:1"><input type="date" value="${esc(L.nextAt || '')}" onchange="save({nextAt:this.value})" style="width:150px"></div>
+      <b>Notes</b><textarea onchange="save({notes:this.value})">${esc(L.notes || '')}</textarea>
+    </div></div>
+    <div class="card"><div class="conv">${conv || '<div class="empty">No message yet.</div>'}</div></div>
+    <p class="small">Messages are read from the phone's WhatsApp every few minutes; replies you send from the phone appear here too.</p>`;
+}
+async function save(patch) { try { await Admin.api('PATCH', '/api/crm/leads/' + ID, patch); Object.assign(L, patch); if ('stage' in patch || 'name' in patch) renderLead(); } catch (e) { alert('Could not save: ' + e.message); } }
+async function toOdoo() { try { const r = await Admin.api('POST', '/api/crm/leads/' + ID + '/odoo'); L.odooLeadId = r.odooLeadId; renderLead(); } catch (e) { alert('Could not create the lead: ' + e.message); } }
+</script>
+</body>
+</html>

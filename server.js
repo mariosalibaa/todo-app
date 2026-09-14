@@ -7,7 +7,8 @@ const budget = require('./budget');           // /api/accounting/budget/* (HomeB
 const wise = require('./wise');               // /api/accounting/wise/* (Wise statements)
 const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
 const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
-const decisions = require('./decisions');      // /api/decisions/* (a question to a partner, answered from a link; Telegram to Mario)
+const decisions = require('./decisions');
+const crm = require('./crm');                  // /api/crm/* + /api/meta/webhook (client conversations: WhatsApp dev line, Instagram, Messenger)      // /api/decisions/* (a question to a partner, answered from a link; Telegram to Mario)
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
@@ -404,7 +405,8 @@ async function executeSyncPlan(direction, odoo, app) {
 // (a worker: his own thread only). Neither opens anything else.
 // reports = the accountant: SARL trial balance / general ledger in LBP at historical rates, read-only, nothing else
 // 'excavation' = the Ajaltoun excavation dashboard on its own, shareable with a partner before the rest of /ajaltoun is ready (Mario, 2026-09-13)
-const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation'];
+// 'crm' = client conversations + leads (WhatsApp 70 165 168, Instagram, Messenger) — sales people (Mario, 2026-09-14)
+const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm'];
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
@@ -661,6 +663,7 @@ const handler = async (req, res) => {
     'excavation-summary.html': path.join(__dirname, 'excavation-summary.html'),
     'decision.html': path.join(__dirname, 'decision.html'),
     'decisions.html': path.join(__dirname, 'decisions.html'),
+    'crm.html': path.join(__dirname, 'crm.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
@@ -669,8 +672,12 @@ const handler = async (req, res) => {
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
     '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
     '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
+    '/crm': 'crm.html',
     '/naccache': 'naccache.html' };   // public hand-out page for Maya (no login; papers under /public/naccache/)
   // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
+  if (/^\/crm\/[\w+-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['crm.html'], 'utf8')); return; }
+  // Meta calls the webhook with its own signature, never with a hub token
+  if (url.split('?')[0] === '/api/meta/webhook') { try { await crm.handle(req, res, url, null, { db, TEAM_ID, access: null, machine: false, odooCall }); } catch (e) { console.error('meta webhook:', e); res.writeHead(500); res.end('error'); } return; }
   if (/^\/decide\/[\w-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['decision.html'], 'utf8')); return; }
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
@@ -788,7 +795,7 @@ const handler = async (req, res) => {
   // No key configured = nothing opens.
   const machineKey = process.env.ACCOUNTING_API_KEY;
   const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const machine = !!machineKey && bearer.length >= 32 && bearer === machineKey && url.startsWith('/api/accounting/');
+  const machine = !!machineKey && bearer.length >= 32 && bearer === machineKey && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest');
 
   // All API endpoints require auth
   const user = machine ? { uid: 'whish-watcher', email: 'whish-watcher@shift-group.co' } : await verifyToken(req);
@@ -885,6 +892,11 @@ const handler = async (req, res) => {
       console.error('site error:', e);
       res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e && e.message || e) }));
     }
+    return;
+  }
+  if (url.startsWith('/api/crm')) {
+    try { const handled = await crm.handle(req, res, url, user, { db, TEAM_ID, access, machine, local: AUTH_DISABLED, odooCall }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
+    catch (e) { console.error('crm error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   if (url.startsWith('/api/decisions')) {
