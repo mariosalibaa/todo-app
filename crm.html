@@ -17,14 +17,11 @@
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--surface0);gap:12px;}
   .hleft{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;} .wordmark{font-family:"Century Gothic","URW Gothic",sans-serif;letter-spacing:.28em;font-weight:600;font-size:.95rem;white-space:nowrap;} .wordmark span{color:var(--amber);}
   .who{font-size:.78rem;color:var(--sub);white-space:nowrap;} .who a{color:var(--overlay0);text-decoration:none;margin-left:10px;}
-  main{max-width:1100px;margin:0 auto;padding:16px 16px 60px;}
+  main{max-width:1500px;margin:0 auto;padding:16px 16px 60px;}
   h1{font-size:1.25rem;margin:0 0 4px;} .muted{color:var(--sub);font-size:.88rem;} .small{font-size:.78rem;color:var(--overlay0);}
   .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0;}
   .bar input,.bar select,select,input,textarea{font:inherit;background:var(--mantle);color:var(--text);border:1px solid var(--surface1);border-radius:9px;padding:8px 10px;}
   .chip{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.72rem;border:1px solid var(--surface1);color:var(--sub);cursor:pointer;} .chip.on{border-color:var(--amber);color:var(--amber);background:rgba(242,169,59,.1);}
-  .lead{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;margin:8px 0;text-decoration:none;color:var(--text);}
-  .lead:hover{border-color:var(--amber);} .lead .av{width:44px;height:44px;border-radius:50%;background:var(--surface0);display:flex;align-items:center;justify-content:center;font-size:1.3rem;}
-  .lead .n{font-weight:600;} .lead .t{font-size:.82rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70vw;} .lead .r{text-align:right;font-size:.75rem;color:var(--overlay0);}
   .badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--amber);color:var(--crust);font-weight:700;font-size:.72rem;line-height:18px;text-align:center;margin-left:6px;}
   .st{display:inline-block;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--surface0);color:var(--sub);}
   .st.new{color:var(--amber);} .st.won{color:var(--green);} .st.lost{color:var(--red);} .st.visit,.st.offer{color:var(--blue);}
@@ -38,6 +35,13 @@
   .day{align-self:center;font-size:.7rem;color:var(--overlay0);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 4px;}
   button{font:inherit;padding:8px 14px;border-radius:9px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);cursor:pointer;} button.primary{background:var(--amber);color:var(--crust);border-color:var(--amber);font-weight:600;}
   .empty{padding:30px;text-align:center;color:var(--overlay0);}
+  .twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;} table{width:100%;border-collapse:collapse;font-size:.84rem;background:var(--mantle);border-radius:12px;overflow:hidden;}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--surface0);vertical-align:middle;white-space:nowrap;}
+  th{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);font-weight:600;} tr.frow th{padding:4px 6px;} th input.f{width:100%;min-width:70px;padding:5px 8px;font-size:.78rem;border-radius:7px;}
+  tr.lead{cursor:pointer;} tr.lead:hover td{background:rgba(255,255,255,.03);} tr.lead td a{color:var(--text);text-decoration:none;font-weight:600;}
+  td.c-last{max-width:260px;overflow:hidden;text-overflow:ellipsis;color:var(--sub);} td.c-when,td.c-n{color:var(--overlay0);font-size:.78rem;} td.c-n{text-align:right;}
+  td select.st{padding:3px 6px;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;background:var(--surface0);border:0;color:var(--sub);cursor:pointer;} td select.st.new{color:var(--amber);} td select.st.won{color:var(--green);} td select.st.lost{color:var(--red);} td select.st.visit,td select.st.offer{color:var(--blue);}
+  tr.new td{background:rgba(242,169,59,.06);} tr.new input,tr.new select{width:100%;min-width:90px;padding:5px 8px;font-size:.82rem;}
   @media (max-width:700px){ main{padding:10px 10px 50px;} .kv{grid-template-columns:1fr;gap:4px;} .kv b{margin-top:6px;} .msg{max-width:88%;} }
 </style>
 </head>
@@ -70,42 +74,53 @@ async function showList() {
   renderList();
 }
 function renderList() {
-  const list = LEADS.filter(l => (!filter.stage || l.stage === filter.stage) && (!filter.q || (l.name + ' ' + l.phone + ' ' + (l.lastText || '') + ' ' + (l.interest || '')).toLowerCase().includes(filter.q)));
+  const F = filter.cols || (filter.cols = {});
+  const cell = (l, k) => k === 'name' ? (l.name || '') + ' ' + (l.pushname || '') : k === 'last' ? (l.lastText || '') : String(l[k] || '');
+  const list = LEADS.filter(l => (!filter.stage || l.stage === filter.stage)
+    && (!filter.q || (l.name + ' ' + l.phone + ' ' + (l.lastText || '') + ' ' + (l.interest || '') + ' ' + (l.projectName || '')).toLowerCase().includes(filter.q))
+    && Object.entries(F).every(([k, v]) => !v || cell(l, k).toLowerCase().includes(v)));
   const waiting = LEADS.filter(l => l.unread > 0).length;
+  const fbox = k => `<input class="f" value="${esc(F[k] || '')}" oninput="filter.cols['${k}']=this.value.toLowerCase();renderList();keep(this)" placeholder="filter">`;
+  const COLS = [['name', 'Client'], ['phone', 'Phone'], ['source', 'Source'], ['interest', 'Interest'], ['projectName', 'Project'], ['stage', 'Stage'], ['owner', 'Owner'], ['next', 'Next action'], ['last', 'Last message'], ['lastAt', 'When']];
   document.getElementById('main').innerHTML = `
     <h1>Clients</h1>
     <p class="muted">Every conversation with a client, from WhatsApp (70 165 168), Instagram and Messenger — read here, answered from the phone. ${waiting ? `<b style="color:var(--amber)">${waiting} waiting for an answer.</b>` : 'Nobody is waiting for an answer.'}</p>
-    <div class="bar"><button class="primary" onclick="newClient()">＋ New client</button><input placeholder="search name, number, text…" value="${esc(filter.q)}" oninput="filter.q=this.value.toLowerCase();renderList()" style="flex:1;min-width:180px">
-      <span class="chip ${filter.stage ? '' : 'on'}" onclick="filter.stage='';renderList()">all</span>${STAGES.map(s => `<span class="chip ${filter.stage === s ? 'on' : ''}" onclick="filter.stage='${s}';renderList()">${s} ${LEADS.filter(l => l.stage === s).length || ''}</span>`).join('')}</div>
-    ${list.length ? list.map(l => `<a class="lead" href="/crm/${esc(l.id)}"><div class="av">${ICON[l.channel] || '👤'}</div>
-      <div><div class="n">${esc(l.name || l.phone || l.id)}${l.unread ? `<span class="badge">${l.unread}</span>` : ''} <span class="st ${esc(l.stage)}">${esc(l.stage)}</span>${l.interest ? ` <span class="small">· ${esc(l.interest)}</span>` : ''}</div>
-      <div class="t">${l.lastFrom === 'us' ? '↩ ' : ''}${esc(l.lastText || '')}</div>${l.next ? `<div class="small">→ ${esc(l.next)}${l.nextAt ? ' · ' + esc(l.nextAt) : ''}${l.owner ? ' · ' + esc(l.owner) : ''}</div>` : ''}</div>
-      <div class="r">${ago(l.lastAt)}<br>${esc(l.phone || '')}${l.projectName ? '<br>' + esc(l.projectName) : ''}</div></a>`).join('')
-    : `<div class="empty">${LEADS.length ? 'Nothing matches.' : 'No conversation yet — the first message on the Shift Development line will appear here.'}</div>`}`;
+    <div class="bar"><button class="primary" onclick="newRow()">＋ New client</button><input placeholder="search everything…" value="${esc(filter.q)}" oninput="filter.q=this.value.toLowerCase();renderList();keep(this)" style="flex:1;min-width:180px">
+      <span class="chip ${filter.stage ? '' : 'on'}" onclick="filter.stage='';renderList()">all ${LEADS.length}</span>${STAGES.map(s => `<span class="chip ${filter.stage === s ? 'on' : ''}" onclick="filter.stage='${s}';renderList()">${s} ${LEADS.filter(l => l.stage === s).length || ''}</span>`).join('')}</div>
+    <div class="twrap"><table>
+      <thead><tr>${COLS.map(([k, l]) => `<th class="c-${k}">${l}</th>`).join('')}<th class="c-n">Msgs</th></tr>
+        <tr class="frow">${COLS.map(([k]) => `<th>${k === 'lastAt' ? '' : fbox(k)}</th>`).join('')}<th></th></tr></thead>
+      <tbody id="rows">${filter.adding ? newRowHtml() : ''}${list.map(l => `<tr class="lead" onclick="if(!event.target.closest('select,input,a'))location.href='/crm/${esc(l.id)}'">
+        <td class="c-name"><a href="/crm/${esc(l.id)}">${ICON[l.channel] || '👤'} ${esc(l.name || l.phone || l.id)}</a>${l.unread ? `<span class="badge">${l.unread}</span>` : ''}</td>
+        <td class="c-phone">${esc(l.phone || '')}</td><td>${esc(l.source || l.channel || '')}</td><td>${esc(l.interest || '')}</td><td>${esc(l.projectName || '')}</td>
+        <td><select class="st ${esc(l.stage)}" onchange="setStage('${esc(l.id)}', this.value)">${STAGES.map(s => `<option ${l.stage === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+        <td>${esc(l.owner || '')}</td><td>${esc(l.next || '')}${l.nextAt ? ` <span class="small">${esc(l.nextAt)}</span>` : ''}</td>
+        <td class="c-last">${l.lastFrom === 'us' ? '↩ ' : ''}${esc(l.lastText || '')}</td><td class="c-when">${ago(l.lastAt)}</td><td class="c-n">${l.msgCount || 0}</td></tr>`).join('')
+      || `<tr><td colspan="11" class="empty">${LEADS.length ? 'Nothing matches.' : 'No client yet — the first message on the Shift Development line, or ＋ New client.'}</td></tr>`}</tbody>
+    </table></div>`;
 }
-// add a client by hand: a call, a visit, a referral — before or without any message
-async function newClient() {
-  const o = await options();
-  const box = document.createElement('div'); box.className = 'card'; box.id = 'newc';
-  box.innerHTML = `<b>New client</b><div class="kv" style="margin-top:10px">
-    <b>Name</b><input id="nc-name" placeholder="who">
-    <b>Phone</b><input id="nc-phone" placeholder="+961 70 …" inputmode="tel">
-    <b>Source</b><select id="nc-src">${o.sources.map(s => `<option>${s}</option>`).join('')}</select>
-    <b>Interest</b><input id="nc-int" placeholder="villa Ajaltoun · Hazmieh land · solar · steel…">
-    <b>Project</b><input id="nc-proj" list="dl-proj" placeholder="Odoo project (analytic)">${dl('dl-proj', o.projects)}
-    <b>Partner</b><input id="nc-part" list="dl-part" placeholder="Odoo partner, if he exists">${dl('dl-part', o.partners)}
-    <b>Company</b><select id="nc-co"><option value="">—</option>${o.companies.map(c => `<option>${c}</option>`).join('')}</select>
-    <b>Notes</b><textarea id="nc-notes" placeholder="what he asked, what was said"></textarea></div>
-    <div class="bar"><button class="primary" onclick="saveClient()">Save</button><button onclick="document.getElementById('newc').remove()">Cancel</button></div>`;
-  const main = document.getElementById('main'); main.insertBefore(box, main.querySelector('.bar').nextSibling); document.getElementById('nc-name').focus();
+// typing in a filter re-renders the grid: put the cursor back where it was
+function keep(inp) { const v = inp.value, ph = inp.placeholder, fk = inp.className; requestAnimationFrame(() => { const el = [...document.querySelectorAll('input')].find(i => i.placeholder === ph && i.className === fk && i.value === v); if (el) { el.focus(); el.setSelectionRange(v.length, v.length); } }); }
+async function setStage(id, stage) { try { await Admin.api('PATCH', '/api/crm/leads/' + id, { stage }); const l = LEADS.find(x => x.id === id); if (l) l.stage = stage; renderList(); } catch (e) { alert('Could not save: ' + e.message); } }
+// the new client is typed straight into the first row of the grid
+async function newRow() { await options(); filter.adding = true; renderList(); const i = document.getElementById('nc-name'); if (i) i.focus(); }
+function newRowHtml() {
+  const o = OPT || { partners: [], projects: [], companies: [], sources: [] };
+  return `<tr class="new"><td><input id="nc-name" placeholder="name"></td><td><input id="nc-phone" placeholder="+961 70 …" inputmode="tel" style="width:130px"></td>
+    <td><select id="nc-src">${o.sources.map(s => `<option>${s}</option>`).join('')}</select></td><td><input id="nc-int" placeholder="villa · land · solar…"></td>
+    <td><input id="nc-proj" list="dl-proj" placeholder="Odoo project">${dl('dl-proj', o.projects)}</td><td><select id="nc-stage">${STAGES.map(s => `<option>${s}</option>`).join('')}</select></td>
+    <td><input id="nc-owner" value="${esc((ME && (ME.name || ME.email)) || '')}" style="width:90px"></td><td><input id="nc-next" placeholder="next action"></td>
+    <td colspan="2"><input id="nc-part" list="dl-part" placeholder="Odoo partner, if he exists">${dl('dl-part', o.partners)}</td>
+    <td style="white-space:nowrap"><button class="primary" onclick="saveClient()">Save</button> <button onclick="filter.adding=false;renderList()">✕</button></td></tr>`;
 }
 async function saveClient() {
-  const o = await options(); const v = id => document.getElementById(id).value.trim();
-  const proj = o.projects.find(p => p.name === v('nc-proj')), part = o.partners.find(p => p.name === v('nc-part'));
-  const body = { name: v('nc-name'), phone: v('nc-phone'), source: v('nc-src'), channel: v('nc-src'), interest: v('nc-int'), company: v('nc-co'), notes: v('nc-notes'),
-    projectId: proj ? proj.id : null, projectName: v('nc-proj'), partnerId: part ? part.id : null, partnerName: v('nc-part') };
+  const o = await options(); const v = id => (document.getElementById(id) || {}).value || '';
+  const proj = o.projects.find(p => p.name === v('nc-proj').trim()), part = o.partners.find(p => p.name === v('nc-part').trim());
+  const body = { name: v('nc-name').trim(), phone: v('nc-phone').trim(), source: v('nc-src'), channel: v('nc-src'), interest: v('nc-int').trim(), stage: v('nc-stage'), owner: v('nc-owner').trim(), next: v('nc-next').trim(),
+    projectId: proj ? proj.id : null, projectName: v('nc-proj').trim(), partnerId: part ? part.id : null, partnerName: v('nc-part').trim() };
   if (!body.name && !body.phone) return alert('A name or a phone number, at least.');
-  try { const r = await Admin.api('POST', '/api/crm/leads', body); location.href = '/crm/' + r.id; } catch (e) { alert('Could not add: ' + e.message + (e.data && e.data.id ? ' — open /crm/' + e.data.id : '')); }
+  try { const r = await Admin.api('POST', '/api/crm/leads', body); filter.adding = false; location.href = '/crm/' + r.id; }
+  catch (e) { alert('Could not add: ' + e.message + (e.data && e.data.id ? ' — open /crm/' + e.data.id : '')); }
 }
 let L = null;
 async function showLead() {
