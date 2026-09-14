@@ -175,6 +175,31 @@
   // Under 700px: the page's tab bar (nav.tabs) and the user line (#who) fold into a ☰ button at the top
   // right; Back + the path take their own row under the wordmark; every explanation (.lead, .note, small
   // muted footnotes) collapses to two lines with a "more" toggle. Nothing changes on a laptop.
+  // ── Installed app (home-screen icon) has no browser chrome, so no reload (Mario, 2026-09-14) ──
+  // Standalone mode only: a small ↻ button at the bottom left, and pull-down at the top of the page reloads.
+  A.refreshUI = function () {
+    if (!matchMedia('(display-mode: standalone)').matches && !navigator.standalone) return;
+    if (document.getElementById('pwa-refresh')) return;
+    const st = document.createElement('style');
+    st.textContent = `#pwa-refresh{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:900;width:42px;height:42px;border-radius:50%;border:1px solid var(--surface1,#45475a);background:var(--mantle,#181825);color:var(--sub,#a6adc8);font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.4);cursor:pointer;}
+      #pwa-refresh.spin{animation:pwa-spin .8s linear infinite;} @keyframes pwa-spin{to{transform:rotate(360deg)}}
+      #ptr{position:fixed;top:0;left:0;right:0;text-align:center;font-size:.8rem;color:var(--amber,#F2A93B);padding:8px;z-index:901;pointer-events:none;opacity:0;transition:opacity .15s;background:var(--mantle,#181825);} #ptr.on{opacity:1;}`;
+    document.head.appendChild(st);
+    const btn = document.createElement('button'); btn.id = 'pwa-refresh'; btn.type = 'button'; btn.title = 'Reload'; btn.textContent = '↻';
+    const reload = () => { btn.classList.add('spin'); location.reload(); };
+    btn.onclick = reload; document.body.appendChild(btn);
+    const ptr = document.createElement('div'); ptr.id = 'ptr'; document.body.appendChild(ptr);
+    let y0 = null, pulled = 0;
+    const top = () => (document.scrollingElement || document.documentElement).scrollTop <= 0;
+    document.addEventListener('touchstart', e => { y0 = top() ? e.touches[0].clientY : null; pulled = 0; }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      if (y0 === null) return; pulled = e.touches[0].clientY - y0;
+      if (pulled > 20) { ptr.textContent = pulled > 90 ? '↻ release to reload' : '↓ pull to reload'; ptr.classList.add('on'); } else ptr.classList.remove('on');
+    }, { passive: true });
+    document.addEventListener('touchend', () => { if (y0 !== null && pulled > 90) { ptr.textContent = '↻ reloading…'; reload(); } else ptr.classList.remove('on'); y0 = null; }, { passive: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => A.refreshUI()); else A.refreshUI();
+
   A.mobileUI = function () {
     if (document.getElementById('mob-css')) return;
     const st = document.createElement('style'); st.id = 'mob-css';
