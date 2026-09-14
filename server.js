@@ -412,6 +412,7 @@ async function allowlistMap() {
       const x = d.data();
       const email = (x.email || d.id).toLowerCase();
       map.set(email, { email, apps: Array.isArray(x.apps) ? x.apps.filter(a => APPS.includes(a)) : ['todo'],
+        name: typeof x.name === 'string' ? x.name : '',                    // shown instead of a bare phone number
         account: typeof x.account === 'string' ? x.account : '',           // a worker's own ledger (site thread)
         projects: Array.isArray(x.projects) ? x.projects.map(Number).filter(n => n > 0) : [] });   // a partner's analytic ids (daily)
     }
@@ -426,7 +427,7 @@ async function accessFor(email) {
   const isAdmin = ADMIN_EMAILS.has(e);
   const entry = (await allowlistMap()).get(e);
   if (!entry && !isAdmin) return null;
-  return { email: e, apps: isAdmin ? APPS.slice() : entry.apps, admin: isAdmin,
+  return { email: e, apps: isAdmin ? APPS.slice() : entry.apps, admin: isAdmin, name: entry ? entry.name : '',
     account: entry ? entry.account : '', projects: entry ? entry.projects : [] };
 }
 async function isAllowedEmail(email) { return !!(await accessFor(email)); }
@@ -593,6 +594,9 @@ async function verifyToken(req) {
   if (token.startsWith('st_')) return verifySessionToken(token);
   try {
     const decodedToken = await auth.verifyIdToken(token);
+    // SMS sign-in (2026-09-14): no email on the token — the phone number in E.164 form is the identity,
+    // so the allowlist, sessions and every "email" check work unchanged for a worker without Google
+    if (!decodedToken.email && decodedToken.phone_number) decodedToken.email = decodedToken.phone_number;
     return decodedToken;
   } catch (e) {
     console.error('Token verification failed:', e.message);
@@ -806,7 +810,7 @@ const handler = async (req, res) => {
   // Who am I + which apps may I open (the hub and every app page ask this first)
   if (url === '/api/me') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ email: access.email, name: user.name || user.displayName || access.email,
+    res.end(JSON.stringify({ email: access.email, name: user.name || user.displayName || access.name || access.email,
       apps: access.apps, admin: access.admin, local: AUTH_DISABLED }));
     return;
   }
@@ -915,11 +919,14 @@ const handler = async (req, res) => {
     req.on('end', async () => {
       try {
         const b = JSON.parse(body);
-        const email = (b.email || '').trim().toLowerCase();
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { res.writeHead(400); res.end('bad email'); return; }
+        // a Google account (email) or a phone number in E.164 form (+96170123456) for SMS sign-in
+        let email = (b.email || '').trim().toLowerCase();
+        if (/^\+/.test(email)) email = '+' + email.replace(/\D/g, '');
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && !/^\+\d{8,15}$/.test(email)) { res.writeHead(400); res.end('bad email'); return; }
         // apps omitted (old To-Do access modal) → keep what the doc has, default To-Do only
         const doc = { email, updatedBy: user.email || user.uid, updatedAt: new Date().toISOString() };
         if (Array.isArray(b.apps)) doc.apps = b.apps.filter(a => APPS.includes(a));
+        if ('name' in b) doc.name = String(b.name || '').trim().slice(0, 60);
         if ('account' in b) doc.account = String(b.account || '').replace(/[^\w-]/g, '').slice(0, 40);
         if ('projects' in b) doc.projects = (Array.isArray(b.projects) ? b.projects : []).map(Number).filter(n => n > 0).slice(0, 50);
         const ref = db.collection('workspaces').doc(TEAM_ID).collection('allowlist').doc(email);

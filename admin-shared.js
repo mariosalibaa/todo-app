@@ -34,7 +34,10 @@
     .admin-login-sub{margin-top:14px;font-size:.72rem;color:#6c7086;}
     .admin-login-sub a{color:#89b4fa;}
     .admin-wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.18em;font-size:1.15rem;color:#cdd6f4;}
-    .admin-wordmark span{color:#F2A93B;}`;
+    .admin-wordmark span{color:#F2A93B;}
+    .admin-alt{margin-top:16px;font-size:.82rem;color:#a6adc8;} .admin-alt a{color:#89b4fa;cursor:pointer;}
+    .admin-phone{display:flex;flex-direction:column;gap:10px;margin-top:8px;} .admin-phone input{font:inherit;font-size:1.05rem;padding:10px 12px;border-radius:8px;border:1px solid #45475a;background:#1e1e2e;color:#cdd6f4;text-align:center;letter-spacing:.04em;}
+    .admin-phone .err{color:#f38ba8;font-size:.8rem;min-height:1em;}`;
   document.head.appendChild(style);
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -45,7 +48,37 @@
     el.style.display = html ? 'flex' : 'none';
   }
   const card = (msg, btn, sub) => `<div class="admin-login-card"><div class="admin-wordmark">SHIFT <span>GROUP</span></div>
-    <p>${msg}</p>${btn ? '<button onclick="Admin.signIn()">Sign in with Google</button>' : ''}<div class="admin-login-sub">${sub || ''}</div></div>`;
+    <p>${msg}</p>${btn ? '<button onclick="Admin.signIn()">Sign in with Google</button><div class="admin-alt">No Google account? <a onclick="Admin.phoneUI()">Sign in with your phone number</a></div>' : ''}<div class="admin-login-sub">${sub || ''}</div></div>`;
+
+  // ── SMS sign-in (Mario, 2026-09-14): for a worker without a Google account ──────────────────
+  // Firebase phone auth: number → SMS code → same session as a Google account; the allowlist
+  // holds the number in E.164 form (+96170123456) where an email would be.
+  let confirmRes = null, captcha = null;
+  A.phoneUI = function (step, err) {
+    const body = step === 'code'
+      ? `<p>Type the 6-digit code we sent by SMS to <b>${esc(A.phoneNo)}</b></p><div class="admin-phone"><input id="ph-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"><div class="err">${esc(err || '')}</div><button onclick="Admin.phoneCode()">Sign in</button></div><div class="admin-alt"><a onclick="Admin.phoneUI()">← other number</a></div>`
+      : `<p>Your phone number — we send a code by SMS</p><div class="admin-phone"><input id="ph-no" type="tel" inputmode="tel" placeholder="+961 70 123 456" value="${esc(A.phoneNo || '+961 ')}"><div class="err">${esc(err || '')}</div><button onclick="Admin.phoneSend()">Send the code</button></div><div id="ph-captcha"></div><div class="admin-alt"><a onclick="Admin.signIn()">← Sign in with Google instead</a></div>`;
+    overlay(`<div class="admin-login-card"><div class="admin-wordmark">SHIFT <span>GROUP</span></div>${body}</div>`);
+    const inp = document.getElementById(step === 'code' ? 'ph-code' : 'ph-no'); if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === 'Enter') (step === 'code' ? A.phoneCode : A.phoneSend)(); }; }
+  };
+  A.phoneSend = async function () {
+    const raw = (document.getElementById('ph-no') || {}).value || '';
+    const no = '+' + raw.replace(/\D/g, '');
+    if (!/^\+\d{8,15}$/.test(no)) return A.phoneUI('', 'Write the number with the country code, e.g. +961 70 123 456');
+    A.phoneNo = no;
+    try {
+      if (captcha) { try { captcha.clear(); } catch {} captcha = null; }
+      captcha = new firebase.auth.RecaptchaVerifier('ph-captcha', { size: 'invisible' });
+      confirmRes = await fbAuth.signInWithPhoneNumber(no, captcha);
+      A.phoneUI('code');
+    } catch (e) { A.phoneUI('', e.code === 'auth/too-many-requests' ? 'Too many tries — wait a while.' : e.code === 'auth/invalid-phone-number' ? 'This number is not valid.' : (e.message || 'Could not send the SMS')); }
+  };
+  A.phoneCode = async function () {
+    const code = ((document.getElementById('ph-code') || {}).value || '').replace(/\D/g, '');
+    if (code.length !== 6 || !confirmRes) return A.phoneUI('code', 'The code has 6 digits');
+    try { overlay(card('Checking…')); const r = await confirmRes.confirm(code); A.user = r.user; idToken = await r.user.getIdToken(); }   // onAuthStateChanged takes it from here
+    catch (e) { A.phoneUI('code', e.code === 'auth/invalid-verification-code' ? 'Wrong code — try again' : e.code === 'auth/code-expired' ? 'The code expired — ask for a new one' : (e.message || 'Could not sign in')); }
+  };
 
   const bearer = () => idToken || A.session || '';
   A.api = async function (method, path, body) {
@@ -95,7 +128,7 @@
     } catch (e) {
       if (e.status === 403) {
         overlay(card(`${esc((e.data && e.data.email) || 'This account')} is not approved yet. Ask Mario to add you, then reload.`, true,
-          'Or try a different Google account'));
+          'Or try a different account'));
         return true;
       }
       if (e.status === 401) drop();
