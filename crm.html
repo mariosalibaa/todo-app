@@ -55,7 +55,9 @@ const ICON = { whatsapp: '💬', instagram: '📸', facebook: '📘', website: '
 const ID = (/^\/crm\/([\w+-]+)$/.exec(location.pathname) || [])[1] || '';
 const fmt = at => { if (!at) return ''; const d = new Date(at); const b = new Date(d.getTime() + 3 * 3600e3); return b.toISOString().slice(0, 16).replace('T', ' '); };
 const ago = at => { if (!at) return ''; const m = (Date.now() - new Date(at)) / 60000; return m < 60 ? Math.round(m) + ' min' : m < 1440 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' d'; };
-let ME = null, LEADS = [], filter = { stage: '', q: '' };
+let ME = null, LEADS = [], OPT = null, filter = { stage: '', q: '' };
+const options = async () => OPT || (OPT = await Admin.api('GET', '/api/crm/options').catch(() => ({ partners: [], projects: [], companies: [], sources: [] })));
+const dl = (id, rows) => `<datalist id="${id}">${rows.map(r => `<option value="${esc(r.name)}">${r.phone ? esc(r.phone) : ''}</option>`).join('')}</datalist>`;
 Admin.require('crm', async me => {
   ME = me;
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
@@ -73,17 +75,41 @@ function renderList() {
   document.getElementById('main').innerHTML = `
     <h1>Clients</h1>
     <p class="muted">Every conversation with a client, from WhatsApp (70 165 168), Instagram and Messenger — read here, answered from the phone. ${waiting ? `<b style="color:var(--amber)">${waiting} waiting for an answer.</b>` : 'Nobody is waiting for an answer.'}</p>
-    <div class="bar"><input placeholder="search name, number, text…" value="${esc(filter.q)}" oninput="filter.q=this.value.toLowerCase();renderList()" style="flex:1;min-width:180px">
+    <div class="bar"><button class="primary" onclick="newClient()">＋ New client</button><input placeholder="search name, number, text…" value="${esc(filter.q)}" oninput="filter.q=this.value.toLowerCase();renderList()" style="flex:1;min-width:180px">
       <span class="chip ${filter.stage ? '' : 'on'}" onclick="filter.stage='';renderList()">all</span>${STAGES.map(s => `<span class="chip ${filter.stage === s ? 'on' : ''}" onclick="filter.stage='${s}';renderList()">${s} ${LEADS.filter(l => l.stage === s).length || ''}</span>`).join('')}</div>
     ${list.length ? list.map(l => `<a class="lead" href="/crm/${esc(l.id)}"><div class="av">${ICON[l.channel] || '👤'}</div>
       <div><div class="n">${esc(l.name || l.phone || l.id)}${l.unread ? `<span class="badge">${l.unread}</span>` : ''} <span class="st ${esc(l.stage)}">${esc(l.stage)}</span>${l.interest ? ` <span class="small">· ${esc(l.interest)}</span>` : ''}</div>
       <div class="t">${l.lastFrom === 'us' ? '↩ ' : ''}${esc(l.lastText || '')}</div>${l.next ? `<div class="small">→ ${esc(l.next)}${l.nextAt ? ' · ' + esc(l.nextAt) : ''}${l.owner ? ' · ' + esc(l.owner) : ''}</div>` : ''}</div>
-      <div class="r">${ago(l.lastAt)}<br>${esc(l.phone || '')}</div></a>`).join('')
+      <div class="r">${ago(l.lastAt)}<br>${esc(l.phone || '')}${l.projectName ? '<br>' + esc(l.projectName) : ''}</div></a>`).join('')
     : `<div class="empty">${LEADS.length ? 'Nothing matches.' : 'No conversation yet — the first message on the Shift Development line will appear here.'}</div>`}`;
+}
+// add a client by hand: a call, a visit, a referral — before or without any message
+async function newClient() {
+  const o = await options();
+  const box = document.createElement('div'); box.className = 'card'; box.id = 'newc';
+  box.innerHTML = `<b>New client</b><div class="kv" style="margin-top:10px">
+    <b>Name</b><input id="nc-name" placeholder="who">
+    <b>Phone</b><input id="nc-phone" placeholder="+961 70 …" inputmode="tel">
+    <b>Source</b><select id="nc-src">${o.sources.map(s => `<option>${s}</option>`).join('')}</select>
+    <b>Interest</b><input id="nc-int" placeholder="villa Ajaltoun · Hazmieh land · solar · steel…">
+    <b>Project</b><input id="nc-proj" list="dl-proj" placeholder="Odoo project (analytic)">${dl('dl-proj', o.projects)}
+    <b>Partner</b><input id="nc-part" list="dl-part" placeholder="Odoo partner, if he exists">${dl('dl-part', o.partners)}
+    <b>Company</b><select id="nc-co"><option value="">—</option>${o.companies.map(c => `<option>${c}</option>`).join('')}</select>
+    <b>Notes</b><textarea id="nc-notes" placeholder="what he asked, what was said"></textarea></div>
+    <div class="bar"><button class="primary" onclick="saveClient()">Save</button><button onclick="document.getElementById('newc').remove()">Cancel</button></div>`;
+  const main = document.getElementById('main'); main.insertBefore(box, main.querySelector('.bar').nextSibling); document.getElementById('nc-name').focus();
+}
+async function saveClient() {
+  const o = await options(); const v = id => document.getElementById(id).value.trim();
+  const proj = o.projects.find(p => p.name === v('nc-proj')), part = o.partners.find(p => p.name === v('nc-part'));
+  const body = { name: v('nc-name'), phone: v('nc-phone'), source: v('nc-src'), channel: v('nc-src'), interest: v('nc-int'), company: v('nc-co'), notes: v('nc-notes'),
+    projectId: proj ? proj.id : null, projectName: v('nc-proj'), partnerId: part ? part.id : null, partnerName: v('nc-part') };
+  if (!body.name && !body.phone) return alert('A name or a phone number, at least.');
+  try { const r = await Admin.api('POST', '/api/crm/leads', body); location.href = '/crm/' + r.id; } catch (e) { alert('Could not add: ' + e.message + (e.data && e.data.id ? ' — open /crm/' + e.data.id : '')); }
 }
 let L = null;
 async function showLead() {
-  L = await Admin.api('GET', '/api/crm/leads/' + ID);
+  [L] = await Promise.all([Admin.api('GET', '/api/crm/leads/' + ID), options()]);
   Admin.crumbs([['Clients', '/crm'], [L.name || L.phone || L.id]]);
   renderLead();
   if (L.unread) Admin.api('PATCH', '/api/crm/leads/' + ID, { unread: 0 }).catch(() => {});
@@ -101,6 +127,12 @@ function renderLead() {
       <b>Name</b><input id="f-name" value="${esc(L.name || '')}" onchange="save({name:this.value})">
       <b>Stage</b><select onchange="save({stage:this.value})">${STAGES.map(s => `<option ${L.stage === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       <b>Interest</b><input id="f-int" value="${esc(L.interest || '')}" placeholder="villa Ajaltoun · Hazmieh land · solar · steel…" onchange="save({interest:this.value})">
+      <b>Project</b><input list="dl-proj" value="${esc(L.projectName || '')}" placeholder="Odoo project (analytic account)" onchange="pick('project', this.value)">${dl('dl-proj', OPT.projects)}
+      <b>Partner</b><input list="dl-part" value="${esc(L.partnerName || '')}" placeholder="Odoo partner, if he exists" onchange="pick('partner', this.value)">${dl('dl-part', OPT.partners)}
+      <b>Company</b><select onchange="save({company:this.value})"><option value="">—</option>${OPT.companies.map(c => `<option ${L.company === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      <b>Source</b><select onchange="save({source:this.value})">${OPT.sources.map(s => `<option ${(L.source || L.channel) === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      <b>Budget</b><input value="${esc(L.budget || '')}" placeholder="what he can spend" onchange="save({budget:this.value})">
+      <b>Location</b><input value="${esc(L.location || '')}" placeholder="where he is / where he wants" onchange="save({location:this.value})">
       <b>Owner</b><input value="${esc(L.owner || '')}" placeholder="who follows this client" onchange="save({owner:this.value})">
       <b>Next action</b><div style="display:flex;gap:8px"><input value="${esc(L.next || '')}" placeholder="call back · send brochure · site visit…" onchange="save({next:this.value})" style="flex:1"><input type="date" value="${esc(L.nextAt || '')}" onchange="save({nextAt:this.value})" style="width:150px"></div>
       <b>Notes</b><textarea onchange="save({notes:this.value})">${esc(L.notes || '')}</textarea>
@@ -109,6 +141,10 @@ function renderLead() {
     <p class="small">Messages are read from the phone's WhatsApp every few minutes; replies you send from the phone appear here too.</p>`;
 }
 async function save(patch) { try { await Admin.api('PATCH', '/api/crm/leads/' + ID, patch); Object.assign(L, patch); if ('stage' in patch || 'name' in patch) renderLead(); } catch (e) { alert('Could not save: ' + e.message); } }
+function pick(kind, name) {
+  const rows = kind === 'project' ? OPT.projects : OPT.partners; const hit = rows.find(r => r.name === name);
+  save(kind === 'project' ? { projectName: name, projectId: hit ? hit.id : null } : { partnerName: name, partnerId: hit ? hit.id : null });
+}
 async function toOdoo() { try { const r = await Admin.api('POST', '/api/crm/leads/' + ID + '/odoo'); L.odooLeadId = r.odooLeadId; renderLead(); } catch (e) { alert('Could not create the lead: ' + e.message); } }
 </script>
 </body>
