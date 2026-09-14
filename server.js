@@ -612,6 +612,7 @@ const MIME = {
   '.png':  'image/png',
   '.svg':  'image/svg+xml',
   '.ico':  'image/x-icon',
+  '.pdf':  'application/pdf',
 };
 
 const handler = async (req, res) => {
@@ -663,7 +664,8 @@ const handler = async (req, res) => {
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
     '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
-    '/decide': 'decisions.html', '/decisions': 'decisions.html' };   // the member's own list of questions put to him
+    '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
+    '/naccache': 'naccache.html' };   // public hand-out page for Maya (no login; papers under /public/naccache/)
   // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
   if (/^\/decide\/[\w-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['decision.html'], 'utf8')); return; }
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
@@ -681,7 +683,7 @@ const handler = async (req, res) => {
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
     const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/hub-history.js', '/ajaltoun-plan-ui.js']);
-    const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url));
+    const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/naccache\/[\w.-]+\.pdf$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
       const ext = path.extname(filePath);
