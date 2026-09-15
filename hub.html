@@ -186,7 +186,8 @@ async function addDecision() {
 }
 async function delDecision(id) { if (!confirm('Delete this decision?')) return; try { await Admin.api('DELETE', '/api/decisions/' + id); loadDecisions(); } catch (e) { alert(e.message); } }
 const ALL_APPS = [['todo', 'To-Do', ''], ['accounting', 'Accounting', ''], ['partners', 'Partners', ''], ['ajaltoun', 'Ajaltoun', ''], ['daily', 'Daily', 'the Day report — only the lines of his projects'], ['site', 'WhatsApp', 'may post on /site — his own thread'], ['reports', 'Reports', 'the accountant: SARL trial balance and ledger in LBP'], ['excavation', 'Excavation', 'the excavation dashboard alone, without the rest of Ajaltoun'], ['crm', 'Clients', 'client conversations and leads (WhatsApp 70 165 168, Instagram, Messenger)']];
-let MEMBERS = [];
+let MEMBERS = [], LEDGERS = [];
+const ledgerList = () => `<datalist id="dl-ledger">${LEDGERS.map(a => `<option value="${esc(a.id)}">${esc(a.name || '')}${a.owner ? ' · ' + esc(a.owner) : ''}</option>`).join('')}</datalist>`;
 // phone: the same allowlist as a dropdown of accounts + one line per app
 function renderMemberPhone() {
   const sel = document.getElementById('mp-who'), box = document.getElementById('mp-apps');
@@ -195,7 +196,7 @@ function renderMemberPhone() {
   const m = MEMBERS.find(x => x.email === sel.value); if (!m) { box.innerHTML = ''; return; }
   const apps = m.admin ? ALL_APPS.map(a => a[0]) : (Array.isArray(m.apps) ? m.apps : ['todo']);
   box.innerHTML = `<div class="apps">${ALL_APPS.map(([id, name, d]) => `<label class="app"><input type="checkbox" ${apps.includes(id) ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="phoneToggle('${esc(m.email)}','${id}',this)"><span>${name}${d ? `<span class="d">${d}</span>` : ''}</span></label>`).join('')}
-    <div class="fld">Ledger account<input value="${esc(m.account || '')}" placeholder="ledger id, e.g. khodr-cash" onchange="setField('${esc(m.email)}','account',this.value)"></div>
+    <div class="fld">Ledger account<input list="dl-ledger" value="${esc(m.account || '')}" placeholder="ledger id, e.g. khodr-cash" onchange="setField('${esc(m.email)}','account',this.value)"></div>
     <div class="fld">Projects (analytic ids)<input value="${esc((m.projects || []).join(','))}" placeholder="69,59,60" onchange="setField('${esc(m.email)}','projects',this.value)"></div></div>
     ${m.admin ? '' : `<button class="rm" onclick="removeMember('${esc(m.email)}')">Remove ${esc(m.email)}</button>`}`;
 }
@@ -208,9 +209,10 @@ async function phoneToggle(email, app, cb) {
 async function loadMembers() {
   const rows = document.getElementById('member-rows');
   try {
-    const list = await Admin.api('GET', '/api/allowlist');
+    const [list, ledgers] = await Promise.all([Admin.api('GET', '/api/allowlist'), Admin.api('GET', '/api/accounting/accounts').catch(() => [])]);
     list.sort((a, b) => a.email.localeCompare(b.email));
-    MEMBERS = list; renderMemberPhone();
+    LEDGERS = ledgers.filter(a => a && a.id); MEMBERS = list; renderMemberPhone();
+    if (!document.getElementById('dl-ledger')) document.body.insertAdjacentHTML('beforeend', ledgerList()); else document.getElementById('dl-ledger').outerHTML = ledgerList();
     rows.innerHTML = list.map(m => {
       const apps = m.admin ? ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm'] : (Array.isArray(m.apps) ? m.apps : ['todo']);
       return `<tr data-email="${esc(m.email)}">
@@ -224,7 +226,7 @@ async function loadMembers() {
         <td class="c"><input type="checkbox" data-app="reports" ${apps.includes('reports') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="The accountant: SARL trial balance and general ledger in LBP, read-only"></td>
         <td class="c"><input type="checkbox" data-app="excavation" ${apps.includes('excavation') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="The Ajaltoun excavation dashboard alone — for a partner, before the rest of Ajaltoun is ready"></td>
         <td class="c"><input type="checkbox" data-app="crm" ${apps.includes('crm') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="Client conversations and leads"></td>
-        <td><input class="small" value="${esc(m.account || '')}" placeholder="ledger id" title="The worker's ledger account id, e.g. khodr-cash (site)" onchange="setField('${esc(m.email)}','account',this.value)"></td>
+        <td><input class="small" list="dl-ledger" value="${esc(m.account || '')}" placeholder="ledger id" title="The worker's ledger account id, e.g. khodr-cash (site)" onchange="setField('${esc(m.email)}','account',this.value)"></td>
         <td><input class="small" value="${esc((m.projects || []).join(','))}" placeholder="analytic ids" title="Analytic account ids the partner may see on the Day report, e.g. 69,59,60,61,62,63,64" onchange="setField('${esc(m.email)}','projects',this.value)"></td>
         <td>${m.admin ? '' : `<button class="ghost" title="Remove" onclick="removeMember('${esc(m.email)}')">✕</button>`}</td>
       </tr>`;
