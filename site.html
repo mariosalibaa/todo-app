@@ -87,6 +87,11 @@
   .composer .lockhint{position:absolute;right:18px;bottom:calc(100% + 8px);width:34px;padding:8px 0 4px;border-radius:17px;background:var(--surface0);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:1rem;color:var(--sub);box-shadow:0 4px 14px rgba(0,0,0,.35);} .composer .lockhint[hidden]{display:none;}
   .lockhint .arr{font-size:.9rem;animation:bob 1s infinite;} @keyframes bob{50%{transform:translateY(-4px)}}
   .composer .row{position:relative;}
+  .composer button.plus{font-size:1.6rem;line-height:1;color:var(--sub);background:transparent;} .composer button.cam{background:transparent;color:var(--sub);font-size:1.3rem;width:36px;}
+  .sheet .card.attach{flex-direction:row;justify-content:space-around;padding:22px 12px calc(22px + env(safe-area-inset-bottom));}
+  .sheet .card.attach button{background:transparent;border:0;color:var(--text);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;}
+  .sheet .card.attach button i{font-style:normal;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;}
+  .sheet .card.attach button i.c1{background:#e0417c;} .sheet .card.attach button i.c2{background:#bf59cf;} .sheet .card.attach button i.c3{background:#f26b3a;}
   .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
   .post.gone{font-style:italic;color:var(--overlay0);}
   .post{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;} .post.gone,.post .line{user-select:text;}
@@ -124,12 +129,12 @@
   </section>
 </main>
 <div class="composer"><div class="row">
-  <button id="btnphoto" disabled onclick="pick('image/*','photo')" title="Photo">📷</button>
-  <button id="btnvideo" disabled onclick="pick('video/*','video')" title="Video">🎬</button>
+  <button id="btnphoto" disabled class="plus" onclick="attachSheet()" title="Attach">＋</button>
   <textarea id="text" disabled placeholder="Write, or talk with Flow" rows="1" oninput="micSend()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText();}"></textarea>
   <!-- recording bar (WhatsApp, Mario 2026-09-15): hold the mic to record, release to send, slide left to cancel, slide up to lock -->
   <div class="recbar" id="recbar" hidden><span class="dot"></span><span id="rectime">0:00</span><span class="slide" id="recslide">‹ Slide to cancel</span><button class="trash" id="rectrash" onclick="recCancel()" title="Delete">🗑</button></div>
   <div class="lockhint" id="lockhint" hidden><span>🔒</span><span class="arr">⌃</span></div>
+  <button id="btnvideo" disabled class="cam" onclick="pick('image/*','photo')" title="Camera">📷</button>
   <button id="btnsend" disabled class="send mic" title="Hold to record · release to send" oncontextmenu="return false">🎤</button>
 </div></div>
 <input type="file" id="file" hidden>
@@ -357,7 +362,18 @@ async function sendText() {
     await digestOne(cur, p.id);
   } catch (e) { alert('Could not send: ' + e.message); el('text').value = t; micSend(); }
 }
-function pick(accept, kind) { const f = el('file'); f.accept = accept; f.capture = kind === 'photo' ? 'environment' : ''; f.onchange = () => sendFile(f.files[0], kind); f.click(); }
+function pick(accept, kind, capture) { const f = el('file'); f.accept = accept; if (capture === false) f.removeAttribute('capture'); else f.capture = 'environment'; f.onchange = () => { const file = f.files[0]; if (!file) return; sendFile(file, kind === 'any' ? (/^video\//.test(file.type) ? 'video' : 'photo') : kind); f.value = ''; }; f.click(); }
+// the ＋ sheet, as on WhatsApp: camera, video, or the phone's gallery
+function attachSheet() {
+  closeSheet();
+  const sh = document.createElement('div'); sh.className = 'sheet'; sh.id = 'sheet';
+  sh.innerHTML = `<div class="card attach">
+    <button onclick="closeSheet();pick('image/*','photo')"><i class="c1">📷</i>Camera</button>
+    <button onclick="closeSheet();pick('video/*','video')"><i class="c2">🎥</i>Video</button>
+    <button onclick="closeSheet();pick('image/*,video/*','any',false)"><i class="c3">🖼</i>Gallery</button></div>`;
+  sh.onclick = e => { if (e.target === sh) closeSheet(); };
+  document.body.appendChild(sh);
+}
 // photos shrink to 1600 px on the phone; a video over 60 s is refused (the spec's phone-side limits)
 async function sendFile(file, kind) {
   if (!file || !cur) return;
