@@ -79,6 +79,14 @@
   .composer button:disabled{opacity:.4;cursor:default;}
   .composer button.send{background:#00a884;color:#fff;}
   .composer button.rec{background:var(--red);color:#fff;}
+  .composer button.send{border-radius:50%;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .12s;} .composer button.send.recording{transform:scale(1.35);background:#00a884;}
+  .composer .recbar{flex:1;display:flex;align-items:center;gap:10px;min-height:42px;padding:0 4px;font-variant-numeric:tabular-nums;color:var(--text);} .composer .recbar[hidden]{display:none;}
+  .recbar .dot{width:10px;height:10px;border-radius:50%;background:var(--red);animation:blink 1s infinite;} @keyframes blink{50%{opacity:.15}}
+  .recbar .slide{flex:1;text-align:center;color:var(--overlay0);font-size:.9rem;transition:opacity .1s;} .recbar .trash{display:none;width:38px;height:38px;border-radius:50%;background:transparent;font-size:1.2rem;}
+  .recbar.locked .slide{display:none;} .recbar.locked .trash{display:inline-flex;align-items:center;justify-content:center;margin-left:auto;}
+  .composer .lockhint{position:absolute;right:18px;bottom:calc(100% + 8px);width:34px;padding:8px 0 4px;border-radius:17px;background:var(--surface0);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:1rem;color:var(--sub);box-shadow:0 4px 14px rgba(0,0,0,.35);} .composer .lockhint[hidden]{display:none;}
+  .lockhint .arr{font-size:.9rem;animation:bob 1s infinite;} @keyframes bob{50%{transform:translateY(-4px)}}
+  .composer .row{position:relative;}
   .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
   .post.gone{font-style:italic;color:var(--overlay0);}
   .post{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;} .post.gone,.post .line{user-select:text;}
@@ -118,9 +126,11 @@
 <div class="composer"><div class="row">
   <button id="btnphoto" disabled onclick="pick('image/*','photo')" title="Photo">📷</button>
   <button id="btnvideo" disabled onclick="pick('video/*','video')" title="Video">🎬</button>
-  <button id="recbtn" disabled onclick="toggleRec()" title="Voice note">🎤</button>
-  <textarea id="text" disabled placeholder="Write, or talk with Flow" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText();}"></textarea>
-  <button id="btnsend" disabled class="send" onclick="sendText()" title="Send">➤</button>
+  <textarea id="text" disabled placeholder="Write, or talk with Flow" rows="1" oninput="micSend()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText();}"></textarea>
+  <!-- recording bar (WhatsApp, Mario 2026-09-15): hold the mic to record, release to send, slide left to cancel, slide up to lock -->
+  <div class="recbar" id="recbar" hidden><span class="dot"></span><span id="rectime">0:00</span><span class="slide" id="recslide">‹ Slide to cancel</span><button class="trash" id="rectrash" onclick="recCancel()" title="Delete">🗑</button></div>
+  <div class="lockhint" id="lockhint" hidden><span>🔒</span><span class="arr">⌃</span></div>
+  <button id="btnsend" disabled class="send mic" title="Hold to record · release to send" oncontextmenu="return false">🎤</button>
 </div></div>
 <input type="file" id="file" hidden>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -136,7 +146,7 @@ const hhmm = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit',
 const dayLabel = ymd => new Date(ymd + 'T12:00:00+03:00').toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', weekday: 'long', day: 'numeric', month: 'long' });
 
 function setComposerEnabled(on) {
-  ['text', 'btnsend', 'btnphoto', 'btnvideo', 'recbtn'].forEach(id => el(id).disabled = !on);
+  ['text', 'btnsend', 'btnphoto', 'btnvideo'].forEach(id => el(id).disabled = !on); micSend();
 }
 const ONE_DAY = 864e5;
 function whenLabel(iso) {
@@ -340,12 +350,12 @@ async function doDelete(id) {
 }
 async function sendText() {
   const t = el('text').value.trim(); if (!t || !cur) return;
-  el('text').value = '';
+  el('text').value = ''; micSend();
   try {
     const p = await Admin.api('POST', `/api/site/${cur}/posts`, { kind: 'text', text: t });
     posts.push(p); draw();
     await digestOne(cur, p.id);
-  } catch (e) { alert('Could not send: ' + e.message); el('text').value = t; }
+  } catch (e) { alert('Could not send: ' + e.message); el('text').value = t; micSend(); }
 }
 function pick(accept, kind) { const f = el('file'); f.accept = accept; f.capture = kind === 'photo' ? 'environment' : ''; f.onchange = () => sendFile(f.files[0], kind); f.click(); }
 // photos shrink to 1600 px on the phone; a video over 60 s is refused (the spec's phone-side limits)
@@ -370,19 +380,70 @@ function shrink(file, max) {
     img.onerror = () => res(file); img.src = URL.createObjectURL(file); });
 }
 function duration(file) { return new Promise(res => { const v = document.createElement('video'); v.preload = 'metadata'; v.onloadedmetadata = () => res(v.duration || 0); v.onerror = () => res(0); v.src = URL.createObjectURL(file); }); }
-let rec = null, chunks = [];
-async function toggleRec() {
-  if (rec) { rec.stop(); return; }
+// ── Voice notes the WhatsApp way (Mario, 2026-09-15) ──────────────────────────────────────────
+// The green round button is the mic while the box is empty and the send arrow once there is text.
+// Hold the mic: recording starts (red dot + timer, "Slide to cancel"). Release: sent. Slide left 80px:
+// cancelled. Slide up 60px: locked — hands off, the bar shows 🗑 to delete and the button becomes ➤ to send.
+// Anything under 0.7 s is dropped (a tap by mistake).
+let rec = null, chunks = [], recT0 = 0, recTimer = null, recState = null;   // recState: null | 'hold' | 'locked' | 'cancel'
+const mmss = ms => { const s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+function micSend() {
+  const b = el('btnsend'), has = !!el('text').value.trim();
+  if (rec) return;
+  b.textContent = has ? '➤' : '🎤'; b.classList.toggle('mic', !has); b.title = has ? 'Send' : 'Hold to record · release to send';
+}
+async function recStart() {
+  if (rec) return false;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     // mp4/AAC first: it plays everywhere (an iPhone stalls on webm); webm only where mp4 recording is missing (older Chrome)
     const mime = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm';
     rec = new MediaRecorder(stream, { mimeType: mime }); chunks = [];
     rec.ondataavailable = e => chunks.push(e.data);
-    rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); el('recbtn').classList.remove('rec'); const b = new Blob(chunks, { type: mime }); rec = null; sendFile(new File([b], 'voice.' + (mime === 'audio/webm' ? 'webm' : 'm4a'), { type: mime }), 'voice'); };
-    rec.start(); el('recbtn').classList.add('rec');
-  } catch (e) { alert('Microphone not available: ' + e.message); }
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const ok = recState !== 'cancel' && Date.now() - recT0 > 700, b = new Blob(chunks, { type: mime }); rec = null; recUI(false);
+      if (ok) sendFile(new File([b], 'voice.' + (mime === 'audio/webm' ? 'webm' : 'm4a'), { type: mime }), 'voice');
+    };
+    rec.start(); recT0 = Date.now(); recState = 'hold'; recUI(true);
+    if (navigator.vibrate) navigator.vibrate(30);
+    return true;
+  } catch (e) { alert('Microphone not available: ' + e.message); return false; }
 }
+function recUI(on) {
+  const bar = el('recbar'), b = el('btnsend');
+  bar.hidden = !on; el('text').style.display = on ? 'none' : ''; el('lockhint').hidden = !on || recState === 'locked';
+  bar.classList.toggle('locked', recState === 'locked'); b.classList.toggle('recording', on && recState !== 'locked');
+  el('btnphoto').style.display = el('btnvideo').style.display = on ? 'none' : '';
+  if (on) { el('rectime').textContent = '0:00'; el('recslide').style.opacity = 1; el('recslide').style.transform = ''; recTimer = setInterval(() => { el('rectime').textContent = mmss(Date.now() - recT0); }, 250); }
+  else { clearInterval(recTimer); recState = null; micSend(); }
+  if (on && recState === 'locked') { b.textContent = '➤'; b.classList.remove('mic'); b.title = 'Send'; }
+}
+function recStop() { if (rec && rec.state !== 'inactive') rec.stop(); }
+function recCancel() { recState = 'cancel'; recStop(); }
+function recLock() { recState = 'locked'; recUI(true); if (navigator.vibrate) navigator.vibrate(20); }
+// pointer handling on the round button: press = start, move = slide, release = send / cancel / stay locked
+(() => {
+  const b = document.getElementById('btnsend'); let x0 = 0, y0 = 0, pid = null, started = false;
+  b.addEventListener('pointerdown', async e => {
+    if (b.disabled) return;
+    if (el('text').value.trim()) return;               // text mode: the click handler sends
+    if (rec && recState === 'locked') return;           // locked: the click handler sends the voice
+    e.preventDefault(); pid = e.pointerId; x0 = e.clientX; y0 = e.clientY; started = false;
+    try { b.setPointerCapture(pid); } catch {}
+    started = await recStart();
+  });
+  b.addEventListener('pointermove', e => {
+    if (!started || !rec || recState !== 'hold') return;
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    const sl = el('recslide'); sl.style.transform = 'translateX(' + Math.min(0, dx) + 'px)'; sl.style.opacity = String(Math.max(0, 1 + dx / 100));
+    if (dx < -80) { recCancel(); started = false; }
+    else if (dy < -60) { recLock(); started = false; }
+  });
+  const up = e => { if (!started) return; started = false; if (rec && recState === 'hold') recStop(); };
+  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+  b.addEventListener('click', () => { if (rec && recState === 'locked') { recStop(); return; } if (el('text').value.trim()) sendText(); });
+})();
 // /flip re-reads the picture the other way (progress ↔ receipt); a 409 means the previous
 // digest is still running — its `error` explains that, so surface it instead of retrying blind
 async function flip(id) {
