@@ -196,7 +196,7 @@ const isWorkerChat = () => { const t = threads.find(x => x.id === cur); return !
 async function loadDay() {
   if (!isWorkerChat()) { el('att').hidden = true; return; }
   try { day = await Admin.api('GET', `/api/site/${cur}/day`); } catch { day = null; }
-  drawDay();
+  drawDay(); followLoc();
 }
 function drawDay() {
   const a = el('att'); if (!isWorkerChat() || !day) { a.hidden = true; return; }
@@ -206,13 +206,29 @@ function drawDay() {
       <button class="big start" ${started ? 'disabled' : ''} onclick="tap('start')">▶ Start${started ? ' ' + esc(day.arrived) : ''}</button>
       <button class="big finish" ${finished ? 'disabled' : ''} onclick="tap('finish')">■ Finish${finished ? ' ' + esc(day.finished) : ''}</button></div>
     <div class="st"><span>${started ? (day.start.siteName ? '📍 ' + esc(day.start.siteName) : '📍 no site') + (day.hours ? ' · ' + day.hours + ' h' : '') : 'Tap Start when you arrive on site'}</span>
-      <span>${day.line ? `<span class="lineState ${esc(day.line.state)}" title="${esc(day.line.description || '')}">day ${day.line.state === 'waiting' ? 'sent — waiting for Mario’s ✓' : day.line.state}</span> ` : ''}<a href="#" onclick="forgotTap();return false;">forgot a tap?</a>${me.admin ? ' · <a href="#" onclick="sitesSheet();return false;">sites</a>' : ''}</span></div>`;
+      <span>${day.line ? `<span class="lineState ${esc(day.line.state)}" title="${esc(day.line.description || '')}">day ${day.line.state === 'waiting' ? 'sent — waiting for Mario’s ✓' : day.line.state}</span> ` : ''}${finished ? `<a href="#" onclick="untap('finish');return false;">undo Finish</a> · ` : started ? `<a href="#" onclick="untap('start');return false;">undo Start</a> · ` : ''}<a href="#" onclick="forgotTap();return false;">forgot a tap?</a>${me.admin ? ' · <a href="#" onclick="sitesSheet();return false;">sites</a>' : ''}</span></div>`;
+}
+// The phone's position is followed while a worker chat is open, so a tap uses the latest fix at once instead
+// of waiting on "locating…" (Mario, 2026-09-16). The browser asks once; a web page cannot track in the background.
+let lastFix = null, locWatch = null;
+function followLoc() {
+  if (locWatch != null || !navigator.geolocation || !isWorkerChat()) return;
+  try { locWatch = navigator.geolocation.watchPosition(p => { lastFix = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, at: Date.now() }; }, () => {}, { enableHighAccuracy: true, maximumAge: 15000 }); } catch { locWatch = null; }
 }
 function getLoc() {
   return new Promise(res => {
     if (!navigator.geolocation) return res(null);
-    navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }), () => res(null), { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+    if (lastFix && Date.now() - lastFix.at < 60000 && lastFix.acc <= 100) return res({ lat: lastFix.lat, lng: lastFix.lng, acc: lastFix.acc });
+    navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }), () => res(lastFix ? { lat: lastFix.lat, lng: lastFix.lng, acc: lastFix.acc } : null), { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
   });
+}
+// a tap made by mistake: the post is taken back and the day recomputes (an accepted day is refused by the server)
+async function untap(kind) {
+  if (!confirm(kind === 'start' ? 'Take back today’s Start?' : 'Take back today’s Finish?')) return;
+  try {
+    const r = await Admin.api('POST', `/api/site/${cur}/untap`, { kind });
+    if (r.post) replacePost(r.post); draw(); await loadDay(); loadThreads();
+  } catch (e) { alert(e.message); }
 }
 async function tap(kind, extra = {}) {
   const btn = document.querySelector('.att .big.' + kind); if (btn) { btn.disabled = true; btn.textContent = '📍 locating…'; }

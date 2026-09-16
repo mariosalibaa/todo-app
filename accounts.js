@@ -1025,6 +1025,8 @@ async function handle(req, res, url, user, ctx) {
     // read off WhatsApp is booked before that (Mario, 2026-09-08)
     // a /site post is a proposal the same way (2026-09-12)
     if ((cur.src === 'whatsapp' || cur.src === 'site') && (body.excluded === false || body.review === false || 'answer' in body || body.waAccepted === true)) data.waAccepted = true;
+    // ✓ is one press: the line counts and leaves review in the same write (learned 2026-09-16 — 13 lines flipped all three by hand)
+    if ((cur.src === 'whatsapp' || cur.src === 'site') && body.waAccepted === true) { data.excluded = false; data.review = false; if (cur.excluded || cur.review) data.dupSrc = 'manual'; }
     if ((cur.src === 'whatsapp' || cur.src === 'site') && (body.excluded === true || body.waAccepted === false)) data.waAccepted = false;
     // A transfer moves against one of our own cash accounts — whichever the row names ("from
     // Mario", "to Ziad"), Mario's when it names nobody. The type dropdown and the WhatsApp lines

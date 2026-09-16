@@ -16,3 +16,6 @@ sandbox-*.log
 srv-*.log
 .wise-profile/
 partners-terms.json
+.claude-session.lock
+verify/
+learn/

@@ -1127,4 +1127,4 @@ async function pushAnalytic(ctx, account, t) {
   return { ...out, move: named.join(', '), distribution: dist, already: !changed.length, changed };
 }
 
-module.exports = { pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+module.exports = { suppliersPublic: suppliers, handVendorPublic: handVendor, pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };

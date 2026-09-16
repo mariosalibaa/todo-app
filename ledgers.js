@@ -446,6 +446,10 @@ function pairUp(rows, targets, opts) {
     // a twin born from a dated message (WhatsApp / site) is exact about its day: same day only —
     // otherwise "200$ from mario" on the 7th swallowed the separate 200$ on the 10th (Mario, 2026-09-12)
     const d = days(r.date, o.date); if (d > ((o.src === 'whatsapp' || o.src === 'site') ? 0 : maxDays)) continue;
+    // Learned 2026-09-16: a worker really is funded twice, even the same day. Two dated messages
+    // more than half an hour apart are two movements, never twins — only a re-read of the same
+    // message (same instant) pairs with the line it already became
+    if (r.waAt && o.waAt && Math.abs(Date.parse(r.waAt) - Date.parse(o.waAt)) > 30 * 60e3) continue;
     const a = amt(r), b = amt(o), diff = Math.abs(a - b);
     if (diff < 0.011) pairs.push({ r, o, d, w: 0 });
     else if (loose && diff <= Math.max(1, a * 0.1)) {
@@ -730,7 +734,11 @@ function waLine(id, m, owner, lbpRate, skipped) {
   return { id, src: 'whatsapp', date: beirutDay(m.ts), ref: '', service: 'WhatsApp', phone: '',
     description: text.slice(0, 160), debit: p.side === 'debit' ? p.amount : 0, credit: p.side === 'credit' ? p.amount : 0,
     waFrom: m.me ? 'mario' : 'them', waCurrency: p.currency, waAt: new Date(m.ts).toISOString(),
-    kind: /from|to/i.test(text) && p.side ? 'transfer' : '', kindSrc: 'whatsapp', importedAt: now() };
+    // Learned 2026-09-16: every worker line Mario corrected ended up company S LB, kind work
+    // (a transfer when it names from/to) — so that is what a WhatsApp line is born as.
+    // (The word boundaries here were literal backspace bytes until today — no line ever became a transfer.)
+    kind: /\bfrom\b|\bto\b/i.test(text) && p.side ? 'transfer' : 'work', kindSrc: 'whatsapp',
+    company: 'S LB', companySrc: 'whatsapp', importedAt: now() };
 }
 
 // The nightly read: `wa-contacts/range-read.mjs` messages ({ id, date, time, fromMe, text, type })
@@ -767,6 +775,9 @@ async function absorbWaLines(ctx, account, who, lines) {
   const targets = cur.docs.map(d => d.data()).filter(t => !t.excluded && (['odoo', 'excel', 'manual', 'telegram'].includes(t.src) || ((t.src === 'whatsapp' || t.src === 'site') && owned(t))));
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines, targets, { taken, maxDays: 4, loose: true });
+  const partner = account.odooPartner && account.odooPartner.id ? { id: +account.odooPartner.id, name: String(account.odooPartner.name || '') } : null;
+  const supplierList = partner && ctx.odooCall && lines.some(t => t.debit > 0) ? await bills.suppliersPublic(ctx.odooCall).catch(() => []) : [];
+  const vendorHit = t => { const text = ' ' + bills.norm(t.description || '') + ' '; return !!bills.handVendorPublic(t, account) || supplierList.some(p => p.words.some(w => text.includes(' ' + w + ' ') || (w.length >= 6 && text.includes(' ' + w)))); };
   let added = 0, updated = 0, linked = 0, review = 0, accepted = 0, kept = 0;
   // A line Mario has already been through is his: reviewed, accepted, booked in Odoo, or edited
   // by hand. A re-import never rewrites it — not its words, not its pairing, not whether it counts
@@ -776,8 +787,14 @@ async function absorbWaLines(ctx, account, who, lines) {
   const writes = lines.filter(t => { if (existing[t.id] && his(existing[t.id])) { kept++; if (!existing[t.id].excluded) accepted++; return false; } return true; }).map(t => {
     const prev = existing[t.id] || {};
     const data = { ...t };
-    if (!/\bfrom\b|\bto\b/i.test(t.description) || !t.kind) { delete data.kind; delete data.kindSrc; }
-    if (prev.kindSrc === 'manual') { delete data.kind; delete data.kindSrc; }
+    if (!t.kind || prev.kindSrc === 'manual') { delete data.kind; delete data.kindSrc; }
+    if (prev.companySrc === 'manual' || (prev.company && prev.companySrc !== 'whatsapp')) { delete data.company; delete data.companySrc; }
+    // Learned 2026-09-16: what he paid out of his own pocket (water, wash, supplies, transport) lands
+    // on HIS payable — the worker is the partner, unless the row names a supplier Odoo knows
+    // ([[worker-vendor-rows-rule]]: that stays the supplier's own bill)
+    if (t.debit > 0 && t.kind !== 'transfer' && partner && !prev.partnerId && prev.partnerSrc !== 'manual' && !vendorHit(t)) {
+      data.partnerId = partner.id; data.partnerName = partner.name; data.partnerSrc = 'auto';
+    }
     if (prev.dupSrc === 'manual') { if (!prev.excluded) accepted++; }
     else {
       const d = dup.get(t.id);

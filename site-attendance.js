@@ -163,6 +163,35 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, { post, line });
   }
 
+  // a tap made by mistake is taken back (Mario, 2026-09-16): the post becomes "deleted" the WhatsApp way, the day
+  // recomputes; a Finish that already became an accepted ledger line stays until Mario undoes it on the ledger
+  if ((m = url.match(/^\/api\/site\/([\w-]+)\/untap$/)) && req.method === 'POST') {
+    const thread = m[1];
+    if (!(await mine(thread))) return json(res, 403, { error: 'not your thread' });
+    const b = await readBody(req);
+    const kind = b.kind === 'finish' ? 'finish' : b.kind === 'start' ? 'start' : null;
+    if (!kind) return json(res, 400, { error: 'start or finish' });
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : beirutDay();
+    const posts = await postsOfDay(ws, thread, date);
+    const taps = posts.filter(p => p.kind === kind);
+    const tap = kind === 'start' ? taps[0] : taps[taps.length - 1];
+    if (!tap) return json(res, 404, { error: 'no ' + kind + ' today' });
+    if (tap.by !== who && !access.admin) return json(res, 403, { error: 'only your own tap' });
+    const account = await acc.resolve(ws, thread);
+    const lineRef = account ? acc.txCol(account).doc('site-day-' + thread + '-' + date) : null;
+    const line = lineRef ? (await lineRef.get()).data() : null;
+    if (line && line.waAccepted) return json(res, 409, { error: 'this day is already accepted on the ledger — ask Mario to undo it there first' });
+    const gone = { id: tap.id, thread, by: tap.by, at: tap.at, date, kind: 'deleted', deleted: true, deletedAt: now(), deletedBy: who, was: kind };
+    await ws.collection('site').doc(thread).collection('posts').doc(tap.id).set(gone);
+    // the day's suggestion follows: gone with its last tap, rewritten when a Finish remains
+    if (lineRef && line) {
+      const left = await postsOfDay(ws, thread, date);
+      if (left.some(p => p.kind === 'finish')) { try { await writeDay(ctx, ws, thread, date, { who }); } catch (e) { console.error('site day', thread, date, e.message); } }
+      else await lineRef.delete().catch(() => {});
+    }
+    return json(res, 200, { post: gone });
+  }
+
   if ((m = url.match(/^\/api\/site\/([\w-]+)\/day$/)) && req.method === 'GET') {
     const thread = m[1];
     if (!(await mine(thread))) return json(res, 403, { error: 'not your thread' });
