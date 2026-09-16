@@ -131,6 +131,10 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'public/naccache/taahod-3303-2024.pdf'));
   fs.readFileSync(path.join(__dirname, 'public/naccache/shatb-istithmar-3300-2024.pdf'));
   fs.readFileSync(path.join(__dirname, 'public/naccache/ifada-aqariya-2023.pdf'));
+  fs.readFileSync(path.join(__dirname, 'rent-law.html'));
+  fs.readFileSync(path.join(__dirname, 'public/rent-law/law-24-2025-gazette-36.pdf'));
+  fs.readFileSync(path.join(__dirname, 'public/rent-law/circular-22-2023-state-rents.pdf'));
+  fs.readFileSync(path.join(__dirname, 'public/rent-law/cas-82-inflation-2013-2022.pdf'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
@@ -673,7 +677,8 @@ const handler = async (req, res) => {
     '/reports': 'reports.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
     '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
     '/crm': 'crm.html',
-    '/naccache': 'naccache.html' };   // public hand-out page for Maya (no login; papers under /public/naccache/)
+    '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
+    '/rent-law': 'rent-law.html' };   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
   // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
   if (/^\/crm\/[\w+-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['crm.html'], 'utf8')); return; }
   // Meta calls the webhook with its own signature, never with a hub token
@@ -694,7 +699,7 @@ const handler = async (req, res) => {
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
     const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/hub-history.js', '/ajaltoun-plan-ui.js']);
-    const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/naccache\/[\w.-]+\.pdf$/.test(url));
+    const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
       const ext = path.extname(filePath);
