@@ -129,7 +129,13 @@ const isAr = s => /[؀-ۿ]/.test(s);
 // "20260830-3 Villa D3 Agreement (Mario Saliba).docx" → title "Villa D3 Agreement (Mario Saliba)", date 2026-08-30:
 // the date under the file comes from Mario's yyyymmdd prefix when there is one, else from the file's own date
 const titleOf = n => n.replace(/\.[a-z0-9]+$/i, '').replace(/^\d{8}(-\d+)?\s+/, '');
-const dateOf = f => { const m = /^(\d{4})(\d{2})(\d{2})/.exec(f.name); return m ? `${m[1]}-${m[2]}-${m[3]}` : (f.mtime || '').slice(0, 10); };
+// when the file was added to the hub (Beirut, with hours) and by whom — Mario: "add timing"
+const NAMES = { 'partners-sync': 'Mario Saliba', 'mario@shift-group.co': 'Mario Saliba', 'mario.salibaa@gmail.com': 'Mario Saliba' };
+const whoOf = f => { const u = f.updatedBy || ''; return NAMES[u] || (u.includes('@') ? u.split('@')[0] : u) || ''; };
+const addedAt = f => { const d = new Date(f.updatedAt || f.mtime || ''); if (isNaN(d)) return (f.mtime || '').slice(0, 10);
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Beirut', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(d);
+  const g = t => (p.find(x => x.type === t) || {}).value; return `${g('year')}-${g('month')}-${g('day')} ${g('hour')}:${g('minute')}`; };
+const dateOf = f => { const w = whoOf(f); return `added ${addedAt(f)}` + (w ? ` by ${w}` : ''); };
 
 Admin.require('partners', async me => {
   document.getElementById('who').innerHTML =
