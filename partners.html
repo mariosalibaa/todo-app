@@ -41,6 +41,14 @@
   .back:hover{color:var(--text);}
   .empty{color:var(--overlay0);font-size:.88rem;}
   .rtl{direction:rtl;text-align:right;}
+  /* tabs — Mario 2026-09-17: "add tabs" */
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--surface0);margin:0 0 22px;overflow-x:auto;}
+  .tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--sub);font-size:.88rem;font-weight:500;padding:10px 14px;cursor:pointer;white-space:nowrap;margin-bottom:-1px;}
+  .tabs button:hover{color:var(--text);}
+  .tabs button.on{color:var(--amber);border-bottom-color:var(--amber);font-weight:600;}
+  .tabs button .n{font-size:.68rem;color:var(--overlay0);margin-left:6px;}
+  .panel{display:none;} .panel.on{display:block;}
+  .signnote{font-size:.85rem;color:var(--sub);line-height:1.5;margin:0 0 16px;}
   /* terms at a glance */
   .termsbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
   .lang button{background:none;border:1px solid var(--surface0);color:var(--sub);font-size:.75rem;padding:4px 11px;cursor:pointer;}
@@ -98,13 +106,25 @@
 <main>
   <h1>Ajaltoun 4193 · Villa D3</h1>
   <p class="lead">The agreements, fee frameworks and proposals between Mario Saliba and Antoine Char. Click a document to open it; the arrow downloads it.</p>
-  <div class="termsbar">
-    <h2 style="margin:0">Terms at a glance</h2>
-    <div class="lang"><button id="lang-en" class="on" onclick="setLang('en')">English</button><button id="lang-ar" onclick="setLang('ar')">عربي</button></div>
+  <div class="tabs" id="tabs">
+    <button data-tab="sign" onclick="setTab('sign')">For signature<span class="n" id="n-sign"></span></button>
+    <button data-tab="terms" onclick="setTab('terms')">Terms at a glance</button>
+    <button data-tab="docs" onclick="setTab('docs')">Documents<span class="n" id="n-docs"></span></button>
   </div>
-  <div id="terms"></div>
-  <h2 style="margin-top:36px">Documents</h2>
-  <div id="groups"><p class="empty">Loading…</p></div>
+  <div class="panel" id="panel-sign">
+    <p class="signnote">The two agreements ready to sign — Word and PDF of each. Open to read, arrow to download.</p>
+    <div id="sign"><p class="empty">Loading…</p></div>
+  </div>
+  <div class="panel" id="panel-terms">
+    <div class="termsbar">
+      <h2 style="margin:0">Terms at a glance</h2>
+      <div class="lang"><button id="lang-en" class="on" onclick="setLang('en')">English</button><button id="lang-ar" onclick="setLang('ar')">عربي</button></div>
+    </div>
+    <div id="terms"></div>
+  </div>
+  <div class="panel" id="panel-docs">
+    <div id="groups"><p class="empty">Loading…</p></div>
+  </div>
 </main>
 <div id="viewer">
   <div class="vbar">
@@ -156,9 +176,7 @@ Admin.require('partners', async me => {
     g.files.push(f);
   }
   FILES = files;
-  box.innerHTML = groups.map(g => `
-    <h2>${esc(g.name)}</h2>
-    <div class="files">${g.files.map(f => `
+  const card = f => `
       <div class="file">
         <a class="open" href="#${esc(f.id)}" onclick="openViewer('${esc(f.id)}');return false;">
           <div class="ico">${ICON(f.mime)}</div>
@@ -168,11 +186,26 @@ Admin.require('partners', async me => {
           </div>
         </a>
         <a class="dl" href="/api/partners/files/${esc(f.id)}?v=${esc((f.sha1 || '').slice(0, 8))}&dl=1" title="Download">↓</a>
-      </div>`).join('')}
-    </div>`).join('');
+      </div>`;
+  // the signable set gets its own tab; everything else stays grouped under Documents
+  const sign = groups.find(g => /^for signature$/i.test(g.name)), rest = groups.filter(g => g !== sign);
+  document.getElementById('sign').innerHTML = sign ? `<div class="files">${sign.files.map(card).join('')}</div>` : '<p class="empty">Nothing waiting for signature.</p>';
+  document.getElementById('n-sign').textContent = sign ? sign.files.length : '';
+  document.getElementById('n-docs').textContent = rest.reduce((n, g) => n + g.files.length, 0) || '';
+  box.innerHTML = rest.map(g => `<h2>${esc(g.name)}</h2><div class="files">${g.files.map(card).join('')}</div>`).join('') || '<p class="empty">No documents.</p>';
   // a shared link or a reload lands straight in the document
   if (location.hash.length > 1) openViewer(location.hash.slice(1), true);
 });
+
+// ── Tabs ────────────────────────────────────────────────────────────────────
+let TAB = 'sign';
+try { TAB = ['sign', 'terms', 'docs'].includes(localStorage.getItem('partners_tab')) ? localStorage.getItem('partners_tab') : 'sign'; } catch {}
+function setTab(k) {
+  TAB = k; try { localStorage.setItem('partners_tab', k); } catch {}
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === k));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === 'panel-' + k));
+}
+setTab(TAB);
 
 // ── Terms at a glance ───────────────────────────────────────────────────────
 // {en, ar} pairs from partners-terms.json (uploaded by partners-sync.mjs); one toggle flips the whole block
