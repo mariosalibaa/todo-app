@@ -17,6 +17,7 @@ const MAX = 700 * 1024;   // Firestore holds one document per file; 1 MiB cap mi
 
 // Which section a file sits in on the page, and the order of the sections
 const GROUPS = [
+  { name: 'For signature', test: n => /\(for signature\)/i.test(n) },   // Mario 2026-09-17: the signable set sits on top
   { name: 'Villa D3 agreement', test: n => /villa d3 agreement/i.test(n) },
   { name: 'Partnership & development fees', test: n => /partnership|development fee/i.test(n) },
   { name: 'Professional services', test: n => /professional services|services contract/i.test(n) },
@@ -42,7 +43,12 @@ const local = readdirSync(FOLDER).filter(n => !n.startsWith('.') && !n.startsWit
       group: GROUPS[gi].name, order: gi * 1e8 + local_order(name), mime: MIME[path.extname(name).toLowerCase()] || 'application/octet-stream' };
   });
 // inside a group: newest date prefix first, then the name
-function local_order(name) { const d = /^(\d{8})/.exec(name); return d ? 99999999 - +d[1] : 0; }
+function local_order(name) {
+  if (/\(for signature\)/i.test(name)) {   // D3 before services, pdf before docx
+    return (/villa d3/i.test(name) ? 0 : 10) + (/\.pdf$/i.test(name) ? 0 : 1);
+  }
+  const d = /^(\d{8})/.exec(name); return d ? 99999999 - +d[1] : 0;
+}
 
 const remote = new Map((await col.get()).docs.map(d => [d.id, d.data()]));
 let changed = 0;
