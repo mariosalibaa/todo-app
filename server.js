@@ -135,6 +135,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'public/rent-law/law-24-2025-gazette-36.pdf'));
   fs.readFileSync(path.join(__dirname, 'public/rent-law/circular-22-2023-state-rents.pdf'));
   fs.readFileSync(path.join(__dirname, 'public/rent-law/cas-82-inflation-2013-2022.pdf'));
+  fs.readFileSync(path.join(__dirname, 'mechanical.html'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
@@ -678,7 +679,8 @@ const handler = async (req, res) => {
     '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
     '/crm': 'crm.html',
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
-    '/rent-law': 'rent-law.html' };   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
+    '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
+    '/mechanical': 'mechanical.html' };   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
   // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
   if (/^\/crm\/[\w+-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['crm.html'], 'utf8')); return; }
   // Meta calls the webhook with its own signature, never with a hub token

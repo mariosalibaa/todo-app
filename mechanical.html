@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mechanical – MEP notes</title>
+<style>
+  :root { --bg:#f7f5f0; --card:#fff; --ink:#1f1f1f; --muted:#666; --amber:#F2A93B; --line:#e6e2da; --soft:#fdf6e9; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Segoe UI",Tahoma,Arial,sans-serif; font-size:16px; line-height:1.6; }
+  .wrap { max-width:820px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:14px; margin-bottom:22px; }
+  .sub a { color:var(--muted); }
+  .doc { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+  .doc h2 { font-size:18px; margin:0 0 2px; }
+  .doc .meta { color:var(--muted); font-size:13px; margin-bottom:10px; }
+  .doc h3 { font-size:15px; margin:14px 0 4px; }
+  ul { margin:4px 0 0; padding-left:20px; }
+  li { margin:3px 0; }
+  b { font-weight:700; }
+  table { border-collapse:collapse; width:100%; margin:8px 0 4px; font-size:14px; }
+  th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  th { background:var(--soft); font-weight:600; }
+  td.k { font-weight:700; white-space:nowrap; }
+  .key { border-left:4px solid var(--amber); background:var(--soft); }
+  .note { color:var(--muted); font-size:13px; margin-top:8px; }
+  .sw { display:inline-block; width:34px; height:0; border-top:3px solid; vertical-align:middle; margin-right:6px; }
+  .sw.red { border-color:#e0262f; } .sw.yel { border-color:#d8c400; } .sw.blk { border-color:#111; } .sw.dash { border-top-style:dashed; }
+  .sym { display:inline-block; vertical-align:middle; margin-right:6px; }
+  .foot { color:var(--muted); font-size:13px; margin-top:30px; text-align:center; }
+  @media (max-width:520px) { body { font-size:15px; } table { font-size:13px; } th, td { padding:5px 6px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mechanical — MEP notes</h1>
+  <div class="sub">Plumbing, drainage, HVAC: how to read the drawings and what the abbreviations mean. Started 19-9-2026 from the villa drainage plans · <a href="/admin">← hub</a></div>
+
+  <div class="doc key">
+    <h2>In one paragraph</h2>
+    A drainage sheet carries three separate pipe systems: <b>soil</b> (WC waste, red), <b>waste</b> (basins, showers, kitchens, yellow) and <b>storm</b> (rain, black). Each run goes to ground through a <b>manhole (MH)</b>; where surface water has to be picked up from the paving, a <b>catch basin (CB)</b> sits next to the manhole and drains into it. Inside the house the small circles are <b>floor drains (FD)</b>; a <b>WCO</b> is the clean-out plug you open to rod a blocked pipe.
+  </div>
+
+  <div class="doc">
+    <h2>1 · Drainage drawing legend</h2>
+    <div class="meta">As used on the villa ground-floor drainage plan (ø110 / ø160 SP/UG, MH + CB pairs on the two vertical runs)</div>
+    <table>
+      <tr><th>Abbrev.</th><th>Meaning</th><th>On the drawing / what it does</th></tr>
+      <tr><td class="k">CB</td><td>Catch basin</td><td><span class="sym"><svg width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="1" width="20" height="20" fill="none" stroke="#111" stroke-width="2"/><path d="M4 5h14M4 9h14M4 13h14M4 17h14" stroke="#111" stroke-width="1.5"/></svg></span>Square box with a hatched grate, drawn next to a manhole. Surface inlet: collects rain or wash-down water from the paving through the grate, holds silt in a sump at the bottom, discharges into the adjacent MH.</td></tr>
+      <tr><td class="k">MH</td><td>Manhole</td><td><span class="sym"><svg width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="1" width="20" height="20" fill="none" stroke="#111" stroke-width="2"/><circle cx="11" cy="11" r="6" fill="none" stroke="#111" stroke-width="2"/></svg></span>Square chamber with a round cover. Access point on the sewer or storm line: pipes change direction, size or level here; where you rod the line.</td></tr>
+      <tr><td class="k">FD</td><td>Floor drain</td><td><span class="sym"><svg width="22" height="22" viewBox="0 0 22 22"><rect x="1" y="1" width="20" height="20" fill="none" stroke="#111" stroke-width="2"/><circle cx="11" cy="11" r="4" fill="none" stroke="#111" stroke-width="2"/></svg></span>Small square with a circle, in baths, maid room, boiler and pool technical rooms. Trapped gully in the floor, usually ø50–ø75 to the nearest waste line.</td></tr>
+      <tr><td class="k">WCO</td><td>Wall clean-out</td><td>Access plug in the pipe, at a wall, to push a rod or a jet through a blocked run. Placed at the top of a run and at changes of direction.</td></tr>
+      <tr><td class="k">CO</td><td>Clean-out</td><td>Same, when it sits in the floor or on the pipe itself.</td></tr>
+      <tr><td class="k">SP/UG</td><td>Soil pipe, underground</td><td><span class="sw red"></span>Red line. Carries WC discharge (black water). ø110 for branches, ø160 for the collector.</td></tr>
+      <tr><td class="k">WP/UG</td><td>Waste pipe, underground</td><td><span class="sw yel"></span>Yellow line. Grey water: basins, showers, kitchen, floor drains. Usually ø75–ø110.</td></tr>
+      <tr><td class="k">RWP</td><td>Rain-water pipe</td><td><span class="sw blk"></span>Black line / black arrows. Storm water from roofs and terraces, down to the storm manholes.</td></tr>
+      <tr><td class="k">VP</td><td>Vent pipe</td><td>Open stack to the roof that lets air into the soil system so traps keep their water seal.</td></tr>
+      <tr><td class="k">ø110, ø160</td><td>Pipe nominal diameter</td><td>Outside diameter in mm (uPVC / PP). ø110 ≈ 4", ø160 ≈ 6", ø75 ≈ 3", ø50 ≈ 2".</td></tr>
+      <tr><td class="k">4"</td><td>Four-inch pipe</td><td>Imperial size on the same sheet (boiler / pool room lines) — same as ø110.</td></tr>
+      <tr><td class="k">TF</td><td>Top of finish (level)</td><td>Finished-floor level in metres, e.g. +458.55. Invert levels are read against it.</td></tr>
+      <tr><td class="k">IL</td><td>Invert level</td><td>Level of the inside bottom of the pipe at a manhole — what sets the slope.</td></tr>
+      <tr><td class="k">Arrow ▼</td><td>Flow direction</td><td>Filled arrow on the line = direction of fall. Text "SLOPE 1%" or "2%" beside it = gradient.</td></tr>
+    </table>
+    <div class="note">Rule of thumb for slopes: ø110 soil at 1–2 %, ø160 collector at 0.7–1 %, waste ø75 at 2 %. Every change of direction underground gets a manhole or a clean-out.</div>
+  </div>
+
+  <div class="doc">
+    <h2>2 · Other abbreviations you will meet on MEP sheets</h2>
+    <table>
+      <tr><th>Abbrev.</th><th>Meaning</th></tr>
+      <tr><td class="k">CW / HW / HWR</td><td>Cold water / hot water / hot-water return (recirculation)</td></tr>
+      <tr><td class="k">WH</td><td>Water heater (boiler for domestic hot water)</td></tr>
+      <tr><td class="k">GT</td><td>Grease trap (kitchen waste before it joins the sewer)</td></tr>
+      <tr><td class="k">ST</td><td>Septic tank</td></tr>
+      <tr><td class="k">SP (pump)</td><td>Sump pump / sewage pump, in the lowest pit</td></tr>
+      <tr><td class="k">GV / BV / CV / NRV</td><td>Gate valve / ball valve / check valve / non-return valve</td></tr>
+      <tr><td class="k">PRV</td><td>Pressure-reducing valve</td></tr>
+      <tr><td class="k">WM</td><td>Water meter</td></tr>
+      <tr><td class="k">HB</td><td>Hose bib (garden tap)</td></tr>
+      <tr><td class="k">FCU / AHU</td><td>Fan-coil unit / air-handling unit (HVAC)</td></tr>
+      <tr><td class="k">VRF / VRV</td><td>Variable-refrigerant-flow split system (Daikin calls it VRV)</td></tr>
+      <tr><td class="k">CD</td><td>Condensate drain (from the AC units)</td></tr>
+      <tr><td class="k">SD / RD / EA / FA</td><td>Supply / return / exhaust / fresh-air duct</td></tr>
+      <tr><td class="k">NTS</td><td>Not to scale</td></tr>
+    </table>
+  </div>
+
+  <div class="doc">
+    <h2>3 · Notes log</h2>
+    <ul>
+      <li><b>19-9-2026</b> — Villa drainage plan: two vertical runs south of the concierge/driver room, one sewer (red) and one storm (black), each with an MH and a CB pair at 205 and at the pool level. Question was "meaning of CB" → catch basin.</li>
+    </ul>
+    <div class="note">Add a line here each time a drawing raises a new mechanical question, with the date.</div>
+  </div>
+
+  <div class="foot">Shift Group · Mechanical reference · 19-9-2026</div>
+</div>
+</body>
+</html>
