@@ -33,10 +33,14 @@
   .file small { display:block; color:var(--muted); font-size:13px; }
   .foot { color:var(--muted); font-size:13px; margin-top:30px; text-align:center; }
   @media (max-width:520px) { body { font-size:15px; } table { font-size:13px; } th, td { padding:5px 6px; } }
+  /* back to the hub — the page is opened from a tile, on the phone there is no other way back (Mario, 2026-09-20) */
+  .hback { display:inline-block; color:var(--amber); text-decoration:none; font-size:14px; font-weight:600; padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); margin-bottom:14px; }
+  .hback:hover { border-color:var(--amber); }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <a class="hback" href="/">‹ Back to the hub</a>
   <h1>Rent law — non-residential leases</h1>
   <div class="sub">Three papers received 16-9-2026 · originals in Dropbox <b>0. SHIFT \ 0. RENT LAW إيجارات</b></div>
 

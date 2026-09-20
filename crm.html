@@ -29,7 +29,7 @@
   .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;margin:10px 0;}
   .kv{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;align-items:center;font-size:.9rem;} .kv b{color:var(--overlay0);font-weight:500;}
   .kv input,.kv select,.kv textarea{width:100%;} .kv textarea{min-height:70px;}
-  .conv{display:flex;flex-direction:column;gap:6px;} .msg{max-width:78%;padding:8px 12px;border-radius:14px;font-size:.92rem;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
+  .conv{display:flex;flex-direction:column;gap:6px;} .msg .mimg{max-width:100%;max-height:360px;border-radius:10px;display:block;} .msg audio{max-width:260px;display:block;} .msg .dur{opacity:.7;} .msg{max-width:78%;padding:8px 12px;border-radius:14px;font-size:.92rem;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
   .msg.them{align-self:flex-start;background:var(--surface0);border-bottom-left-radius:4px;} .msg.us{align-self:flex-end;background:rgba(166,227,161,.14);border:1px solid rgba(166,227,161,.25);border-bottom-right-radius:4px;}
   .msg small{display:block;color:var(--overlay0);font-size:.68rem;margin-top:3px;text-align:right;}
   .day{align-self:center;font-size:.7rem;color:var(--overlay0);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 4px;}
@@ -131,7 +131,18 @@ async function showLead() {
 }
 function renderLead() {
   let day = '';
-  const conv = L.messages.map(m => { const d = fmt(m.at).slice(0, 10); const h = d !== day ? `<div class="day">${d}</div>` : ''; day = d; return h + `<div class="msg ${m.from}">${esc(m.text || ('[' + (m.type || 'media') + ']'))}<small>${fmt(m.at).slice(11)}</small></div>`; }).join('');
+  // a media message with `mid` shows the file itself (through /api/crm/media, from the laptop's archive)
+  const body = m => {
+    if (m.mid) {
+      const src = `/api/crm/media/${m.acc || 'dev'}/${m.mid}`;
+      if (m.type === 'image' || m.type === 'sticker') return `<a href="${src}" target="_blank"><img class="mimg" src="${src}" alt="photo" loading="lazy"></a>${m.text ? '<div>' + esc(m.text) + '</div>' : ''}`;
+      if (m.type === 'ptt' || m.type === 'audio') return `<audio controls preload="none" src="${src}"></audio>${m.duration ? `<small class="dur">${Math.floor(m.duration / 60)}:${String(m.duration % 60).padStart(2, '0')}</small>` : ''}`;
+      if (m.type === 'video') return `<video controls preload="metadata" class="mimg" src="${src}"></video>${m.text ? '<div>' + esc(m.text) + '</div>' : ''}`;
+      return `<a href="${src}" target="_blank">📄 ${esc(m.fileName || 'document')}</a>${m.text ? '<div>' + esc(m.text) + '</div>' : ''}`;
+    }
+    return esc(m.text || ('[' + (m.type || 'media') + ']'));
+  };
+  const conv = L.messages.map(m => { const d = fmt(m.at).slice(0, 10); const h = d !== day ? `<div class="day">${d}</div>` : ''; day = d; return h + `<div class="msg ${m.from}">${body(m)}<small>${fmt(m.at).slice(11)}</small></div>`; }).join('');
   const wa = L.phone ? `https://wa.me/${L.phone.replace(/\D/g, '')}` : '';
   document.getElementById('main').innerHTML = `
     <h1>${ICON[L.channel] || '👤'} ${esc(L.name || L.phone || L.id)} <span class="st ${esc(L.stage)}">${esc(L.stage)}</span></h1>

@@ -681,6 +681,29 @@ const handler = async (req, res) => {
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html' };   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
+  // /whatsapp — the WhatsApp Archive (whatsapp-local on Mario's laptop, 2013 → today, refreshed from
+  // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
+  // the archive-daemon heartbeat (meta/whatsappArchive) and the short-lived token it gets is signed
+  // with ACCOUNTING_API_KEY, the same key the laptop holds — so a leaked tunnel URL alone opens nothing.
+  if (url === '/whatsapp' || url.startsWith('/whatsapp?')) {
+    const dev = /[?&]account=dev\b/.test(url);   // the Shift Development line's archive (viewer :4621, its own tunnel)
+    const u = await verifyToken(req);
+    const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
+    const page = (title, body) => { res.writeHead(u && acc ? 200 : 401, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>${title}</title><body style="font-family:system-ui,sans-serif;background:#111;color:#eee;padding:48px 20px;text-align:center"><h2 style="margin:0 0 12px">${title}</h2><p style="color:#aaa;max-width:420px;margin:0 auto 24px">${body}</p><a href="/" style="color:#F2A93B">‹ Back to the hub</a>`); };
+    if (!u || !acc) return page('WhatsApp Archive', 'Sign in to the hub first, then open this tile again.');
+    if (!acc.admin) return page('WhatsApp Archive', 'This one is Mario’s alone.');
+    const key = process.env.ACCOUNTING_API_KEY || '';
+    let meta = null;
+    try { meta = (await db.collection('workspaces').doc(TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); } catch {}
+    const target = meta && (dev ? meta.urlDev : meta.url);
+    const fresh = target && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
+    if (!fresh || !key) return page('The laptop is offline', `The archive lives on Mario’s laptop and answers only while it is on and online${meta && meta.at ? ` — last seen ${new Date(meta.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' })}` : ''}.`);
+    const exp = Date.now() + 60000;
+    const sig = crypto.createHmac('sha256', key).update('open:' + exp).digest('hex');
+    res.writeHead(302, { Location: `${target}/auth?t=${exp}.${sig}`, 'Cache-Control': 'no-store' });
+    res.end();
+    return;
+  }
   // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
   if (/^\/crm\/[\w+-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['crm.html'], 'utf8')); return; }
   // Meta calls the webhook with its own signature, never with a hub token

@@ -567,6 +567,20 @@ async function handle(req, res, url, user, ctx) {
   const who = user.email || user.uid;
   let m;
 
+  // ── WhatsApp Archive heartbeat ────────────────────────────────────────────────────────────
+  // The full WhatsApp history (2013 → today, whatsapp-local on the laptop) reaches the website
+  // through a Cloudflare quick tunnel whose URL changes at every restart; wa-contacts/
+  // archive-daemon.mjs posts the current one every 5 min and /whatsapp (server.js) redirects to it.
+  if (url === '/api/accounting/archive-url' && req.method === 'POST') {
+    const b = await readBody(req);
+    const u = String(b.url || '');
+    const ok = x => /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(x);
+    if (!ok(u)) return json(res, 400, { error: 'url: https://….trycloudflare.com' });
+    const uDev = String(b.urlDev || '');   // the Shift Development line's viewer (:4621), when its tunnel is up
+    await ws.collection('meta').doc('whatsappArchive').set({ url: u, urlDev: ok(uDev) ? uDev : '', at: now(), viewer: String(b.viewer || ''), sync: String(b.sync || '') });
+    return json(res, 200, { ok: true });
+  }
+
   if (url === '/api/accounting/odoo/journals' && req.method === 'GET') {
     try { return json(res, 200, await odooJournals(odooCall)); }
     catch (e) { return json(res, 502, { error: String(e.message || e) }); }

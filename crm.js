@@ -42,7 +42,9 @@ async function ingestLead(col, lead, source) {
   for (const m of msgs) {
     const mref = ref.collection('messages').doc(String(m.id).replace(/[^\w-]/g, '_').slice(0, 120));
     if ((await mref.get()).exists) continue;
-    await mref.set({ at: m.at, from: m.from === 'us' ? 'us' : 'them', text: String(m.text || '').slice(0, 4000), type: m.type || 'chat', media: !!m.media, source });
+    // mid = the message's id in the laptop's live archive (crm-push.mjs): /api/crm/media/<acc>/<mid> shows the file
+    await mref.set({ at: m.at, from: m.from === 'us' ? 'us' : 'them', text: String(m.text || '').slice(0, 4000), type: m.type || 'chat', media: !!m.media, source,
+      ...(m.mid ? { mid: Number(m.mid), acc: m.acc || 'dev', mime: String(m.mime || ''), fileName: String(m.fileName || ''), duration: Number(m.duration) || 0 } : {}) });
     added++; if (m.from !== 'us') { fromThem++; lastIn = m; }
   }
   const last = msgs[msgs.length - 1];
@@ -110,6 +112,23 @@ async function handle(req, res, url, user, ctx) {
   }
 
   if (!(ctx.access.apps || []).includes('crm') && !ctx.access.admin) return json(res, 403, { error: 'no_app', app: 'crm' });
+
+  // a photo / voice note of a conversation: it lives in the laptop's WhatsApp archive, reached through the
+  // tunnel that archive-daemon.mjs reports (meta/whatsappArchive: url = Mario's line, urlDev = 70 165 168),
+  // with a 10-minute token signed by the shared machine key — an <img src="/api/crm/media/dev/…"> just works
+  let mm;
+  if ((mm = path.match(/^\/api\/crm\/media\/(dev|main)\/(\d+)$/)) && req.method === 'GET') {
+    const key = process.env.ACCOUNTING_API_KEY || '';
+    let meta = null;
+    try { meta = (await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); } catch {}
+    const url = meta && (mm[1] === 'dev' ? meta.urlDev : meta.url);
+    const fresh = meta && url && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
+    if (!fresh || !key) { res.writeHead(503, { 'Content-Type': 'text/plain' }); res.end('the laptop holding the WhatsApp archive is offline'); return true; }
+    const exp = Date.now() + 10 * 60000;
+    const sig = crypto.createHmac('sha256', key).update('open:' + exp).digest('hex');
+    res.writeHead(302, { Location: `${url}/api/media/${mm[2]}?t=${exp}.${sig}`, 'Cache-Control': 'private, max-age=300' }); res.end();
+    return true;
+  }
 
   // pickers: every Odoo partner (name + phone), every analytic account (= project), the companies
   if (path === '/api/crm/options' && req.method === 'GET') {
