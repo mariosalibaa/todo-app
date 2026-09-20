@@ -24,6 +24,7 @@
   .who a:hover{color:var(--text);}
   main{max-width:1240px;margin:0 auto;padding:22px 20px 40px;}
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 14px;font-weight:600;}
+  .hback{display:inline-block;color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;margin-bottom:14px;} .hback:hover{background:var(--surface0);}
   .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:28px;}
   .tile{display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:start;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
   .tile:hover{border-color:var(--amber);transform:translateY(-2px);}
@@ -129,6 +130,8 @@ const APPS = [
   { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide', everyone: true },
   { id: 'reports', ico: '📊', name: 'Reports', desc: 'SHIFT GROUP SARL trial balance and general ledger in LBP at historical rates — for the accountant', href: '/reports' },
   { id: 'daily', ico: '📋', name: 'Day report', desc: 'Who worked on your project each day, what he did and what it cost.', href: '/accounting/daily' },
+  { id: 'members', ico: '👥', name: 'Members & access', desc: 'Who may open which app — Google accounts and phone sign-ins, ledger and projects per member', href: '/members', admin: true },
+  { id: 'ask', ico: '❓', name: 'Ask a decision', desc: 'Put a question to a partner from its own link — approve or hold, you get a Telegram when he answers', href: '/ask', admin: true },
   { id: 'naccache', ico: '🏠', name: 'Naccache 900/4', desc: 'مايا — خطوات تسجيل الشقة + الأوراق (public link, no sign-in)', href: '/naccache', admin: true },
   { id: 'rent-law', ico: '⚖️', name: 'Rent law', desc: 'Law 24/2025 on pre-1992 non-residential leases — extension ladder, fair rent, yearly increases — plus the State-rent circular and CAS inflation letter', href: '/rent-law', admin: true },
   { id: 'mechanical', ico: '🔧', name: 'Mechanical', desc: 'MEP reference — how to read the drainage drawings (CB, MH, FD, WCO, SP/UG…), pipe sizes and slopes, plus a dated notes log', href: '/mechanical', admin: true },
@@ -155,7 +158,17 @@ Admin.require(null, me => {
     <a class="tile" href="${a.href}">
       <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
     </a>`).join('');
-  if (me.admin) { document.getElementById('members').style.display = ''; loadMembers(); document.getElementById('decisions').style.display = ''; loadDecisions(); }
+  // the hub page is the tiles only; members & access and the decisions desk are their own pages
+  // (/members, /ask — same file, one section shown) (Mario, 2026-09-20)
+  const view = /^\/members/.test(location.pathname) ? 'members' : /^\/ask/.test(location.pathname) ? 'decisions' : '';
+  if (view) {
+    if (!me.admin) { location.replace('/'); return; }
+    document.querySelector('main > h2').textContent = '';
+    document.getElementById('tiles').style.display = 'none';
+    document.querySelector('main').insertAdjacentHTML('afterbegin', '<a class="hback" href="/">‹ Back to the hub</a>');
+    document.getElementById(view).style.display = '';
+    if (view === 'members') loadMembers(); else loadDecisions();
+  }
 });
 
 let DEC_MEMBERS = [];

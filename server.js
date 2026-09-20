@@ -670,7 +670,7 @@ const handler = async (req, res) => {
     'decisions.html': path.join(__dirname, 'decisions.html'),
     'crm.html': path.join(__dirname, 'crm.html'),
   };
-  const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html',
+  const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/members': 'hub.html', '/ask': 'hub.html',   // members & access, the decisions desk (admin views of the hub page)
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
