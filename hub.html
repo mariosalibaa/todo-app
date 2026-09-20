@@ -82,7 +82,7 @@
   <section id="members" style="display:none;">
     <h2>Members &amp; access</h2>
     <div class="twrap"><table>
-      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th class="c">Daily</th><th class="c">WhatsApp</th><th class="c">Reports</th><th class="c" title="The Ajaltoun excavation dashboard alone (Georges / Anthony / Dib), without the project's accounts, budget and cash flow">Excavation</th><th class="c" title="Client conversations and leads">Clients</th><th>Ledger</th><th>Projects</th><th style="width:40px"></th></tr></thead>
+      <thead><tr><th>Google account</th><th class="c">To-Do</th><th class="c">Accounting</th><th class="c">Partners</th><th class="c">Ajaltoun</th><th class="c">Daily</th><th class="c">WhatsApp</th><th class="c">Reports</th><th class="c" title="The Ajaltoun excavation dashboard alone (Georges / Anthony / Dib), without the project's accounts, budget and cash flow">Excavation</th><th class="c" title="Client conversations and leads">Clients</th><th class="c" title="The Decisions tile — questions Mario puts to him (a decision's own link works for the person asked in any case)">Decisions</th><th>Ledger</th><th>Projects</th><th style="width:40px"></th></tr></thead>
       <tbody id="member-rows"></tbody>
     </table></div>
     <div id="member-phone"><select id="mp-who" onchange="renderMemberPhone()"></select><div id="mp-apps"></div></div>
@@ -132,7 +132,7 @@ const APPS = [
   { id: 'ajaltoun', ico: '🏗️', name: 'Ajaltoun 4193', desc: 'Project accounts from Odoo — cash flow, costs by section and villa, each partner share', href: '/ajaltoun' },
   { id: 'excavation', ico: '⛏️', name: 'Excavation', desc: 'Ajaltoun 4193 excavation — Georges, Anthony and the diesel, cycle by cycle, with the one-page summary', href: '/ajaltoun/excavation', only: true },
   { id: 'crm', ico: '🤝', name: 'Clients', desc: 'Every client conversation — WhatsApp (Shift Development line), Instagram, Messenger — with stage, owner, next action and the Odoo lead', href: '/crm' },
-  { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide', everyone: true },
+  { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide' },
   { id: 'reports', ico: '📊', name: 'Reports', desc: 'SHIFT GROUP SARL trial balance and general ledger in LBP at historical rates — for the accountant', href: '/reports' },
   { id: 'daily', ico: '📋', name: 'Day report', desc: 'Who worked on your project each day, what he did and what it cost.', href: '/accounting/daily' },
   { id: 'members', ico: '👥', name: 'Members & access', desc: 'Who may open which app — Google accounts and phone sign-ins, ledger and projects per member', href: '/members', admin: true },
@@ -147,7 +147,7 @@ const APPS = [
 const esc = Admin.esc;
 // Mario, 2026-09-12: an app id isn't always its own URL (daily lives under /accounting/daily) —
 // the one-app redirect used to just prepend '/', which sent a daily-only member to the wrong page
-const APP_HREF = { todo: '/todo', accounting: '/accounting', partners: '/partners', ajaltoun: '/ajaltoun', daily: '/accounting/daily', site: '/site', reports: '/reports', excavation: '/ajaltoun/excavation', crm: '/crm' };
+const APP_HREF = { decisions: '/decide', todo: '/todo', accounting: '/accounting', partners: '/partners', ajaltoun: '/ajaltoun', daily: '/accounting/daily', site: '/site', reports: '/reports', excavation: '/ajaltoun/excavation', crm: '/crm' };
 
 Admin.require(null, me => {
   // one app only (and not admin) → straight into it, no tile page in the way
@@ -239,7 +239,7 @@ async function addDecision() {
   } catch (e) { alert('Could not post: ' + e.message); }
 }
 async function delDecision(id) { if (!confirm('Delete this decision?')) return; try { await Admin.api('DELETE', '/api/decisions/' + id); loadDecisions(); } catch (e) { alert(e.message); } }
-const ALL_APPS = [['todo', 'To-Do', ''], ['accounting', 'Accounting', ''], ['partners', 'Partners', ''], ['ajaltoun', 'Ajaltoun', ''], ['daily', 'Daily', 'the Day report — only the lines of his projects'], ['site', 'WhatsApp', 'may post on /site — his own thread'], ['reports', 'Reports', 'the accountant: SARL trial balance and ledger in LBP'], ['excavation', 'Excavation', 'the excavation dashboard alone, without the rest of Ajaltoun'], ['crm', 'Clients', 'client conversations and leads (WhatsApp 70 165 168, Instagram, Messenger)']];
+const ALL_APPS = [['todo', 'To-Do', ''], ['accounting', 'Accounting', ''], ['partners', 'Partners', ''], ['ajaltoun', 'Ajaltoun', ''], ['daily', 'Daily', 'the Day report — only the lines of his projects'], ['site', 'WhatsApp', 'may post on /site — his own thread'], ['reports', 'Reports', 'the accountant: SARL trial balance and ledger in LBP'], ['excavation', 'Excavation', 'the excavation dashboard alone, without the rest of Ajaltoun'], ['crm', 'Clients', 'client conversations and leads (WhatsApp 70 165 168, Instagram, Messenger)'], ['decisions', 'Decisions', 'the Decisions tile — questions Mario puts to him']];
 let MEMBERS = [], LEDGERS = [];
 const ledgerList = () => `<datalist id="dl-ledger">${LEDGERS.map(a => `<option value="${esc(a.id)}">${esc(a.name || '')}${a.owner ? ' · ' + esc(a.owner) : ''}</option>`).join('')}</datalist>`;
 // phone: the same allowlist as a dropdown of accounts + one line per app
@@ -268,7 +268,7 @@ async function loadMembers() {
     LEDGERS = ledgers.filter(a => a && a.id); MEMBERS = list; renderMemberPhone();
     if (!document.getElementById('dl-ledger')) document.body.insertAdjacentHTML('beforeend', ledgerList()); else document.getElementById('dl-ledger').outerHTML = ledgerList();
     rows.innerHTML = list.map(m => {
-      const apps = m.admin ? ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm'] : (Array.isArray(m.apps) ? m.apps : ['todo']);
+      const apps = m.admin ? ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm', 'decisions'] : (Array.isArray(m.apps) ? m.apps : ['todo']);
       return `<tr data-email="${esc(m.email)}">
         <td>${esc(m.email)}${m.name ? ` <span class="small" style="color:var(--overlay0)">${esc(m.name)}</span>` : ''}${m.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</td>
         <td class="c"><input type="checkbox" data-app="todo" ${apps.includes('todo') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)"></td>
@@ -280,6 +280,7 @@ async function loadMembers() {
         <td class="c"><input type="checkbox" data-app="reports" ${apps.includes('reports') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="The accountant: SARL trial balance and general ledger in LBP, read-only"></td>
         <td class="c"><input type="checkbox" data-app="excavation" ${apps.includes('excavation') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="The Ajaltoun excavation dashboard alone — for a partner, before the rest of Ajaltoun is ready"></td>
         <td class="c"><input type="checkbox" data-app="crm" ${apps.includes('crm') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="Client conversations and leads"></td>
+        <td class="c"><input type="checkbox" data-app="decisions" ${apps.includes('decisions') ? 'checked' : ''} ${m.admin ? 'disabled' : ''} onchange="toggleApp(this)" title="The Decisions tile"></td>
         <td><input class="small" list="dl-ledger" value="${esc(m.account || '')}" placeholder="ledger id" title="The worker's ledger account id, e.g. khodr-cash (site)" onchange="setField('${esc(m.email)}','account',this.value)"></td>
         <td><input class="small" value="${esc((m.projects || []).join(','))}" placeholder="analytic ids" title="Analytic account ids the partner may see on the Day report, e.g. 69,59,60,61,62,63,64" onchange="setField('${esc(m.email)}','projects',this.value)"></td>
         <td>${m.admin ? '' : `<button class="ghost" title="Remove" onclick="removeMember('${esc(m.email)}')">✕</button>`}</td>

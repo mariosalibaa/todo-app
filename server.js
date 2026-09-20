@@ -411,7 +411,7 @@ async function executeSyncPlan(direction, odoo, app) {
 // reports = the accountant: SARL trial balance / general ledger in LBP at historical rates, read-only, nothing else
 // 'excavation' = the Ajaltoun excavation dashboard on its own, shareable with a partner before the rest of /ajaltoun is ready (Mario, 2026-09-13)
 // 'crm' = client conversations + leads (WhatsApp 70 165 168, Instagram, Messenger) — sales people (Mario, 2026-09-14)
-const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm'];
+const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm', 'decisions'];   // decisions = the tile only; a decision's own link stays open to the person asked
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
