@@ -25,6 +25,9 @@
   main{max-width:1240px;margin:0 auto;padding:22px 20px 40px;}
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 14px;font-weight:600;}
   .hback{display:inline-block;color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;margin-bottom:14px;} .hback:hover{background:var(--surface0);}
+  .apps-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;} .apps-head h2{margin:0;}
+  #tileSearch{margin-left:auto;width:min(260px,100%);background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:.85rem;} #tileSearch:focus{outline:none;border-color:var(--amber);}
+  .tile.hide{display:none;}
   .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:28px;}
   .tile{display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:start;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
   .tile:hover{border-color:var(--amber);transform:translateY(-2px);}
@@ -72,7 +75,7 @@
   <div class="who" id="who"></div>
 </header>
 <main>
-  <h2>Apps</h2>
+  <div class="apps-head"><h2>Apps</h2><input type="search" id="tileSearch" placeholder="Search apps…" autocomplete="off" oninput="filterTiles(this.value)"></div>
   <div class="tiles" id="tiles"></div>
   <section id="members" style="display:none;">
     <h2>Members &amp; access</h2>
@@ -163,13 +166,21 @@ Admin.require(null, me => {
   const view = /^\/members/.test(location.pathname) ? 'members' : /^\/ask/.test(location.pathname) ? 'decisions' : '';
   if (view) {
     if (!me.admin) { location.replace('/'); return; }
-    document.querySelector('main > h2').textContent = '';
+    document.querySelector('.apps-head').style.display = 'none';
     document.getElementById('tiles').style.display = 'none';
     document.querySelector('main').insertAdjacentHTML('afterbegin', '<a class="hback" href="/">‹ Back to the hub</a>');
     document.getElementById(view).style.display = '';
     if (view === 'members') loadMembers(); else loadDecisions();
   }
 });
+
+// search the tiles by name or description; Enter opens the first hit (Mario, 2026-09-20)
+function filterTiles(q) {
+  q = q.trim().toLowerCase();
+  document.querySelectorAll('#tiles .tile').forEach(t => t.classList.toggle('hide', !!q && !t.textContent.toLowerCase().includes(q)));
+}
+document.getElementById('tileSearch').addEventListener('keydown', e => { if (e.key === 'Enter') { const t = document.querySelector('#tiles .tile:not(.hide)'); if (t) location.href = t.getAttribute('href'); } });
+document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') { e.preventDefault(); document.getElementById('tileSearch').focus(); } });
 
 let DEC_MEMBERS = [];
 async function loadDecisions() {
