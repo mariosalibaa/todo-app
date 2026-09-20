@@ -109,6 +109,15 @@
   .btn.book{padding:1px 7px;height:22px;font-size:11.5px;color:var(--odoo);border-color:var(--surface1);} .btn.book:hover{background:rgba(255,255,255,.035);}
   .odoo-doc{color:var(--muted);font-size:11px;margin-top:1px;white-space:normal;word-break:break-word;}
   .odoo-doc a.doc{display:flex;align-items:center;gap:6px;margin-top:3px;text-decoration:none;}
+  .odoo-doc.one{display:flex;align-items:center;gap:3px;margin-top:0;} .odoo-doc.one a.doc{margin:0;}
+  .doc-nav{border:1px solid var(--line);background:var(--crust);color:var(--text);border-radius:3px;width:16px;height:22px;padding:0;line-height:1;cursor:pointer;font-size:13px;} .doc-nav:hover{border-color:var(--odoo);}
+  .doc-n{font-size:10px;color:var(--muted);min-width:22px;text-align:center;}
+  /* Odoo-like rows: the description shows two lines until you click into it (Mario, 2026-09-20) */
+  .desc-in:not(:focus){max-height:2.7em;overflow:hidden;}
+  .desc-txt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;} tr:hover .desc-txt{-webkit-line-clamp:unset;}
+  .fuel{flex-wrap:nowrap;} .fuel input.odo-in{width:64px;} .fuel select{max-width:70px;}
+  td{padding:2px 6px;} .noteline{margin-top:0;}
+  .note-in:not(:focus){max-height:1.4em;overflow:hidden;}
   .odoo-doc a.doc:hover .doc-name{text-decoration:underline;}
   .doc-thumb{width:34px;height:34px;flex:none;object-fit:cover;border:1px solid var(--line);border-radius:3px;background:var(--crust);}
   .doc-thumb.none{display:inline-flex;align-items:center;justify-content:center;font-size:15px;color:var(--muted);}
@@ -1475,11 +1484,20 @@ const fileLinks = t => {
     return isImg ? `<img class="doc-thumb" loading="lazy" src="${href}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'doc-thumb none',textContent:'📎'}))">`
       : `<span class="doc-thumb none" title="PDF">📄</span>`;
   };
-  const one = (name, i, href, mime) => `<a class="doc" ${href ? `href="${href}" ` : ''}onclick="event.preventDefault();openViewer('${t.id}',${i})" title="${esc(name + why(name))}">`
-    + `${thumb(name, href, mime)}<span class="doc-name">${cut(name)}</span></a>`;
-  return `<div class="odoo-doc">${[...F.map((f, i) => one(f.name, i, '/api/accounting/odoo-file/' + f.id, '')),
-    ...D.map((d, i) => one(d.name, F.length + i, `/api/accounting/accounts/${accOf(t)}/tx/${t.id}/docs/${d.id}`, d.mime || ''))].join('')}</div>`;
+  // one paper at a time with ‹ › to flip through the others — no file names, the row stays one
+  // line high (Mario, 2026-09-20). The name is still the tooltip; click opens the viewer.
+  const all = [...F.map((f, i) => ({ name: f.name, i, href: '/api/accounting/odoo-file/' + f.id, mime: '' })),
+    ...D.map((d, i) => ({ name: d.name, i: F.length + i, href: `/api/accounting/accounts/${accOf(t)}/tx/${t.id}/docs/${d.id}`, mime: d.mime || '' }))];
+  const at = Math.min(t._docAt || 0, all.length - 1), d = all[at];
+  const nav = all.length > 1 ? `<button class="doc-nav" onclick="event.stopPropagation();docFlip('${t.id}',-1,${all.length})" title="previous">‹</button><span class="doc-n">${at + 1}/${all.length}</span><button class="doc-nav" onclick="event.stopPropagation();docFlip('${t.id}',1,${all.length})" title="next">›</button>` : '';
+  return `<div class="odoo-doc one"><a class="doc" href="${d.href}" onclick="event.preventDefault();openViewer('${t.id}',${d.i})" title="${esc(d.name + why(d.name))}">${thumb(d.name, d.href, d.mime)}</a>${nav}</div>`;
 };
+function docFlip(id, dir, n) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  t._docAt = ((t._docAt || 0) + dir + n) % n;
+  const cell = document.querySelector(`tr[data-id="${id}"] .odoo-doc.one`);
+  if (cell) cell.outerHTML = fileLinks(t); else render();
+}
 function odooCell(t) {
   const btn = bookButton(t);
   const m = (t.odoo && t.odoo.matches) || [];
@@ -1687,7 +1705,7 @@ function render() {
         : dayDate(t.date)}<div class="ref">${refTxt}</div>${waWhen}<div class="acts">${acts}</div></td>
       ${!isAll() ? '' : `<td class="c-acct"><a onclick="selectAccount('${esc(t._acc || '')}')" title="Open ${esc(t._accName || '')} on its own">${esc(t._accName || '')}</a>${t._accCur ? `<div class="ref">${esc(t._accCur)}</div>` : ''}</td>`}
       <td class="c-desc" title="${esc(t.description)}">
-        <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : esc(t.description)}</div>
+        <div><span class="svc">${esc(t.service || '')}</span> ${t.src === 'excel' ? `<textarea class="desc-in" rows="1" title="What the workbook says on this row. Correct it here and the cell is corrected too." oninput="growNote(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onchange="saveSheet('${t.id}', 'description', this.value, this)">${esc(t.description || '')}</textarea>` : `<span class="desc-txt" title="${esc(t.description || '')}">${esc(t.description)}</span>`}</div>
         ${sheetEdit(t)}
         ${t.phone ? `<div class="who ${srcClass(cn.src)}" onclick="renameContact('${t.phone}', this)" title="${cn.name ? esc(cn.name) + ' — the owner of ' + cp + '. Click to rename.' : 'Who owns ' + cp + '? Click to name this number.'}">${cn.name ? esc(cn.name) : 'who? ' + cp}</div>` : ''}
         ${st || t.src === 'odoo' ? (t.note ? `<div class="noteline"><textarea class="note-in" rows="1" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note)}</textarea></div>` : '') : `<div class="noteline"><textarea class="note-in" rows="1" placeholder="add note" oninput="growNote(this)" onchange="saveField('${t.id}', 'note', this.value, this)">${esc(t.note || '')}</textarea></div>`}
