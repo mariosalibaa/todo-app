@@ -685,8 +685,51 @@ const handler = async (req, res) => {
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
   // the archive-daemon heartbeat (meta/whatsappArchive) and the short-lived token it gets is signed
   // with ACCOUNTING_API_KEY, the same key the laptop holds — so a leaked tunnel URL alone opens nothing.
-  if (url === '/whatsapp' || url === '/03165168' || url === '/70165168') {   // hub.shift-group.co/70165168 = the tile's short link (Mario, 2026-09-20)
-    const dev = url === '/70165168' || /[?&]account=dev(&|$)/.test(req.url);   // `url` has no query string — read the raw one (the dev tile opened Mario's line, 2026-09-20)
+  // hub.shift-group.co/03165168/… and /70165168/… — the WhatsApp archives, RELAYED through the hub so the
+  // address never leaves the hub (Mario, 2026-09-20: "still this" on seeing trycloudflare.com). The hub
+  // checks the member (session cookie, admin), then forwards the request to the laptop's tunnel with a
+  // 10-minute token in x-wa-token and streams the answer back. POST is allowed on the cookie here only
+  // (the viewer's own fetches; the cookie is SameSite=Lax, so another site cannot post with it).
+  // The tunnel URL comes from the archive-daemon heartbeat (meta/whatsappArchive). Vercel caps a request
+  // body at ~4.5 MB, so a long video will not go out from here — the rest does.
+  if (/^\/(03165168|70165168)(\/|$)/.test(url)) {
+    const line = url.slice(1, 9), rest = req.url.slice(9) || '/';
+    if (url === '/' + line) { res.writeHead(302, { Location: '/' + line + '/' }); res.end(); return; }
+    const page = (code, title, body) => { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>${title}</title><body style="font-family:system-ui,sans-serif;background:#111;color:#eee;padding:48px 20px;text-align:center"><h2 style="margin:0 0 12px">${title}</h2><p style="color:#aaa;max-width:420px;margin:0 auto 24px">${body}</p><a href="/" style="color:#F2A93B">‹ Back to the hub</a>`); };
+    // GET by cookie is what verifyToken does; for the viewer's POSTs (send, reply, file) take the same cookie
+    let u;
+    if (req.method === 'GET') u = await verifyToken(req);
+    else { const c = /(?:^|;\s*)todo_session=([^;]+)/.exec(req.headers.cookie || ''); let tok = ''; if (c) { try { tok = decodeURIComponent(c[1]); } catch {} } u = tok.startsWith('st_') ? await verifySessionToken(tok) : null; }
+    if (AUTH_DISABLED) u = u || { email: 'local@shift' };
+    const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
+    if (!u || !acc) return page(401, 'WhatsApp ' + line, 'Sign in to the hub first, then open this tile again.');
+    if (!acc.admin) return page(403, 'WhatsApp ' + line, 'This one is Mario’s alone.');
+    const key = process.env.ACCOUNTING_API_KEY || '';
+    let meta = null;
+    try { meta = (await db.collection('workspaces').doc(TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); } catch {}
+    const target = meta && (line === '70165168' ? meta.urlDev : meta.url);
+    const fresh = target && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
+    if (!fresh || !key) return page(503, 'The laptop is offline', `The archive lives on Mario’s laptop and answers only while it is on and online${meta && meta.at ? ` — last seen ${new Date(meta.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' })}` : ''}.`);
+    const exp = Date.now() + 10 * 60000;
+    const token = exp + '.' + crypto.createHmac('sha256', key).update('open:' + exp).digest('hex');
+    try {
+      const chunks = []; for await (const c of req) chunks.push(c);
+      const body = Buffer.concat(chunks);
+      const fwd = { 'x-wa-token': token, 'x-forwarded-for': String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '') };
+      for (const h of ['content-type', 'x-kind', 'x-name', 'x-caption', 'range', 'accept', 'if-none-match']) if (req.headers[h]) fwd[h] = req.headers[h];
+      const r = await fetch(target + rest, { method: req.method, headers: fwd, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body, redirect: 'manual', signal: AbortSignal.timeout(55000) });
+      const out = {};
+      for (const h of ['content-type', 'content-length', 'content-disposition', 'cache-control', 'accept-ranges', 'content-range', 'etag', 'last-modified']) { const v = r.headers.get(h); if (v) out[h] = v; }
+      if (r.status >= 300 && r.status < 400 && r.headers.get('location')) out.location = r.headers.get('location').replace(target, '/' + line);
+      res.writeHead(r.status, out);
+      if (!r.body) { res.end(); return; }
+      const { Readable } = require('stream');
+      Readable.fromWeb(r.body).pipe(res);
+    } catch (e) { page(502, 'The laptop did not answer', String(e.message || e).slice(0, 200)); }
+    return;
+  }
+  if (url === '/whatsapp') {   // the direct way: a redirect to the tunnel itself (bigger files, or when the relay misbehaves)
+    const dev = /[?&]account=dev(&|$)/.test(req.url);   // `url` has no query string — read the raw one (the dev tile opened Mario's line, 2026-09-20)
     const u = await verifyToken(req);
     const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
     const page = (title, body) => { res.writeHead(u && acc ? 200 : 401, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>${title}</title><body style="font-family:system-ui,sans-serif;background:#111;color:#eee;padding:48px 20px;text-align:center"><h2 style="margin:0 0 12px">${title}</h2><p style="color:#aaa;max-width:420px;margin:0 auto 24px">${body}</p><a href="/" style="color:#F2A93B">‹ Back to the hub</a>`); };
