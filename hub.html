@@ -132,11 +132,11 @@ const APPS = [
   { id: 'ajaltoun', ico: '🏗️', name: 'Ajaltoun 4193', desc: 'Project accounts from Odoo — cash flow, costs by section and villa, each partner share', href: '/ajaltoun' },
   { id: 'excavation', ico: '⛏️', name: 'Excavation', desc: 'Ajaltoun 4193 excavation — Georges, Anthony and the diesel, cycle by cycle, with the one-page summary', href: '/ajaltoun/excavation', only: true },
   { id: 'crm', ico: '🤝', name: 'Clients', desc: 'Every client conversation — WhatsApp (Shift Development line), Instagram, Messenger — with stage, owner, next action and the Odoo lead', href: '/crm' },
-  { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide' },
+  // one tile for both sides (Mario, 2026-09-20 "combine into one"): a partner opens his list (/decide), Mario his desk (/ask)
+  { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide', adminHref: '/ask', adminDesc: 'Put a question to a partner from its own link — approve or hold, you get a Telegram when he answers' },
   { id: 'reports', ico: '📊', name: 'Reports', desc: 'SHIFT GROUP SARL trial balance and general ledger in LBP at historical rates — for the accountant', href: '/reports' },
   { id: 'daily', ico: '📋', name: 'Day report', desc: 'Who worked on your project each day, what he did and what it cost.', href: '/accounting/daily' },
   { id: 'members', ico: '👥', name: 'Members & access', desc: 'Who may open which app — Google accounts and phone sign-ins, ledger and projects per member', href: '/members', admin: true },
-  { id: 'ask', ico: '❓', name: 'Ask a decision', desc: 'Put a question to a partner from its own link — approve or hold, you get a Telegram when he answers', href: '/ask', admin: true },
   { id: 'naccache', ico: '🏠', name: 'Naccache 900/4', desc: 'مايا — خطوات تسجيل الشقة + الأوراق (public link, no sign-in)', href: '/naccache', admin: true },
   { id: 'rent-law', ico: '⚖️', name: 'Rent law', desc: 'Law 24/2025 on pre-1992 non-residential leases — extension ladder, fair rent, yearly increases — plus the State-rent circular and CAS inflation letter', href: '/rent-law', admin: true },
   { id: 'mechanical', ico: '🔧', name: 'Mechanical', desc: 'MEP reference — how to read the drainage drawings (CB, MH, FD, WCO, SP/UG…), pipe sizes and slopes, plus a dated notes log', href: '/mechanical', admin: true },
@@ -191,8 +191,8 @@ function renderTiles(who) {
   const on = a => a.everyone || a.admin || who.apps.includes(a.id);   // 'admin' tiles: Mario-only hand-out pages, not an app key
   // a member sees only the tiles he may open — no faded ones (Mario, 2026-09-20)
   document.getElementById('tiles').innerHTML = APPS.filter(a => on(a) && (!a.admin || who.admin) && (!a.only || (who.apps.includes(a.id) && !who.apps.includes('ajaltoun')))).map(a => `
-    <a class="tile" href="${a.href}">
-      <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
+    <a class="tile" href="${who.admin && a.adminHref || a.href}">
+      <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${who.admin && a.adminDesc || a.desc}</div>
     </a>`).join('') || '<div class="note">Nothing — this member sees an empty hub.</div>';
   filterTiles(document.getElementById('tileSearch').value);
 }
