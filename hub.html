@@ -150,8 +150,9 @@ Admin.require(null, me => {
   // 'only' tiles show only to members who have that key and not the full app (Excavation without Ajaltoun);
   // 'everyone' tiles (Decisions) are open to every signed-in member — the server filters what each one sees
   const on = a => a.everyone || a.admin || me.apps.includes(a.id);   // 'admin' tiles: Mario-only hand-out pages, not an app key
-  document.getElementById('tiles').innerHTML = APPS.filter(a => (!a.admin || me.admin) && (!a.only || (me.apps.includes(a.id) && !me.apps.includes('ajaltoun')))).map(a => `
-    <a class="tile ${on(a) ? '' : 'off'}" href="${a.href}">
+  // a member sees only the tiles he may open — no faded ones (Mario, 2026-09-20)
+  document.getElementById('tiles').innerHTML = APPS.filter(a => on(a) && (!a.admin || me.admin) && (!a.only || (me.apps.includes(a.id) && !me.apps.includes('ajaltoun')))).map(a => `
+    <a class="tile" href="${a.href}">
       <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
     </a>`).join('');
   if (me.admin) { document.getElementById('members').style.display = ''; loadMembers(); document.getElementById('decisions').style.display = ''; loadDecisions(); }
