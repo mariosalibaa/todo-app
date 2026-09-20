@@ -52,6 +52,16 @@ async function visionRead(buf, mime) {
   return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', date: out.date || null, note: String(out.note || '').slice(0, 160) };
 }
 
+// The fuel line's photos (pump display, odometer, receipt) → the numbers the words did not carry
+// (Mario, 2026-09-20: "for the fuel the number from the photos"). Several photos go in one call.
+async function fuelRead(images) {
+  const out = await anthropic({ model: 'claude-sonnet-5', max_tokens: 300,
+    system: 'These are the photos a driver in Lebanon sent for one fuel fill: a pump display, a car odometer/dashboard, a receipt — any subset. Return JSON only: {"odometer":number|null,"liters":number|null,"pricePerL":number|null,"total":number|null,"currency":"USD"|"LBP"|null,"car":string|null,"confidence":"high"|"low","note":string}. odometer = the total km on the dashboard (not the trip meter, not the fuel gauge). liters and total from the pump or receipt. car = the make/model if a badge or dashboard makes it clear, else null. Numbers only, no units, null when not visible.',
+    messages: [{ role: 'user', content: images.map(i => ({ type: 'image', source: { type: 'base64', media_type: i.mime, data: i.buf.toString('base64') } })) }] });
+  const n = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
+  return { odometer: n(out.odometer), liters: n(out.liters), pricePerL: n(out.pricePerL), total: n(out.total), currency: out.currency || null, car: out.car || null, confidence: out.confidence === 'high' ? 'high' : 'low', note: String(out.note || '').slice(0, 160) };
+}
+
 async function whisper(buf, mime) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('no OPENAI_API_KEY — voice notes cannot be transcribed');
@@ -64,4 +74,4 @@ async function whisper(buf, mime) {
   return String(j.text || '').trim();
 }
 
-module.exports = { quickParse, matchName, claudeParse, visionRead, whisper };
+module.exports = { quickParse, matchName, claudeParse, visionRead, fuelRead, whisper };

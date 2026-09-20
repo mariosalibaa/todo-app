@@ -71,6 +71,7 @@
   .fuel select,.fuel input.odo-in{width:auto;border:1px solid transparent;background:transparent;font-size:11.5px;padding:1px 4px;border-radius:3px;font-family:inherit;color:inherit;}
   .fuel select:hover,.fuel input.odo-in:hover{border-color:var(--line);} .fuel input.odo-in{width:78px;text-align:right;} .fuel input.odo-in.l{width:44px;}
   .fuel select.src-auto,.fuel input.src-auto{color:var(--auto);font-style:italic;} .fuel select.ask{color:var(--odoo);font-weight:600;}
+  .fuel-read{border:1px solid var(--line);background:var(--crust);border-radius:3px;height:20px;padding:0 5px;cursor:pointer;font-size:11px;color:var(--text);} .fuel-read:hover{border-color:var(--odoo);} .fuel-read:disabled{opacity:.6;}
   .fuel-h{font-size:14px;margin:16px 0 4px;} .fuel-h .hint{font-weight:400;margin-left:8px;}
   /* the timesheet's project chips */
   #ts-body .tag{display:inline-block;background:var(--surface0);border:1px solid var(--line);border-radius:10px;padding:0 7px;margin:1px 2px 1px 0;font-size:11.5px;white-space:nowrap;}
@@ -723,7 +724,10 @@ function cashOf(t) {
 function reconOf(t) {
   const won = t.odoo && (t.odoo.matches || []).find(x => x.chosen);
   if (won) return won.settled || (won.docs || []).some(d => !/^P(CSH|SETT|BNK)/.test(d)) ? 'yes' : 'no';
-  if (t.bookedMove && t.bookedMove.id) return t.bookedMove.paymentState === 'paid' || t.bookedMove.paymentState === 'in_payment' || (t.bookedMove.paidBy || []).length ? 'yes' : 'no';
+  // a row on the worker's own monthly bill is settled by that bill: it is money of his account, the
+  // bill IS the debt to him, and the cash Mario hands him later pays the bill, not the row
+  // (Mario, 2026-09-20: "bills from Abed are coming from his account, so payment done")
+  if (t.bookedMove && t.bookedMove.id) return 'bill';
   return '';
 }
 const unjustified = t => !t.excluded && !!(t.debit || t.credit) && !partnerShown(t) && !t.partnerText && !cashOf(t);
@@ -1752,7 +1756,7 @@ function render() {
         ${t.projectFrom && t.analyticName && t.analyticSrc !== 'manual' ? `<div class="sug-act" title="${esc('Not written in the sheet: taken from the ' + t.projectFrom + '. ✓ keeps it, ✕ clears it so you pick one.')}"><span class="sug-why">from the ${esc(t.projectFrom)}</span> <button class="yes" onclick="confirmAnalytic('${t.id}', true)">✓</button><button class="no" onclick="confirmAnalytic('${t.id}', false)">✕</button></div>` : ''}
       </td>`}
       <td class="c-odoo">${odooCell(t)}</td>
-      ${(() => { const r = reconOf(t); return `<td class="c-recon ${r}" title="${r === 'yes' ? 'Reconciled in Odoo with a bill or invoice — the project cost is on that document' : r === 'no' ? 'In Odoo but not yet reconciled — the project shows this payment until it is' : 'Not in Odoo'}">${r === 'yes' ? '✓ reconciled' : r === 'no' ? `○ open <a class="recon" onclick="openReconcile('${t.id}')" title="Reconcile this payment with the partner's open bills or invoices in Odoo">⇄</a>` : '—'}</td>`; })()}
+      ${(() => { const r = reconOf(t); return `<td class="c-recon ${r === 'bill' ? 'yes' : r}" title="${r === 'yes' ? 'Reconciled in Odoo with a bill or invoice — the project cost is on that document' : r === 'bill' ? 'On his monthly bill ' + esc(t.bookedMove.name || t.bookedMove.ref || '') + ' — the cost is booked; the bill itself is paid by the next cash he receives' : r === 'no' ? 'In Odoo but not yet reconciled — the project shows this payment until it is' : 'Not in Odoo'}">${r === 'yes' ? '✓ reconciled' : r === 'bill' ? '✓ on bill' : r === 'no' ? `○ open <a class="recon" onclick="openReconcile('${t.id}')" title="Reconcile this payment with the partner's open bills or invoices in Odoo">⇄</a>` : '—'}</td>`; })()}
       <td class="c-rev${t.reviewed ? ' on' : ''}" title="${t.reviewed ? esc('Reviewed ' + stamp(t.reviewedAt) + ' by ' + (t.reviewedBy || '?')) : 'Tick when you have looked at this line — the time and your name are kept, and it goes in the log'}">
         <label><input type="checkbox" ${t.reviewed ? 'checked' : ''} onchange="setReviewed('${t.id}', this.checked, this)"> ${t.reviewed ? 'reviewed' : 'review'}</label>
         ${t.reviewed ? `<div class="hint">${esc(stamp(t.reviewedAt))}<br>${esc(shortWho(t.reviewedBy))}</div>` : ''}
@@ -2802,7 +2806,18 @@ function fuelStrip(t) {
   return `<div class="fuel" title="⛽ Which car this benzine went into and the odometer at the pump — the Fuel view adds it up per car. Italic = read off the words, not yet confirmed.">⛽
     <select class="${f.carSrc === 'auto' ? 'src-auto' : ''}${!f.car ? ' ask' : ''}" onchange="saveFuel('${t.id}', 'car', this.value, this)"><option value="">? which car</option>${CARS.map(c => `<option ${f.car === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <input class="odo-in${f.odoSrc === 'auto' && f.odometer ? ' src-auto' : ''}" type="text" inputmode="numeric" placeholder="odometer" value="${f.odometer || ''}" onchange="saveFuel('${t.id}', 'odometer', this.value, this)"><span>km</span>
-    <input class="odo-in l" type="text" inputmode="decimal" placeholder="L" value="${esc(String(f.liters || ''))}" onchange="saveFuel('${t.id}', 'liters', this.value, this)"><span>L</span></div>`;
+    <input class="odo-in l${f.litersSrc === 'photo' ? ' src-auto' : ''}" type="text" inputmode="decimal" placeholder="L" value="${esc(String(f.liters || ''))}" onchange="saveFuel('${t.id}', 'liters', this.value, this)"><span>L</span>${(t.docs || []).some(d => /^image\//.test(d.mime || '')) || (t.fileIds || []).length ? `<button class="fuel-read" onclick="fuelRead('${t.id}', this)" title="${f.photoRead ? esc('Read from ' + f.photoRead.images + ' photo(s) on ' + String(f.photoRead.at).slice(0, 16).replace('T', ' ') + (f.photoRead.note ? ' — ' + f.photoRead.note : '') + '. Click to read again.') : 'Read the odometer and the litres off the photos of this line'}">📷${f.photoRead ? '✓' : ''}</button>` : ''}</div>`;
+}
+async function fuelRead(id, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const t = tx.find(x => x.id === id);
+    const r = await api('POST', `/api/accounting/accounts/${accOf(t)}/tx/${id}/fuel-read`, {});
+    t.fuel = r.fuel;
+    const x = r.read;
+    say(`Photos: odometer ${x.odometer ?? '—'} km · ${x.liters ?? '—'} L · ${x.total ?? '—'} ${x.currency || ''}${x.pricePerL ? ' @ ' + x.pricePerL : ''} (${x.confidence})${x.note ? ' — ' + x.note : ''}`, x.confidence === 'high' ? 'ok' : 'warn');
+    render();
+  } catch (e) { say('Could not read the photos: ' + e.message, 'err'); btn.disabled = false; btn.textContent = '📷'; }
 }
 async function saveFuel(id, field, value, el) {
   const t = tx.find(x => x.id === id); if (!t) return;

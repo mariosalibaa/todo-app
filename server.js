@@ -685,8 +685,8 @@ const handler = async (req, res) => {
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
   // the archive-daemon heartbeat (meta/whatsappArchive) and the short-lived token it gets is signed
   // with ACCOUNTING_API_KEY, the same key the laptop holds — so a leaked tunnel URL alone opens nothing.
-  if (url === '/whatsapp' || url.startsWith('/whatsapp?')) {
-    const dev = /[?&]account=dev\b/.test(url);   // the Shift Development line's archive (viewer :4621, its own tunnel)
+  if (url === '/whatsapp') {
+    const dev = /[?&]account=dev(&|$)/.test(req.url);   // `url` has no query string — read the raw one (the dev tile opened Mario's line, 2026-09-20)
     const u = await verifyToken(req);
     const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
     const page = (title, body) => { res.writeHead(u && acc ? 200 : 401, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>${title}</title><body style="font-family:system-ui,sans-serif;background:#111;color:#eee;padding:48px 20px;text-align:center"><h2 style="margin:0 0 12px">${title}</h2><p style="color:#aaa;max-width:420px;margin:0 auto 24px">${body}</p><a href="/" style="color:#F2A93B">‹ Back to the hub</a>`); };

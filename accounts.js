@@ -951,6 +951,43 @@ async function handle(req, res, url, user, ctx) {
     } catch (e) { return json(res, 400, { error: String(e.message || e) }); }
   }
 
+  // ⛽ read the row's photos for the odometer / litres / price — the line's fuel fields are filled
+  // from what Claude sees, marked `photo`, and Mario confirms (Mario, 2026-09-20)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)\/fuel-read$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const ref = txCol(a).doc(m[2]);
+    const cur = (await ref.get()).data();
+    if (!cur) return json(res, 404, { error: 'no such line' });
+    const images = [];
+    for (const d of (cur.docs || []).filter(d => /^image\//.test(d.mime || '')).slice(0, 6)) {
+      try {
+        let buf;
+        if (d.store === 'firestore') { const x = (await ws.collection('txDocs').doc(d.id).get()).data(); buf = x && Buffer.from(x.b64, 'base64'); }
+        else [buf] = await admin.storage().bucket().file(d.key).download();
+        if (buf) images.push({ buf, mime: d.mime });
+      } catch (e) { console.error('fuel-read doc', d.id, e.message); }
+    }
+    for (const f of (cur.fileIds || []).slice(0, 6)) {
+      try {
+        const [x] = await odooCall('ir.attachment', 'read', [[+f.id], ['mimetype', 'datas']], { context: { allowed_company_ids: [2, 4, 7, 8, 9, 10] } });
+        if (x && x.datas && /^image\//.test(x.mimetype || '')) images.push({ buf: Buffer.from(x.datas, 'base64'), mime: x.mimetype });
+      } catch (e) { console.error('fuel-read odoo file', f.id, e.message); }
+    }
+    if (!images.length) return json(res, 400, { error: 'no photo on this line' });
+    let r;
+    try { r = await require('./site-parse').fuelRead(images); } catch (e) { return json(res, 502, { error: String(e.message || e) }); }
+    const fuel = { ...(cur.fuel || {}) };
+    const before = { ...fuel };
+    if (r.odometer && (!fuel.odometer || fuel.odoSrc !== 'manual')) { fuel.odometer = Math.round(r.odometer); fuel.odoSrc = 'photo'; }
+    if (r.liters && (!fuel.liters || fuel.litersSrc !== 'manual')) { fuel.liters = Math.round(r.liters * 100) / 100; fuel.litersSrc = 'photo'; }
+    if (r.pricePerL) fuel.pricePerL = r.pricePerL;
+    fuel.photoRead = { at: now(), by: who, ...r, images: images.length };
+    await ref.set({ fuel, updatedAt: now(), updatedBy: who }, { merge: true });
+    await hubLog(ws, 'fuel', { who, txId: m[2], line: `${a.id}: fuel read from ${images.length} photo(s) — odometer ${r.odometer ?? '?'}, ${r.liters ?? '?'} L, ${r.total ?? '?'} ${r.currency || ''}`, before, after: fuel });
+    return json(res, 200, { ok: true, fuel, read: r });
+  }
+
   // the file itself, streamed back through the app (the bucket stays private)
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)\/docs\/([\w-]+)$/)) && req.method === 'GET') {
     const a = await resolve(ws, m[1]);
