@@ -26,7 +26,8 @@
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 14px;font-weight:600;}
   .hback{display:inline-block;color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;margin-bottom:14px;} .hback:hover{background:var(--surface0);}
   .apps-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;} .apps-head h2{margin:0;}
-  #tileSearch{margin-left:auto;width:min(260px,100%);background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:.85rem;} #tileSearch:focus{outline:none;border-color:var(--amber);}
+  #viewAs{margin-left:auto;background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--sub);font:inherit;font-size:.85rem;max-width:260px;} #viewAs.on{color:var(--amber);border-color:var(--amber);}
+  #tileSearch{width:min(260px,100%);background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:.85rem;} #tileSearch:focus{outline:none;border-color:var(--amber);}
   .tile.hide{display:none;}
   .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:28px;}
   .tile{display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:start;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
@@ -75,7 +76,8 @@
   <div class="who" id="who"></div>
 </header>
 <main>
-  <div class="apps-head"><h2>Apps</h2><input type="search" id="tileSearch" placeholder="Search apps…" autocomplete="off" oninput="filterTiles(this.value)"></div>
+  <div class="apps-head"><h2>Apps</h2><select id="viewAs" title="See the hub the way a member sees it (preview only — nothing changes)" style="display:none" onchange="viewAs(this.value)"><option value="">View as…</option></select><input type="search" id="tileSearch" placeholder="Search apps…" autocomplete="off" oninput="filterTiles(this.value)"></div>
+  <div id="viewAsNote" class="note" style="display:none;margin:-4px 0 12px"></div>
   <div class="tiles" id="tiles"></div>
   <section id="members" style="display:none;">
     <h2>Members &amp; access</h2>
@@ -155,12 +157,14 @@ Admin.require(null, me => {
     (me.local ? '<span style="color:var(--overlay0)">local</span>' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   // 'only' tiles show only to members who have that key and not the full app (Excavation without Ajaltoun);
   // 'everyone' tiles (Decisions) are open to every signed-in member — the server filters what each one sees
-  const on = a => a.everyone || a.admin || me.apps.includes(a.id);   // 'admin' tiles: Mario-only hand-out pages, not an app key
-  // a member sees only the tiles he may open — no faded ones (Mario, 2026-09-20)
-  document.getElementById('tiles').innerHTML = APPS.filter(a => on(a) && (!a.admin || me.admin) && (!a.only || (me.apps.includes(a.id) && !me.apps.includes('ajaltoun')))).map(a => `
-    <a class="tile" href="${a.href}">
-      <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
-    </a>`).join('');
+  renderTiles(me);
+  ME = me;
+  // admin: "View as…" renders the tiles the way a member sees them — a preview, nothing changes (Mario, 2026-09-20)
+  if (me.admin && !/^\/(members|ask)/.test(location.pathname)) Admin.api('GET', '/api/allowlist').then(list => {
+    const sel = document.getElementById('viewAs');
+    list.sort((a, b) => a.email.localeCompare(b.email)).forEach(m => { if (!m.admin) sel.insertAdjacentHTML('beforeend', `<option value="${esc(m.email)}">${esc(m.name || m.email)}</option>`); });
+    sel.dataset.members = JSON.stringify(list); sel.style.display = '';
+  }).catch(() => {});
   // the hub page is the tiles only; members & access and the decisions desk are their own pages
   // (/members, /ask — same file, one section shown) (Mario, 2026-09-20)
   const view = /^\/members/.test(location.pathname) ? 'members' : /^\/ask/.test(location.pathname) ? 'decisions' : '';
@@ -181,6 +185,27 @@ function filterTiles(q) {
 }
 document.getElementById('tileSearch').addEventListener('keydown', e => { if (e.key === 'Enter') { const t = document.querySelector('#tiles .tile:not(.hide)'); if (t) location.href = t.getAttribute('href'); } });
 document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') { e.preventDefault(); document.getElementById('tileSearch').focus(); } });
+
+let ME = null;
+function renderTiles(who) {
+  const on = a => a.everyone || a.admin || who.apps.includes(a.id);   // 'admin' tiles: Mario-only hand-out pages, not an app key
+  // a member sees only the tiles he may open — no faded ones (Mario, 2026-09-20)
+  document.getElementById('tiles').innerHTML = APPS.filter(a => on(a) && (!a.admin || who.admin) && (!a.only || (who.apps.includes(a.id) && !who.apps.includes('ajaltoun')))).map(a => `
+    <a class="tile" href="${a.href}">
+      <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${a.desc}</div>
+    </a>`).join('') || '<div class="note">Nothing — this member sees an empty hub.</div>';
+  filterTiles(document.getElementById('tileSearch').value);
+}
+function viewAs(email) {
+  const sel = document.getElementById('viewAs'), note = document.getElementById('viewAsNote');
+  const m = email && JSON.parse(sel.dataset.members || '[]').find(x => x.email === email);
+  sel.classList.toggle('on', !!m);
+  if (!m) { note.style.display = 'none'; renderTiles(ME); return; }
+  const apps = Array.isArray(m.apps) ? m.apps : ['todo'];
+  renderTiles({ apps, admin: false });
+  note.style.display = '';
+  note.innerHTML = `Previewing the hub as <b>${esc(m.name || m.email)}</b> — ${apps.length ? apps.map(esc).join(', ') : 'no app'}${m.account ? ' · ledger ' + esc(m.account) : ''}${(m.projects || []).length ? ' · projects ' + esc(m.projects.join(', ')) : ''}. The tiles open your own session, not his. <a href="/members">Change his access</a>`;
+}
 
 let DEC_MEMBERS = [];
 async function loadDecisions() {
