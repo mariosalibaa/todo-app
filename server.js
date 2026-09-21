@@ -11,6 +11,7 @@ const decisions = require('./decisions');
 const crm = require('./crm');                  // /api/crm/* + /api/meta/webhook (client conversations: WhatsApp dev line, Instagram, Messenger)      // /api/decisions/* (a question to a partner, answered from a link; Telegram to Mario)
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 const procurement = require('./procurement');  // /api/procurement/* (the price book: supplier, item, price, description — admin only)
+const aiFill = require('./ai-fill');            // POST /api/ai/fill — Dictate: a voice/typed note → a form's fields (any member; extraction only)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
 const excavation = require('./excavation');
@@ -979,6 +980,11 @@ const handler = async (req, res) => {
   if (url.startsWith('/api/decisions')) {
     try { const handled = await decisions.handle(req, res, url, user, { db, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('decisions error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+  if (url === '/api/ai/fill') {
+    try { if ((await aiFill.handle(req, res)) === false) { res.writeHead(405); res.end('method'); } }
+    catch (e) { console.error('ai-fill error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   if (url.startsWith('/api/procurement')) {

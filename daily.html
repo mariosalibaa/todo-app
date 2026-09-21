@@ -117,6 +117,7 @@
 
   <div class="card write">
     <h2>Write the day <span class="muted" id="ratehint"></span></h2>
+    <div id="dictate" style="margin:0 0 12px"></div>
     <div class="drafthead"><div>Who</div><div>Project</div><div>What he did</div><div>Paid by Shift</div><div>Due to employee</div><div></div></div>
     <div id="drafts"></div>
     <div class="foot">
@@ -400,6 +401,32 @@ Admin.require(null, async me => {
   el('ans').innerHTML = analytic.map(a => `<option value="${esc(a.name)}">`).join('');
   await load();
   if (!READ_ONLY && !drafts.length) addDraft();
+  // Dictate the day (Mario, 2026-09-21): "Abed with his son and Georges at Ajaltoun, Khoder 8 hours Naccache, 40 dollars benzine for the BMW"
+  // → one draft row per person, names matched to the sheet, his default rate as on a click; nothing saved until "Save the day"
+  if (!READ_ONLY) Admin.dictate({ host: 'dictate', hint: 'Say who worked, where, what he did and any money he got — one row per person appears below; check, then Save the day.',
+    schema: () => ({ name: 'Day report', shape: 'array',
+      intro: 'One record per person who worked. The same person twice (two projects) = two records.',
+      fields: [
+        { key: 'who', hint: 'the person, one of PEOPLE' },
+        { key: 'project', hint: 'where he worked, one of PROJECTS (empty if not said)' },
+        { key: 'description', hint: 'what he did, short (hours if said, e.g. "8 h"; "with his son" for Abed)' },
+        { key: 'dueToEmployee', hint: 'what he earns for this day in USD, ONLY if a wage/amount for his day is said (else empty — the form knows his rate)' },
+        { key: 'paidByShift', hint: 'money he received from Shift that day in USD: benzine, cash advance, a payment (else empty)' },
+      ],
+      context: { PEOPLE: people.map(p => p.name), PROJECTS: analytic.map(a => a.name) } }),
+    onFilled: rows => {
+      if (drafts.length === 1 && !drafts[0].accountId && !drafts[0].description) drafts = [];   // the empty starter row
+      for (const r of rows) {
+        const q = norm(r.who); let p = people.find(x => norm(x.name) === q);
+        if (!p && q) { const hits = people.filter(x => norm(x.name).includes(q) || q.includes(norm(x.name).split(' ')[0])); if (hits.length === 1) p = hits[0]; }
+        const d = { who: p ? p.name : r.who || '', accountId: p ? p.id : '', project: r.project || '', description: r.description || '', debit: r.paidByShift || '', credit: r.dueToEmployee || '', nature: 'labour' };
+        if (p && !d.credit && p.defaultRate) d.credit = String(p.defaultRate);
+        if (p && !d.project && p.defaultProject) d.project = p.defaultProject.name || '';
+        drafts.push(d);
+      }
+      drawDrafts();
+      say(`${rows.length} row${rows.length === 1 ? '' : 's'} from your words — check them, then Save the day.`);
+    } });
 });
 </script>
 </body>
