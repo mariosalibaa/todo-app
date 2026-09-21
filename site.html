@@ -87,7 +87,9 @@
   .composer .lockhint{position:absolute;right:18px;bottom:calc(100% + 8px);width:34px;padding:8px 0 4px;border-radius:17px;background:var(--surface0);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:1rem;color:var(--sub);box-shadow:0 4px 14px rgba(0,0,0,.35);} .composer .lockhint[hidden]{display:none;}
   .lockhint .arr{font-size:.9rem;animation:bob 1s infinite;} @keyframes bob{50%{transform:translateY(-4px)}}
   .composer .row{position:relative;}
-  .composer button.plus{font-size:1.6rem;line-height:1;color:var(--sub);background:transparent;} .composer button.cam{background:transparent;color:var(--sub);font-size:1.3rem;width:36px;}
+  .composer button.plus{font-size:1.6rem;line-height:1;color:var(--sub);background:transparent;}
+  .composer button.emo{font-size:1.45rem;width:34px;} /* emoji picker (Mario 2026-09-21), WhatsApp order: emoji, then + */
+  :root{--ep-bg:var(--mantle);--ep-line:var(--surface0);--ep-hover:var(--base);--ep-dim:var(--sub);--ep-text:var(--text);} .composer button.cam{background:transparent;color:var(--sub);font-size:1.3rem;width:36px;}
   .sheet .card.attach{flex-direction:row;justify-content:space-around;padding:22px 12px calc(22px + env(safe-area-inset-bottom));}
   .sheet .card.attach button{background:transparent;border:0;color:var(--text);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;}
   .sheet .card.attach button i{font-style:normal;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;}
@@ -129,6 +131,7 @@
   </section>
 </main>
 <div class="composer"><div class="row">
+  <button id="btnemoji" disabled class="plus emo" onclick="EmojiPicker.toggle(this, el('text'))" title="Emoji">☺</button>
   <button id="btnphoto" disabled class="plus" onclick="attachSheet()" title="Attach">＋</button>
   <textarea id="text" disabled placeholder="Write, or talk with Flow" rows="1" oninput="micSend()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText();}"></textarea>
   <!-- recording bar (WhatsApp, Mario 2026-09-15): hold the mic to record, release to send, slide left to cancel, slide up to lock -->
@@ -140,7 +143,7 @@
 <input type="file" id="file" hidden>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="/admin-shared.js"></script><script src="/phone-preview.js"></script>
+<script src="/admin-shared.js"></script><script src="/phone-preview.js"></script><script src="/emoji-picker.js"></script>
 <script>
 // Mario, 2026-09-12: no background digest on the server any more — the page awaits
 // POST .../digest right after a successful post (Vercel can freeze a function right
@@ -151,7 +154,7 @@ const hhmm = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit',
 const dayLabel = ymd => new Date(ymd + 'T12:00:00+03:00').toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', weekday: 'long', day: 'numeric', month: 'long' });
 
 function setComposerEnabled(on) {
-  ['text', 'btnsend', 'btnphoto', 'btnvideo'].forEach(id => el(id).disabled = !on); micSend();
+  ['text', 'btnsend', 'btnphoto', 'btnvideo', 'btnemoji'].forEach(id => el(id).disabled = !on); micSend();
 }
 const ONE_DAY = 864e5;
 function whenLabel(iso) {
