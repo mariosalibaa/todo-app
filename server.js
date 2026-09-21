@@ -716,7 +716,7 @@ const handler = async (req, res) => {
       const chunks = []; for await (const c of req) chunks.push(c);
       const body = Buffer.concat(chunks);
       const fwd = { 'x-wa-token': token, 'x-forwarded-for': String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '') };
-      for (const h of ['content-type', 'x-kind', 'x-name', 'x-caption', 'range', 'accept', 'if-none-match']) if (req.headers[h]) fwd[h] = req.headers[h];
+      for (const h of ['content-type', 'x-kind', 'x-name', 'x-caption', 'x-at', 'range', 'accept', 'if-none-match']) if (req.headers[h]) fwd[h] = req.headers[h];
       const r = await fetch(target + rest, { method: req.method, headers: fwd, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body, redirect: 'manual', signal: AbortSignal.timeout(55000) });
       const out = {};
       for (const h of ['content-type', 'content-length', 'content-disposition', 'cache-control', 'accept-ranges', 'content-range', 'etag', 'last-modified']) { const v = r.headers.get(h); if (v) out[h] = v; }
