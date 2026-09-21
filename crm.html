@@ -52,6 +52,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
+<script src="/dictate.js"></script>
 <script>
 const esc = Admin.esc;
 const STAGES = ['new', 'contacted', 'visit', 'offer', 'won', 'lost'];
@@ -74,6 +75,7 @@ async function showList() {
   renderList();
 }
 function renderList() {
+  setTimeout(mountDictateNew, 0);
   const F = filter.cols || (filter.cols = {});
   const cell = (l, k) => k === 'name' ? (l.name || '') + ' ' + (l.pushname || '') : k === 'last' ? (l.lastText || '') : String(l[k] || '');
   const list = LEADS.filter(l => (!filter.stage || l.stage === filter.stage)
@@ -85,7 +87,7 @@ function renderList() {
   document.getElementById('main').innerHTML = `
     <h1>Clients</h1>
     <p class="muted">Every conversation with a client, from WhatsApp (70 165 168), Instagram and Messenger — read here, answered from the phone. ${waiting ? `<b style="color:var(--amber)">${waiting} waiting for an answer.</b>` : 'Nobody is waiting for an answer.'}</p>
-    <div class="bar"><button class="primary" onclick="newRow()">＋ New client</button><input placeholder="search everything…" value="${esc(filter.q)}" oninput="filter.q=this.value.toLowerCase();renderList();keep(this)" style="flex:1;min-width:180px">
+    <div class="bar"><button class="primary" onclick="newRow()">＋ New client</button><span id="dictate-new"></span><input placeholder="search everything…" value="${esc(filter.q)}" oninput="filter.q=this.value.toLowerCase();renderList();keep(this)" style="flex:1;min-width:180px">
       <span class="chip ${filter.stage ? '' : 'on'}" onclick="filter.stage='';renderList()">all ${LEADS.length}</span>${STAGES.map(s => `<span class="chip ${filter.stage === s ? 'on' : ''}" onclick="filter.stage='${s}';renderList()">${s} ${LEADS.filter(l => l.stage === s).length || ''}</span>`).join('')}</div>
     <div class="twrap"><table>
       <thead><tr>${COLS.map(([k, l]) => `<th class="c-${k}">${l}</th>`).join('')}<th class="c-n">Msgs</th></tr>
@@ -98,6 +100,26 @@ function renderList() {
         <td class="c-last">${l.lastFrom === 'us' ? '↩ ' : ''}${esc(l.lastText || '')}</td><td class="c-when">${ago(l.lastAt)}</td><td class="c-n">${l.msgCount || 0}</td></tr>`).join('')
       || `<tr><td colspan="11" class="empty">${LEADS.length ? 'Nothing matches.' : 'No client yet — the first message on the Shift Development line, or ＋ New client.'}</td></tr>`}</tbody>
     </table></div>`;
+}
+// Dictate a new client (Mario, 2026-09-21): "Karim, 70 123 456, from Instagram, wants a villa in Ajaltoun, budget 600k, call him Thursday" → the new row, filled; Save is yours
+function mountDictateNew() {
+  const host = document.getElementById('dictate-new'); if (!host || host.dataset.on || !window.Dictate) return; host.dataset.on = '1';
+  Admin.dictate({ host, note: true,
+    schema: () => { const o = OPT || { partners: [], projects: [], sources: [] }; return { name: 'New client', shape: 'object',
+      fields: [
+        { key: 'name', hint: 'the client' }, { key: 'phone', hint: 'digits with country code if said (+961…)' },
+        { key: 'source', hint: 'one of SOURCES (where he came from)' }, { key: 'interest', hint: 'what he wants: villa · land · solar · steel…, short' },
+        { key: 'project', hint: 'one of PROJECTS if it is clearly one' }, { key: 'stage', hint: 'one of STAGES if the note says how far it is, else "new"' },
+        { key: 'next', hint: 'the next action, short (call back Thursday · send brochure)' }, { key: 'partner', hint: 'one of PARTNERS if he already exists there' },
+      ],
+      context: { SOURCES: o.sources, PROJECTS: o.projects.map(p => p.name), PARTNERS: o.partners.map(p => p.name).slice(0, 300), STAGES } }; },
+    onFilled: async f => {
+      if (!filter.adding) await newRow();
+      const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+      set('nc-name', f.name); set('nc-phone', f.phone); set('nc-int', f.interest); set('nc-proj', f.project); set('nc-next', f.next); set('nc-part', f.partner);
+      const src = document.getElementById('nc-src'); if (src && f.source && [...src.options].some(o => o.value === f.source)) src.value = f.source;
+      const st = document.getElementById('nc-stage'); if (st && STAGES.includes(f.stage)) st.value = f.stage;
+    } });
 }
 // typing in a filter re-renders the grid: put the cursor back where it was
 function keep(inp) { const v = inp.value, ph = inp.placeholder, fk = inp.className; requestAnimationFrame(() => { const el = [...document.querySelectorAll('input')].find(i => i.placeholder === ph && i.className === fk && i.value === v); if (el) { el.focus(); el.setSelectionRange(v.length, v.length); } }); }
@@ -165,6 +187,28 @@ function renderLead() {
     </div></div>
     <div class="card"><div class="conv">${conv || '<div class="empty">No message yet.</div>'}</div></div>
     <p class="small">Messages are read from the phone's WhatsApp every few minutes; replies you send from the phone appear here too.</p>`;
+  mountDictateLead();
+}
+// Dictate an update on the client (Mario, 2026-09-21): "spoke with him, wants Villa B, budget 600k, visit Saturday" → stage/next/budget/notes saved as if typed
+function mountDictateLead() {
+  const host = document.getElementById('dictate-lead'); if (!host || !window.Dictate) return;
+  Admin.dictate({ host, note: true, hint: 'Say what happened — the stage, next action and date, budget, location, notes fill in and save.',
+    schema: () => ({ name: 'Client update', shape: 'object', intro: `The client is ${L.name || L.phone || ''}; interest so far: ${L.interest || '-'}; stage now: ${L.stage}.`,
+      fields: [
+        { key: 'stage', hint: 'one of STAGES if the note moves it (contacted, visit, offer, won, lost), else empty' },
+        { key: 'next', hint: 'the next action, short' }, { key: 'nextAt', hint: 'yyyy-mm-dd of the next action if a day is said' },
+        { key: 'budget', hint: 'what he can spend, as said' }, { key: 'location', hint: 'where he is / where he wants' },
+        { key: 'interest', hint: 'what he wants, only if it changes or adds to the interest so far' },
+        { key: 'note', hint: 'everything else worth keeping, one or two lines' },
+      ], context: { STAGES } }),
+    onFilled: async f => {
+      const patch = {};
+      if (STAGES.includes(f.stage) && f.stage !== L.stage) patch.stage = f.stage;
+      for (const k of ['next', 'nextAt', 'budget', 'location', 'interest']) if (f[k]) patch[k] = f[k];
+      if (f.note) { const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Beirut', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); patch.notes = ((L.notes || '') + `
+${p} — ${f.note}`).trim(); }
+      if (Object.keys(patch).length) { await save(patch); renderLead(); }
+    } });
 }
 async function save(patch) { try { await Admin.api('PATCH', '/api/crm/leads/' + ID, patch); Object.assign(L, patch); if ('stage' in patch || 'name' in patch) renderLead(); } catch (e) { alert('Could not save: ' + e.message); } }
 function pick(kind, name) {

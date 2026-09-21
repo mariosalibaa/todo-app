@@ -1800,6 +1800,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="/dictate.js"></script>
 </head>
 <body>
 <!-- Login Screen -->
@@ -1928,6 +1929,7 @@
     <!-- Same spot as the Project List's "+ New Project": top-left, above the table -->
     <div class="content-add-bar" id="content-add-bar" style="display:none;">
       <button class="save-btn" onclick="openAddModal()" style="padding:6px 14px;font-size:0.82rem;">+ Add task</button>
+      <span id="dictate" title="Say the tasks — “call Rawad tomorrow about the level, Ajaltoun, high; send Antoine the D3 drawings Friday” — each becomes a task"></span>
       <button class="save-btn" onclick="printTaskList()" title="Print what the list is showing now (filters, sort and grouping respected) — or Save as PDF from the print dialog"
               style="padding:6px 11px;font-size:0.82rem;background:var(--surface0);color:var(--subtext0);border:1px solid var(--surface1);">🖨 Print</button>
       <div id="line-count" style="margin-left:auto;text-align:right;align-self:center;">
@@ -6229,6 +6231,7 @@ function setView(v, keepStack) {
   // its own "+ New Project" button in that same slot.
   document.getElementById('content-add-bar').style.display =
     (isList || isKanban || isClassic || isStatusBoard || isGantt) ? '' : 'none';
+  mountDictateTasks();   // once, the first time the bar shows (needs users/priorities loaded — it reads them at click time)
   if (!isList) updateLineCount(null);   // the counter reflects the List table only
   if (isTrash) renderTrash();
   document.getElementById('view-statusboard-btn').classList.toggle('active', isStatusBoard);
@@ -11495,6 +11498,42 @@ function nlStartAdd(proj) {
   setTimeout(() => nlOpenInlineAdd('', ''), 0);
 }
 function openAddModal() { nlStartAdd(null); }
+
+// Dictate tasks (Mario, 2026-09-21 "dictate everywhere"): one sentence → one or more tasks, created
+// like the inline add (same save path, Odoo untouched); the list shows them first. Names for project,
+// priority and assignee are matched to what the workspace has.
+function mountDictateTasks() {
+  if (!window.Dictate || document.getElementById('dictate')?.dataset.on) return;
+  const host = document.getElementById('dictate'); if (!host) return; host.dataset.on = '1';
+  Dictate({ api: apiCall, host, note: false,
+    schema: () => ({ name: 'To-Do tasks', shape: 'array', intro: 'One record per task. Several tasks may be in one sentence ("…; and …").',
+      fields: [
+        { key: 'title', hint: 'the task, imperative, short (Call Rawad about the level)' },
+        { key: 'project', hint: 'one of PROJECTS if it is clearly one of them, else empty' },
+        { key: 'due', hint: 'yyyy-mm-dd when a day is said (tomorrow, Friday, end of month…), else empty' },
+        { key: 'priority', hint: 'one of PRIORITIES if urgency is said (urgent/asap = the highest), else empty' },
+        { key: 'assignee', hint: 'one of PEOPLE if the task is for someone else, else empty' },
+        { key: 'notes', hint: 'any detail beyond the title, else empty' },
+      ],
+      context: { PROJECTS: [...new Set([...tasks.map(t => t.project), ...Object.keys(projectMeta)].filter(Boolean))].slice(0, 200),
+        PRIORITIES: priorities.map(p => p.name), PEOPLE: users.map(u => u.name).filter(Boolean) } }),
+    onFilled: rows => {
+      const lc = s => String(s || '').toLowerCase().trim();
+      let n = 0;
+      for (const r of rows) {
+        if (!lc(r.title)) continue;
+        const pr = priorities.find(p => lc(p.name) === lc(r.priority)) || null;
+        const who = users.find(u => lc(u.name) === lc(r.assignee)) || users.find(u => lc(r.assignee) && lc(u.name).includes(lc(r.assignee))) || null;
+        const proj = r.project && (Object.keys(projectMeta).find(p => lc(p) === lc(r.project)) || tasks.find(t => lc(t.project) === lc(r.project))?.project) || '';
+        const t = { id: uid(), done: false, doneAt: null, createdAt: new Date().toISOString(),
+          title: String(r.title).trim(), project: proj, due: /^\d{4}-\d{2}-\d{2}$/.test(r.due || '') ? r.due : '', priority: pr ? pr.id : '',
+          notes: String(r.notes || '').trim(), subtasks: [], assignees: who ? [who.id] : [], taskType: 'task', department: null,
+          clientName: projectMeta[proj]?.clientName || '', clientId: projectMeta[proj]?.clientId || null };
+        tasks.push(t); placeNewTaskFirst(t); n++;
+      }
+      if (n) { scheduleSave(); renderAll(); }
+    } });
+}
 function openAddModalForProject(proj) { nlStartAdd(proj); }
 
 // A finished parent means finished children: every open subtask closes with it

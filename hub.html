@@ -105,6 +105,7 @@
       <thead><tr><th>Decision</th><th>Asked to</th><th class="c">Amount</th><th>Status</th><th>Link</th><th style="width:40px"></th></tr></thead>
       <tbody id="dec-rows"><tr><td colspan="6" style="color:var(--overlay0)">Loading…</td></tr></tbody>
     </table></div>
+    <div id="dictate-dec" style="margin:14px 0 6px"></div>
     <div class="addrow" style="flex-wrap:wrap;align-items:flex-start;gap:10px">
       <input id="dec-title" placeholder="What to decide, e.g. Buy the excavator: Cat 305.5E2" style="flex:2;min-width:260px">
       <input id="dec-amount" type="number" placeholder="amount $" style="max-width:130px">
@@ -124,6 +125,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="/admin-shared.js"></script>
 <script src="/phone-preview.js"></script>
+<script src="/dictate.js"></script>
 <script>
 const APPS = [
   { id: 'todo', ico: '✓', name: 'To-Do', desc: 'Team tasks, projects and follow-ups', href: '/todo' },
@@ -216,6 +218,7 @@ async function loadDecisions() {
     DEC_MEMBERS = members.filter(m => !m.admin).sort((a, b) => a.email.localeCompare(b.email));
     const who = document.getElementById('dec-who');
     if (!who.options.length) who.innerHTML = DEC_MEMBERS.map(m => `<option value="${esc(m.email)}">${esc(m.email)}</option>`).join('');
+    mountDictateDecision();
     const when = at => at ? new Date(at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
     rows.innerHTML = list.map(d => {
       const url = 'https://hub.shift-group.co/decide/' + d.id, dec = d.decision || {};
@@ -227,6 +230,25 @@ async function loadDecisions() {
         <td>${d.status === 'open' ? `<button class="ghost" title="Delete" onclick="delDecision('${esc(d.id)}')">✕</button>` : ''}</td></tr>`;
     }).join('') || '<tr><td colspan="6" style="color:var(--overlay0)">No decision yet</td></tr>';
   } catch (e) { rows.innerHTML = `<tr><td colspan="6" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; }
+}
+// Dictate the question (Mario, 2026-09-21): "ask Antoine: buy the Cat 305 for 38,000 — year 2014, 3,100 hours, breaker included" → title, amount, name, points, note; Post it is yours
+function mountDictateDecision() {
+  const host = document.getElementById('dictate-dec'); if (!host || host.dataset.on || !window.Dictate) return; host.dataset.on = '1';
+  Admin.dictate({ host, note: true, hint: 'Say the question, for whom, the amount and the points — the form fills in; check, then Post it.',
+    schema: () => ({ name: 'Decision to ask a partner', shape: 'object',
+      fields: [
+        { key: 'title', hint: 'what is to be decided, one line (Buy the excavator: Cat 305.5E2)' },
+        { key: 'amount', hint: 'the amount in USD, number only, if said' },
+        { key: 'name', hint: 'the partner asked, first name (one of PEOPLE)' },
+        { key: 'lines', hint: 'the points that support the decision, one per line, separated by " | "' },
+        { key: 'note', hint: 'a personal note for him, if said' },
+      ], context: { PEOPLE: DEC_MEMBERS.map(m => (m.name || m.email.split('@')[0])) } }),
+    onFilled: f => {
+      const set = (id, v) => { if (v) document.getElementById(id).value = v; };
+      set('dec-title', f.title); set('dec-amount', f.amount); set('dec-name', f.name); set('dec-note', f.note);
+      if (f.lines) document.getElementById('dec-lines').value = String(f.lines).split(/\s*\|\s*|\n/).filter(Boolean).join('\n');
+      if (f.name) { const q = String(f.name).toLowerCase(); for (const o of document.getElementById('dec-who').options) o.selected = (DEC_MEMBERS.find(m => m.email === o.value) || {}).name?.toLowerCase().includes(q) || o.value.toLowerCase().includes(q); }
+    } });
 }
 async function addDecision() {
   const title = document.getElementById('dec-title').value.trim(), approvers = [...document.getElementById('dec-who').selectedOptions].map(o => o.value);

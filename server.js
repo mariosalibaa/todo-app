@@ -128,6 +128,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'ledgers.js'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
   fs.readFileSync(path.join(__dirname, 'phone-preview.js'));
+  fs.readFileSync(path.join(__dirname, 'dictate.js'));
   fs.readFileSync(path.join(__dirname, 'hub-history.js'));
   fs.readFileSync(path.join(__dirname, 'naccache.html'));
   fs.readFileSync(path.join(__dirname, 'public/naccache/taahod-3303-2024.pdf'));
@@ -771,7 +772,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/hub-history.js', '/ajaltoun-plan-ui.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
