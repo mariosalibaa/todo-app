@@ -10,6 +10,7 @@ const accounts = require('./accounts');        // cash & bank accounts, their li
 const decisions = require('./decisions');
 const crm = require('./crm');                  // /api/crm/* + /api/meta/webhook (client conversations: WhatsApp dev line, Instagram, Messenger)      // /api/decisions/* (a question to a partner, answered from a link; Telegram to Mario)
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
+const procurement = require('./procurement');  // /api/procurement/* (the price book: supplier, item, price, description — admin only)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
 const excavation = require('./excavation');
@@ -136,6 +137,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'public/rent-law/circular-22-2023-state-rents.pdf'));
   fs.readFileSync(path.join(__dirname, 'public/rent-law/cas-82-inflation-2013-2022.pdf'));
   fs.readFileSync(path.join(__dirname, 'mechanical.html'));
+  fs.readFileSync(path.join(__dirname, 'procurement.html'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
@@ -669,6 +671,7 @@ const handler = async (req, res) => {
     'decision.html': path.join(__dirname, 'decision.html'),
     'decisions.html': path.join(__dirname, 'decisions.html'),
     'crm.html': path.join(__dirname, 'crm.html'),
+    'procurement.html': path.join(__dirname, 'procurement.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/members': 'hub.html', '/ask': 'hub.html',   // members & access, the decisions desk (admin views of the hub page)
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
@@ -680,7 +683,8 @@ const handler = async (req, res) => {
     '/crm': 'crm.html',
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
-    '/mechanical': 'mechanical.html' };   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
+    '/mechanical': 'mechanical.html',
+    '/procurement': 'procurement.html' };   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
   // /whatsapp — the WhatsApp Archive (whatsapp-local on Mario's laptop, 2013 → today, refreshed from
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
   // the archive-daemon heartbeat (meta/whatsappArchive) and the short-lived token it gets is signed
@@ -975,6 +979,12 @@ const handler = async (req, res) => {
   if (url.startsWith('/api/decisions')) {
     try { const handled = await decisions.handle(req, res, url, user, { db, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('decisions error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+  if (url.startsWith('/api/procurement')) {
+    if (!access.admin) return noApp('admin');
+    try { const handled = await procurement.handle(req, res, url, user, { db, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
+    catch (e) { console.error('procurement error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   if (url.startsWith('/api/partners/')) {

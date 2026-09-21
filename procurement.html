@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Procurement · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--red:#f38ba8;--green:#a6e3a1;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1100px;margin:0 auto;padding:28px 16px 60px;}
+  h1{font-size:1.35rem;font-weight:600;margin:0 0 6px;}
+  .lead{color:var(--sub);font-size:.88rem;line-height:1.5;margin:0 0 20px;}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  .bar input[type=search]{flex:1;min-width:220px;background:var(--mantle);border:1px solid var(--surface0);color:var(--text);border-radius:10px;padding:10px 14px;font-size:.95rem;}
+  .bar input:focus{outline:none;border-color:var(--amber);}
+  .btn{background:var(--amber);color:var(--base);border:0;border-radius:10px;padding:10px 16px;font-weight:600;font-size:.88rem;cursor:pointer;white-space:nowrap;}
+  .btn.ghost{background:none;border:1px solid var(--surface0);color:var(--sub);font-weight:500;}
+  .btn.ghost:hover{color:var(--text);border-color:var(--surface1);}
+  .btn.danger{background:none;border:1px solid var(--surface0);color:var(--red);}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;}
+  .chip{font-size:.74rem;color:var(--sub);background:var(--mantle);border:1px solid var(--surface0);border-radius:999px;padding:4px 11px;cursor:pointer;}
+  .chip:hover,.chip.on{border-color:var(--amber);color:var(--amber);}
+  .n{font-size:.78rem;color:var(--overlay0);}
+  table{width:100%;border-collapse:collapse;font-size:.86rem;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;overflow:hidden;}
+  th{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:10px 12px;border-bottom:1px solid var(--surface0);cursor:pointer;white-space:nowrap;}
+  th.on{color:var(--amber);}
+  td{padding:10px 12px;border-bottom:1px solid var(--surface0);vertical-align:top;line-height:1.4;}
+  tr:last-child td{border-bottom:0;}
+  tr.row{cursor:pointer;} tr.row:hover td{background:rgba(242,169,59,.06);}
+  td.price{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600;color:var(--amber);}
+  th.price{text-align:right;}
+  td.sup{font-weight:600;white-space:nowrap;}
+  td .sub{display:block;font-size:.74rem;color:var(--overlay0);margin-top:2px;font-weight:400;}
+  td .desc{color:var(--sub);white-space:pre-wrap;}
+  td a{color:var(--amber);text-decoration:none;} td a:hover{text-decoration:underline;}
+  mark{background:rgba(242,169,59,.28);color:inherit;border-radius:3px;padding:0 1px;}
+  .empty{color:var(--overlay0);font-size:.88rem;padding:30px;text-align:center;}
+  /* editor */
+  #ed{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:40px 12px;overflow:auto;}
+  #ed.on{display:flex;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:16px;padding:22px;width:100%;max-width:640px;}
+  .card h2{margin:0 0 16px;font-size:1.05rem;font-weight:600;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;}
+  .grid .full{grid-column:1/-1;}
+  label{display:block;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);margin:0 0 4px;}
+  .card input,.card textarea,.card select{width:100%;background:var(--base);border:1px solid var(--surface0);color:var(--text);border-radius:8px;padding:9px 11px;font-size:.9rem;font-family:inherit;}
+  .card input:focus,.card textarea:focus{outline:none;border-color:var(--amber);}
+  .card textarea{min-height:84px;resize:vertical;}
+  .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;align-items:center;}
+  .acts .err{color:var(--red);font-size:.8rem;margin-right:auto;}
+  .pricewrap{display:flex;gap:6px;} .pricewrap input{flex:1;} .pricewrap select{width:84px;}
+  @media (max-width:720px){
+    .grid{grid-template-columns:1fr;}
+    table,thead,tbody,tr,td{display:block;} thead{display:none;}
+    tr.row{border-bottom:1px solid var(--surface0);padding:10px 12px;}
+    td{padding:2px 0;border:0;} td.price{text-align:left;} td.sup{white-space:normal;}
+    td:empty{display:none;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft">
+    <span id="crumbs"></span>
+    <div class="wordmark">SHIFT <span>GROUP</span><small>PROCUREMENT</small></div><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Procurement']]));</script>
+  </div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1>Procurement</h1>
+  <p class="lead">Every price a supplier gave us — from a website, a call, a visit. Search by supplier, item, brand or anything in the description; click a row to edit it.</p>
+  <div class="bar">
+    <input type="search" id="q" placeholder="Search supplier, item, brand, description…" autocomplete="off">
+    <span class="n" id="count"></span>
+    <button class="btn" onclick="openEd()">+ Add a price</button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <table>
+    <thead><tr>
+      <th data-k="supplier">Supplier</th><th data-k="item">Item</th><th class="price" data-k="price">Price</th><th data-k="description">Description</th><th data-k="date">Date</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+
+<div id="ed" onclick="if(event.target===this)closeEd()">
+  <div class="card">
+    <h2 id="ed-title">Add a price</h2>
+    <div class="grid">
+      <div><label>Supplier</label><input id="f-supplier" list="dl-sup" placeholder="Sakr LB"></div>
+      <div><label>Contact</label><input id="f-contact" placeholder="Rawad Sakr · +961 …"></div>
+      <div><label>Item</label><input id="f-item" placeholder="Optical level"></div>
+      <div><label>Brand / model</label><input id="f-brand" placeholder="Bosch GOL 32 D"></div>
+      <div><label>Price</label><div class="pricewrap"><input id="f-price" inputmode="decimal" placeholder="490"><select id="f-currency"><option>USD</option><option>LBP</option><option>EUR</option></select></div></div>
+      <div><label>Unit</label><input id="f-unit" placeholder="per piece · per m² · per set"></div>
+      <div class="full"><label>Description</label><textarea id="f-description" placeholder="What is included, conditions, delivery, warranty…"></textarea></div>
+      <div class="full"><label>Source</label><input id="f-source" placeholder="URL, or 'WhatsApp call', 'visit', 'email'"></div>
+      <div><label>Date of the quote</label><input id="f-date" type="date"></div>
+      <div><label>Project</label><input id="f-project" placeholder="AJ4193 · general"></div>
+    </div>
+    <div class="acts">
+      <span class="err" id="ed-err"></span>
+      <button class="btn danger" id="ed-del" onclick="delRow()" style="display:none">Delete</button>
+      <button class="btn ghost" onclick="closeEd()">Cancel</button>
+      <button class="btn" onclick="saveRow()">Save</button>
+    </div>
+  </div>
+</div>
+<datalist id="dl-sup"></datalist>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+let ROWS = [], SORT = { k: 'date', dir: -1 }, CHIP = '', EDIT = null;
+const F = ['supplier', 'contact', 'item', 'brand', 'price', 'currency', 'unit', 'description', 'source', 'date', 'project'];
+
+Admin.require(null, async me => {   // admin only — the server refuses /api/procurement to anyone else
+  document.getElementById('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  if (!me.admin) { document.querySelector('main').innerHTML = '<p class="empty">This page is for Mario only. <a href="/admin" style="color:var(--amber)">← Back to the hub</a></p>'; return; }
+  await load();
+  const q = document.getElementById('q');
+  q.addEventListener('input', render);
+  if (location.hash.length > 1) { q.value = decodeURIComponent(location.hash.slice(1)); render(); }
+  document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; SORT = { k, dir: SORT.k === k ? -SORT.dir : (k === 'price' || k === 'date' ? -1 : 1) }; render(); });
+});
+
+async function load() {
+  try { ROWS = await Admin.api('GET', '/api/procurement'); }
+  catch (e) { document.getElementById('rows').innerHTML = `<tr><td colspan="5" class="empty" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; return; }
+  const sups = [...new Set(ROWS.map(r => r.supplier).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  document.getElementById('dl-sup').innerHTML = sups.map(s => `<option value="${esc(s)}">`).join('');
+  document.getElementById('chips').innerHTML = sups.map(s => `<span class="chip${CHIP === s ? ' on' : ''}" onclick="chip(${JSON.stringify(s).replace(/"/g, '&quot;')})">${esc(s)}</span>`).join('');
+  render();
+}
+function chip(s) { CHIP = CHIP === s ? '' : s; document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.textContent === CHIP)); render(); }
+
+const price = r => r.price == null || r.price === '' ? '' : (r.currency && r.currency !== 'USD' ? '' : '$') + Number(r.price).toLocaleString('en-US', { maximumFractionDigits: 2 }) + (r.currency && r.currency !== 'USD' ? ' ' + r.currency : '') + (r.unit ? `<span class="sub">${esc(r.unit)}</span>` : '');
+const dmy = d => d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(8, 10) + '-' + d.slice(5, 7) + '-' + d.slice(0, 4) : (d || '');
+const hi = (s, terms) => { let h = esc(s); for (const t of terms) if (t) h = h.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`); return h; };
+const link = s => /^https?:\/\//i.test(s) ? `<a href="${esc(s)}" target="_blank" rel="noopener">${esc(s.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])} ↗</a>` : esc(s);
+
+function render() {
+  const terms = document.getElementById('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = r => F.map(k => r[k] == null ? '' : String(r[k])).join(' ').toLowerCase();
+  let list = ROWS.filter(r => (!CHIP || r.supplier === CHIP) && terms.every(t => hay(r).includes(t)));
+  const { k, dir } = SORT;
+  list.sort((a, b) => { const x = a[k] == null ? '' : a[k], y = b[k] == null ? '' : b[k]; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * dir; });
+  document.querySelectorAll('th[data-k]').forEach(th => th.classList.toggle('on', th.dataset.k === k));
+  document.getElementById('count').textContent = list.length === ROWS.length ? `${ROWS.length} prices` : `${list.length} of ${ROWS.length}`;
+  const tb = document.getElementById('rows');
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="5" class="empty">${ROWS.length ? 'Nothing matches.' : 'No prices yet — add the first one.'}</td></tr>`; return; }
+  tb.innerHTML = list.map(r => `<tr class="row" onclick="openEd('${esc(r.id)}')">
+    <td class="sup">${hi(r.supplier || '', terms)}${r.contact ? `<span class="sub">${hi(r.contact, terms)}</span>` : ''}</td>
+    <td>${hi(r.item || '', terms)}${r.brand ? `<span class="sub">${hi(r.brand, terms)}</span>` : ''}</td>
+    <td class="price">${price(r)}</td>
+    <td><span class="desc">${hi(r.description || '', terms)}</span>${r.source ? `<span class="sub">${link(r.source)}</span>` : ''}${r.project ? `<span class="sub">${hi(r.project, terms)}</span>` : ''}</td>
+    <td>${dmy(r.date)}</td>
+  </tr>`).join('');
+}
+
+function openEd(id) {
+  EDIT = id ? ROWS.find(r => r.id === id) : null;
+  document.getElementById('ed-title').textContent = EDIT ? 'Edit' : 'Add a price';
+  document.getElementById('ed-del').style.display = EDIT ? '' : 'none';
+  document.getElementById('ed-err').textContent = '';
+  for (const k of F) document.getElementById('f-' + k).value = EDIT ? (EDIT[k] == null ? '' : EDIT[k]) : (k === 'currency' ? 'USD' : k === 'date' ? today() : '');
+  document.getElementById('ed').classList.add('on');
+  setTimeout(() => document.getElementById('f-' + (EDIT ? 'price' : 'supplier')).focus(), 50);
+}
+function closeEd() { document.getElementById('ed').classList.remove('on'); EDIT = null; }
+async function saveRow() {
+  const b = {}; for (const k of F) b[k] = document.getElementById('f-' + k).value;
+  if (EDIT) b.id = EDIT.id;
+  try { await Admin.api('POST', '/api/procurement', b); closeEd(); await load(); }
+  catch (e) { document.getElementById('ed-err').textContent = e.message; }
+}
+async function delRow() {
+  if (!EDIT || !confirm(`Delete "${EDIT.item || EDIT.supplier}"?`)) return;
+  try { await Admin.api('DELETE', '/api/procurement/' + EDIT.id); closeEd(); await load(); }
+  catch (e) { document.getElementById('ed-err').textContent = e.message; }
+}
+// yyyy-mm-dd in Beirut — never toISOString() (hub-date-timezone rule)
+function today() { const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Beirut', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()); const g = t => p.find(x => x.type === t).value; return `${g('year')}-${g('month')}-${g('day')}`; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEd(); });
+</script>
+</body>
+</html>
