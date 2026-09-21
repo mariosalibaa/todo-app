@@ -159,6 +159,9 @@ const el = id => document.getElementById(id);
 const say = (t) => { el('msg').textContent = t || ''; };
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dayOf = () => el('day').value || ymd(new Date());
+// list date: "Sa 19/09/2026" (Mario 2026-09-22: "add day before date")
+const DOW2 = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const shortDate = d => DOW2[new Date(d + 'T12:00:00+03:00').getDay()] + ' ' + d.slice(8) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4);
 const pretty = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 function step(n) {
@@ -307,14 +310,14 @@ function drawLines() {
       : `<a href="/api/site/${x.thread}/posts/${x.postId}/file" target="_blank" class="vid" title="${esc(x.who)} · ${esc(x.note)}">🎬 ${esc(x.who)}</a>`).join('')}</div>` : '';
   if (!show.length) { el('lines').innerHTML = '<div class="empty">Nothing written for this day yet.</div>'; el('totals').innerHTML = ''; return; }
   el('lines').innerHTML = `<table><thead><tr>
-      <th style="width:96px">Date</th><th style="width:17%">Partner</th><th style="width:15%">Analytical</th><th>Description</th>
+      <th style="width:118px">Date</th><th style="width:17%">Partner</th><th style="width:15%">Analytical</th><th>Description</th>
       <th class="num" style="width:110px">Paid by Shift</th><th class="num" style="width:130px">Due to employee</th><th style="width:34px"></th></tr></thead>
     <tbody>${show.map(t => {
       const proj = t.analyticName || t.analyticText || '';
       const typed = !t.analyticId && !!t.analyticText;
       const sug = !READ_ONLY && isSuggestion(t);
       return `<tr class="line ${sug ? 'suggest' : ''}">
-        <td class="muted">${esc(t.date.slice(8) + '/' + t.date.slice(5, 7))}</td>
+        <td class="muted" style="white-space:nowrap">${esc(shortDate(t.date))}</td>
         <td class="who-cell">${esc(t.accountName)}</td>
         <td class="proj ${typed ? 'typed' : ''}">${esc(proj) || '<span class="muted">—</span>'}</td>
         <td>${esc(t.description || '')}${sug ? (t.src === 'site'
