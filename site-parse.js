@@ -74,4 +74,4 @@ async function whisper(buf, mime) {
   return String(j.text || '').trim();
 }
 
-module.exports = { quickParse, matchName, claudeParse, visionRead, fuelRead, whisper };
+module.exports = { quickParse, matchName, claudeParse, visionRead, fuelRead, whisper, anthropic };

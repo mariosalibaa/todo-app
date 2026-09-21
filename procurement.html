@@ -63,6 +63,15 @@
   .card textarea{min-height:84px;resize:vertical;}
   .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;align-items:center;}
   .acts .err{color:var(--red);font-size:.8rem;margin-right:auto;}
+  .mic{display:flex;align-items:center;gap:10px;margin:-6px 0 14px;flex-wrap:wrap;}
+  .mic button{background:none;border:1px solid var(--surface0);color:var(--sub);border-radius:999px;padding:7px 14px;font-size:.82rem;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .mic button:hover{border-color:var(--amber);color:var(--amber);}
+  .mic button.rec{border-color:var(--red);color:var(--red);animation:pulse 1s infinite;}
+  .mic button.busy{opacity:.6;cursor:wait;}
+  @keyframes pulse{50%{background:rgba(243,139,168,.15);}}
+  .mic .hint{font-size:.76rem;color:var(--overlay0);line-height:1.4;}
+  .transcript{font-size:.8rem;color:var(--sub);background:var(--base);border:1px dashed var(--surface1);border-radius:8px;padding:8px 11px;margin:0 0 14px;line-height:1.45;display:none;}
+  .transcript.on{display:block;} .transcript b{color:var(--overlay0);font-weight:600;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:3px;}
   .pricewrap{display:flex;gap:6px;} .pricewrap input{flex:1;} .pricewrap select{width:84px;}
   @media (max-width:720px){
     .grid{grid-template-columns:1fr;}
@@ -87,6 +96,7 @@
   <div class="bar">
     <input type="search" id="q" placeholder="Search supplier, item, brand, description…" autocomplete="off">
     <span class="n" id="count"></span>
+    <button class="btn ghost" onclick="openEd(null, true)" title="Say the price — supplier, item, price, what is included — and the form fills itself">🎤 Dictate</button>
     <button class="btn" onclick="openEd()">+ Add a price</button>
   </div>
   <div class="chips" id="chips"></div>
@@ -101,6 +111,13 @@
 <div id="ed" onclick="if(event.target===this)closeEd()">
   <div class="card">
     <h2 id="ed-title">Add a price</h2>
+    <div class="mic">
+      <button type="button" id="micbtn" onclick="micToggle()">🎤 <span id="miclbl">Dictate</span></button>
+      <button type="button" id="notebtn" onclick="noteToggle()">✎ From a note</button>
+      <span class="hint">Say it in one go: supplier, who you spoke to, the item, the price, what is included. The fields fill in — check, then Save.</span>
+    </div>
+    <div id="notebox" style="display:none;margin:-6px 0 14px"><textarea id="notetxt" placeholder="Paste or type the note here — a WhatsApp message, an email line… — then Fill" style="min-height:64px"></textarea><div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn ghost" onclick="noteFill()">Fill the fields</button></div></div>
+    <div class="transcript" id="transcript"></div>
     <div class="grid">
       <div><label>Supplier</label><input id="f-supplier" list="dl-sup" placeholder="Sakr LB"></div>
       <div><label>Contact</label><input id="f-contact" placeholder="Rawad Sakr · +961 …"></div>
@@ -176,16 +193,57 @@ function render() {
   </tr>`).join('');
 }
 
-function openEd(id) {
+function openEd(id, dictate) {
   EDIT = id ? ROWS.find(r => r.id === id) : null;
+  document.getElementById('transcript').className = 'transcript'; document.getElementById('notebox').style.display = 'none';
   document.getElementById('ed-title').textContent = EDIT ? 'Edit' : 'Add a price';
   document.getElementById('ed-del').style.display = EDIT ? '' : 'none';
   document.getElementById('ed-err').textContent = '';
   for (const k of F) document.getElementById('f-' + k).value = EDIT ? (EDIT[k] == null ? '' : EDIT[k]) : (k === 'currency' ? 'USD' : k === 'date' ? today() : '');
   document.getElementById('ed').classList.add('on');
   setTimeout(() => document.getElementById('f-' + (EDIT ? 'price' : 'supplier')).focus(), 50);
+  if (dictate) micToggle();
 }
-function closeEd() { document.getElementById('ed').classList.remove('on'); EDIT = null; }
+
+// ── voice / note entry: record → /api/procurement/voice (whisper + Claude) → fields ──
+let rec = null, chunks = [], recT0 = 0;
+async function micToggle() {
+  const b = document.getElementById('micbtn');
+  if (rec) { rec.stop(); return; }
+  if (b.classList.contains('busy')) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm';   // iPhone records mp4, Chrome webm
+    rec = new MediaRecorder(stream, { mimeType: mime }); chunks = [];
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: mime }); rec = null;
+      b.classList.remove('rec');
+      if (Date.now() - recT0 < 700) { document.getElementById('miclbl').textContent = 'Dictate'; return; }
+      await fillFrom(blob, mime);
+    };
+    rec.start(); recT0 = Date.now(); b.classList.add('rec'); document.getElementById('miclbl').textContent = 'Listening… tap to stop';
+    setTimeout(() => { if (rec) rec.stop(); }, 120000);   // 2-minute ceiling
+  } catch (e) { rec = null; document.getElementById('ed-err').textContent = 'Microphone not available: ' + e.message; }
+}
+async function fillFrom(body, mime) {
+  const b = document.getElementById('micbtn'), lbl = document.getElementById('miclbl'), err = document.getElementById('ed-err');
+  b.classList.add('busy'); lbl.textContent = 'Reading…'; err.textContent = '';
+  try {
+    const isText = typeof body === 'string';
+    const b64 = isText ? null : await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(body); });
+    const j = await Admin.api('POST', '/api/procurement/voice', isText ? { text: body } : { audioBase64: b64, mime });
+    const f = j.fields || {}; let n = 0;
+    for (const k of F) { const v = f[k]; if (v == null || v === '') continue; const el = document.getElementById('f-' + k); if (k === 'currency') { el.value = ['USD', 'LBP', 'EUR'].includes(String(v).toUpperCase()) ? String(v).toUpperCase() : 'USD'; } else el.value = v; n++; }
+    const t = document.getElementById('transcript'); t.innerHTML = `<b>${isText ? 'Note' : 'Heard'}</b>${esc(j.transcript || '')}`; t.classList.add('on');
+    if (!n) err.textContent = 'Nothing usable in that — try again, say the supplier and the price.';
+  } catch (e) { err.textContent = 'Voice entry failed: ' + e.message; }
+  b.classList.remove('busy'); lbl.textContent = 'Dictate again';
+}
+function noteToggle() { const nb = document.getElementById('notebox'); nb.style.display = nb.style.display === 'none' ? '' : 'none'; if (nb.style.display === '') document.getElementById('notetxt').focus(); }
+async function noteFill() { const t = document.getElementById('notetxt').value.trim(); if (!t) return; await fillFrom(t); }
+function closeEd() { if (rec) { try { rec.stop(); } catch {} } document.getElementById('ed').classList.remove('on'); EDIT = null; document.getElementById('miclbl').textContent = 'Dictate'; document.getElementById('notetxt').value = ''; }
 async function saveRow() {
   const b = {}; for (const k of F) b[k] = document.getElementById('f-' + k).value;
   if (EDIT) b.id = EDIT.id;

@@ -21,6 +21,23 @@ function readBody(req, limit) {
   });
 }
 
+const parse = require('./site-parse');   // whisper() + anthropic() — the same helpers the site chat uses
+
+// Voice / free-text entry (Mario, 2026-09-21 "add voice AI option for entry"): the spoken sentence
+// ("Sakr, Rawad on WhatsApp, Bosch optical level 490 dollars with the staff and tripod") becomes the
+// form's fields; the page shows them for a look before Save. Never writes to Firestore itself.
+async function extract(text, suppliers) {
+  const sys = `You turn one spoken or typed note about a supplier's price into the fields of a procurement record.
+Fields: supplier (company/shop name; reuse the exact spelling from the known list when it is the same one), contact (person and/or phone, how we spoke), item (what it is, generic), brand (brand + model), price (number only), currency (USD unless clearly LBP/EUR), unit (per piece, per m², per set, per kit… or ""), description (what is included, conditions, delivery, warranty — the rest of the note, in clean English, keep figures), source ("WhatsApp call", "visit", "phone", "email", a URL… if said), date (yyyy-mm-dd if a date is said, else ""), project (if a project like AJ4193 / Ajaltoun is said, else "").
+Lebanese context: "mira" = levelling staff, "cash" prices are in USD, "million" may mean LBP. Arabic or French words are fine — translate to English.
+Answer with ONLY a JSON object with those keys; empty string for anything not said.`;
+  return parse.anthropic({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, system: sys,
+    messages: [{ role: 'user', content: `Known suppliers: ${suppliers.join(' | ') || '(none yet)'}
+
+Note:
+${text.slice(0, 3000)}` }] });
+}
+
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 async function handle(req, res, url, user, ctx) {
@@ -51,6 +68,21 @@ async function handle(req, res, url, user, ctx) {
     if (!cur) { doc.addedAt = doc.updatedAt; doc.addedBy = who; if (!doc.date) doc.date = beirutDay(); }
     await ref.set(doc, { merge: true });
     return json(res, 200, (await ref.get()).data());
+  }
+
+  // Voice note → transcript → fields. Body = { audioBase64, mime } (as the site chat sends its voice notes) or { text }
+  if (url === '/api/procurement/voice' && req.method === 'POST') {
+    const b = await readBody(req, 6e6);
+    const suppliers = [...new Set((await col.get()).docs.map(d => d.data().supplier).filter(Boolean))];
+    let text = String(b.text || '');
+    if (!text && b.audioBase64) {
+      const buf = Buffer.from(String(b.audioBase64).replace(/^data:[^,]*,/, ''), 'base64');
+      if (buf.length < 1000) return json(res, 400, { error: 'no audio' });
+      text = await parse.whisper(buf, String(b.mime || 'audio/webm').replace(/;.*/, ''));
+    }
+    if (!text.trim()) return json(res, 400, { error: 'nothing heard' });
+    const fields = await extract(text, suppliers);
+    return json(res, 200, { transcript: text, fields });
   }
 
   if ((m = url.match(/^\/api\/procurement\/([\w-]+)$/)) && req.method === 'DELETE') {
