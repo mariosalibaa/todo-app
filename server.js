@@ -699,6 +699,13 @@ const handler = async (req, res) => {
   // (the viewer's own fetches; the cookie is SameSite=Lax, so another site cannot post with it).
   // The tunnel URL comes from the archive-daemon heartbeat (meta/whatsappArchive). Vercel caps a request
   // body at ~4.5 MB, so a long video will not go out from here — the rest does.
+  // the archive heartbeat (tunnel URLs, last seen) is read once per 30 s per warm instance, not per request
+  if (!global.__waMeta) global.__waMeta = { at: 0, data: null };
+  const archiveMeta = async () => {
+    const m = global.__waMeta;
+    if (Date.now() - m.at > 30000) { m.data = (await db.collection('workspaces').doc(TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); m.at = Date.now(); }
+    return m.data;
+  };
   if (/^\/(whatsapp|03165168|70165168)(\/|$)/.test(url)) {
     const seg = url.split('/')[1], rest = req.url.slice(seg.length + 1) || '/';
     const line = seg === 'whatsapp' ? '03165168' : seg;   // /whatsapp = Mario's line; the page adds the other
@@ -714,7 +721,7 @@ const handler = async (req, res) => {
     if (!acc.admin) return page(403, 'WhatsApp ' + line, 'This one is Mario’s alone.');
     const key = process.env.ACCOUNTING_API_KEY || '';
     let meta = null;
-    try { meta = (await db.collection('workspaces').doc(TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); } catch {}
+    try { meta = await archiveMeta(); } catch {}
     const target = meta && (line === '70165168' ? meta.urlDev : meta.url);
     const fresh = target && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
     if (!fresh || !key) return page(503, 'The laptop is offline', `The archive lives on Mario’s laptop and answers only while it is on and online${meta && meta.at ? ` — last seen ${new Date(meta.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' })}` : ''}.`);
@@ -759,7 +766,7 @@ const handler = async (req, res) => {
     if (!acc.admin) return page(name, 'This one is Mario’s alone.');
     const apiKey = process.env.ACCOUNTING_API_KEY || '';
     let meta = null;
-    try { meta = (await db.collection('workspaces').doc(TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); } catch {}
+    try { meta = await archiveMeta(); } catch {}
     const target = meta && meta.apps && meta.apps[key];
     const fresh = target && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
     if (!fresh || !apiKey) return page('The laptop is offline', `${name} runs on Mario’s laptop and answers only while it is on and online${meta && meta.at ? ` — last seen ${new Date(meta.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' })}` : ''}.`);
@@ -778,7 +785,7 @@ const handler = async (req, res) => {
     if (!acc.admin) return page('WhatsApp Archive', 'This one is Mario’s alone.');
     const key = process.env.ACCOUNTING_API_KEY || '';
     let meta = null;
-    try { meta = (await db.collection('workspaces').doc(TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); } catch {}
+    try { meta = await archiveMeta(); } catch {}
     const target = meta && (dev ? meta.urlDev : meta.url);
     const fresh = target && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
     if (!fresh || !key) return page('The laptop is offline', `The archive lives on Mario’s laptop and answers only while it is on and online${meta && meta.at ? ` — last seen ${new Date(meta.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' })}` : ''}.`);
