@@ -735,6 +735,29 @@ const handler = async (req, res) => {
     } catch (e) { page(502, 'The laptop did not answer', String(e.message || e).slice(0, 200)); }
     return;
   }
+  // /app/<key> — a laptop app (photo-map, lead-hub, invoice-renamer, power-analyzer) behind
+  // wa-contacts/laptop-gateway.mjs: same door as /whatsapp — a signed token, a redirect to the app's tunnel
+  if (/^\/app\/[a-z0-9-]{1,30}$/.test(url)) {
+    const key = url.slice(5);
+    const NAMES = { 'photo-map': ['Photo Map', '/vscode/photo-map/map.html'], 'lead-hub': ['Lead Hub', '/'], 'invoice-renamer': ['Invoice Renamer', '/'], 'power-analyzer': ['Power Analyzer', '/'] };
+    const [name, home] = NAMES[key] || [key, '/'];
+    const u = await verifyToken(req);
+    const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
+    const page = (title, body) => { res.writeHead(u && acc ? 200 : 401, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>${title}</title><body style="font-family:system-ui,sans-serif;background:#111;color:#eee;padding:48px 20px;text-align:center"><h2 style="margin:0 0 12px">${title}</h2><p style="color:#aaa;max-width:420px;margin:0 auto 24px">${body}</p><a href="/" style="color:#F2A93B">‹ Back to the hub</a>`); };
+    if (!u || !acc) return page(name, 'Sign in to the hub first, then open this tile again.');
+    if (!acc.admin) return page(name, 'This one is Mario’s alone.');
+    const apiKey = process.env.ACCOUNTING_API_KEY || '';
+    let meta = null;
+    try { meta = (await db.collection('workspaces').doc(TEAM_ID).collection('meta').doc('whatsappArchive').get()).data(); } catch {}
+    const target = meta && meta.apps && meta.apps[key];
+    const fresh = target && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
+    if (!fresh || !apiKey) return page('The laptop is offline', `${name} runs on Mario’s laptop and answers only while it is on and online${meta && meta.at ? ` — last seen ${new Date(meta.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' })}` : ''}.`);
+    const exp = Date.now() + 60000;
+    const sig = crypto.createHmac('sha256', apiKey).update('open:' + exp).digest('hex');
+    res.writeHead(302, { Location: `${target}/auth?t=${exp}.${sig}&next=${encodeURIComponent(home)}`, 'Cache-Control': 'no-store' });
+    res.end();
+    return;
+  }
   if (url === '/whatsapp') {   // the direct way: a redirect to the tunnel itself (bigger files, or when the relay misbehaves)
     const dev = /[?&]account=dev(&|$)/.test(req.url);   // `url` has no query string — read the raw one (the dev tile opened Mario's line, 2026-09-20)
     const u = await verifyToken(req);

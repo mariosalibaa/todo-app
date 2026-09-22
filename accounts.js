@@ -577,7 +577,9 @@ async function handle(req, res, url, user, ctx) {
     const ok = x => /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(x);
     if (!ok(u)) return json(res, 400, { error: 'url: https://….trycloudflare.com' });
     const uDev = String(b.urlDev || '');   // the Shift Development line's viewer (:4621), when its tunnel is up
-    await ws.collection('meta').doc('whatsappArchive').set({ url: u, urlDev: ok(uDev) ? uDev : '', at: now(), viewer: String(b.viewer || ''), sync: String(b.sync || '') });
+    // the laptop apps behind laptop-gateway.mjs (photo-map, lead-hub, …): key → tunnel url, '' while down
+    const apps = {}; for (const [k, v] of Object.entries(b.apps || {})) if (/^[a-z0-9-]{1,30}$/.test(k)) apps[k] = ok(String(v)) ? String(v) : '';
+    await ws.collection('meta').doc('whatsappArchive').set({ url: u, urlDev: ok(uDev) ? uDev : '', at: now(), viewer: String(b.viewer || ''), sync: String(b.sync || ''), apps });
     return json(res, 200, { ok: true });
   }
 
