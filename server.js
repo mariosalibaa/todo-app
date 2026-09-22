@@ -699,9 +699,10 @@ const handler = async (req, res) => {
   // (the viewer's own fetches; the cookie is SameSite=Lax, so another site cannot post with it).
   // The tunnel URL comes from the archive-daemon heartbeat (meta/whatsappArchive). Vercel caps a request
   // body at ~4.5 MB, so a long video will not go out from here — the rest does.
-  if (/^\/(03165168|70165168)(\/|$)/.test(url)) {
-    const line = url.slice(1, 9), rest = req.url.slice(9) || '/';
-    if (url === '/' + line) { res.writeHead(302, { Location: '/' + line + '/' }); res.end(); return; }
+  if (/^\/(whatsapp|03165168|70165168)(\/|$)/.test(url)) {
+    const seg = url.split('/')[1], rest = req.url.slice(seg.length + 1) || '/';
+    const line = seg === 'whatsapp' ? '03165168' : seg;   // /whatsapp = Mario's line; the page adds the other
+    if (url === '/' + seg) { res.writeHead(302, { Location: '/' + seg + '/' }); res.end(); return; }
     const page = (code, title, body) => { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>${title}</title><body style="font-family:system-ui,sans-serif;background:#111;color:#eee;padding:48px 20px;text-align:center"><h2 style="margin:0 0 12px">${title}</h2><p style="color:#aaa;max-width:420px;margin:0 auto 24px">${body}</p><a href="/" style="color:#F2A93B">‹ Back to the hub</a>`); };
     // GET by cookie is what verifyToken does; for the viewer's POSTs (send, reply, file) take the same cookie
     let u;
@@ -758,7 +759,7 @@ const handler = async (req, res) => {
     res.end();
     return;
   }
-  if (url === '/whatsapp') {   // the direct way: a redirect to the tunnel itself (bigger files, or when the relay misbehaves)
+  if (url === '/whatsapp-direct') {   // the direct way: a redirect to the tunnel itself (bigger files, or when the relay misbehaves)
     const dev = /[?&]account=dev(&|$)/.test(req.url);   // `url` has no query string — read the raw one (the dev tile opened Mario's line, 2026-09-20)
     const u = await verifyToken(req);
     const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
