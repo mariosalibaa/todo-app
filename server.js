@@ -738,6 +738,7 @@ const handler = async (req, res) => {
         const v = r.headers.get(h); if (v) out[h] = v;
       }
       if (r.status >= 300 && r.status < 400 && r.headers.get('location')) out.location = r.headers.get('location').replace(target, '/' + line);
+      if (packed) out['cache-control'] = 'no-store';   // a chat list or an index is never worth caching anywhere on the way
       res.writeHead(r.status, out);
       if (!r.body) { res.end(); return; }
       const { Readable } = require('stream');
