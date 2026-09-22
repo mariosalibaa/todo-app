@@ -729,7 +729,10 @@ const handler = async (req, res) => {
       const out = {};
       // fetch() already un-gzipped the body but keeps the upstream's compressed content-length — copying it
       // cut the chat index off mid-way and the 03 line vanished from the merged page (2026-09-22).
-      const packed = !!r.headers.get('content-encoding');
+      // Node strips content-encoding on some runtimes after decoding and keeps only the stale length,
+      // so do not trust that header: any JSON answer goes out chunked. Media keeps its length (range
+      // requests and download progress need it), and media is never JSON.
+      const packed = /json/i.test(String(r.headers.get('content-type') || '')) || !!r.headers.get('content-encoding');
       for (const h of ['content-type', 'content-length', 'content-disposition', 'cache-control', 'accept-ranges', 'content-range', 'etag', 'last-modified']) {
         if (packed && h === 'content-length') continue;   // it is chunked now, and the length no longer fits
         const v = r.headers.get(h); if (v) out[h] = v;
