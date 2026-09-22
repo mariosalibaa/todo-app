@@ -5,12 +5,14 @@
 //
 // Firestore layout (under workspaces/<team>):
 //   procurement/<id>  { id, supplier, contact, item, brand, price, currency, unit, description,
-//                       source, date, project, addedBy, addedAt, updatedBy, updatedAt }
+//                       source, date, project, trade (topography, ppr, sanitary…), division (Mechanical,
+//                       Electrical, Civil, Steel, Solar…), addedBy, addedAt, updatedBy, updatedAt }
 // `date` = the day of the quote (yyyy-mm-dd, Beirut); `source` = URL or "WhatsApp call" etc.
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const now = () => new Date().toISOString();
-const FIELDS = ['supplier', 'contact', 'item', 'brand', 'unit', 'description', 'source', 'date', 'project', 'currency'];
+// trade + division (Mario 2026-09-22: "add trade column: topography", "supplier list for ppr; division mechanical")
+const FIELDS = ['supplier', 'contact', 'item', 'brand', 'unit', 'description', 'source', 'date', 'project', 'currency', 'trade', 'division'];
 
 function readBody(req, limit) {
   return new Promise((resolve, reject) => {

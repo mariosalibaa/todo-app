@@ -93,7 +93,7 @@
   <div class="chips" id="chips"></div>
   <table>
     <thead><tr>
-      <th data-k="supplier">Supplier</th><th data-k="item">Item</th><th class="price" data-k="price">Price</th><th data-k="description">Description</th><th data-k="date">Date</th>
+      <th data-k="supplier">Supplier</th><th data-k="trade">Trade</th><th data-k="item">Item</th><th class="price" data-k="price">Price</th><th data-k="description">Description</th><th data-k="date">Date</th>
     </tr></thead>
     <tbody id="rows"></tbody>
   </table>
@@ -106,6 +106,8 @@
     <div class="grid">
       <div><label>Supplier</label><input id="f-supplier" list="dl-sup" placeholder="Sakr LB"></div>
       <div><label>Contact</label><input id="f-contact" placeholder="Rawad Sakr · +961 …"></div>
+      <div><label>Trade</label><input id="f-trade" list="dl-trade" placeholder="topography · ppr · sanitary · steel"></div>
+      <div><label>Division</label><input id="f-division" list="dl-div" placeholder="Mechanical · Electrical · Civil"></div>
       <div><label>Item</label><input id="f-item" placeholder="Optical level"></div>
       <div><label>Brand / model</label><input id="f-brand" placeholder="Bosch GOL 32 D"></div>
       <div><label>Price</label><div class="pricewrap"><input id="f-price" inputmode="decimal" placeholder="490"><select id="f-currency"><option>USD</option><option>LBP</option><option>EUR</option></select></div></div>
@@ -123,7 +125,8 @@
     </div>
   </div>
 </div>
-<datalist id="dl-sup"></datalist>
+<datalist id="dl-sup"></datalist><datalist id="dl-trade"></datalist>
+<datalist id="dl-div"><option value="Mechanical"><option value="Electrical"><option value="Civil"><option value="Architectural"><option value="Steel"><option value="Solar"><option value="Survey"><option value="General"></datalist>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -133,7 +136,7 @@
 <script>
 const esc = Admin.esc;
 let ROWS = [], SORT = { k: 'date', dir: -1 }, CHIP = '', EDIT = null, DICT = null;
-const F = ['supplier', 'contact', 'item', 'brand', 'price', 'currency', 'unit', 'description', 'source', 'date', 'project'];
+const F = ['supplier', 'contact', 'trade', 'division', 'item', 'brand', 'price', 'currency', 'unit', 'description', 'source', 'date', 'project'];
 
 Admin.require(null, async me => {   // admin only — the server refuses /api/procurement to anyone else
   document.getElementById('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
@@ -145,6 +148,8 @@ Admin.require(null, async me => {   // admin only — the server refuses /api/pr
       fields: [
         { key: 'supplier', hint: 'company/shop, one of SUPPLIERS when it is the same one' },
         { key: 'contact', hint: 'person and/or phone, how we spoke' },
+        { key: 'trade', hint: 'the trade: topography, ppr, sanitary, steel, aluminum, electrical… (one of TRADES when it is the same)' },
+        { key: 'division', hint: 'Mechanical / Electrical / Civil / Architectural / Steel / Solar / Survey / General' },
         { key: 'item', hint: 'what it is, generic (optical level, sliding window, rebar…)' },
         { key: 'brand', hint: 'brand + model' },
         { key: 'price', hint: 'number only' }, { key: 'currency', hint: 'USD / LBP / EUR' },
@@ -153,7 +158,7 @@ Admin.require(null, async me => {   // admin only — the server refuses /api/pr
         { key: 'source', hint: 'WhatsApp call, visit, phone, email, a URL — if said' },
         { key: 'date', hint: 'yyyy-mm-dd if a date is said' }, { key: 'project', hint: 'AJ4193 / Ajaltoun / general… if said' },
       ],
-      context: { SUPPLIERS: [...new Set(ROWS.map(r => r.supplier).filter(Boolean))] } }),
+      context: { SUPPLIERS: [...new Set(ROWS.map(r => r.supplier).filter(Boolean))], TRADES: [...new Set(ROWS.map(r => r.trade).filter(Boolean))] } }),
     onFilled: f => { for (const k of F) { const v = f[k]; if (v == null || v === '') continue; const el = document.getElementById('f-' + k);
       if (k === 'currency') el.value = ['USD', 'LBP', 'EUR'].includes(String(v).toUpperCase()) ? String(v).toUpperCase() : 'USD'; else el.value = v; } } });
   const q = document.getElementById('q');
@@ -164,9 +169,10 @@ Admin.require(null, async me => {   // admin only — the server refuses /api/pr
 
 async function load() {
   try { ROWS = await Admin.api('GET', '/api/procurement'); }
-  catch (e) { document.getElementById('rows').innerHTML = `<tr><td colspan="5" class="empty" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; return; }
+  catch (e) { document.getElementById('rows').innerHTML = `<tr><td colspan="6" class="empty" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; return; }
   const sups = [...new Set(ROWS.map(r => r.supplier).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   document.getElementById('dl-sup').innerHTML = sups.map(s => `<option value="${esc(s)}">`).join('');
+  document.getElementById('dl-trade').innerHTML = [...new Set(ROWS.map(r => r.trade).filter(Boolean))].sort().map(s => `<option value="${esc(s)}">`).join('');
   document.getElementById('chips').innerHTML = sups.map(s => `<span class="chip${CHIP === s ? ' on' : ''}" onclick="chip(${JSON.stringify(s).replace(/"/g, '&quot;')})">${esc(s)}</span>`).join('');
   render();
 }
@@ -186,9 +192,10 @@ function render() {
   document.querySelectorAll('th[data-k]').forEach(th => th.classList.toggle('on', th.dataset.k === k));
   document.getElementById('count').textContent = list.length === ROWS.length ? `${ROWS.length} prices` : `${list.length} of ${ROWS.length}`;
   const tb = document.getElementById('rows');
-  if (!list.length) { tb.innerHTML = `<tr><td colspan="5" class="empty">${ROWS.length ? 'Nothing matches.' : 'No prices yet — add the first one.'}</td></tr>`; return; }
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="6" class="empty">${ROWS.length ? 'Nothing matches.' : 'No prices yet — add the first one.'}</td></tr>`; return; }
   tb.innerHTML = list.map(r => `<tr class="row" onclick="openEd('${esc(r.id)}')">
     <td class="sup">${hi(r.supplier || '', terms)}${r.contact ? `<span class="sub">${hi(r.contact, terms)}</span>` : ''}</td>
+    <td>${hi(r.trade || '', terms)}${r.division ? `<span class="sub">${hi(r.division, terms)}</span>` : ''}</td>
     <td>${hi(r.item || '', terms)}${r.brand ? `<span class="sub">${hi(r.brand, terms)}</span>` : ''}</td>
     <td class="price">${price(r)}</td>
     <td><span class="desc">${hi(r.description || '', terms)}</span>${r.source ? `<span class="sub">${link(r.source)}</span>` : ''}${r.project ? `<span class="sub">${hi(r.project, terms)}</span>` : ''}</td>
