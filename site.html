@@ -27,7 +27,7 @@
   main{display:flex;height:calc(100vh - var(--hdr,61px));overflow:hidden;}
   .pane{display:flex;flex-direction:column;min-width:0;}
   .pane.list{width:360px;flex:none;background:var(--mantle);border-right:1px solid var(--surface0);overflow-y:auto;}
-  .pane.chat{flex:1;overflow-y:auto;padding-bottom:90px;}
+  .pane.chat{flex:1;overflow-y:auto;padding-bottom:90px;overflow-anchor:none;}
   .pane.list h1{font-size:1.6rem;margin:14px 16px 8px;}
   .search{padding:0 12px 8px;} .search input{width:100%;box-sizing:border-box;background:var(--bar);border:0;border-radius:10px;padding:9px 12px;font:inherit;font-size:.95rem;color:var(--text);outline:none;}
   .chats{flex:1;}
@@ -67,6 +67,8 @@
   .post.media{padding:4px;max-width:338px;} .post.media img{width:330px;max-width:100%;max-height:400px;object-fit:cover;cursor:zoom-in;} .post.media video{width:330px;max-width:100%;max-height:400px;background:#000;}
   .post.media .meta,.post.media .line{margin-left:6px;margin-right:6px;} .post.media .meta{margin-bottom:2px;}
   .post .line{font-size:.72rem;margin-top:6px;padding:4px 8px;border-radius:8px;background:#fff3d6;color:#8a5a00;}
+  .post .line table.lt{border-collapse:collapse;width:100%;} .post .line table.lt th{text-align:left;font-weight:600;opacity:.65;padding:0 8px 1px 0;white-space:nowrap;vertical-align:top;width:1%;} .post .line table.lt td{padding:0 0 1px;}
+  .post .line .q{opacity:.7;} .post .line .lt-act{margin-top:3px;}
   .post .line.accepted{background:#dcf8c6;color:#0b6b2c;} .post .line.dismissed{background:#fde2e4;color:#b3261e;}
   .post .line a{color:inherit;}
   .post .err{font-size:.72rem;color:var(--red);margin-top:4px;}
@@ -201,7 +203,7 @@ function drawChatBar() {
   el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'}</div></div>`;
 }
 function showList() { document.body.classList.remove('in-chat'); history.replaceState(null, '', location.pathname); }
-function open_(id) { cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts(); loadDay(); }
+function open_(id) { pinned = true; cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts(); loadDay(); }
 
 // ── attendance: Start / Finish with location (part 2) ─────────────────────────
 let day = null;
@@ -303,6 +305,10 @@ async function delSite(id) { if (!confirm('Remove this site?')) return; await Ad
 // the closing balance of each ledger the tags point at (Mario, 2026-09-23: "also we show the balance")
 const balances = {};
 const accName = id => (balances[id] && balances[id].name) || id;
+// the work sections, so a line's division reads "Suspended ceilings", not "ceilings"
+let SECTIONS = [];
+Admin.api('GET', '/api/ajaltoun/sections').then(r => { SECTIONS = (r && r.sections) || r || []; if (posts.length) draw(); }).catch(() => {});
+const sectionName = id => { if (!id) return ''; const x = SECTIONS.find(s => s.id === id); return x ? x.name : id; };
 async function loadBalances(force) {
   const ids = [...new Set(posts.filter(p => p.line && p.line.accountId).map(p => p.line.accountId))];
   let changed = false;
@@ -355,11 +361,25 @@ function lineTag(p) {
   if (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3) return `<div class="line">reading took too long · <a href="#" onclick="retry('${esc(p.id)}');return false;">retry</a></div>`;
   if (!p.digestedAt) return `<div class="line">reading…</div>`;
   if (!p.line) return p.parsed && p.parsed.receipt === false && (p.kind === 'photo' || p.kind === 'video') ? `<div class="line" style="background:#26352a;color:var(--green)">progress photo · <a href="#" onclick="flip('${esc(p.id)}');return false;">this is a receipt</a></div>` : '';
-  const amt = p.parsed && (p.parsed.amount || 0);
   const L = p.line, bal = balances[L.accountId];
-  const state = L.state === 'booked' ? 'in Odoo ✓✓' + (L.move ? ' ' + esc(L.move) : '') : L.state === 'accepted' ? 'accepted ✓' : L.state === 'dismissed' ? 'dismissed' : 'waiting for Mario\'s ✓';
-  const side = L.debit ? 'out' : L.credit ? 'in' : '';
-  return `<div class="line ${esc(L.state || 'waiting')}">${amt ? amt.toFixed(2) + ' ' + esc(p.parsed.currency || 'USD') + (side ? ' ' + side : '') + ' · ' : ''}${esc(accName(L.accountId))}${L.partnerName ? ' · ' + esc(L.partnerName) : ''}${L.company ? ' · ' + esc(L.company) : ''}${L.analyticName ? ' · ' + esc(L.analyticName) : ''}${L.section ? ' · ' + esc(L.section) : ''} — ${state}${bal ? ` · <span title="Closing balance of ${esc(bal.name)} today">balance ${bal.balance.toFixed(2)}</span>` : ''}${me.admin && L.state !== 'dismissed' ? ` · <a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : ''}${(p.kind === 'photo' && L.state !== 'booked') ? ` · <a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : ''}</div>`;
+  const state = L.state === 'booked' ? `in Odoo ✓✓ ${esc(L.move || '')}` : L.state === 'accepted' ? 'accepted ✓ — on the ledger, not in Odoo yet' : L.state === 'dismissed' ? 'dismissed' : 'waiting for your ✓';
+  const cur = (p.parsed && p.parsed.currency) || 'USD';
+  const amount = L.debit ? `${L.debit.toFixed(2)} ${cur} out` : L.credit ? `${L.credit.toFixed(2)} ${cur} in` : (p.parsed && p.parsed.amount ? `${p.parsed.amount.toFixed(2)} ${cur}` : '—');
+  const rows = [
+    ['Amount', esc(amount)],
+    ['Account', esc(accName(L.accountId)) + (bal ? ` <span class="q">balance ${bal.balance.toFixed(2)}</span>` : '')],
+    ['Partner', esc(L.partnerName || '')],
+    ['Company', esc(L.company || '')],
+    ['Project', esc(L.analyticName || '')],
+    ['Division', esc(sectionName(L.section))],
+    ...(L.extras || []).map(x => ['+ ' + esc((x.description || '').split(' · ')[0]), `${Math.abs(x.amount).toFixed(2)} ${cur}${x.booked ? ' <span class="q">in Odoo ✓✓</span>' : ''}`]),
+    ['Status', state],
+  ].filter(r => r[1]);
+  const acts = [
+    me.admin && L.state !== 'dismissed' ? `<a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : '',
+    (p.kind === 'photo' && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
+  ].filter(Boolean).join(' · ');
+  return `<div class="line ${esc(L.state || 'waiting')}"><table class="lt">${rows.map(r => `<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</table>${acts ? `<div class="lt-act">${acts}</div>` : ''}</div>`;
 }
 function draw() {
   if (!posts.length) { el('feed').innerHTML = '<div class="empty">Nothing here yet. Write what happened, send a photo, or record.</div>'; return; }
@@ -377,13 +397,30 @@ function draw() {
     const canDel = mine || me.admin;
     return `${dayHdr}<div class="post ${mine ? 'me' : ''}${p.kind === 'photo' || p.kind === 'video' ? ' media' : ''}" data-id="${esc(p.id)}" ${canDel ? `oncontextmenu="event.preventDefault();askDelete('${esc(p.id)}')" ontouchstart="pressStart(event,'${esc(p.id)}')" ontouchend="pressEnd()" ontouchmove="pressEnd()"` : ''}>${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
   }).join('');
-  toBottom(true);
+  pinFor(3000);
 }
-// stay at the end while pictures push the feed down (Mario, 2026-09-24: "when you launch make it from down, not the middle")
-let stickBottom = true;
-function toBottom(force) { const pane = el('chatpane'); if (!pane) return; if (force || stickBottom) { pane.scrollTop = pane.scrollHeight; window.scrollTo(0, document.body.scrollHeight); } }
-function feedGrew() { toBottom(); }
-document.addEventListener('DOMContentLoaded', () => { const pane = el('chatpane'); if (pane) pane.addEventListener('scroll', () => { stickBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80; }, { passive: true }); });
+// Open at the END of the conversation and stay there while the pictures arrive (Mario, 2026-09-24: "still opens in
+// the middle of the chat, not the bottom"). The pane's height keeps changing as photos decode, and the browser's
+// scroll anchoring moves the view back up — so the pane is pushed to the end on every frame for a few seconds, and
+// only Mario's own gesture (wheel up, a drag, PageUp) unpins it.
+let pinned = true, pinT = null;
+function pinNow() { const pane = el('chatpane'); if (!pane) return; pane.scrollTop = pane.scrollHeight + 2000; if (document.body.scrollHeight > window.innerHeight) window.scrollTo(0, document.body.scrollHeight); }
+function pinFor(ms) {
+  pinned = true; pinNow();
+  clearInterval(pinT); const until = Date.now() + (ms || 2000);
+  pinT = setInterval(() => { if (!pinned || Date.now() > until) { clearInterval(pinT); pinT = null; return; } pinNow(); }, 80);
+}
+function feedGrew() { if (pinned) pinNow(); }          // a picture finished decoding
+function unpin() { pinned = false; clearInterval(pinT); pinT = null; }
+document.addEventListener('DOMContentLoaded', () => {
+  const pane = el('chatpane'); if (!pane) return;
+  pane.addEventListener('wheel', e => { if (e.deltaY < 0) unpin(); }, { passive: true });
+  pane.addEventListener('touchstart', () => { if (pinT) unpin(); }, { passive: true });
+  pane.addEventListener('pointerdown', e => { if (e.target === pane) unpin(); }, { passive: true });   // dragging the scrollbar
+  window.addEventListener('keydown', e => { if (['PageUp', 'Home', 'ArrowUp'].includes(e.key)) unpin(); });
+  // back to the end once the reader returns there by hand
+  pane.addEventListener('scroll', () => { if (!pinT && pane.scrollHeight - pane.scrollTop - pane.clientHeight < 60) pinned = true; }, { passive: true });
+});
 // long-press a message (or right-click on the laptop) → Delete, the WhatsApp way
 let pressT = null;
 function pressStart(e, id) { pressEnd(); pressT = setTimeout(() => { pressT = null; if (navigator.vibrate) navigator.vibrate(15); askDelete(id); }, 550); }

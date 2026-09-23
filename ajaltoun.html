@@ -221,8 +221,9 @@ function compute() {
   return { lines, cost, equip, sum, paidOut, owed, approved, approvedN, verified, verifiedN, flaggedN, bookedN, booked, waitN, wait, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
 }
 
+let keepY = 0;
 function render() {
-  const keepY = window.scrollY;
+  keepY = window.scrollY;   // the page redraws whole; the reader keeps his place (a section opened, a filter typed)
   const root = document.getElementById('app');
   Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#accounts'], [{ accounts: 'Accounts', budget: 'Budget (BOQ)', plan: 'Cashflow plan' }[TAB] || TAB]]);
   document.getElementById('tabs').innerHTML = [['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('') + '<a href="/ajaltoun/excavation" title="Georges EL Hajj: what was collected, by whom, from which account, against his certificates">Excavation</a>';

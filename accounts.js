@@ -102,7 +102,10 @@ const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'company
   // the line shared between analytic accounts by percentage, the Odoo way: [{ id, name, pct }]
   'analyticSplit',
   // the Ajaltoun work section / division (prefab, excavation…) — the /ajaltoun page groups by it (Mario, 2026-09-23)
-  'section'];   // `docs` is written by the upload route only, never by a PATCH
+  'section',
+  // an extra expense added on another line's paper (transport, a tip): the line it came with, and the chat
+  // message that carries them both, so the Site chat can list them under the receipt (Mario, 2026-09-24)
+  'fromTxId', 'postId'];   // `docs` is written by the upload route only, never by a PATCH
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 // what a correction can change in the workbook itself, on a row that came from it

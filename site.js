@@ -173,6 +173,11 @@ async function handle(req, res, url, user, ctx) {
       const a = await acc.resolve(ws, p.line.accountId); if (!a) return;
       const t = (await acc.txCol(a).doc(p.line.txId).get()).data();
       p.line.state = !t ? 'dismissed' : t.bookedMove ? 'booked' : t.waAccepted ? 'accepted' : t.excluded && !t.review ? 'dismissed' : 'waiting';
+      // the extra expenses added on this receipt (transport 25$…), so the chat shows them under it
+      try {
+        const ex = await acc.txCol(a).where('fromTxId', '==', p.line.txId).get();
+        if (!ex.empty) p.line.extras = ex.docs.map(d => d.data()).map(x => ({ id: x.id, description: x.description || '', amount: (x.debit || 0) - (x.credit || 0), booked: !!x.bookedMove }));
+      } catch (e) { console.error('site extras', p.line.txId, e.message); }
       if (t) { p.line.debit = t.debit || 0; p.line.credit = t.credit || 0; p.line.section = t.section || ''; p.line.partnerName = t.partnerName || ''; p.line.company = t.company || ''; p.line.analyticName = t.analyticName || ''; p.line.move = t.bookedMove && t.bookedMove.name || ''; }
     }));
     return json(res, 200, { posts: out });

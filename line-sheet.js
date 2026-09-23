@@ -46,6 +46,8 @@
       A.api('GET', `/api/accounting/accounts/${acc}/balance`).then(b => { if (S && S.acc === acc) { S.bal = b; const el = g('ls-bal'); if (el) el.textContent = ' · balance ' + b.balance.toFixed(2); } }).catch(() => {});
     } catch (e) { o.querySelector('.ls').innerHTML = `<div class="err">${esc(e.message)}</div><div class="ls-actions"><button class="ghost" onclick="LineSheet.close()">Close</button></div>`; }
   }
+  // the clock time the paper carries: the WhatsApp/chat message's minute, else when the line was written
+  const when = t => { const iso = t.waAt || t.createdAt; if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); };
   const secName = id => { const x = (REFS.sections || []).find(s => s.id === id); return x ? x.name : (id || ''); };
   function draw() {
     const o = g('ls-overlay'); if (!o || !S) return;
@@ -55,7 +57,7 @@
     const stateTxt = booked ? `in Odoo ✓✓ ${esc(t.bookedMove.name || '')}` : odoo ? 'an Odoo entry' : accepted ? 'accepted ✓ — counts on the ledger, not in Odoo yet' : 'proposal — not counted until you accept it';
     const lock = booked || odoo;
     o.querySelector('.ls').innerHTML = `
-    <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
+    <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
       <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/web#model=account.move&view_type=form&id=${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
     <label>Description<input id="ls-desc" value="${esc(t.description || '')}" ${lock ? 'disabled' : ''}></label>
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
@@ -104,19 +106,27 @@
       section: await sectionId(),
     };
   }
-  // book one line the way the grid does: a worker ledger (Odoo partner on the account) books through book-row (a bill
-  // from him); any other ledger with a partner + company books a payment through /book (the rules route)
+  // book one line exactly the way the accounts grid does (its bookAny): a line that has a TYPE (expense, labour,
+  // vendor, transfer) goes through book-row — the same entry ✓ accept makes; a line with no type but a partner and
+  // a company is paid from this account's cash journal through the rules route. If the first refuses, the other is
+  // tried, and both reasons are reported (Mario, 2026-09-24: "book in odoo not working").
   async function bookOne(txId, section) {
     const t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${txId}`);
-    if (t.bookedMove) return t.bookedMove;
-    let move = '';
-    if (t.account && t.account.odooPartner) { const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/book-row`, { txId }); move = r.move || ''; }
-    else {
-      if (!t.partnerId || !t.company) throw new Error('to book in Odoo the line needs a partner from the Odoo list and a company');
+    if (t.bookedMove) return t.bookedMove.name || '';
+    const byRow = async () => { const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/book-row`, { txId }); return r.move || ''; };
+    const byPay = async () => {
+      if (!t.partnerId) throw new Error('the partner is not one of Odoo\'s — pick it from the list');
+      if (!t.company) throw new Error('the company is missing');
       const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/book`, { ids: [txId], post: true });
-      const one = (r.results || [])[0] || {}; if (one.error) throw new Error(one.error); move = one.move || '';
+      const one = (r.results || [])[0] || {}; if (one.error) throw new Error(one.error);
       A.api('POST', `/api/accounting/accounts/${S.acc}/odoo-check`, { ids: [txId] }).catch(() => {});
-    }
+      return one.move || '';
+    };
+    const typed = t.nature && t.nature !== 'note';
+    const first = typed ? byRow : byPay, second = typed ? byPay : byRow;
+    let move = '', why = '';
+    try { move = await first(); }
+    catch (e) { why = e.message; try { move = await second(); } catch (e2) { throw new Error(why + (e2.message && e2.message !== why ? ' · and: ' + e2.message : '')); } }
     if (section && move) A.api('POST', '/api/ajaltoun/section', { lineId: 'move:' + String(move).replace(/\//g, '-'), section }).catch(() => {});
     return move;
   }
@@ -138,7 +148,10 @@
       for (const x of S.extra) {
         const a = Math.round((+x.amount || 0) * 100) / 100; if (!a || !String(x.description || '').trim()) continue;
         const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/tx`, { date: t.date, description: String(x.description).trim() + ' · ' + (f.description || t.description || '').slice(0, 60), debit: a, credit: 0,
-          note: 'with ' + (f.description || t.description || '').slice(0, 80), partnerId: f.partnerId, partnerName: f.partnerName, company: f.company, analyticId: f.analyticId, analyticName: f.analyticName, section: f.section, nature: 'expense', waAccepted: true });
+          note: 'with ' + (f.description || t.description || '').slice(0, 80), partnerId: f.partnerId, partnerName: f.partnerName, company: f.company, analyticId: f.analyticId, analyticName: f.analyticName,
+          section: f.section, nature: t.nature && t.nature !== 'note' ? t.nature : 'expense', waAccepted: true,
+          // it belongs to the same paper: same minute, same chat message, and it points back at the line it came with
+          fromTxId: S.txId, postId: t.postId || null, waAt: t.waAt || null, waFrom: t.waFrom || null });
         made.push(r.id);
       }
       S.extra = [];
@@ -152,9 +165,11 @@
       S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`);
       if (S.onChange) { try { await S.onChange(); } catch {} }
       draw();
-      if (action === 'book') close();
+      const note = [made.length ? `${made.length} expense${made.length > 1 ? 's' : ''} added to the ledger` : '', action === 'book' ? 'booked in Odoo' : action === 'accept' ? 'accepted' : 'saved'].filter(Boolean).join(' · ');
+      const ok = g('ls-err'); if (ok) { ok.style.color = '#3fb950'; ok.textContent = note; }
+      if (action === 'book') setTimeout(close, 900);
     } catch (e) {
-      err.textContent = e.message; btns.forEach(b => b.disabled = false);
+      err.style.color = ''; err.textContent = e.message; btns.forEach(b => b.disabled = false);
       try { S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`); if (S.onChange) await S.onChange(); } catch {}
     }
   }
