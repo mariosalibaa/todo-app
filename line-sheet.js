@@ -122,8 +122,10 @@
       A.api('POST', `/api/accounting/accounts/${S.acc}/odoo-check`, { ids: [txId] }).catch(() => {});
       return one.move || '';
     };
-    const typed = t.nature && t.nature !== 'note';
-    const first = typed ? byRow : byPay, second = typed ? byPay : byRow;
+    // a worker's ledger (his workbook, or his Odoo partner) books its rows as bills from him; any other wallet pays
+    // the supplier from its own cash journal — the way the grid's Pay does
+    const worker = !!(t.account && (t.account.odooPartner || t.account.excel));
+    const first = worker ? byRow : byPay, second = worker ? byPay : byRow;
     let move = '', why = '';
     try { move = await first(); }
     catch (e) { why = e.message; try { move = await second(); } catch (e2) { throw new Error(why + (e2.message && e2.message !== why ? ' · and: ' + e2.message : '')); } }
