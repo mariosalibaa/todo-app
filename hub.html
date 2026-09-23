@@ -156,12 +156,30 @@ const esc = Admin.esc;
 // the one-app redirect used to just prepend '/', which sent a daily-only member to the wrong page
 const APP_HREF = { decisions: '/decide', todo: '/todo', accounting: '/accounting', partners: '/partners', ajaltoun: '/ajaltoun', daily: '/accounting/daily', site: '/site', reports: '/reports', excavation: '/ajaltoun/excavation', crm: '/crm' };
 
+// the bell: 🔔 on, 🔕 off, greyed when the browser refuses (Mario 2026-09-23: push notifications in the PWA)
+async function drawBell() {
+  const el = document.getElementById('pushBell'); if (!el) return;
+  const st = await Admin.push.status();
+  el.textContent = st === 'on' ? '🔔' : '🔕';
+  el.style.opacity = st === 'on' ? '1' : '.55';
+  el.title = st === 'on' ? 'Notifications on — tap to turn off' : st === 'blocked' ? 'Notifications are blocked in the browser settings' : st === 'unsupported' ? 'This browser cannot receive notifications' : 'Tap to turn notifications on';
+}
+async function togglePush() {
+  try {
+    const st = await Admin.push.status();
+    if (st === 'on') await Admin.push.disable();
+    else { await Admin.push.enable(); await Admin.push.test(); }
+  } catch (e) { alert(e.message); }
+  drawBell();
+}
 Admin.require(null, me => {
   // one app only (and not admin) → straight into it, no tile page in the way
   if (!me.admin && me.apps.length === 1 && !location.search.includes('stay')) { location.replace(APP_HREF[me.apps[0]] || '/' + me.apps[0]); return; }
   document.getElementById('who').innerHTML =
     `<span>${esc(me.name || me.email)}${me.admin ? '<span class="admin-badge">ADMIN</span>' : ''}</span>` +
-    (me.local ? '<span style="color:var(--overlay0)">local</span>' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+    (me.local ? '<span style="color:var(--overlay0)">local</span>' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>') +
+    '<a href="#" id="pushBell" title="Notifications" onclick="togglePush();return false;" style="margin-left:10px;text-decoration:none">🔔</a>';
+  drawBell();
   // 'only' tiles show only to members who have that key and not the full app (Excavation without Ajaltoun);
   // 'everyone' tiles (Decisions) are open to every signed-in member — the server filters what each one sees
   renderTiles(me);

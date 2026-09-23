@@ -16,7 +16,17 @@ const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
 const excavation = require('./excavation');
 const reconcileLine = require('./reconcile-line');   // /api/accounting/accounts/<id>/tx/<txId>/reconcile     // /api/accounting/excavation (Georges EL Hajj collections dashboard)           // /api/reports/* (SARL trial balance + GL in LBP for the accountant)        // /api/ajaltoun/* (the project's accounts, from Odoo)
-const site = require('./site');            // /api/site/* (the conversation that replaces the WhatsApp groups)
+const site = require('./site');
+// Web push (Mario 2026-09-23: "push notifications … do it"): VAPID keys in the env on Vercel, from
+// ~/.hub-vapid.json on the laptop. Standard Web Push — the installed PWA gets them on Android and desktop,
+// on iPhone once the hub is added to the home screen.
+const webpush = require('web-push');
+const VAPID = (() => {
+  let pub = process.env.VAPID_PUBLIC || '', priv = process.env.VAPID_PRIVATE || '';
+  if (!pub || !priv) { try { const k = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.hub-vapid.json'), 'utf8')); pub = k.publicKey; priv = k.privateKey; } catch {} }
+  if (pub && priv) webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:mario@shift-group.co', pub, priv);
+  return { pub, priv };
+})();            // /api/site/* (the conversation that replaces the WhatsApp groups)
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -420,6 +430,39 @@ const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 're
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
+// ---- web push ----
+const pushCol = () => db.collection('workspaces').doc(TEAM_ID).collection('pushSubs');
+const subId = endpoint => crypto.createHash('sha256').update(String(endpoint)).digest('hex').slice(0, 40);
+async function pushTo(emails, payload) {   // emails: array, or null = everyone subscribed
+  if (!VAPID.priv) return { sent: 0, skipped: 'no VAPID keys' };
+  let q = pushCol();
+  const want = emails ? new Set(emails.map(e => String(e).toLowerCase())) : null;
+  const snap = await q.get();
+  const body = JSON.stringify(payload);
+  let sent = 0, gone = 0;
+  await Promise.all(snap.docs.map(async d => {
+    const r = d.data();
+    if (want && !want.has(String(r.email || '').toLowerCase())) return;
+    try { await webpush.sendNotification(r.sub, body, { TTL: 3600 }); sent++; }
+    catch (e) {
+      if (e.statusCode === 404 || e.statusCode === 410) { await d.ref.delete().catch(() => {}); gone++; }
+      else console.error('push', r.email, e.statusCode || e.message);
+    }
+  }));
+  return { sent, gone };
+}
+// a Site chat post → the people in that thread (Mario for every thread, the worker for his own), never the poster
+async function notifySitePost(post, byEmail) {
+  const list = await allowlistMap();
+  const by = list.get(String(byEmail || '').toLowerCase());
+  const name = by && by.name || String(byEmail || '').split('@')[0];
+  const to = new Set([...ADMIN_EMAILS]);
+  for (const [email, entry] of list) if (post.thread !== 'general' && entry.account === post.thread) to.add(email);
+  to.delete(String(byEmail || '').toLowerCase());
+  if (!to.size) return { sent: 0 };
+  const what = post.kind === 'text' ? String(post.text || '').slice(0, 140) : post.kind === 'photo' ? '📷 Photo' : post.kind === 'video' ? '🎞️ Video' : post.kind === 'voice' ? '🎤 Voice note' : 'New message';
+  return pushTo([...to], { title: name + ' · Site chat', body: what, url: '/site', tag: 'site-' + post.thread });
+}
 async function allowlistMap() {
   if (!_allowCache.map || Date.now() - _allowCache.at > 60000) {
     const snap = await db.collection('workspaces').doc(TEAM_ID).collection('allowlist').get();
@@ -949,6 +992,37 @@ const handler = async (req, res) => {
     return;
   }
 
+  // Web push: the member's own subscriptions (any member), a test ping, and an admin send
+  if (url.startsWith('/api/push/')) {
+    const readJson = () => new Promise(resolve => { let b = ''; req.on('data', c => { b += c; if (b.length > 1e6) req.destroy(); }); req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch { resolve({}); } }); });
+    const out = (code, o) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+    if (url === '/api/push/key' && req.method === 'GET') return out(200, { key: VAPID.pub });
+    if (url === '/api/push/subscribe' && req.method === 'POST') {
+      const b = await readJson();
+      const sub = b.subscription;
+      if (!sub || !sub.endpoint || !sub.keys) return out(400, { error: 'no subscription' });
+      await pushCol().doc(subId(sub.endpoint)).set({ email: access.email, sub, ua: String(b.ua || '').slice(0, 160), at: Date.now() });
+      return out(200, { ok: true });
+    }
+    if (url === '/api/push/unsubscribe' && req.method === 'POST') {
+      const b = await readJson();
+      if (b.endpoint) await pushCol().doc(subId(b.endpoint)).delete().catch(() => {});
+      return out(200, { ok: true });
+    }
+    if (url === '/api/push/test' && req.method === 'POST') {
+      const r = await pushTo([access.email], { title: 'Shift Hub', body: 'Notifications are on for ' + (access.name || access.email), url: '/' });
+      return out(200, { ok: true, ...r });
+    }
+    if (url === '/api/push/send' && req.method === 'POST') {   // admin: to everyone or a list of emails
+      if (!access.admin) return out(403, { error: 'admin only' });
+      const b = await readJson();
+      const to = Array.isArray(b.to) && b.to.length ? b.to : null;
+      const r = await pushTo(to, { title: String(b.title || 'Shift Hub').slice(0, 80), body: String(b.body || '').slice(0, 300), url: String(b.url || '/').slice(0, 300) });
+      return out(200, { ok: true, ...r });
+    }
+    return out(404, { error: 'not found' });
+  }
+
   // Per-app gate. /api/session and /api/allowlist belong to no app; the
   // allowlist is admin-only; everything else is the To-Do API.
   const noApp = app => {
@@ -1007,7 +1081,7 @@ const handler = async (req, res) => {
   if (url.startsWith('/api/site/')) {
     if (!access.apps.includes('site')) return noApp('site');
     try {
-      const handled = await site.handle(req, res, url, user, { db, admin, TEAM_ID, odooCall, access });
+      const handled = await site.handle(req, res, url, user, { db, admin, TEAM_ID, odooCall, access, notify: notifySitePost });
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {
       console.error('site error:', e);

@@ -201,6 +201,8 @@ async function handle(req, res, url, user, ctx) {
     } else if (!text) return json(res, 400, { error: 'nothing to post' });
     const ref = ws.collection('site').doc(thread).collection('posts').doc(id);
     await ref.set(post);
+    // push to the others in the thread before answering — Vercel may freeze the function right after the reply
+    if (ctx.notify) { try { await ctx.notify(post, who); } catch (e) { console.error('site push', e.message); } }
     return json(res, 200, post);   // the caller drives the parse via POST .../digest — Vercel can freeze a function right after the reply (Mario, 2026-09-12)
   }
 

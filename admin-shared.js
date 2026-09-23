@@ -17,6 +17,39 @@
   fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
 
   const A = window.Admin = { user: null, me: null, session: null, disabled: false, app: null };
+  // the service worker on every hub page (installable + web push); todo.html registered it alone before
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
+  // Web push (2026-09-23): status() → 'on' | 'off' | 'blocked' | 'unsupported'; enable() asks the browser and
+  // stores the subscription on the server; disable() removes it. Used by the bell on the hub page.
+  const b64ToBytes = b64 => { const s = (b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(s); return Uint8Array.from([...raw].map(c => c.charCodeAt(0))); };
+  A.push = {
+    supported: () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol === 'https:',
+    async status() {
+      if (!A.push.supported()) return 'unsupported';
+      if (Notification.permission === 'denied') return 'blocked';
+      const reg = await navigator.serviceWorker.getRegistration('/'); if (!reg) return 'off';
+      return (await reg.pushManager.getSubscription()) ? 'on' : 'off';
+    },
+    async enable() {
+      if (!A.push.supported()) throw new Error('this browser cannot receive notifications');
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') throw new Error('notifications were not allowed');
+      const reg = await navigator.serviceWorker.ready;
+      const { key } = await A.api('GET', '/api/push/key');
+      if (!key) throw new Error('push is not set up on the server');
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+      await A.api('POST', '/api/push/subscribe', { subscription: sub.toJSON(), ua: navigator.userAgent });
+      return sub;
+    },
+    async disable() {
+      const reg = await navigator.serviceWorker.getRegistration('/'); if (!reg) return;
+      const sub = await reg.pushManager.getSubscription(); if (!sub) return;
+      await A.api('POST', '/api/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
+      await sub.unsubscribe().catch(() => {});
+    },
+    test: () => A.api('POST', '/api/push/test'),
+  };
   let idToken = null, ready = false;
   try { A.session = localStorage.getItem('todo_session'); } catch {}
   // The session also rides as a cookie, because an <img>, an <iframe> or a "Full size" tab
