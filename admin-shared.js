@@ -69,6 +69,7 @@
     .admin-wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.18em;font-size:1.15rem;color:#cdd6f4;}
     .admin-wordmark span{color:#F2A93B;}
     .admin-alt{margin-top:16px;font-size:.82rem;color:#a6adc8;} .admin-alt a{color:#89b4fa;cursor:pointer;}
+    .admin-inapp{margin-top:14px;font-size:.84rem;line-height:1.45;color:#f9e2af;background:#2a2433;border:1px solid #45475a;border-radius:10px;padding:10px 12px;} .admin-inapp.small{color:#a6adc8;background:transparent;border:0;padding:0;font-size:.76rem;} .admin-out{display:inline-block;margin-top:6px;color:#89b4fa;font-weight:600;text-decoration:none;}
     .admin-phone{display:flex;flex-direction:column;gap:10px;margin-top:8px;} .admin-phone input{font:inherit;font-size:1.05rem;padding:10px 12px;border-radius:8px;border:1px solid #45475a;background:#1e1e2e;color:#cdd6f4;text-align:center;letter-spacing:.04em;}
     .admin-phone .err{color:#f38ba8;font-size:.8rem;min-height:1em;}`;
   document.head.appendChild(style);
@@ -80,8 +81,19 @@
     el.innerHTML = html;
     el.style.display = html ? 'flex' : 'none';
   }
+  // Google refuses to sign in inside another app's browser (Telegram, Instagram, Facebook, Gmail links…):
+  // the popup never comes back, or Google answers "this browser may not be secure". The card says so and
+  // offers the one-tap way out to the real browser (Mario, 2026-09-23: "opening the hub from Telegram fails").
+  const UA = navigator.userAgent || '';
+  const inApp = /Telegram|FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat|GSA\/|; wv\)|WebView/i.test(UA) || (/iPhone|iPad|iPod/.test(UA) && !/Safari\//.test(UA)) || (/Android/.test(UA) && /Version\/\d/.test(UA));
+  const isIOS = /iPhone|iPad|iPod/.test(UA), isAndroid = /Android/.test(UA);
+  const here = location.href.replace(/^https?:\/\//, '');
+  const openOut = isIOS ? `<a class="admin-out" href="x-safari-https://${here}">Open in Safari ↗</a>` : isAndroid ? `<a class="admin-out" href="intent://${here}#Intent;scheme=https;package=com.android.chrome;end">Open in Chrome ↗</a>` : '';
+  const inAppNote = inApp
+    ? `<div class="admin-inapp"><b>You are inside another app's browser.</b> Google does not sign in from here. ${openOut || 'Open this address in Safari or Chrome.'}</div>`
+    : (isIOS || isAndroid) && openOut ? `<div class="admin-inapp small">If the Google window does not come back (Telegram, Instagram…): ${openOut}</div>` : '';
   const card = (msg, btn, sub) => `<div class="admin-login-card"><div class="admin-wordmark">SHIFT <span>GROUP</span></div>
-    <p>${msg}</p>${btn ? '<button onclick="Admin.signIn()">Sign in with Google</button><div class="admin-alt">No Google account? <a onclick="Admin.phoneUI()">Sign in with your phone number</a></div>' : ''}<div class="admin-login-sub">${sub || ''}</div></div>`;
+    <p>${msg}</p>${btn ? '<button onclick="Admin.signIn()">Sign in with Google</button>' + inAppNote + '<div class="admin-alt">No Google account? <a onclick="Admin.phoneUI()">Sign in with your phone number</a></div>' : ''}<div class="admin-login-sub">${sub || ''}</div></div>`;
 
   // ── SMS sign-in (Mario, 2026-09-14): for a worker without a Google account ──────────────────
   // Firebase phone auth: number → SMS code → same session as a Google account; the allowlist
@@ -197,7 +209,13 @@
     const p = new firebase.auth.GoogleAuthProvider();
     (scopes || []).forEach(s => p.addScope(s));
     // no forced re-consent: once the contact scopes are granted, the popup just closes
-    const r = await fbAuth.signInWithPopup(p);
+    let r;
+    try { r = await fbAuth.signInWithPopup(p); }
+    catch (e) {
+      // an in-app browser blocks the popup: try the redirect flow before giving up (the page comes back through getRedirectResult)
+      if (/popup-blocked|operation-not-supported|cancelled-popup|popup-closed/.test(String(e.code || '')) && !scopes) { await fbAuth.signInWithRedirect(p); return new Promise(() => {}); }
+      throw e;
+    }
     A.user = r.user; idToken = await r.user.getIdToken();
     return { user: r.user, accessToken: r.credential && r.credential.accessToken };
   };

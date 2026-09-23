@@ -347,6 +347,7 @@
   #stmtsum .dette{color:var(--amber);}   /* his debt to us -- taken off the balance beside it */
   #stmtsum .g{color:var(--green);}
   .acts{margin-top:2px;font-size:11px;} .acts a{color:var(--muted);text-decoration:none;margin-right:6px;cursor:pointer;} .acts a:hover{color:var(--odoo);}
+  .acts a.bookrow{color:var(--green,#22c55e);font-weight:600;}
   .c-paid{width:110px;}
   .form{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;align-items:center;font-size:13px;}
   .form label{color:var(--muted);font-size:12px;} .form input,.form select,.form textarea{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13px;font-family:inherit;width:100%;}
@@ -470,7 +471,7 @@
   <button class="btn" id="btn-projects" onclick="openProjects()" title="The sheet's project names matched to Odoo's analytic accounts, with what each project cost him: days, benzine, misc, vendors" style="display:none">🗂 Projects</button>
   <button class="btn" id="btn-stmt" onclick="openStmt()" title="The statement as the Excel shows it: old sum (what he last saw), the new rows, all sum. Once sent, mark the new rows old." style="display:none">📄 Statement</button>
   <button class="btn" id="btn-queue" onclick="openQueue()" title="Lines you asked to be booked in Odoo — reviewed here before anything is written" hidden>📗 To book</button>
-  <button class="btn" id="btn-bills" onclick="openBills()" title="Recurring payments with a standing rule — create their draft bills in Odoo">📗 Odoo bills</button>
+  <button class="btn" id="btn-bills" onclick="openBills()" title="Recurring payments with a standing rule — create their draft bills in Odoo" hidden>📗 Odoo bills</button>
 </div>
 <!-- Phone: the toolbar's 20-odd buttons live here, in groups, behind ⋯ — the bar keeps one row
      (account, search, ＋ Line, ⋯) so the ledger gets the screen (Mario, 2026-09-12: "half of the page is fixed") -->
@@ -1696,9 +1697,9 @@ function render() {
         + `<a onclick="openLineForm('${t.id}', true)" title="Duplicate this line — a new line filled in like this one, for you to adjust and save">⧉</a>`
         // a /site post is a proposal the same way (2026-09-12)
         + (['manual', 'telegram', 'budget', 'excel', 'whatsapp', 'site'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '')
-        + (t.src !== 'odoo' && !t.bookedMove ? `<a class="wantbook${t.bookWanted ? ' on' : ''}" onclick="wantBook('${t.id}', ${!t.bookWanted})" title="${t.bookWanted ? 'Waiting to be booked — click to take it off the list' : 'Ask for this line to be booked in Odoo. Nothing is written until it is approved on the laptop.'}">📗</a>` : '')
         + ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this proposed line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
-        + ((t.src === 'whatsapp' || t.src === 'site') && t.waAccepted && !t.bookedMove ? `<a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
+        // second ✓ (Mario, 2026-09-23): the accepted line goes to Odoo from the row itself — no queue, no list
+        + ((t.src === 'whatsapp' || t.src === 'site') && t.waAccepted && !t.bookedMove ? `<a class="bookrow" onclick="autoBook('${t.id}')" title="Book this accepted line in Odoo now (a bill paid from this cash, or a payment)">✓ book in Odoo</a><a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
         + '';   // the line's paper is listed by name in the Odoo column now, not counted here
     return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}${unjustified(t) ? ' unjust' : ''}${selected.has(t.id) ? ' sel' : ''}">
       <td class="c-sel"><input type="checkbox" ${selected.has(t.id) ? 'checked' : ''} onchange="selRow('${t.id}', this.checked)"></td>
@@ -1754,6 +1755,7 @@ function render() {
           oninput="anFilter('an-${t.id}')" onkeydown="anKey(event,'an-${t.id}')" onblur="anBlur('an-${t.id}')">
           <input type="hidden" id="an-${t.id}" value="${esc(t.analyticId || '')}" data-row="${t.id}"><div class="pick-list" id="an-${t.id}-list"></div></div>
         <div class="plan" id="an-${t.id}-plan">${esc(planOf(t.analyticId))}</div>
+        ${divisionCell(t)}
         ${splitLine(t)}
         ${(() => { const pr = analyticProposal(t); return pr
           ? `<div class="sug-act typed" title="${esc('You typed "' + t.analyticText + '" — the closest Odoo analytic account is ' + pr.name)}"><span class="sug-why">typed</span> <button class="yes" onclick="takeTyped('${t.id}','analytic',true)">✓ ${esc(pr.name)}</button><button class="no" title="Leave it as you typed it" onclick="takeTyped('${t.id}','analytic',false)">✕</button></div>`
@@ -3057,11 +3059,30 @@ async function toggleExcluded(id, on) {
     if (!on && t.src !== 'excel' && t.src !== 'odoo' && !t.bookedMove && t.nature && t.nature !== 'note' && account && account.odooPartner) await autoBook(id);
   } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
+// ── the division (work section) of an Ajaltoun line: prefab, excavation, stone walls… — the list the
+//    /ajaltoun page groups by (Mario, 2026-09-23: "add the division under the project · division: prefab")
+const AJ_IDS = new Set([69, 59, 60, 61, 62, 63, 64]);
+let ajSections = null;
+Admin.api('GET', '/api/ajaltoun/sections').then(l => { ajSections = Array.isArray(l) ? l : (l && l.sections) || []; if (tx.length) render(); }).catch(() => { ajSections = []; });
+function divisionCell(t) {
+  if (!AJ_IDS.has(+t.analyticId) || t.src === 'odoo') return '';
+  const list = ajSections || [];
+  return `<select class="division" onchange="saveSection('${t.id}', this.value)" title="Which work section of Ajaltoun this line belongs to" style="margin-top:3px;max-width:100%;font-size:11px">
+    <option value="">division…</option>${list.map(x => `<option value="${esc(x.id)}" ${t.section === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
+}
+async function saveSection(id, value) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  try { await patch(id, { section: value || null }); t.section = value || ''; say(value ? 'Division saved' : 'Division cleared'); }
+  catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
 async function autoBook(id) {
   const t = tx.find(x => x.id === id); if (!t) return;
+  if (!confirm(`Book ${fmt(t.debit || t.credit)} of ${t.date} — ${(t.description || '').slice(0, 60)} — in Odoo now?`)) return;
   say('Booking ' + (t.description || '').slice(0, 40) + ' into Odoo…');
   try {
     const r = await Admin.api('POST', `/api/accounting/accounts/${accOf(t)}/book-row`, { txId: id });
+    // the division chosen here follows the line into the /ajaltoun sections (keyed by the Odoo move name)
+    if (t.section && r.move) Admin.api('POST', '/api/ajaltoun/section', { lineId: 'move:' + String(r.move).replace(/\//g, '-'), section: t.section }).catch(() => {});
     await loadTx();
     say(r.already ? 'Already in Odoo: ' + r.move
       : `Booked in Odoo: ${r.move || ''} (${r.kind})${r.photos ? ' · ' + r.photos + ' photo' + (r.photos > 1 ? 's' : '') + ' attached' : ''}${r.pendingExcel ? ' · still to be written into the workbook' : ''}`);
@@ -3641,7 +3662,7 @@ async function wantBook(id, on) {
 const queued = () => tx.filter(t => t.bookWanted && !t.bookedMove);
 function queueButton() {
   const b = document.getElementById('btn-queue'), n = queued().length;
-  b.hidden = !n;
+  b.hidden = true;   // Mario, 2026-09-23: the queue and the bills buttons are gone — a line is booked from its row
   b.textContent = `📗 To book (${n})`;
 }
 function openQueue() {

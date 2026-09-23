@@ -1066,7 +1066,8 @@ const handler = async (req, res) => {
   }
   if (url.startsWith('/api/ajaltoun/')) {
     const excavOnly = url.split('?')[0] === '/api/ajaltoun/excavation' && access.apps.includes('excavation');
-    if (!access.apps.includes('ajaltoun') && !excavOnly) return noApp('ajaltoun');
+    const sectionsList = url.split('?')[0] === '/api/ajaltoun/sections' && req.method === 'GET';   // the divisions list: any member (the grid and the Site chat offer it)
+    if (!access.apps.includes('ajaltoun') && !excavOnly && !sectionsList) return noApp('ajaltoun');
     try {
       const handled = await excavation.handle(req, res, url, user, { db, TEAM_ID, odooCall, access })
         || await ajaltoun.handle(req, res, url, user, { db, TEAM_ID, odooCall, access });

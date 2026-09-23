@@ -105,6 +105,18 @@
   .dlg{background:var(--mantle);border:1px solid var(--surface1);border-radius:14px;padding:20px 22px;width:min(640px,94vw);max-height:90vh;overflow:auto;}
   .frm{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;} .frm label{display:flex;flex-direction:column;gap:4px;font-size:.74rem;color:var(--sub);} .frm label.row{flex-direction:row;align-items:center;grid-column:1/-1;}
   .frm input,.frm select{width:100%;}
+  /* Mario, 2026-09-23: hub lines not in Odoo, paid column, collapsible sections, column filters, comboboxes */
+  .pill.hub{background:rgba(242,169,59,.16);color:var(--amber);} .pill.hub a{color:inherit;text-decoration:none;} .pill.hub a:hover{text-decoration:underline;}
+  .pill.notpaid{background:rgba(243,139,168,.15);color:var(--red);} .pill.partly{background:rgba(242,169,59,.16);color:var(--amber);} .pill.paid{background:rgba(166,227,161,.14);color:var(--green);}
+  .prop{color:var(--amber);font-size:.74rem;} tr.prop td{opacity:.8;}
+  tr.srow{cursor:pointer;} tr.srow:hover td{background:rgba(255,255,255,.03);} tr.srow .chev{display:inline-block;width:14px;color:var(--overlay0);font-size:.72rem;}
+  tr.sdet td{background:rgba(0,0,0,.18);padding:4px 8px 8px 26px;} tr.sdet table{font-size:.76rem;} tr.sdet th{font-size:.6rem;} tr.sdet td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.05);}
+  tr.cf th{padding:3px 4px;border-bottom:1px solid var(--surface0);} tr.cf input,tr.cf select{width:100%;min-width:56px;padding:3px 6px;font-size:.72rem;} tr.cf input.on,tr.cf select.on{border-color:var(--amber);}
+  .combo{position:relative;display:inline-block;} .combo input{min-width:150px;} .combo input.on{border-color:var(--amber);}
+  .combo .clist{position:absolute;left:0;top:calc(100% + 3px);z-index:70;min-width:100%;max-height:260px;overflow:auto;background:var(--mantle);border:1px solid var(--surface1);border-radius:9px;padding:4px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;}
+  .combo.open .clist{display:block;} .combo .it{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:1px solid transparent;color:var(--text);border-radius:6px;padding:5px 9px;font-size:.8rem;cursor:pointer;white-space:nowrap;}
+  .combo .it:hover,.combo .it.hit{background:var(--surface0);} .combo .it.cur{border-color:var(--amber);color:var(--amber);} .combo .it.eq{color:var(--blue);} .combo .it small{color:var(--overlay0);font-size:.66rem;} .combo .none{color:var(--overlay0);font-size:.76rem;padding:5px 9px;}
+  #secpop{width:300px;} #secpop .combo{display:block;} #secpop .combo input{width:100%;} #secpop .clist{position:static;display:block;box-shadow:none;border:0;padding:0;max-height:300px;}
 </style>
 </head>
 <body>
@@ -138,7 +150,11 @@ const usd = n => (n < 0 ? '−' : '') + '$' + Math.abs(Math.round(n)).toLocaleSt
 const usd2 = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : '—';
 const VILLA_ORDER = ['Common', 'U1', 'U2', 'U3', 'D1', 'D2', 'D3'];
-let D = null, ME = null, F = { section: '', villa: '', q: '', review: '' };
+let D = null, ME = null, F = { section: '', villa: '', q: '', review: '', cols: {} };   // cols = the per-column filters of the Detail table
+// line ids are STRINGS on the page (Odoo analytic ids as '12345', hub lines 'hub:<acc>:<tx>'); this quotes one for an inline handler
+const idA = id => "'" + String(id).replace(/[^\w:.-]/g, '') + "'";
+const lineById = id => D.lines.find(x => x.id === String(id));
+const counted = l => l.paid !== 'proposal';   // a WhatsApp/site proposal waits for Mario's ✓: listed, never counted
 let TAB = (location.hash || '').replace('#', '') || 'accounts';   // accounts · budget · plan
 // the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
 const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
@@ -166,19 +182,21 @@ function fmtWhen(iso) { if (!iso) return ''; const d = new Date(iso); return isN
 async function load(fresh) {
   if (fresh) { const h = document.querySelector('#app h2 .muted'); if (h) h.textContent = 'Pulling from Odoo…'; }
   try {
-    [D] = await Promise.all([Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')), Plan.load()]); window.D = D;
+    [D] = await Promise.all([Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')), Plan.load()]); normIds(D); window.D = D;
     if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved';   // the partner opens on what waits for him
     render();
-    if (D.stale && !fresh) { try { D = await Admin.api('GET', '/api/ajaltoun/data?refresh=1'); window.D = D; render(); } catch (e) { console.warn('refresh failed', e); } }
+    if (D.stale && !fresh) { try { D = await Admin.api('GET', '/api/ajaltoun/data?refresh=1'); normIds(D); window.D = D; render(); } catch (e) { console.warn('refresh failed', e); } }
   }
   catch (e) { document.getElementById('app').innerHTML = `<p style="color:var(--red)">Could not read Odoo: ${esc(e.message)}</p>`; }
 }
+
+function normIds(d) { for (const l of d.lines) l.id = String(l.id); }
 
 // ── the numbers ────────────────────────────────────────────────────────────
 function compute() {
   const secOf = id => D.sections.find(s => s.id === id) || { id, name: id };
   const isEq = l => !!secOf(l.section).equipment;
-  const lines = D.lines;
+  const lines = D.lines.filter(counted);            // Odoo lines + accepted hub lines; proposals wait
   const cost = lines.filter(l => !isEq(l));          // what the partners share
   const equip = lines.filter(isEq);                  // reusable: prefab, scaffolding
   const sum = a => a.reduce((x, l) => x + l.amount, 0);
@@ -233,16 +251,17 @@ function renderAccounts(app) {
     <h2>Cash flow <span class="r muted">in − out = remaining · click a month for its lines</span></h2>
     <div class="card">${cashflowBlock(c)}</div>
 
-    <h2>Costs by work section</h2>
+    <h2>Costs by work section <span class="r muted">click a section for its lines</span></h2>
     <div class="card"><div class="wrap"><table>
       <thead><tr><th>Section</th><th class="n">Lines</th><th class="n">Amount</th><th class="n">Qty done</th><th class="n">$ / unit</th><th class="n">BOQ rate</th><th>Share</th><th class="n">% of cost</th></tr></thead>
       <tbody>${c.bySec.map(s => { const q = (D.qtyDone || {})[s.id], boq = boqRate(s.id), unit = (q && q.unit) || (boq && boq.unit) || '';
-        const perUnit = q && q.qty ? s.amount / q.qty : null;
-        return `<tr class="${s.equipment ? 'eq' : ''}"><td>${esc(s.name)}${s.equipment ? ' <span class="pill eq">equipment</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${usd2(s.amount)}</td>
-        <td class="n qin">${D.admin ? `<input type="number" step="any" value="${q ? q.qty : ''}" placeholder="qty" onchange="setQty('${s.id}', this.value, this.nextElementSibling.value)"><input value="${esc(unit)}" placeholder="unit" style="width:52px" onchange="setQty('${s.id}', this.previousElementSibling.value, this.value)">` : (q ? `${q.qty.toLocaleString('en-US')} ${esc(unit)}` : '<span class="muted">—</span>')}</td>
+        const perUnit = q && q.qty ? s.amount / q.qty : null, open = OPEN_SEC.has(s.id);
+        return `<tr class="srow ${s.equipment ? 'eq' : ''}" onclick="toggleSec(event, '${s.id}')"><td><span class="chev">${open ? '▾' : '▸'}</span>${esc(s.name)}${s.equipment ? ' <span class="pill eq">equipment</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${usd2(s.amount)}</td>
+        <td class="n qin" onclick="event.stopPropagation()">${D.admin ? `<input type="number" step="any" value="${q ? q.qty : ''}" placeholder="qty" onchange="setQty('${s.id}', this.value, this.nextElementSibling.value)"><input value="${esc(unit)}" placeholder="unit" style="width:52px" onchange="setQty('${s.id}', this.previousElementSibling.value, this.value)">` : (q ? `${q.qty.toLocaleString('en-US')} ${esc(unit)}` : '<span class="muted">—</span>')}</td>
         <td class="n ${perUnit != null && boq && boq.rate ? (perUnit <= boq.rate ? 'ok' : 'flag') : ''}">${perUnit != null ? usd2(perUnit) : '—'}</td>
         <td class="n muted">${boq && boq.rate ? usd2(boq.rate) + '/' + esc(boq.unit) : '—'}</td>
-        <td><div class="bar"><i style="width:${Math.min(100, 100 * s.amount / Math.max(1, c.costTotal))}%"></i></div></td><td class="n">${s.equipment ? '—' : pct(s.amount, c.costTotal)}</td></tr>`; }).join('')}
+        <td><div class="bar"><i style="width:${Math.min(100, 100 * s.amount / Math.max(1, c.costTotal))}%"></i></div></td><td class="n">${s.equipment ? '—' : pct(s.amount, c.costTotal)}</td></tr>
+        ${open ? `<tr class="sdet"><td colspan="8">${secLinesTable(s.id)}</td></tr>` : ''}`; }).join('')}
       <tr class="tot"><td>Project cost to date (without equipment)</td><td class="n">${c.cost.length}</td><td class="n">${usd2(c.costTotal)}</td><td colspan="3"></td><td></td><td class="n">100%</td></tr>
       </tbody></table></div>
       <div class="note">Prefab and scaffolding are bought once and can serve the next project, so they are shown as equipment and left out of the cost the partners share. Whether Ajaltoun should bear a usage charge for them is still to be agreed.</div>
@@ -271,9 +290,9 @@ function renderAccounts(app) {
       </div>
     </div>
 
-    <h2>Detail <span class="r muted">${c.lines.length} lines · Odoo as of ${esc(fmtWhen(D.cachedAt))}${D.stale ? ' · refreshing…' : ''}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">pull now</a>` : ''}</span></h2>
+    <h2>Detail <span class="r muted">${c.lines.length} lines${D.hubLines ? ` · ${D.hubLines} from the hub ledgers not in Odoo` : ''} · Odoo as of ${esc(fmtWhen(D.cachedAt))}${D.stale ? ' · refreshing…' : ''}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">pull now</a>` : ''}</span></h2>
     <div class="filters">
-      <select onchange="F.section=this.value;pageNo=0;renderDetail()"><option value="">All sections</option>${D.sections.map(s => `<option value="${s.id}" ${F.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+      <span class="combo" id="secfilter"></span>
       <select onchange="F.villa=this.value;pageNo=0;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <select onchange="F.review=this.value;F._touched=1;pageNo=0;renderDetail()"><option value="">All lines</option><option value="booked" ${F.review === 'booked' ? 'selected' : ''}>Booked — to approve (Mario)</option><option value="approved" ${F.review === 'approved' ? 'selected' : ''}>Approved — waiting for the partner</option><option value="verified" ${F.review === 'verified' ? 'selected' : ''}>Verified</option><option value="flagged" ${F.review === 'flagged' ? 'selected' : ''}>Flagged</option></select>
       <input placeholder="supplier / text…" value="${esc(F.q)}" oninput="F.q=this.value;pageNo=0;renderDetail()" style="min-width:200px">
@@ -286,9 +305,40 @@ function renderAccounts(app) {
     <h2>Review log <span class="r muted" id="log-sub"></span></h2>
     <div class="card"><div class="wrap" id="log"><p class="muted small">Loading…</p></div></div>
     ${(D.owed || []).length ? `<div class="note">Still owed to suppliers (net, from the payables ledger): ${D.owed.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ')}.${(D.prepaid || []).length ? ' Paid ahead of the bill: ' + D.prepaid.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ') + '.' : ''}</div>` : ''}
-    <div class="note">What this shows: the bills and cash lines tagged to Ajaltoun 4193 in Odoo (S DEV, SARL, S LB). Not yet in it: worker hours before August 2026, design fees, land and permits — so this is the gross build cost to date, not the full cost of the project.</div>`;
+    <div class="note">What this shows: the bills and cash lines tagged to Ajaltoun 4193 in Odoo (S DEV, SARL, S LB), plus the lines tagged Ajaltoun on the hub's own ledgers (Mario cash, the workers' cash, Whish) that are not in Odoo yet — marked "not in Odoo"; a WhatsApp / site proposal waits for Mario's ✓ and is not counted. Not yet in it: worker hours before August 2026, design fees, land and permits — so this is the gross build cost to date, not the full cost of the project.</div>`;
+  // the "All sections" combobox: type to filter, ↑↓ Enter, click
+  const secItems = () => [{ id: '', name: 'All sections' }, ...D.sections.map(s => ({ id: s.id, name: s.name, cls: s.equipment ? 'eq' : '', hint: s.equipment ? 'equipment' : '' }))];
+  combo(document.getElementById('secfilter'), { items: secItems, value: F.section, placeholder: 'All sections', onPick: it => { F.section = it.id; pageNo = 0; renderDetail(); } });
   renderDetail();
   loadLog();
+}
+// ── the section rows fold open on their lines (Mario, 2026-09-23) ──
+const OPEN_SEC = new Set();
+function toggleSec(e, id) {
+  if (e.target.closest('input, select, button, a')) return;
+  if (OPEN_SEC.has(id)) OPEN_SEC.delete(id); else OPEN_SEC.add(id);
+  render();
+}
+function secLinesTable(id) {
+  const ls = D.lines.filter(l => l.section === id && counted(l)).sort((a, b) => b.date.localeCompare(a.date));
+  const props = D.lines.filter(l => l.section === id && !counted(l));
+  return `<table><thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>
+    ${ls.map(l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td>${billCell(l)}</td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No lines.</td></tr>'}
+    <tr class="tot"><td colspan="6">${ls.length} lines${props.length ? ` · ${props.length} proposal${props.length > 1 ? 's' : ''} waiting for Mario's ✓ (not counted)` : ''}</td><td class="n">${usd2(ls.reduce((x, l) => x + l.amount, 0))}</td></tr></tbody></table>`;
+}
+// the BILL cell: the Odoo bill number, "payment · no bill", or "not in Odoo" linking to the hub ledger line
+function billCell(l) {
+  if (l.hub) return `<span class="pill hub" title="A line of the hub ledger (${esc(l.paidBy || '')}) tagged Ajaltoun 4193 — not booked in Odoo yet"><a href="${esc(l.ledgerUrl || '#')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">not in Odoo ↗</a></span>`;
+  return `${l.payment ? `<span class="pill pay" title="Paid to the supplier, bill not booked in Odoo yet. Book/match the bill and this line becomes the bill's own analytic line.">payment · no bill</span> ` : ''}${esc(l.moveName)}`;
+}
+// the PAID cell: paid / not paid / partly paid + who paid (journal · date, or the hub ledger's name)
+const paidText = l => l.paid === 'proposal' ? 'proposal' : l.paid === 'paid' || l.paid === 'in_payment' ? 'paid' : l.paid === 'not_paid' ? 'not paid' : l.paid === 'partial' ? 'partly paid' : (l.paid || '');
+function paidCell(l) {
+  if (l.paid === 'proposal') return `<span class="prop" title="A WhatsApp / site line Mario has not accepted yet — listed, not counted">proposal · waiting for Mario's ✓</span>`;
+  const t = paidText(l), cls = t === 'paid' ? 'paid' : t === 'not paid' ? 'notpaid' : t === 'partly paid' ? 'partly' : '';
+  const who = (l.paidBy || '').split(' + ').filter(Boolean);   // a bill settled in many instalments: show three, fold the rest
+  const whoHtml = who.length <= 3 ? esc(who.join(' + ')) : `${esc(who.slice(0, 3).join(' + '))} <a href="#" class="muted" title="${esc(who.join(' + '))}" onclick="this.parentElement.textContent = this.title;return false;">+${who.length - 3} more</a>`;
+  return `${t ? `<span class="pill ${cls}">${esc(t)}</span>` : '<span class="muted">—</span>'}${who.length ? `<div class="stamp">${whoHtml}</div>` : ''}`;
 }
 
 // ── the audit trail: every review action, newest first; withdrawn verifications stand out ──
@@ -371,12 +421,53 @@ function cashflowRows(c) {
     + `<tr class="tot"><td></td><td>Remaining project cash</td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(c.received - c.paidOut)}</td></tr>`;
 }
 
+// ── the column filters of the Detail table (Mario, 2026-09-23): one input under every title ──
+const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
+// amount syntax as on the accounts page: 150 · =150 · >100 · <50 · 100-200
+function amountMatch(v, f) {
+  f = f.replace(/,/g, '').trim(); let m;
+  if ((m = f.match(/^(-?[\d.]+)\s*-\s*(-?[\d.]+)$/))) return v >= +m[1] && v <= +m[2];
+  if ((m = f.match(/^>=?\s*(-?[\d.]+)$/))) return v >= +m[1];
+  if ((m = f.match(/^<=?\s*(-?[\d.]+)$/))) return v <= +m[1];
+  if ((m = f.match(/^=?\s*(-?[\d.]+)$/))) return Math.abs(Math.abs(v) - Math.abs(+m[1])) < 0.005;
+  return String(v).includes(f);
+}
+// "2026-09" · "2026-09-01..2026-09-15" · "2026-08..2026-09"
+function dateMatch(d, f) {
+  f = f.trim(); const m = f.match(/^(\S*)\s*\.\.\s*(\S*)$/);
+  if (m) return (!m[1] || d >= m[1]) && (!m[2] || d.slice(0, m[2].length) <= m[2]);
+  return d.includes(f);
+}
+const has = (s, f) => String(s || '').toLowerCase().includes(f.toLowerCase());
+const COLS = [
+  { k: 'date', ph: 'yyyy-mm · a..b', test: (l, f) => dateMatch(l.date, f) },
+  { k: 'partner', ph: 'supplier', test: (l, f) => has(l.partner, f) },
+  { k: 'name', ph: 'description', test: (l, f) => has(l.name + ' ' + l.account + ' ' + l.company + ' ' + (l.note || ''), f) },
+  { k: 'villa', ph: 'villa', test: (l, f) => has(l.villa, f) },
+  { k: 'section', ph: 'section', test: (l, f) => has(secName(l.section), f) },
+  { k: 'bill', ph: 'bill · not in Odoo', test: (l, f) => has((l.hub ? 'not in odoo ' : '') + (l.payment ? 'payment · no bill ' : '') + l.moveName + ' ' + l.moveRef + ' ' + (l.files || []).map(x => x.name).join(' '), f) },
+  { k: 'amount', ph: '=, >, <, a-b', test: (l, f) => amountMatch(l.amount, f), n: true },
+  { k: 'paid', ph: 'paid · who', test: (l, f) => has(paidText(l) + ' ' + (l.paidBy || ''), f) },
+  { k: 'mario', sel: [['', 'all'], ['approved', 'approved'], ['not', 'not approved']], test: (l, f) => f === 'approved' ? !!(l.review && l.review.approved) : !(l.review && l.review.approved) },
+  { k: 'antoine', sel: [['', 'all'], ['verified', 'verified'], ['flagged', 'flagged'], ['waiting', 'waiting']], test: (l, f) => { const s = stOf(l); return f === 'waiting' ? s === 'approved' : s === f; } },
+];
+function colF(k, v) { if (v) F.cols[k] = v; else delete F.cols[k]; pageNo = 0; renderDetail(); }
+function matches(l) {
+  const q = F.q.toLowerCase();
+  if ((F.section && l.section !== F.section) || (F.villa && l.villa !== F.villa) || (F.review && stOf(l) !== F.review)) return false;
+  if (q && !(l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef + ' ' + (l.paidBy || '') + (l.hub ? ' not in odoo' : '')).toLowerCase().includes(q)) return false;
+  for (const c of COLS) { const f = F.cols[c.k]; if (f && !c.test(l, f)) return false; }
+  return true;
+}
+function filterRow() {
+  return `<tr class="cf">${D.admin ? '<th class="ck"></th>' : ''}${COLS.map(c => { const v = F.cols[c.k] || '', on = v ? 'on' : '';
+    return `<th class="${c.n ? 'n' : ''}">${c.sel ? `<select class="${on}" data-cf="${c.k}" onchange="colF('${c.k}', this.value)">${c.sel.map(([id, n]) => `<option value="${id}" ${v === id ? 'selected' : ''}>${n}</option>`).join('')}</select>`
+      : `<input type="text" class="${on}" data-cf="${c.k}" value="${esc(v)}" placeholder="${c.ph}" oninput="colF('${c.k}', this.value)">`}</th>`; }).join('')}</tr>`;
+}
+
 function renderDetail() {
   if (!document.getElementById('detail')) return;
-  const q = F.q.toLowerCase();
-  const rows = D.lines.filter(l => (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)))
-    .sort((a, b) => b.date.localeCompare(a.date));
-  const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
+  const rows = D.lines.filter(matches).sort((a, b) => b.date.localeCompare(a.date));
   const PAGE = PAGE_SIZE();
   const last = Math.max(0, Math.ceil(rows.length / PAGE) - 1);
   pageNo = Math.min(Math.max(0, pageNo), last);
@@ -385,29 +476,37 @@ function renderDetail() {
   document.getElementById('pg-prev').disabled = pageNo === 0; document.getElementById('pg-next').disabled = pageNo >= last;
   if (D.admin) bulkBar(rows);
   PV.rows = page.map(l => l.id);
+  // the filter input being typed in survives the re-render: remember it, put the caret back after
+  const act = document.activeElement, actKey = act && act.dataset ? act.dataset.cf : null, caret = actKey && act.selectionStart != null ? act.selectionStart : null;
+  const NCOL = COLS.length + (D.admin ? 1 : 0);
+  const sumRows = rows.filter(counted), nProp = rows.length - sumRows.length;
   document.getElementById('detail').innerHTML = `<table>
-    <thead><tr>${D.admin ? `<th class="ck"><input type="checkbox" onchange="tickAll(this.checked)" ${page.length && page.every(l => SEL.has(l.id)) ? 'checked' : ''}></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Mario</th><th>Antoine</th></tr></thead>
-    <tbody>${page.map(l => `<tr class="selectable ${PV.line === l.id ? 'sel' : ''}" data-line="${l.id}" onclick="rowClick(event, ${l.id})">
-      ${D.admin ? `<td class="ck"><input type="checkbox" ${SEL.has(l.id) ? 'checked' : ''} onchange="tick(${l.id}, this.checked)"></td>` : ''}
+    <thead><tr>${D.admin ? `<th class="ck"><input type="checkbox" onchange="tickAll(this.checked)" ${page.length && page.every(l => SEL.has(l.id)) ? 'checked' : ''}></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Section</th><th>Bill</th><th class="n">Amount</th><th>Paid</th><th>Mario</th><th>Antoine</th></tr>${filterRow()}</thead>
+    <tbody>${page.map(l => `<tr class="selectable ${PV.line === l.id ? 'sel' : ''} ${counted(l) ? '' : 'prop'}" data-line="${esc(l.id)}" onclick="rowClick(event, ${idA(l.id)})">
+      ${D.admin ? `<td class="ck"><input type="checkbox" ${SEL.has(l.id) ? 'checked' : ''} onchange="tick(${idA(l.id)}, this.checked)"></td>` : ''}
       <td class="muted small" style="white-space:nowrap">${esc(l.date)}</td>
       <td>${esc(l.partner || '—')}</td>
-      <td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}<div class="small muted">${esc(l.account)} · ${esc(l.company.replace(/SHIFT /i, ''))}</div></td>
+      <td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}<div class="small muted">${esc(l.account)} · ${esc((l.company || '').replace(/SHIFT /i, ''))}${l.note ? ' · ' + esc(l.note) : ''}</div></td>
       <td><span class="pill">${esc(l.villa)}</span></td>
-      <td>${D.admin ? `<button class="secbtn" onclick="openSecPop(${l.id}, this)" title="Change the section"><span>${esc(secName(l.section))}</span><i>▾</i></button>
-        <div class="small"><a href="#" class="muted" onclick="setSection(${l.id}, null, true);return false;">whole supplier →</a></div>` : `<span class="pill ${(D.sections.find(s => s.id === l.section) || {}).equipment ? 'eq' : ''}">${esc(secName(l.section))}</span>`}</td>
-      <td class="small">${l.payment ? `<span class="pill pay" title="Paid to the supplier, bill not booked in Odoo yet. Book/match the bill and this line becomes the bill's own analytic line.">payment · no bill</span> ` : ''}${esc(l.moveName)}<div>${fileLinks(l)}</div></td>
+      <td>${D.admin ? `<button class="secbtn" onclick="openSecPop(${idA(l.id)}, this)" title="Change the section"><span>${esc(secName(l.section))}</span><i>▾</i></button>
+        <div class="small"><a href="#" class="muted" onclick="setSection(${idA(l.id)}, null, true);return false;">whole supplier →</a></div>` : `<span class="pill ${(D.sections.find(s => s.id === l.section) || {}).equipment ? 'eq' : ''}">${esc(secName(l.section))}</span>`}</td>
+      <td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td>
       <td class="n">${usd2(l.amount)}</td>
-      <td>${marioCell(l)}</td><td>${antoineCell(l)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">Nothing matches.</td></tr>'}
-    <tr class="tot"><td colspan="${D.admin ? 7 : 6}">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}</td><td class="n">${usd2(rows.reduce((x, l) => x + l.amount, 0))}</td><td></td><td></td></tr></tbody></table>`;
+      <td class="small">${paidCell(l)}</td>
+      <td>${marioCell(l)}</td><td>${antoineCell(l)}</td></tr>`).join('') || `<tr><td colspan="${NCOL}" class="muted">Nothing matches.</td></tr>`}
+    <tr class="tot"><td colspan="${NCOL - 4}">${rows.length} lines match${rows.length > PAGE ? ` · showing ${pageNo * PAGE + 1}-${Math.min(rows.length, (pageNo + 1) * PAGE)}` : ''}${nProp ? ` · ${nProp} proposal${nProp > 1 ? 's' : ''} not counted` : ''}</td><td class="n">${usd2(sumRows.reduce((x, l) => x + l.amount, 0))}</td><td></td><td></td><td></td></tr></tbody></table>`;
+  if (actKey) { const el = document.querySelector(`#detail [data-cf="${actKey}"]`); if (el) { el.focus(); if (caret != null && el.setSelectionRange) try { el.setSelectionRange(caret, caret); } catch {} } }
   showPreview();
 }
 
 // a worker's month-bill carries every receipt of the month: show two, fold the rest behind "+N"
+// an attachment as inline-handler arguments: (id, name, mime, url) — url only for a hub ledger doc
+const fileArgs = f => `${idA(f.id)}, '${esc(f.name).replace(/'/g, '')}', '${esc(f.mime)}', ${f.url ? "'" + String(f.url).replace(/[^\w\/:.%-]/g, '') + "'" : 'null'}`;
 function fileLinks(l, all) {
-  const link = f => `<a class="file" href="#" onclick="openFile(${f.id}, '${esc(f.name).replace(/'/g, '')}', '${esc(f.mime)}');return false;">📎 ${esc(f.name.length > 28 ? f.name.slice(0, 26) + '…' : f.name)}</a>`;
+  const link = f => `<a class="file" href="#" onclick="openFile(${fileArgs(f)});return false;">📎 ${esc(f.name.length > 28 ? f.name.slice(0, 26) + '…' : f.name)}</a>`;
   const fs = l.files || [];
   if (all || fs.length <= 3) return fs.map(link).join('');
-  return fs.slice(0, 2).map(link).join('') + `<a class="file muted" href="#" onclick="this.parentElement.innerHTML = fileLinks(D.lines.find(x => x.id === ${l.id}), true);return false;">+${fs.length - 2} more</a>`;
+  return fs.slice(0, 2).map(link).join('') + `<a class="file muted" href="#" onclick="this.parentElement.innerHTML = fileLinks(lineById(${idA(l.id)}), true);return false;">+${fs.length - 2} more</a>`;
 }
 // the four-eyes column: the partner verifies or flags; the writer only sees the stamp (and may clear an answered flag)
 // two columns: what Mario did to the line, what Antoine did — each with its own buttons for whoever is logged in
@@ -417,12 +516,13 @@ function marioCell(l) {
   const r = l.review || {}; let html = '';
   if (r.approved) html += stampOf('ap', '✓ Approved', r.approved);
   if (r.withdrawRequest) html += `<div class="stamp warn" title="${esc(r.withdrawRequest.note || '')}">↩ ${esc(r.withdrawRequest.by || 'the partner')} asks to withdraw his verification${r.withdrawRequest.note ? ': ' + esc(r.withdrawRequest.note) : ''}</div>`;
-  if (D.admin) {
-    if (r.flag) html += `<button class="btn" onclick="review(${l.id}, null)" title="Clear the flag once you have answered it">answered</button> `;
-    if (r.verified) html += `<button class="btn" onclick="review(${l.id}, null)" title="Release the partner's verification so he can look at the line again — logged">release verification</button> ${r.withdrawRequest ? `<button class="btn" onclick="review(${l.id}, 'keep')" title="Refuse: the verification stands">keep it</button> ` : ''}`;
-    html += r.approved ? `<button class="btn" onclick="approve([${l.id}], false)">withdraw</button>` : `<button class="btn ap" onclick="approve([${l.id}], true)">✓ Approve</button>`;
+  if (D.admin && counted(l)) {
+    if (r.flag) html += `<button class="btn" onclick="review(${idA(l.id)}, null)" title="Clear the flag once you have answered it">answered</button> `;
+    if (r.verified) html += `<button class="btn" onclick="review(${idA(l.id)}, null)" title="Release the partner's verification so he can look at the line again — logged">release verification</button> ${r.withdrawRequest ? `<button class="btn" onclick="review(${idA(l.id)}, 'keep')" title="Refuse: the verification stands">keep it</button> ` : ''}`;
+    html += r.approved ? `<button class="btn" onclick="approve([${idA(l.id)}], false)">withdraw</button>` : `<button class="btn ap" onclick="approve([${idA(l.id)}], true)">✓ Approve</button>`;
   }
-  return html || '<span class="stamp">booked · not yet approved</span>';
+  if (!counted(l)) return html || `<span class="stamp">proposal · accept it on the <a href="${esc(l.ledgerUrl || '/accounting/accounts')}" target="_blank" rel="noopener" style="color:var(--amber)">ledger</a> first</span>`;
+  return html || `<span class="stamp">${l.hub ? 'on the hub ledger' : 'booked'} · not yet approved</span>`;
 }
 function antoineCell(l) {
   const r = l.review || {}; let html = '';
@@ -430,29 +530,28 @@ function antoineCell(l) {
   if (r.flag) html += stampOf('flag', '⚑ Flagged', r.flag) + (r.flag.note ? `<div class="stamp" style="color:var(--text)">“${esc(r.flag.note)}”</div>` : '');
   for (const w of (r.withdrawn || [])) html += `<div class="stamp warn" title="A verification that was taken back">↩ verification by ${esc(w.by)} (${esc(whenOf(w))}) withdrawn ${esc((w.undoneAt || '').replace('T', ' ').slice(0, 16))}</div>`;
   if (D.canVerify) {
-    if (r.approved && !r.verified) html += `<button class="btn ok" onclick="review(${l.id}, 'verified')">✓ Verify</button> `;
-    if (r.approved && !r.flag && !r.verified) html += `<button class="btn flag" onclick="review(${l.id}, 'flagged')">⚑ Flag</button>`;
-    if (r.flag) html += ` <button class="btn" onclick="review(${l.id}, null)">undo</button>`;
+    if (r.approved && !r.verified) html += `<button class="btn ok" onclick="review(${idA(l.id)}, 'verified')">✓ Verify</button> `;
+    if (r.approved && !r.flag && !r.verified) html += `<button class="btn flag" onclick="review(${idA(l.id)}, 'flagged')">⚑ Flag</button>`;
+    if (r.flag) html += ` <button class="btn" onclick="review(${idA(l.id)}, null)">undo</button>`;
     // a verification stands until Mario releases it (Mario, 2026-09-13): the partner can only ask
-    if (r.verified && !r.withdrawRequest) html += ` <button class="btn" onclick="review(${l.id}, 'withdraw-request')" title="Your verification stays until Mario releases it — say why you want it back">ask to withdraw</button>`;
+    if (r.verified && !r.withdrawRequest) html += ` <button class="btn" onclick="review(${idA(l.id)}, 'withdraw-request')" title="Your verification stays until Mario releases it — say why you want it back">ask to withdraw</button>`;
     if (r.verified && r.withdrawRequest) html += ` <span class="stamp muted">waiting for Mario</span>`;
   }
   if (!html) return r.approved ? '<span class="stamp">— waiting</span>' : '<span class="stamp muted">—</span>';
   return html;
 }
-function tick(id, on) { if (on) SEL.add(id); else SEL.delete(id); bulkBar(); }
-function tickAll(on) { const q = F.q.toLowerCase(); for (const l of D.lines) { if (visible(l, q)) { if (on) SEL.add(l.id); else SEL.delete(l.id); } } renderDetail(); }
-function visible(l, q) { return (!F.section || l.section === F.section) && (!F.villa || l.villa === F.villa) && (!F.review || stOf(l) === F.review) && (!q || (l.partner + ' ' + l.name + ' ' + l.moveName + ' ' + l.moveRef).toLowerCase().includes(q)); }
+function tick(id, on) { if (on) SEL.add(String(id)); else SEL.delete(String(id)); bulkBar(); }
+function tickAll(on) { for (const l of D.lines) { if (matches(l) && counted(l)) { if (on) SEL.add(l.id); else SEL.delete(l.id); } } renderDetail(); }
 function bulkBar() {
   const el = document.getElementById('bulk'); if (!el) return;
-  const ids = [...SEL]; const amt = ids.reduce((x, id) => { const l = D.lines.find(y => y.id === id); return x + (l ? l.amount : 0); }, 0);
+  const ids = [...SEL]; const amt = ids.reduce((x, id) => { const l = lineById(id); return x + (l ? l.amount : 0); }, 0);
   el.innerHTML = ids.length ? `${ids.length} ticked · ${usd2(amt)} <button class="btn ap" onclick="approve([...SEL], true)">✓ Approve ${ids.length}</button> <button class="btn" onclick="approve([...SEL], false)">withdraw</button> <button class="btn" onclick="SEL.clear();renderDetail()">clear</button>`
     : '<span class="muted">Tick lines (or the header box for the whole filtered list) to approve them in one go.</span>';
 }
 async function approve(ids, on) {
   try {
     const r = await Admin.api('POST', '/api/ajaltoun/approve', { lineIds: ids, on });
-    for (const id of ids) { const l = D.lines.find(x => x.id === id); if (l) l.review = r.reviews[String(id)] || null; }
+    for (const id of ids) { const l = lineById(id); if (l) l.review = r.reviews[String(id)] || null; }
     SEL.clear(); render();
   } catch (e) { alert('Could not save: ' + e.message); }
 }
@@ -462,52 +561,77 @@ async function review(lineId, state) {
   if (state === 'withdraw-request') { note = prompt('Why do you want to withdraw your verification? (Mario decides)'); if (note === null) return; }
   try {
     const r = await Admin.api('POST', '/api/ajaltoun/verify', { lineId, state, note });
-    const l = D.lines.find(x => x.id === lineId); l.review = r.review; render();
+    const l = lineById(lineId); if (l) l.review = r.review; render();
   } catch (e) { alert('Could not save: ' + e.message); }
 }
-// ── the section picker: one shared popover, every section visible at once, type to filter ──
-let SP = { line: null, btn: null, hit: 0 };
+// ── one reusable combobox (Mario, 2026-09-23): a text input, the matching items listed under it ──
+// combo(host, { items: () => [{id, name, cls?, hint?}], value, placeholder, onPick, open? })
+// substring match (case-insensitive) · ↑↓ move · Enter picks · Esc closes · click picks. Fills `host` (a .combo span).
+function combo(host, o) {
+  if (!host) return;
+  host.classList.add('combo');
+  host.innerHTML = `<input type="text" autocomplete="off" spellcheck="false" placeholder="${esc(o.placeholder || '')}"><div class="clist"></div>`;
+  const input = host.querySelector('input'), list = host.querySelector('.clist');
+  const st = { items: [], hit: 0, cur: o.value || '' };
+  const nameOf = id => { const it = o.items().find(x => x.id === id); return it ? it.name : ''; };
+  const show = () => { input.value = st.cur ? nameOf(st.cur) : ''; input.classList.toggle('on', !!st.cur); };
+  const draw = q => {
+    const qq = q.trim().toLowerCase();
+    st.items = o.items().filter(it => !qq || it.name.toLowerCase().includes(qq) || String(it.id).toLowerCase().includes(qq));
+    st.hit = qq ? 0 : Math.max(0, st.items.findIndex(it => it.id === st.cur));
+    list.innerHTML = st.items.length ? st.items.map((it, i) => `<button type="button" class="it ${it.cls || ''} ${it.id === st.cur ? 'cur' : ''} ${i === st.hit ? 'hit' : ''}" data-i="${i}">${esc(it.name)}${it.id === st.cur ? '<small>current</small>' : it.hint ? `<small>${esc(it.hint)}</small>` : ''}</button>`).join('') : '<div class="none">Nothing matches.</div>';
+    const h = list.querySelector('.hit'); if (h) h.scrollIntoView({ block: 'nearest' });
+  };
+  const open = () => { host.classList.add('open'); draw(input.value === nameOf(st.cur) ? '' : input.value); };
+  const close = () => { host.classList.remove('open'); show(); };
+  const pick = it => { st.cur = it.id; close(); o.onPick(it); };
+  input.addEventListener('focus', () => { input.select(); open(); });
+  input.addEventListener('input', () => { host.classList.add('open'); draw(input.value); });
+  input.addEventListener('keydown', e => {
+    const n = st.items.length;
+    if (e.key === 'Escape') { e.preventDefault(); close(); input.blur(); if (o.onClose) o.onClose(); return; }
+    if (e.key === 'Enter') { e.preventDefault(); if (host.classList.contains('open') && n) pick(st.items[st.hit]); return; }
+    const d = { ArrowDown: 1, ArrowUp: -1 }[e.key]; if (d === undefined) return;
+    e.preventDefault(); if (!host.classList.contains('open')) return open();
+    if (!n) return; st.hit = (st.hit + d + n) % n;
+    list.querySelectorAll('.it').forEach((b, i) => b.classList.toggle('hit', i === st.hit)); const h = list.querySelector('.hit'); if (h) h.scrollIntoView({ block: 'nearest' });
+  });
+  list.addEventListener('mousedown', e => { const b = e.target.closest('.it'); if (b) { e.preventDefault(); pick(st.items[+b.dataset.i]); } });
+  input.addEventListener('blur', () => setTimeout(() => { if (!host.contains(document.activeElement)) close(); }, 120));
+  show(); if (o.open) { input.focus(); }
+  return { set: id => { st.cur = id; show(); } };
+}
+
+// ── the section picker: one shared popover holding the combobox ──
+let SP = { line: null, btn: null };
 function openSecPop(lineId, btn) {
+  lineId = String(lineId);
   if (SP.line === lineId && document.getElementById('secpop')) return closeSecPop();
   closeSecPop();
-  SP = { line: lineId, btn, hit: -1 };
+  SP = { line: lineId, btn };
   btn.classList.add('open');
+  const l = lineById(lineId);
   const pop = document.createElement('div'); pop.id = 'secpop';
-  pop.innerHTML = `<input type="text" placeholder="type to filter…" oninput="secPopList(this.value)" onkeydown="secPopKey(event)"><div class="grid"></div><div class="hint">↑↓ move · Enter choose · Esc close · blue = equipment</div>`;
+  pop.innerHTML = `<span class="combo"></span><div class="hint">↑↓ move · Enter choose · Esc close · blue = equipment</div>`;
   document.body.appendChild(pop);
-  secPopList('');
+  combo(pop.querySelector('.combo'), { items: () => D.sections.map(s => ({ id: s.id, name: s.name, cls: s.equipment ? 'eq' : '', hint: s.equipment ? 'equipment' : '' })),
+    value: l ? l.section : '', placeholder: 'type to filter…', open: true, onPick: it => pickSection(it.id), onClose: closeSecPop });
   const r = btn.getBoundingClientRect(), h = pop.offsetHeight, w = pop.offsetWidth;
   let top = r.bottom + 4; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
   pop.style.top = top + 'px'; pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
-  pop.querySelector('input').focus();
   setTimeout(() => { document.addEventListener('mousedown', secPopOutside); window.addEventListener('scroll', closeSecPop, { once: true }); }, 0);
-}
-function secPopList(q) {
-  const l = D.lines.find(x => x.id === SP.line); const qq = q.trim().toLowerCase();
-  const items = D.sections.filter(s => !qq || s.name.toLowerCase().includes(qq) || s.id.includes(qq));
-  SP.items = items; SP.hit = qq ? 0 : Math.max(0, items.findIndex(s => s.id === l.section));
-  document.querySelector('#secpop .grid').innerHTML = items.length ? items.map((s, i) => `<button class="it ${s.id === l.section ? 'cur' : ''} ${s.equipment ? 'eq' : ''} ${i === SP.hit ? 'hit' : ''}" onclick="pickSection('${s.id}')">${esc(s.name)}${s.id === l.section ? '<small>current</small>' : s.equipment ? '<small>equipment</small>' : ''}</button>`).join('') : '<div class="none">No section matches.</div>';
-}
-function secPopKey(e) {
-  const n = (SP.items || []).length;
-  if (e.key === 'Escape') { closeSecPop(); return; }
-  if (e.key === 'Enter') { e.preventDefault(); if (n) pickSection(SP.items[SP.hit].id); return; }
-  const d = { ArrowDown: 2, ArrowUp: -2, ArrowRight: 1, ArrowLeft: -1 }[e.key];   // two columns
-  if (d === undefined || !n) return;
-  e.preventDefault(); SP.hit = (SP.hit + d + n) % n;
-  document.querySelectorAll('#secpop .it').forEach((b, i) => b.classList.toggle('hit', i === SP.hit));
 }
 function secPopOutside(e) { if (!e.target.closest('#secpop')) closeSecPop(); }
 function closeSecPop() {
   const pop = document.getElementById('secpop'); if (pop) pop.remove();
   if (SP.btn) SP.btn.classList.remove('open');
   document.removeEventListener('mousedown', secPopOutside);
-  SP = { line: null, btn: null, hit: 0 };
+  SP = { line: null, btn: null };
 }
-function pickSection(id) { const line = SP.line; closeSecPop(); setSection(line, id, false); }
+function pickSection(id) { const line = SP.line; closeSecPop(); if (line) setSection(line, id, false); }
 
 async function setSection(lineId, section, forPartner) {
-  const l = D.lines.find(x => x.id === lineId);
+  const l = lineById(lineId); if (!l) return;
   const sec = section || l.section;   // "whole supplier →" spreads the line's current section over the partner
   try {
     await Admin.api('POST', '/api/ajaltoun/section', forPartner ? { section: sec, forPartner: l.partner } : { lineId, section: sec });
@@ -519,17 +643,20 @@ async function setSection(lineId, section, forPartner) {
 // ── the bill scan, in the page ─────────────────────────────────────────────
 // one fetch per attachment, kept in memory for the session (the preview pane hops between lines of the same bill)
 const FILES = new Map();
-async function fetchFile(id) {
-  if (FILES.has(id)) return FILES.get(id);
-  const pr = fetch('/api/ajaltoun/file/' + id, { headers: { Authorization: 'Bearer ' + (Admin.session || '') } }).then(async r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
-  pr.catch(() => FILES.delete(id)); FILES.set(id, pr); return pr;
+// an Odoo attachment goes through /api/ajaltoun/file/<id>; a hub ledger doc has its own url (cookie-authenticated GET)
+const fileUrl = (id, url) => url || ('/api/ajaltoun/file/' + id);
+async function fetchFile(id, url) {
+  const u = fileUrl(id, url);
+  if (FILES.has(u)) return FILES.get(u);
+  const pr = fetch(u, { headers: { Authorization: 'Bearer ' + (Admin.session || '') } }).then(async r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  pr.catch(() => FILES.delete(u)); FILES.set(u, pr); return pr;
 }
 // draw an attachment (pdf pages or an image) into a container at the given width
-async function renderFile(body, id, mime, width) {
-  const url = '/api/ajaltoun/file/' + id;
+async function renderFile(body, id, mime, width, url) {
+  url = fileUrl(id, url);
   body.innerHTML = '<div class="vstatus">Loading…</div>';
   try {
-    const buf = await fetchFile(id);
+    const buf = await fetchFile(id, url);
     if (body.dataset.file !== String(id)) return;   // the user moved on while this one loaded
     body.innerHTML = '';
     if (/pdf/.test(mime)) {
@@ -545,11 +672,11 @@ async function renderFile(body, id, mime, width) {
     else body.innerHTML = `<div class="vstatus">This file type cannot be shown here — <a href="${url}" target="_blank" style="color:var(--amber)">open it in a new tab</a>.</div>`;
   } catch (e) { body.innerHTML = `<div class="vstatus">Could not load the file (${esc(e.message)}).</div>`; }
 }
-async function openFile(id, name, mime) {
+async function openFile(id, name, mime, url) {
   const v = document.getElementById('viewer'), body = document.getElementById('vbody');
-  document.getElementById('vtitle').textContent = name; document.getElementById('vtab').href = '/api/ajaltoun/file/' + id;
+  document.getElementById('vtitle').textContent = name; document.getElementById('vtab').href = fileUrl(id, url);
   v.classList.add('on'); document.body.style.overflow = 'hidden'; body.dataset.file = id;
-  await renderFile(body, id, mime, Math.min(body.clientWidth - 24, 900));
+  await renderFile(body, id, mime, Math.min(body.clientWidth - 24, 900), url);
 }
 
 // ── the preview pane (Mario, 2026-09-12): click a line, its scan shows on the right; ↑↓ walk the list, A approves, V verifies ──
@@ -565,21 +692,22 @@ function selectLine(id) {
   PV.line = id; PV.idx = 0;
   document.querySelectorAll('#detail tr.sel').forEach(tr => tr.classList.remove('sel'));
   const tr = document.querySelector(`#detail tr[data-line="${id}"]`); if (tr) { tr.classList.add('sel'); tr.scrollIntoView({ block: 'nearest' }); }
-  if (window.innerWidth <= 1300) { const l = D.lines.find(x => x.id === id), f = l && (l.files || [])[0]; if (f) openFile(f.id, f.name, f.mime); return; }   // no room for a pane: the full viewer instead
+  if (window.innerWidth <= 1300) { const l = lineById(id), f = l && (l.files || [])[0]; if (f) openFile(f.id, f.name, f.mime, f.url); return; }   // no room for a pane: the full viewer instead
   showPreview();
 }
 function showPreview() {
   const pane = document.getElementById('prev'); if (!pane || !PV.on) return;
-  const l = D.lines.find(x => x.id === PV.line);
+  const l = lineById(PV.line);
   if (!l || !PV.rows.includes(l.id)) { pane.innerHTML = '<div class="pempty">Click a line to see its bill scan here.<br><span class="small">↑ ↓ move between lines' + (D.admin ? ' · A approves' : D.canVerify ? ' · V verifies' : '') + '</span></div>'; return; }
   const files = l.files || []; PV.idx = Math.min(PV.idx, Math.max(0, files.length - 1)); const f = files[PV.idx];
-  pane.innerHTML = `<div class="pbar"><div class="pt"><b>${esc(l.moveName)}</b> · ${usd2(l.amount)} · ${esc(l.partner || '—')}<small>${f ? esc(f.name) : 'no attachment on this bill'}</small></div>
+  const title = l.hub ? 'not in Odoo · ' + (l.paidBy || 'hub ledger') : l.moveName;
+  pane.innerHTML = `<div class="pbar"><div class="pt"><b>${esc(title)}</b> · ${usd2(l.amount)} · ${esc(l.partner || '—')}<small>${f ? esc(f.name) : 'no attachment on this line'}</small></div>
     ${files.length > 1 ? `<span class="small muted" style="white-space:nowrap">${PV.idx + 1} / ${files.length}</span><button class="btn" onclick="PV.idx=(PV.idx+${files.length}-1)%${files.length};showPreview()" title="Previous attachment">‹</button><button class="btn" onclick="PV.idx=(PV.idx+1)%${files.length};showPreview()" title="Next attachment">›</button>` : ''}
-    ${f ? `<button class="btn" onclick="openFile(${f.id}, '${esc(f.name).replace(/'/g, '')}', '${esc(f.mime)}')" title="Full screen">⤢ open full</button>` : ''}</div><div class="pbody"></div>`;
+    ${f ? `<button class="btn" onclick="openFile(${fileArgs(f)})" title="Full screen">⤢ open full</button>` : ''}</div><div class="pbody"></div>`;
   const body = pane.querySelector('.pbody');
-  if (!f) { body.innerHTML = `<div class="pempty">No attachment on ${esc(l.moveName)}.</div>`; return; }
+  if (!f) { body.innerHTML = `<div class="pempty">No attachment on ${esc(title)}.</div>`; return; }
   body.dataset.file = f.id;
-  renderFile(body, f.id, f.mime, Math.max(200, body.clientWidth - 24));
+  renderFile(body, f.id, f.mime, Math.max(200, body.clientWidth - 24), f.url);
 }
 document.addEventListener('keydown', e => {
   if (!PV.on || !D || document.getElementById('secpop') || document.getElementById('viewer').classList.contains('on')) return;
@@ -588,8 +716,8 @@ document.addEventListener('keydown', e => {
   const i = PV.rows.indexOf(PV.line);
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); selectLine(PV.rows[i < 0 ? 0 : (i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n]); return; }
   if (i < 0) return;
-  const l = D.lines.find(x => x.id === PV.line), r = l.review || {};
-  if (e.key === 'a' || e.key === 'A') { if (D.admin && !r.approved) approve([l.id], true); }
+  const l = lineById(PV.line); if (!l) return; const r = l.review || {};
+  if (e.key === 'a' || e.key === 'A') { if (D.admin && !r.approved && counted(l)) approve([l.id], true); }
   if (e.key === 'v' || e.key === 'V') { if (D.canVerify && r.approved && !r.verified) review(l.id, 'verified'); }
 });
 function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }

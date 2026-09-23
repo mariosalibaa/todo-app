@@ -100,7 +100,9 @@ const ANNOT = ['note', 'kind', 'analyticId', 'analyticName', 'company', 'company
   // ⛽ a benzine line: which car it went into, the odometer at the pump, the litres
   'car', 'carSrc', 'odometer', 'liters',
   // the line shared between analytic accounts by percentage, the Odoo way: [{ id, name, pct }]
-  'analyticSplit'];   // `docs` is written by the upload route only, never by a PATCH
+  'analyticSplit',
+  // the Ajaltoun work section / division (prefab, excavation…) — the /ajaltoun page groups by it (Mario, 2026-09-23)
+  'section'];   // `docs` is written by the upload route only, never by a PATCH
 // Fields of a line a person typed (or Telegram sent). Odoo/statement lines keep theirs.
 const LINE = ['date', 'description', 'debit', 'credit', 'ref', 'service'];
 // what a correction can change in the workbook itself, on a row that came from it
@@ -1029,6 +1031,27 @@ async function handle(req, res, url, user, ctx) {
 
   // A line typed by hand (or sent from Telegram). Money out is `debit`, money in `credit`,
   // as on a bank statement.
+  // one line by id (the Site chat's tag editor reads the line it hangs on)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const d = await txCol(a).doc(m[2]).get();
+    if (!d.exists) return json(res, 404, { error: 'no such line' });
+    return json(res, 200, { ...d.data(), account: { id: a.id, name: a.name, currency: a.currency || 'USD' } });
+  }
+  // the closing balance of an account, the way the grid computes it (opening + credit − debit over the counted lines)
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/balance$/)) && req.method === 'GET') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const snap = await txCol(a).select('date', 'debit', 'credit', 'excluded', 'xlAmount').get();
+    const mv = t => t.excluded ? 0 : t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0);
+    const op = a.opening && a.opening.date ? a.opening : null;
+    let bal = 0;
+    if (op) bal = op.amount + snap.docs.map(d => d.data()).filter(t => t.date >= op.date).reduce((s, t) => s + mv(t), 0);
+    else bal = snap.docs.reduce((s, d) => s + mv(d.data()), 0);
+    return json(res, 200, { id: a.id, name: a.name, currency: a.currency || 'USD', balance: Math.round(bal * 100) / 100, lines: snap.size });
+  }
+
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });

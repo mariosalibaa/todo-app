@@ -9,6 +9,7 @@
 // (/api/cron/ajaltoun, see server.js + vercel.json), in the background when a visitor finds it older than
 // SNAP_TTL (the page renders the stale copy at once, then asks again with ?refresh=1 and swaps the result in), or on
 // demand with ?fresh=1. Review states and section rules stay live from Firestore.
+//   GET  /api/ajaltoun/sections          the work-section list (any signed-in member)
 //   GET  /api/ajaltoun/file/<attId>      an Odoo attachment (the bill scan), streamed for the viewer
 //   POST /api/ajaltoun/section           { lineId, section, forPartner? }  admin: classify a line (or its whole supplier)
 //   POST /api/ajaltoun/qty                { section, qty, unit }   admin: quantity done so far in a section (for $/unit)
@@ -164,6 +165,15 @@ async function pullCosts(odooCall) {
   ]) : [[], []];
   const moveById = new Map(moves.map(m => [m.id, m]));
   const attsOf = {}; for (const a of atts) (attsOf[a.res_id] = attsOf[a.res_id] || []).push({ id: a.id, name: a.name, mime: a.mimetype });
+  // who paid each bill (Mario, 2026-09-23): the payments reconciled with it → "Cash Mario · 2026-09-13 + Whish · 2026-09-20"
+  const paidByOf = {};
+  if (moveIds.length) {
+    try {
+      const bp = await odooCall('account.payment', 'search_read', [[['reconciled_bill_ids', 'in', moveIds]]],
+        { fields: ['name', 'date', 'amount', 'journal_id', 'reconciled_bill_ids'], context: CTX, limit: 5000, order: 'date, id' });
+      for (const p of bp) for (const mid of (p.reconciled_bill_ids || [])) (paidByOf[mid] = paidByOf[mid] || []).push(`${p.journal_id ? p.journal_id[1] : p.name} · ${p.date}`);
+    } catch (e) { console.warn('ajaltoun: who-paid lookup failed:', e.message); }
+  }
 
   const lines = [];
   for (const l of raw) {
@@ -174,7 +184,7 @@ async function pullCosts(odooCall) {
     lines.push({ id: l.id, date: l.date, name: l.name, amount: -l.amount, partner: l.partner_id ? l.partner_id[1] : '', partnerId: l.partner_id ? l.partner_id[0] : null,
       account: gacc, company: l.company_id ? l.company_id[1] : '', companyId: l.company_id ? l.company_id[0] : null,
       villa: VILLAS[l.account_id[0]] || l.account_id[1], moveId: move ? move.id : null, moveName: move ? move.name : '', moveRef: move ? move.ref : '',
-      paid: move ? move.payment_state : '', files: move ? (attsOf[move.id] || []) : [] });
+      paid: move ? move.payment_state : '', paidBy: move ? (paidByOf[move.id] || []).join(' + ') : '', files: move ? (attsOf[move.id] || []) : [] });
   }
   // 3. payments tagged with an Ajaltoun project (payment field "Project", x_studio_project) that are not yet
   // matched to a bill: money already out for a bill that does not exist in Odoo yet, so it is a real cost the
@@ -190,7 +200,7 @@ async function pullCosts(odooCall) {
       partner: p.partner_id ? p.partner_id[1] : '', partnerId: p.partner_id ? p.partner_id[0] : null,
       account: 'Payment, bill not booked yet', company: p.company_id ? p.company_id[1] : '', companyId: p.company_id ? p.company_id[0] : null,
       villa: VILLAS[p.x_studio_project[0]] || p.x_studio_project[1], moveId: null, moveName: p.name, moveRef: p.journal_id ? p.journal_id[1] : '',
-      paid: 'paid', files: pAttsOf[p.id] || [] });
+      paid: 'paid', paidBy: p.journal_id ? p.journal_id[1] : '', files: pAttsOf[p.id] || [] });
   }
   lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id);
   return { lines };
@@ -224,14 +234,57 @@ async function pullPayables(odooCall) {
   return sumBy(odooCall, [['company_id', '=', SDEV], ['account_type', '=', 'liability_payable'], ['parent_state', '=', 'posted'], ['reconciled', '=', false]], 'partner_id', 'amount_residual', 5000);
 }
 
+// ── the hub's own ledgers (Mario, 2026-09-23): lines tagged Ajaltoun 4193 that are NOT in Odoo yet ──
+// Every account under workspaces/<team>/accounts (+ the Whish statement account) keeps its lines in a tx
+// subcollection; the accounts page calls a line "not in Odoo" when it is not an Odoo import, not booked
+// (bookedMove) and not matched to an existing Odoo entry (odoo.matches[].chosen) — the same rule here, so the
+// two pages agree. Excluded lines (duplicates) never count. A WhatsApp / site line is a PROPOSAL until Mario's
+// ✓ (waAccepted): shown in the Detail list, never counted. Line id = 'hub:<accId>:<txId>' (a string; the Odoo
+// ids stay numbers) — section overrides and review docs use that string as their key.
+const AJ_ANALYTIC = 69;
+const HUB_FIELDS = ['id', 'date', 'description', 'debit', 'credit', 'src', 'analyticId', 'partnerName', 'company', 'nature', 'note', 'paidBy', 'waAccepted', 'excluded', 'bookedMove', 'odoo', 'docs', 'section'];
+let lastHub = [];   // the last hub lines served by this instance (for the review log's line details)
+async function hubLines(db, TEAM_ID) {
+  const ws = db.collection('workspaces').doc(TEAM_ID);
+  const [a, w] = await Promise.all([ws.collection('accounts').get(), ws.collection('whishAccounts').get()]);
+  const accounts = [...a.docs.map(d => ({ id: d.id, name: (d.data().name || d.id), ref: d.ref })),
+    ...w.docs.map(d => ({ id: d.id, name: 'Whish · ' + (d.data().name || d.id), ref: d.ref }))];
+  const snaps = await Promise.all(accounts.map(acc => acc.ref.collection('tx').where('analyticId', 'in', [AJ_ANALYTIC, String(AJ_ANALYTIC)]).select(...HUB_FIELDS).get()
+    .catch(e => { console.warn(`ajaltoun: hub lines of ${acc.id} failed:`, e.message); return { docs: [] }; })));
+  const lines = [];
+  accounts.forEach((acc, i) => {
+    for (const d of snaps[i].docs) {
+      const t = d.data(); const txId = d.id;
+      if (t.excluded || t.bookedMove || t.src === 'odoo') continue;
+      if (t.odoo && (t.odoo.matches || []).some(x => x.chosen)) continue;   // matched to an Odoo entry = in Odoo already
+      const proposal = (t.src === 'whatsapp' || t.src === 'site') && !t.waAccepted;
+      // who paid: the ledger's name ("Ziad cash"), unless the line names someone else (an Excel row's paidBy 'ziad' is the same person)
+      const who = t.paidBy && !acc.name.toLowerCase().startsWith(String(t.paidBy).toLowerCase()) ? String(t.paidBy) : acc.name;
+      lines.push({ id: `hub:${acc.id}:${txId}`, hub: true, accId: acc.id, txId, date: t.date || '', name: t.description || '', amount: +(((+t.debit || 0) - (+t.credit || 0)).toFixed(2)),
+        partner: t.partnerName || '', partnerId: null, account: t.nature || t.src || '', company: t.company || '', companyId: null, villa: 'Common',
+        moveId: null, moveName: '', moveRef: '', paid: proposal ? 'proposal' : 'paid', paidBy: who, src: t.src || '', txSection: t.section || '',
+        note: t.note || '', ledgerUrl: `/accounting/accounts?id=${encodeURIComponent(acc.id)}`,
+        files: (t.docs || []).map(doc => ({ id: doc.id, name: doc.name || 'file', mime: doc.mime || '', url: `/api/accounting/accounts/${acc.id}/tx/${txId}/docs/${doc.id}` })) });
+    }
+  });
+  lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1);
+  lastHub = lines;
+  return lines;
+}
+
 const metaRef = (db, TEAM_ID) => db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('sections');
 async function meta(db, TEAM_ID) {
   const d = (await metaRef(db, TEAM_ID).get()).data();
   return { rules: (d && d.rules) || DEFAULT_RULES, overrides: (d && d.overrides) || {}, qty: (d && d.qty) || {} };
 }
-// section of a line: an explicit override, else the first supplier rule that matches, else general
+// section of a line: a hub line's own `section` (set on the accounts grid / site chat), else an explicit override
+// (by line id, or by Odoo move name 'move:BILL-2026-09-0021' — slashes as dashes, written through POST /section when
+// a hub line is booked), else the first supplier rule that matches, else general
+const moveKey = name => 'move:' + String(name || '').replace(/\//g, '-');
 function sectionOf(l, m) {
+  if (l.hub && l.txSection && SECTIONS.some(s => s.id === l.txSection)) return l.txSection;
   if (m.overrides[l.id]) return m.overrides[l.id];
+  if (l.moveName && m.overrides[moveKey(l.moveName)]) return m.overrides[moveKey(l.moveName)];
   const p = (l.partner || '').toLowerCase(), n = (l.name || '').toLowerCase();
   const r = m.rules.find(r => (r.partner && p.includes(r.partner)) || (r.text && n.includes(r.text)));
   return r ? r.section : 'general';
@@ -255,11 +308,16 @@ async function handle(req, res, url, user, ctx) {
     }
     if (fresh || (wantRefresh && Date.now() - cache.at > SNAP_TTL)) await refresh(odooCall, db, TEAM_ID);
     const stale = Date.now() - cache.at > SNAP_TTL;
-    const [mt, vsnap] = await Promise.all([meta(db, TEAM_ID), db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get()]);
+    const [mt, vsnap, hub] = await Promise.all([meta(db, TEAM_ID), db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify').get(),
+      hubLines(db, TEAM_ID).catch(e => { console.warn('ajaltoun: hub lines failed:', e.message); return []; })]);
     const ver = {}; for (const d of vsnap.docs) { const x = d.data(); ver[d.id] = x.state ? { approved: null, verified: x.state === 'verified' ? x : null, flag: x.state === 'flagged' ? x : null } : x; }   // (old one-field shape)
-    const lines = cache.data.lines.map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
-    return json(res, 200, { ...cache.data, lines, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), stale, admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
+    // Odoo lines first, then the hub's own (not yet in Odoo) — the page sorts by date anyway
+    const lines = [...cache.data.lines, ...hub].map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
+    return json(res, 200, { ...cache.data, lines, hubLines: hub.length, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), stale, admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
   }
+
+  // the work sections, for the accounts grid and the site chat (same list everywhere)
+  if (url === '/api/ajaltoun/sections' && req.method === 'GET') return json(res, 200, { sections: SECTIONS });
 
   if ((m = url.match(/^\/api\/ajaltoun\/file\/(\d+)$/)) && req.method === 'GET') {
     const [f] = await odooCall('ir.attachment', 'read', [[+m[1]], ['name', 'mimetype', 'datas']], { context: CTX });
@@ -279,10 +337,10 @@ async function handle(req, res, url, user, ctx) {
       // the whole supplier: a rule at the front (first match wins), and the supplier's overrides cleared
       const p = String(b.forPartner).toLowerCase();
       mt.rules = [{ partner: p, section: b.section }, ...mt.rules.filter(r => r.partner !== p)];
-      const ids = (cache.data ? cache.data.lines : []).filter(l => (l.partner || '').toLowerCase() === p).map(l => l.id);
+      const ids = [...(cache.data ? cache.data.lines : []), ...lastHub].filter(l => (l.partner || '').toLowerCase() === p).map(l => l.id);
       for (const id of ids) delete mt.overrides[id];
     } else if (b.lineId) {
-      mt.overrides[b.lineId] = b.section;
+      mt.overrides[String(b.lineId).slice(0, 200)] = b.section;   // a number (Odoo analytic line) or 'hub:<acc>:<tx>'
     } else return json(res, 400, { error: 'lineId or forPartner required' });
     await metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, qty: mt.qty, updatedAt: now(), updatedBy: user.email || '' });
     return json(res, 200, { ok: true });
@@ -304,7 +362,7 @@ async function handle(req, res, url, user, ctx) {
   const vcol = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounVerify');
   const lcol = db.collection('workspaces').doc(TEAM_ID).collection('ajaltounLog');
   // the audit trail: who did what to which line — Mario, 2026-09-12: "so I can know if he pulled back a previous approval"
-  const lineOf = id => (cache.data ? cache.data.lines : []).find(l => String(l.id) === String(id));
+  const lineOf = id => [...(cache.data ? cache.data.lines : []), ...lastHub].find(l => String(l.id) === String(id));
   const logEvent = (batch, lineId, action, extra) => {
     const l = lineOf(lineId) || {};
     const ev = { at: now(), ...stamp(), lineId: String(lineId), action, date: l.date || '', partner: l.partner || '', amount: l.amount || 0, name: (l.name || '').slice(0, 120), ...(extra || {}) };
@@ -379,4 +437,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, refresh, _pullCosts: pullCosts };
+module.exports = { handle, refresh, SECTIONS, hubLines, _pullCosts: pullCosts };

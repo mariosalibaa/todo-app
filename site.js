@@ -92,7 +92,7 @@ async function digest(ctx, ws, ref, post, buf) {
         const partner = parsed.vendor ? parse.matchName(parsed.vendor, partners) : null;
         // a caption on a receipt photo rides along on the same line instead of spawning a second one (see below)
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: isGeneral ? 'credit' : 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense' });   // a receipt is always an expense — bookable right after ✓
+          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense' });   // a receipt is always an expense — bookable right after ✓
       }
       // a site photo/video = progress; it is kept on the post and the Day report shows it under the day (part 2 hangs it on the attendance line)
     }
@@ -106,7 +106,7 @@ async function digest(ctx, ws, ref, post, buf) {
           const analytic = c.project ? parse.matchName(c.project, analytics) : null;
           const paidFrom = c.paidFrom ? parse.matchName(c.paidFrom, (await acc.listAccounts(ws)).map(a => ({ id: a.id, name: a.name }))) : null;
           line = await writeLine(ctx, ws, post, paidFrom ? paidFrom.id : MARIO_CASH,
-            { amount: c.amount, side: 'credit', description: [partner ? partner.name : c.partner, c.note].filter(Boolean).join(' · '), partner, analytic, note: '' });
+            { amount: c.amount, side: 'debit', description: [partner ? partner.name : c.partner, c.note].filter(Boolean).join(' · '), partner, analytic, note: '' });   // paid = out of the wallet (2026-09-23: the site lines were landing as money in)
         }
       } else {
         const a = await acc.resolve(ws, post.thread);
@@ -172,7 +172,8 @@ async function handle(req, res, url, user, ctx) {
     await Promise.all(out.filter(p => p.line).map(async p => {
       const a = await acc.resolve(ws, p.line.accountId); if (!a) return;
       const t = (await acc.txCol(a).doc(p.line.txId).get()).data();
-      p.line.state = !t ? 'dismissed' : t.waAccepted ? 'accepted' : t.excluded && !t.review ? 'dismissed' : 'waiting';
+      p.line.state = !t ? 'dismissed' : t.bookedMove ? 'booked' : t.waAccepted ? 'accepted' : t.excluded && !t.review ? 'dismissed' : 'waiting';
+      if (t) { p.line.debit = t.debit || 0; p.line.credit = t.credit || 0; p.line.section = t.section || ''; p.line.partnerName = t.partnerName || ''; p.line.move = t.bookedMove && t.bookedMove.name || ''; }
     }));
     return json(res, 200, { posts: out });
   }
