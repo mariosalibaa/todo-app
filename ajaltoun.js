@@ -275,14 +275,17 @@ async function hubLines(db, TEAM_ID) {
 const metaRef = (db, TEAM_ID) => db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('sections');
 async function meta(db, TEAM_ID) {
   const d = (await metaRef(db, TEAM_ID).get()).data();
-  return { rules: (d && d.rules) || DEFAULT_RULES, overrides: (d && d.overrides) || {}, qty: (d && d.qty) || {} };
+  return { rules: (d && d.rules) || DEFAULT_RULES, overrides: (d && d.overrides) || {}, qty: (d && d.qty) || {}, sections: (d && d.sections) || [] };
 }
+// the fixed list + the ones Mario added from a line's sheet (2026-09-24: "allow to add new section")
+const allSections = mt => [...SECTIONS, ...((mt && mt.sections) || []).filter(x => x && x.id && !SECTIONS.some(s => s.id === x.id))];
+const saveMeta = (db, TEAM_ID, mt, email) => metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, qty: mt.qty, sections: mt.sections || [], updatedAt: now(), updatedBy: email || '' });
 // section of a line: a hub line's own `section` (set on the accounts grid / site chat), else an explicit override
 // (by line id, or by Odoo move name 'move:BILL-2026-09-0021' — slashes as dashes, written through POST /section when
 // a hub line is booked), else the first supplier rule that matches, else general
 const moveKey = name => 'move:' + String(name || '').replace(/\//g, '-');
 function sectionOf(l, m) {
-  if (l.hub && l.txSection && SECTIONS.some(s => s.id === l.txSection)) return l.txSection;
+  if (l.hub && l.txSection && allSections(m).some(s => s.id === l.txSection)) return l.txSection;
   if (m.overrides[l.id]) return m.overrides[l.id];
   if (l.moveName && m.overrides[moveKey(l.moveName)]) return m.overrides[moveKey(l.moveName)];
   const p = (l.partner || '').toLowerCase(), n = (l.name || '').toLowerCase();
@@ -313,11 +316,27 @@ async function handle(req, res, url, user, ctx) {
     const ver = {}; for (const d of vsnap.docs) { const x = d.data(); ver[d.id] = x.state ? { approved: null, verified: x.state === 'verified' ? x : null, flag: x.state === 'flagged' ? x : null } : x; }   // (old one-field shape)
     // Odoo lines first, then the hub's own (not yet in Odoo) — the page sorts by date anyway
     const lines = [...cache.data.lines, ...hub].map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
-    return json(res, 200, { ...cache.data, lines, hubLines: hub.length, sections: SECTIONS, rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), stale, admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
+    return json(res, 200, { ...cache.data, lines, hubLines: hub.length, sections: allSections(mt), rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), stale, admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
   }
 
   // the work sections, for the accounts grid and the site chat (same list everywhere)
-  if (url === '/api/ajaltoun/sections' && req.method === 'GET') return json(res, 200, { sections: SECTIONS });
+  if (url === '/api/ajaltoun/sections' && req.method === 'GET') return json(res, 200, { sections: allSections(await meta(db, TEAM_ID)) });
+  // a new work section, typed by name on a line (admin); the id is the slug, the name is kept as typed
+  if (url === '/api/ajaltoun/sections' && req.method === 'POST') {
+    if (!access.admin) return json(res, 403, { error: 'admin only' });
+    const b = await readBody(req);
+    const name = String(b.name || '').trim().slice(0, 60);
+    if (!name) return json(res, 400, { error: 'name required' });
+    const mt = await meta(db, TEAM_ID);
+    const hit = allSections(mt).find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (hit) return json(res, 200, { section: hit, existed: true });
+    let id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
+    while (allSections(mt).some(x => x.id === id)) id += '-2';
+    const section = { id, name, custom: true };
+    mt.sections = [...(mt.sections || []), section];
+    await saveMeta(db, TEAM_ID, mt, user.email);
+    return json(res, 200, { section });
+  }
 
   if ((m = url.match(/^\/api\/ajaltoun\/file\/(\d+)$/)) && req.method === 'GET') {
     const [f] = await odooCall('ir.attachment', 'read', [[+m[1]], ['name', 'mimetype', 'datas']], { context: CTX });
@@ -331,8 +350,8 @@ async function handle(req, res, url, user, ctx) {
   if (url === '/api/ajaltoun/section' && req.method === 'POST') {
     if (!access.admin) return json(res, 403, { error: 'admin only' });
     const b = await readBody(req);
-    if (!SECTIONS.some(s => s.id === b.section)) return json(res, 400, { error: 'unknown section' });
     const mt = await meta(db, TEAM_ID);
+    if (!allSections(mt).some(s => s.id === b.section)) return json(res, 400, { error: 'unknown section' });
     if (b.forPartner) {
       // the whole supplier: a rule at the front (first match wins), and the supplier's overrides cleared
       const p = String(b.forPartner).toLowerCase();
@@ -342,7 +361,7 @@ async function handle(req, res, url, user, ctx) {
     } else if (b.lineId) {
       mt.overrides[String(b.lineId).slice(0, 200)] = b.section;   // a number (Odoo analytic line) or 'hub:<acc>:<tx>'
     } else return json(res, 400, { error: 'lineId or forPartner required' });
-    await metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, qty: mt.qty, updatedAt: now(), updatedBy: user.email || '' });
+    await saveMeta(db, TEAM_ID, mt, user.email);
     return json(res, 200, { ok: true });
   }
 
@@ -350,11 +369,11 @@ async function handle(req, res, url, user, ctx) {
   if (url === '/api/ajaltoun/qty' && req.method === 'POST') {
     if (!access.admin) return json(res, 403, { error: 'admin only' });
     const b = await readBody(req);
-    if (!SECTIONS.some(s => s.id === b.section)) return json(res, 400, { error: 'unknown section' });
     const mt = await meta(db, TEAM_ID);
+    if (!allSections(mt).some(s => s.id === b.section)) return json(res, 400, { error: 'unknown section' });
     if (b.qty == null || b.qty === '') delete mt.qty[b.section];
     else mt.qty[b.section] = { qty: +b.qty, unit: String(b.unit || '').slice(0, 12), at: now(), by: user.email || '' };
-    await metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, qty: mt.qty, updatedAt: now(), updatedBy: user.email || '' });
+    await saveMeta(db, TEAM_ID, mt, user.email);
     return json(res, 200, { qtyDone: mt.qty });
   }
 

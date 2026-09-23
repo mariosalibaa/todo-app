@@ -3063,17 +3063,30 @@ async function toggleExcluded(id, on) {
 //    /ajaltoun page groups by (Mario, 2026-09-23: "add the division under the project · division: prefab")
 const AJ_IDS = new Set([69, 59, 60, 61, 62, 63, 64]);
 let ajSections = null;
-Admin.api('GET', '/api/ajaltoun/sections').then(l => { ajSections = Array.isArray(l) ? l : (l && l.sections) || []; if (tx.length) render(); }).catch(() => { ajSections = []; });
+Admin.api('GET', '/api/ajaltoun/sections').then(l => { ajSections = Array.isArray(l) ? l : (l && l.sections) || []; drawDivisionList(); if (tx.length) render(); }).catch(() => { ajSections = []; });
 function divisionCell(t) {
   if (!AJ_IDS.has(+t.analyticId) || t.src === 'odoo') return '';
-  const list = ajSections || [];
-  return `<select class="division" onchange="saveSection('${t.id}', this.value)" title="Which work section of Ajaltoun this line belongs to" style="margin-top:3px;max-width:100%;font-size:11px">
-    <option value="">division…</option>${list.map(x => `<option value="${esc(x.id)}" ${t.section === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
+  const list = ajSections || [], cur = list.find(x => x.id === t.section);
+  return `<input class="division" list="aj-divisions" value="${esc(cur ? cur.name : (t.section || ''))}" placeholder="division…" title="Which work section of Ajaltoun this line belongs to — type to search, or type a new name to create it" style="margin-top:3px;max-width:100%;font-size:11px;box-sizing:border-box;width:100%" onchange="saveSection('${t.id}', this.value, this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">`;
 }
-async function saveSection(id, value) {
+// the one datalist behind every division input (drawn once, refreshed when a section is created)
+function drawDivisionList() {
+  let dl = document.getElementById('aj-divisions'); if (!dl) { dl = document.createElement('datalist'); dl.id = 'aj-divisions'; document.body.appendChild(dl); }
+  dl.innerHTML = (ajSections || []).map(x => `<option value="${esc(x.name)}">`).join('');
+}
+async function saveSection(id, value, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
-  try { await patch(id, { section: value || null }); t.section = value || ''; say(value ? 'Division saved' : 'Division cleared'); }
-  catch (e) { say('Could not save: ' + e.message, 'err'); }
+  const name = String(value || '').trim();
+  try {
+    let sec = null;
+    if (name) {
+      sec = (ajSections || []).find(x => x.name.toLowerCase() === name.toLowerCase() || x.id === name.toLowerCase());
+      if (!sec) { const r = await Admin.api('POST', '/api/ajaltoun/sections', { name }); sec = r.section; ajSections.push(sec); drawDivisionList(); }
+    }
+    await patch(id, { section: sec ? sec.id : null }); t.section = sec ? sec.id : '';
+    if (el && sec) el.value = sec.name;
+    say(sec ? `Division: ${sec.name}` : 'Division cleared');
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
 }
 async function autoBook(id) {
   const t = tx.find(x => x.id === id); if (!t) return;

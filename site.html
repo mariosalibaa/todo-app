@@ -153,7 +153,7 @@
 <input type="file" id="file" hidden>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="/admin-shared.js"></script><script src="/phone-preview.js"></script><script src="/emoji-picker.js"></script>
+<script src="/admin-shared.js"></script><script src="/line-sheet.js"></script><script src="/phone-preview.js"></script><script src="/emoji-picker.js"></script>
 <script>
 // Mario, 2026-09-12: no background digest on the server any more — the page awaits
 // POST .../digest right after a successful post (Vercel can freeze a function right
@@ -359,26 +359,31 @@ function lineTag(p) {
   const L = p.line, bal = balances[L.accountId];
   const state = L.state === 'booked' ? 'in Odoo ✓✓' + (L.move ? ' ' + esc(L.move) : '') : L.state === 'accepted' ? 'accepted ✓' : L.state === 'dismissed' ? 'dismissed' : 'waiting for Mario\'s ✓';
   const side = L.debit ? 'out' : L.credit ? 'in' : '';
-  return `<div class="line ${esc(L.state || 'waiting')}">${amt ? amt.toFixed(2) + ' ' + esc(p.parsed.currency || 'USD') + (side ? ' ' + side : '') + ' · ' : ''}${esc(accName(L.accountId))} — ${state}${L.section ? ' · ' + esc(L.section) : ''}${bal ? ` · <span title="Closing balance of ${esc(bal.name)} today">balance ${bal.balance.toFixed(2)}</span>` : ''}${me.admin && L.state !== 'dismissed' ? ` · <a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : ''}${(p.kind === 'photo' && L.state !== 'booked') ? ` · <a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : ''}</div>`;
+  return `<div class="line ${esc(L.state || 'waiting')}">${amt ? amt.toFixed(2) + ' ' + esc(p.parsed.currency || 'USD') + (side ? ' ' + side : '') + ' · ' : ''}${esc(accName(L.accountId))}${L.partnerName ? ' · ' + esc(L.partnerName) : ''}${L.company ? ' · ' + esc(L.company) : ''}${L.analyticName ? ' · ' + esc(L.analyticName) : ''}${L.section ? ' · ' + esc(L.section) : ''} — ${state}${bal ? ` · <span title="Closing balance of ${esc(bal.name)} today">balance ${bal.balance.toFixed(2)}</span>` : ''}${me.admin && L.state !== 'dismissed' ? ` · <a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : ''}${(p.kind === 'photo' && L.state !== 'booked') ? ` · <a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : ''}</div>`;
 }
 function draw() {
   if (!posts.length) { el('feed').innerHTML = '<div class="empty">Nothing here yet. Write what happened, send a photo, or record.</div>'; return; }
   if (me.admin) loadBalances();
   let lastDay = '';
-  el('feed').innerHTML = posts.map(p => {
+  el('feed').innerHTML = posts.map((p, ix) => {
     const dayHdr = p.date !== lastDay ? `<div class="day">${esc(dayLabel(p.date))}</div>` : ''; lastDay = p.date;
     const mine = p.by === me.email;
     if (p.deleted) return `${dayHdr}<div class="post ${mine ? 'me' : ''} gone" data-id="${esc(p.id)}">🚫 This message was deleted<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
     if (p.kind === 'start' || p.kind === 'finish') return `${dayHdr}<div class="post tap" data-id="${esc(p.id)}">${p.kind === 'start' ? '▶' : '■'} <b>${p.kind === 'start' ? 'Started' : 'Finished'} ${hhmm(p.at)}</b>${p.siteName ? ' · 📍 ' + esc(p.siteName) : p.loc ? ' · outside every site' : ' · no location'}${p.distanceM != null ? ` <span title="from the site’s centre">(${p.distanceM} m)</span>` : ''}${p.manual ? ` · entered by hand at ${hhmm(p.enteredAt)}` : ''}${p.noStart ? ' · ⚠ no Start before it' : ''}</div>`;
-    const body = p.kind === 'photo' ? `<a href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><img src="/api/site/${cur}/posts/${p.id}/file" loading="lazy"></a>`
+    const body = p.kind === 'photo' ? `<a href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><img src="/api/site/${cur}/posts/${p.id}/file" ${ix >= posts.length - 8 ? '' : 'loading="lazy"'} onload="feedGrew()"></a>`
       : p.kind === 'video' ? `<video src="/api/site/${cur}/posts/${p.id}/file" controls preload="metadata"></video>`
       : p.kind === 'voice' ? `<audio src="/api/site/${cur}/posts/${p.id}/file" controls></audio>${p.parsed && p.parsed.transcript ? `<div style="margin-top:6px;font-style:italic">${esc(p.parsed.transcript)}</div>` : ''}`
       : esc(p.text);
     const canDel = mine || me.admin;
     return `${dayHdr}<div class="post ${mine ? 'me' : ''}${p.kind === 'photo' || p.kind === 'video' ? ' media' : ''}" data-id="${esc(p.id)}" ${canDel ? `oncontextmenu="event.preventDefault();askDelete('${esc(p.id)}')" ontouchstart="pressStart(event,'${esc(p.id)}')" ontouchend="pressEnd()" ontouchmove="pressEnd()"` : ''}>${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
   }).join('');
-  const pane = el('chatpane'); pane.scrollTop = pane.scrollHeight; window.scrollTo(0, document.body.scrollHeight);
+  toBottom(true);
 }
+// stay at the end while pictures push the feed down (Mario, 2026-09-24: "when you launch make it from down, not the middle")
+let stickBottom = true;
+function toBottom(force) { const pane = el('chatpane'); if (!pane) return; if (force || stickBottom) { pane.scrollTop = pane.scrollHeight; window.scrollTo(0, document.body.scrollHeight); } }
+function feedGrew() { toBottom(); }
+document.addEventListener('DOMContentLoaded', () => { const pane = el('chatpane'); if (pane) pane.addEventListener('scroll', () => { stickBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80; }, { passive: true }); });
 // long-press a message (or right-click on the laptop) → Delete, the WhatsApp way
 let pressT = null;
 function pressStart(e, id) { pressEnd(); pressT = setTimeout(() => { pressT = null; if (navigator.vibrate) navigator.vibrate(15); askDelete(id); }, 550); }
@@ -409,114 +414,11 @@ async function sendText() {
 }
 function pick(accept, kind, capture) { const f = el('file'); f.accept = accept; if (capture === false) f.removeAttribute('capture'); else f.capture = 'environment'; f.onchange = () => { const file = f.files[0]; if (!file) return; sendFile(file, kind === 'any' ? (/^video\//.test(file.type) ? 'video' : 'photo') : kind); f.value = ''; }; f.click(); }
 // the ＋ sheet, as on WhatsApp: camera, video, or the phone's gallery
-// ── the line behind a receipt, edited from the chat (Mario, 2026-09-23): note, extra expenses (transport 25$),
-//    partner, company, project and its division, then ✓ accept (counts on the ledger) and ✓ book in Odoo.
-//    Everything goes through the accounts API the grid itself uses; nothing new is written from here.
-const REFS = { partners: null, companies: null, analytic: null, sections: null, p: null };
-async function loadRefs() {
-  if (REFS.p) return REFS.p;
-  REFS.p = Promise.all([
-    Admin.api('GET', '/api/accounting/partners').then(r => { REFS.partners = r.partners || []; REFS.companies = r.companies || []; }).catch(() => { REFS.partners = []; REFS.companies = []; }),
-    Admin.api('GET', '/api/accounting/analytic').then(r => { REFS.analytic = Array.isArray(r) ? r : []; }).catch(() => { REFS.analytic = []; }),
-    Admin.api('GET', '/api/ajaltoun/sections').then(r => { REFS.sections = Array.isArray(r) ? r : (r && r.sections) || []; }).catch(() => { REFS.sections = []; }),
-  ]);
-  return REFS.p;
-}
-const AJ_IDS = new Set([69, 59, 60, 61, 62, 63, 64]);
-let LS = null;   // the sheet's state: { post, acc, txId, t, extra: [{ description, amount }] }
-async function lineSheet(postId) {
+// the line behind a receipt is edited in the shared sheet (/line-sheet.js): note, extra expenses, partner, company,
+// project + division, ✓ accept, ✓ book in Odoo — the same sheet the Ajaltoun page opens
+function lineSheet(postId) {
   const p = posts.find(x => x.id === postId); if (!p || !p.line) return;
-  closeSheet();
-  const sh = document.createElement('div'); sh.className = 'sheet'; sh.id = 'sheet';
-  sh.innerHTML = `<div class="card lf"><div class="hint">Loading the line…</div></div>`;
-  sh.onclick = e => { if (e.target === sh) closeSheet(); };
-  document.body.appendChild(sh);
-  try {
-    const [t] = await Promise.all([Admin.api('GET', `/api/accounting/accounts/${p.line.accountId}/tx/${p.line.txId}`), loadRefs()]);
-    LS = { post: p, acc: p.line.accountId, txId: p.line.txId, t, extra: [] };
-    drawLineSheet();
-  } catch (e) { sh.querySelector('.card').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
-}
-function drawLineSheet() {
-  const sh = document.getElementById('sheet'); if (!sh || !LS) return;
-  const t = LS.t, amt = t.debit || t.credit || 0, side = t.debit ? 'debit' : 'credit';
-  const isAj = AJ_IDS.has(+t.analyticId);
-  const booked = !!t.bookedMove, accepted = !!t.waAccepted;
-  const bal = balances[LS.acc];
-  const stateTxt = booked ? `in Odoo ✓✓ ${esc(t.bookedMove.name || '')}` : accepted ? 'accepted ✓ — counts on the ledger, not in Odoo yet' : 'proposal — not counted until you accept it';
-  sh.querySelector('.card').innerHTML = `
-    <div class="lf-head"><b>${esc(t.account ? t.account.name : LS.acc)}</b> · ${esc(t.date)}${bal ? ` · <span class="hint">balance ${bal.balance.toFixed(2)}</span>` : ''}<span class="lf-state ${booked ? 'booked' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span></div>
-    <label>Description<input id="lf-desc" value="${esc(t.description || '')}" ${booked ? 'disabled' : ''}></label>
-    <div class="lf-row"><label>Amount<input id="lf-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${booked ? 'disabled' : ''}></label>
-      <label>Money<select id="lf-side" ${booked ? 'disabled' : ''}><option value="debit" ${side === 'debit' ? 'selected' : ''}>out (paid)</option><option value="credit" ${side === 'credit' ? 'selected' : ''}>in (received)</option></select></label></div>
-    <label>Note<input id="lf-note" value="${esc(t.note || '')}" placeholder="what it was for"></label>
-    <label>Partner (supplier)<input id="lf-partner" list="lf-partners" value="${esc(t.partnerName || '')}" placeholder="type to search Odoo partners" ${booked ? 'disabled' : ''}><datalist id="lf-partners">${(REFS.partners || []).slice(0, 3000).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></label>
-    <div class="lf-row"><label>Company<select id="lf-co" ${booked ? 'disabled' : ''}><option value="">—</option>${(REFS.companies || []).map(c => `<option value="${esc(c.name)}" ${t.company === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}${t.company && !(REFS.companies || []).some(c => c.name === t.company) ? `<option selected>${esc(t.company)}</option>` : ''}</select></label>
-      <label>Project<input id="lf-proj" list="lf-projects" value="${esc(t.analyticName || '')}" placeholder="analytic account" ${booked ? 'disabled' : ''} oninput="lfProjChanged()"><datalist id="lf-projects">${(REFS.analytic || []).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></label></div>
-    <label id="lf-div-wrap" ${isAj ? '' : 'hidden'}>Division (Ajaltoun work section)<select id="lf-div"><option value="">—</option>${(REFS.sections || []).map(x => `<option value="${esc(x.id)}" ${t.section === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
-    <div class="lf-extra"><div class="hint">Additional expenses on the same paper — each becomes its own line (one Odoo bill per line)</div>
-      ${LS.extra.map((x, i) => `<div class="lf-row"><input placeholder="e.g. transport" value="${esc(x.description)}" oninput="LS.extra[${i}].description=this.value"><input type="number" step="0.01" inputmode="decimal" placeholder="25" value="${x.amount || ''}" oninput="LS.extra[${i}].amount=this.value" style="max-width:110px"><button class="x" onclick="LS.extra.splice(${i},1);drawLineSheet()">✕</button></div>`).join('')}
-      <button class="lf-add" onclick="LS.extra.push({description:'',amount:''});drawLineSheet();setTimeout(()=>{const l=document.querySelectorAll('.lf-extra input');l[l.length-2]&&l[l.length-2].focus()},0)">+ add an expense</button></div>
-    <div class="lf-actions">
-      <button onclick="lineSave()" ${booked ? 'disabled' : ''}>Save</button>
-      ${!accepted && !booked ? `<button class="ok" onclick="lineSave('accept')">✓ Accept</button>` : ''}
-      ${accepted && !booked ? `<button class="ok" onclick="lineSave('book')">✓ Book in Odoo</button><button class="warn" onclick="lineHold()">↩ hold</button>` : ''}
-      <button class="ghost" onclick="closeSheet()">Close</button></div>
-    <div class="err" id="lf-err"></div>`;
-}
-function lfProjChanged() {
-  const name = document.getElementById('lf-proj').value.trim();
-  const a = (REFS.analytic || []).find(x => x.name.toLowerCase() === name.toLowerCase());
-  document.getElementById('lf-div-wrap').hidden = !(a && AJ_IDS.has(+a.id));
-}
-function lfFields() {
-  const g = id => document.getElementById(id);
-  const partnerName = g('lf-partner').value.trim(), projName = g('lf-proj').value.trim();
-  const partner = (REFS.partners || []).find(x => x.name.toLowerCase() === partnerName.toLowerCase());
-  const proj = (REFS.analytic || []).find(x => x.name.toLowerCase() === projName.toLowerCase());
-  const amt = Math.round((+g('lf-amt').value || 0) * 100) / 100, side = g('lf-side').value;
-  return {
-    description: g('lf-desc').value.trim(), note: g('lf-note').value.trim(),
-    debit: side === 'debit' ? amt : 0, credit: side === 'credit' ? amt : 0,
-    partnerId: partner ? partner.id : null, partnerName: partnerName, partnerSrc: partnerName ? 'manual' : '',
-    company: g('lf-co').value, companySrc: g('lf-co').value ? 'manual' : '',
-    analyticId: proj ? proj.id : null, analyticName: projName, analyticSrc: projName ? 'manual' : '',
-    section: g('lf-div-wrap').hidden ? null : (g('lf-div').value || null),
-  };
-}
-async function lineSave(action) {
-  const err = document.getElementById('lf-err'); err.textContent = '';
-  const btns = [...document.querySelectorAll('.lf-actions button')]; btns.forEach(b => b.disabled = true);
-  try {
-    const f = lfFields(), t = LS.t;
-    if (!t.bookedMove) {
-      if (!f.debit && !f.credit) throw new Error('an amount is needed');
-      const patch = { ...f };
-      if (action === 'accept') Object.assign(patch, { waAccepted: true, excluded: false, review: false, dupOf: null });
-      await Admin.api('PATCH', `/api/accounting/accounts/${LS.acc}/tx/${LS.txId}`, patch);
-    } else if (f.note !== (t.note || '') || f.section !== (t.section || null)) {
-      await Admin.api('PATCH', `/api/accounting/accounts/${LS.acc}/tx/${LS.txId}`, { note: f.note, section: f.section });
-    }
-    // the extra expenses: their own lines, same day, same partner / company / project / division, money out
-    for (const x of LS.extra) {
-      const a = Math.round((+x.amount || 0) * 100) / 100; if (!a || !String(x.description || '').trim()) continue;
-      await Admin.api('POST', `/api/accounting/accounts/${LS.acc}/tx`, { date: t.date, description: String(x.description).trim() + ' · ' + (f.description || t.description || '').slice(0, 60), debit: a, credit: 0,
-        note: 'with ' + (f.description || t.description || '').slice(0, 80), partnerId: f.partnerId, partnerName: f.partnerName, company: f.company, analyticId: f.analyticId, analyticName: f.analyticName, section: f.section, nature: 'expense', waAccepted: true });
-    }
-    LS.extra = [];
-    if (action === 'book') {
-      const r = await Admin.api('POST', `/api/accounting/accounts/${LS.acc}/book-row`, { txId: LS.txId });
-      if (f.section && r.move) Admin.api('POST', '/api/ajaltoun/section', { lineId: 'move:' + String(r.move).replace(/\//g, '-'), section: f.section }).catch(() => {});
-    }
-    LS.t = await Admin.api('GET', `/api/accounting/accounts/${LS.acc}/tx/${LS.txId}`);
-    await loadPosts(); await loadBalances(true);
-    drawLineSheet();
-    if (action === 'book') closeSheet();
-  } catch (e) { err.textContent = e.message; btns.forEach(b => b.disabled = false); }
-}
-async function lineHold() {
-  try { await Admin.api('PATCH', `/api/accounting/accounts/${LS.acc}/tx/${LS.txId}`, { waAccepted: false }); LS.t = await Admin.api('GET', `/api/accounting/accounts/${LS.acc}/tx/${LS.txId}`); await loadPosts(); drawLineSheet(); }
-  catch (e) { document.getElementById('lf-err').textContent = e.message; }
+  LineSheet.open(p.line.accountId, p.line.txId, { onChange: async () => { await loadPosts(); await loadBalances(true); } });
 }
 function attachSheet() {
   closeSheet();

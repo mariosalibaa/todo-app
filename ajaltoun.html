@@ -141,7 +141,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="/admin-shared.js"></script>
+<script src="/admin-shared.js"></script><script src="/line-sheet.js"></script>
 <script src="/ajaltoun-plan-ui.js"></script>
 <script src="/phone-preview.js"></script>
 <script>
@@ -222,6 +222,7 @@ function compute() {
 }
 
 function render() {
+  const keepY = window.scrollY;
   const root = document.getElementById('app');
   Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#accounts'], [{ accounts: 'Accounts', budget: 'Budget (BOQ)', plan: 'Cashflow plan' }[TAB] || TAB]]);
   document.getElementById('tabs').innerHTML = [['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('') + '<a href="/ajaltoun/excavation" title="Georges EL Hajj: what was collected, by whom, from which account, against his certificates">Excavation</a>';
@@ -311,9 +312,11 @@ function renderAccounts(app) {
   combo(document.getElementById('secfilter'), { items: secItems, value: F.section, placeholder: 'All sections', onPick: it => { F.section = it.id; pageNo = 0; renderDetail(); } });
   renderDetail();
   loadLog();
+  if (keepY) requestAnimationFrame(() => window.scrollTo(0, keepY));
 }
 // ── the section rows fold open on their lines (Mario, 2026-09-23) ──
 const OPEN_SEC = new Set();
+const ODOO_MOVE = 'https://shift2.odoo.com/web#model=account.move&view_type=form&id=';
 function toggleSec(e, id) {
   if (e.target.closest('input, select, button, a')) return;
   if (OPEN_SEC.has(id)) OPEN_SEC.delete(id); else OPEN_SEC.add(id);
@@ -323,13 +326,14 @@ function secLinesTable(id) {
   const ls = D.lines.filter(l => l.section === id && counted(l)).sort((a, b) => b.date.localeCompare(a.date));
   const props = D.lines.filter(l => l.section === id && !counted(l));
   return `<table><thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>
-    ${ls.map(l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td>${billCell(l)}</td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No lines.</td></tr>'}
+    ${ls.map(l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No lines.</td></tr>'}
     <tr class="tot"><td colspan="6">${ls.length} lines${props.length ? ` · ${props.length} proposal${props.length > 1 ? 's' : ''} waiting for Mario's ✓ (not counted)` : ''}</td><td class="n">${usd2(ls.reduce((x, l) => x + l.amount, 0))}</td></tr></tbody></table>`;
 }
 // the BILL cell: the Odoo bill number, "payment · no bill", or "not in Odoo" linking to the hub ledger line
 function billCell(l) {
-  if (l.hub) return `<span class="pill hub" title="A line of the hub ledger (${esc(l.paidBy || '')}) tagged Ajaltoun 4193 — not booked in Odoo yet"><a href="${esc(l.ledgerUrl || '#')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">not in Odoo ↗</a></span>`;
-  return `${l.payment ? `<span class="pill pay" title="Paid to the supplier, bill not booked in Odoo yet. Book/match the bill and this line becomes the bill's own analytic line.">payment · no bill</span> ` : ''}${esc(l.moveName)}`;
+  if (l.hub) return `<span class="pill hub" title="A line of the hub ledger (${esc(l.paidBy || '')}) tagged Ajaltoun 4193 — not booked in Odoo yet"><a href="${esc(l.ledgerUrl || '#')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">not in Odoo ↗</a></span>${D.admin && l.accId && l.txId ? ` <a href="#" class="edit" onclick="event.stopPropagation();LineSheet.open('${esc(l.accId)}', '${esc(l.txId)}', { onChange: () => load() });return false;" title="Note, extra expenses (transport 25$), partner, company, division, accept, book in Odoo — the same sheet as the accounts grid">edit ▸</a>` : ''}`;
+  const odoo = l.moveId ? `<a href="${ODOO_MOVE}${l.moveId}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open this entry in Odoo">${esc(l.moveName)} ↗</a>` : esc(l.moveName);
+  return `${l.payment ? `<span class="pill pay" title="Paid to the supplier, bill not booked in Odoo yet. Book/match the bill and this line becomes the bill's own analytic line.">payment · no bill</span> ` : ''}${odoo}`;
 }
 // the PAID cell: paid / not paid / partly paid + who paid (journal · date, or the hub ledger's name)
 const paidText = l => l.paid === 'proposal' ? 'proposal' : l.paid === 'paid' || l.paid === 'in_payment' ? 'paid' : l.paid === 'not_paid' ? 'not paid' : l.paid === 'partial' ? 'partly paid' : (l.paid || '');
@@ -387,7 +391,7 @@ function cashflowBlock(c) {
   // one row per month, expandable to sections → lines
   const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
   const rows = [...M].reverse().map(x => `<tr class="mrow" onclick="toggleMonth('${x.k}')"><td class="muted small">${esc(x.k)}</td><td>${x.ins.map(p => `<span class="ok">▲ ${esc(c.inv.partner)} · ${esc(p.journal)}</span> `).join('')}${x.out ? `<span class="muted small">${Object.keys(x.secs).length} section${Object.keys(x.secs).length > 1 ? 's' : ''} · ${c.lines.filter(l => l.date.startsWith(x.k)).length} lines</span>` : ''}</td><td class="n ok">${x.inn ? usd2(x.inn) : ''}</td><td class="n flag">${x.out ? usd2(x.out) : ''}</td><td class="n">${usd2(x.bal)}</td></tr>
-    <tr class="mdet" id="mdet-${x.k}" hidden><td colspan="5">${Object.entries(x.secs).sort((a, b) => b[1] - a[1]).map(([s, a]) => `<div><b>${esc(secName(s))}</b> ${usd2(a)} — ${c.lines.filter(l => l.date.startsWith(x.k) && l.section === s).sort((a, b) => b.amount - a.amount).slice(0, 6).map(l => `${esc(l.partner || l.name.slice(0, 30))} ${usd(l.amount)}`).join(' · ')}${c.lines.filter(l => l.date.startsWith(x.k) && l.section === s).length > 6 ? ' · …' : ''}</div>`).join('')}</td></tr>`).join('');
+    <tr class="mdet" id="mdet-${x.k}" hidden><td colspan="5">${monthLinesTable(c, x.k)}</td></tr>`).join('');
   return `${facts}<div class="wrap" style="margin-top:10px"><table><thead><tr><th>Month</th><th></th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th></tr></thead><tbody>${rows}
     <tr class="tot"><td></td><td>Remaining project cash</td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(remaining)}</td></tr></tbody></table></div>`;
 }
@@ -406,6 +410,15 @@ function boqRate(trade) {
 async function setQty(section, qty, unit) {
   try { const r = await Admin.api('POST', '/api/ajaltoun/qty', { section, qty: qty === '' ? null : +qty, unit }); D.qtyDone = r.qtyDone; render(); }
   catch (e) { alert('Could not save: ' + e.message); }
+}
+function monthLinesTable(c, k) {
+  const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
+  const ls = c.lines.filter(l => l.date.startsWith(k)).sort((a, b) => a.section === b.section ? b.date.localeCompare(a.date) : secName(a.section).localeCompare(secName(b.section)));
+  const ins = (c.inv ? c.inv.received : []).filter(p => p.date.startsWith(k));
+  return `<table class="mtab"><thead><tr><th>Date</th><th>Section</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>
+    ${ins.map(p => `<tr><td class="muted" style="white-space:nowrap">${esc(p.date)}</td><td colspan="4" class="ok">▲ ${esc(c.inv.partner)} · ${esc(p.journal)}${p.memo ? ' · ' + esc(p.memo) : ''}</td><td></td><td></td><td class="n ok">${usd2(p.amount)}</td></tr>`).join('')}
+    ${ls.map(l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(secName(l.section))}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`).join('')}
+    <tr class="tot"><td colspan="7">${ls.length} lines</td><td class="n">${usd2(ls.reduce((x, l) => x + l.amount, 0))}</td></tr></tbody></table>`;
 }
 function toggleMonth(k) { const el = document.getElementById('mdet-' + k); if (el) el.hidden = !el.hidden; }
 function cashflowRows(c) {

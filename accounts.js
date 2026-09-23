@@ -1037,7 +1037,7 @@ async function handle(req, res, url, user, ctx) {
     if (!a) return json(res, 404, { error: 'no such account' });
     const d = await txCol(a).doc(m[2]).get();
     if (!d.exists) return json(res, 404, { error: 'no such line' });
-    return json(res, 200, { ...d.data(), account: { id: a.id, name: a.name, currency: a.currency || 'USD' } });
+    return json(res, 200, { ...d.data(), account: { id: a.id, name: a.name, currency: a.currency || 'USD', odooPartner: !!(a.odooPartner && a.odooPartner.id) } });
   }
   // the closing balance of an account, the way the grid computes it (opening + credit − debit over the counted lines)
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/balance$/)) && req.method === 'GET') {
