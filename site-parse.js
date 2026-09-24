@@ -46,10 +46,23 @@ ACCOUNTS: ${names(accounts)}`;
 }
 
 async function visionRead(buf, mime) {
-  const out = await anthropic({ model: 'claude-sonnet-5', max_tokens: 300,
-    system: 'Look at the image. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","date":"yyyy-mm-dd"|null,"note":string}. If it is a photo of a construction site or work in progress return {"receipt":false,"note":one line describing the work}. JSON only.',
+  const out = await anthropic({ model: 'claude-sonnet-5', max_tokens: 400,
+    system: 'Look at the image. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","date":"yyyy-mm-dd"|null,"invoiceNo":string|null,"billedTo":string|null,"vat":true|false,"note":string}. billedTo = the customer the paper is made out to, copied as printed (the "Messrs"/"Client" line), null when it is a plain cash receipt with no customer. vat = true only when the paper charges VAT/TVA (a VAT line, ض.ق.م, or 11%). invoiceNo = the invoice number the supplier printed on it. If it is a photo of a construction site or work in progress return {"receipt":false,"note":one line describing the work}. JSON only.',
     messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data: buf.toString('base64') } }] }] });
-  return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', date: out.date || null, note: String(out.note || '').slice(0, 160) };
+  return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', date: out.date || null,
+    invoiceNo: String(out.invoiceNo || '').slice(0, 40), billedTo: String(out.billedTo || '').slice(0, 80), vat: !!out.vat,
+    note: String(out.note || '').slice(0, 160) };
+}
+
+// An official paper — made out to SHIFT GROUP SARL and charging VAT — belongs to the SARL and nowhere
+// else (Mario, 2026-09-24; the same rule the accountant works by). It carries the company by itself,
+// so no one has to pick it on every receipt.
+const SARL = 'SHIFT GROUP SARL (USD)';
+function officialCompany(parsed) {
+  if (!parsed || !parsed.receipt || !parsed.vat) return '';
+  const to = norm(parsed.billedTo);                       // "Ste ATTAL … SHIFT GROUP SARL المحترمين" → "shift group sarl"
+  if (!to || /development/.test(to)) return '';           // Shift Development keeps its own company
+  return /(^| )shift( |$)/.test(to) && /(^| )s ?a ?r ?l( |$)/.test(to) ? SARL : '';
 }
 
 // The fuel line's photos (pump display, odometer, receipt) → the numbers the words did not carry
@@ -74,4 +87,4 @@ async function whisper(buf, mime) {
   return String(j.text || '').trim();
 }
 
-module.exports = { quickParse, matchName, claudeParse, visionRead, fuelRead, whisper, anthropic };
+module.exports = { quickParse, matchName, claudeParse, visionRead, fuelRead, whisper, anthropic, officialCompany, SARL };

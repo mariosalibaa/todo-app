@@ -69,6 +69,7 @@
   .post .line{font-size:.72rem;margin-top:6px;padding:4px 8px;border-radius:8px;background:#fff3d6;color:#8a5a00;}
   .post .line table.lt{border-collapse:collapse;width:100%;} .post .line table.lt th{text-align:left;font-weight:600;opacity:.65;padding:0 8px 1px 0;white-space:nowrap;vertical-align:top;width:1%;} .post .line table.lt td{padding:0 0 1px;}
   .post .line .q{opacity:.7;} .post .line .lt-act{margin-top:3px;}
+  .post .line .miss{color:var(--overlay0);text-decoration:none;border-bottom:1px dotted var(--overlay0);}
   .post .line.accepted{background:#dcf8c6;color:#0b6b2c;} .post .line.dismissed{background:#fde2e4;color:#b3261e;}
   .post .line a{color:inherit;}
   .post .err{font-size:.72rem;color:var(--red);margin-top:4px;}
@@ -354,6 +355,7 @@ async function loadPosts() {
   // a digest that never ran (e.g. the phone lost signal), or one that hung mid-way, gets one chance to run now
   posts.filter(p => !p.error && (!p.digestedAt && !p.digesting || (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3))).forEach(p => digestOne(cur, p.id));
 }
+const isAjaltoun = L => /4193|ajaltoun/i.test(L.analyticName || '');
 function lineTag(p) {
   if (p.error) return `<div class="err">${esc(p.error)} · <a href="#" onclick="retry('${esc(p.id)}');return false;">retry</a></div>`;
   // Mario, 2026-09-12: a digest that hung (Vercel froze the function, no error ever came back)
@@ -362,18 +364,28 @@ function lineTag(p) {
   if (!p.digestedAt) return `<div class="line">reading…</div>`;
   if (!p.line) return p.parsed && p.parsed.receipt === false && (p.kind === 'photo' || p.kind === 'video') ? `<div class="line" style="background:#26352a;color:var(--green)">progress photo · <a href="#" onclick="flip('${esc(p.id)}');return false;">this is a receipt</a></div>` : '';
   const L = p.line, bal = balances[L.accountId];
-  const state = L.state === 'booked' ? `in Odoo ✓✓ ${esc(L.move || '')}` : L.state === 'accepted' ? 'accepted ✓ — on the ledger, not in Odoo yet' : L.state === 'dismissed' ? 'dismissed' : 'waiting for your ✓';
+  const state = L.state === 'booked' ? 'in Odoo ✓✓' : L.state === 'accepted' ? 'accepted ✓ — on the ledger, not in Odoo yet' : L.state === 'dismissed' ? 'dismissed' : 'waiting for your ✓';
   const cur = (p.parsed && p.parsed.currency) || 'USD';
   const amount = L.debit ? `${L.debit.toFixed(2)} ${cur} out` : L.credit ? `${L.credit.toFixed(2)} ${cur} in` : (p.parsed && p.parsed.amount ? `${p.parsed.amount.toFixed(2)} ${cur}` : '—');
+  // Company, Project and Division are always on the card, empty or not (Mario, 2026-09-24) — a blank
+  // one is the thing he needs to see. "set" opens the same edit sheet.
+  const miss = `<a href="#" class="miss" onclick="lineSheet('${esc(p.id)}');return false;">— set</a>`;
   const rows = [
     ['Amount', esc(amount)],
     ['Account', esc(accName(L.accountId)) + (bal ? ` <span class="q">balance ${bal.balance.toFixed(2)}</span>` : '')],
-    ['Partner', esc(L.partnerName || '')],
-    ['Company', esc(L.company || '')],
-    ['Project', esc(L.analyticName || '')],
-    ['Division', esc(sectionName(L.section))],
+    ['Partner', esc(L.partnerName || '') || miss],
+    ['Company', esc(L.company || '') || miss],
+    ['Project', esc(L.analyticName || '') || miss],
+    ['Division', esc(sectionName(L.section)) || (isAjaltoun(L) ? miss : '<span class="q">—</span>')],
     ...(L.extras || []).map(x => ['+ ' + esc((x.description || '').split(' · ')[0]), `${Math.abs(x.amount).toFixed(2)} ${cur}${x.booked ? ' <span class="q">in Odoo ✓✓</span>' : ''}`]),
     ['Status', state],
+    // once it is in Odoo: the bill it became, and the entry that paid it
+    ...(L.state === 'booked' ? [
+      ['Bill', esc(L.move || '') + (L.billRef ? ` <span class="q">ref ${esc(L.billRef)}</span>` : '')],
+      ['Payment', (L.paidBy || []).length
+        ? (L.paidBy || []).map(x => esc(x.name) + (x.amount ? ` <span class="q">${Math.abs(+x.amount).toFixed(2)}</span>` : '')).join('<br>')
+        : `<span class="q">${L.paymentState === 'paid' ? 'paid' : 'not paid yet'}</span>`],
+    ] : []),
   ].filter(r => r[1]);
   const acts = [
     me.admin ? `<a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : '',

@@ -36,6 +36,21 @@ async function readBytes(ctx, doc) {
   try { const [buf] = await admin.storage().bucket().file(doc.key).download(); return buf; } catch { return null; }
 }
 
+// What Odoo says about a booked bill: its own reference and the entries that settled it (the payment).
+// Read once — the answer is written back on the line, so the chat does not call Odoo on every load.
+async function settlement(ctx, txRef, bm) {
+  const ctxAll = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
+  const [mv] = await ctx.odooCall('account.move', 'read', [[bm.id], ['name', 'ref', 'move_type', 'payment_state', 'amount_residual', 'invoice_payments_widget']], { context: ctxAll });
+  if (!mv) return bm;
+  const w = (mv.invoice_payments_widget && mv.invoice_payments_widget.content) || [];
+  const ids = [...new Set(w.map(c => c.move_id).filter(Boolean))];
+  const names = ids.length ? Object.fromEntries((await ctx.odooCall('account.move', 'read', [ids, ['name', 'ref']], { context: ctxAll })).map(x => [x.id, x])) : {};
+  const out = { ...bm, name: mv.name || bm.name, ref: mv.ref || bm.ref || '', paymentState: mv.payment_state || '', residual: mv.amount_residual,
+    paidBy: w.map(c => { const sm = names[c.move_id] || {}; return { name: sm.name || c.name || '', ref: sm.ref || '', moveId: c.move_id || null, amount: c.amount, date: c.date || '' }; }) };
+  await txRef.set({ bookedMove: out }, { merge: true });
+  return out;
+}
+
 // which threads this caller may open
 async function threadsFor(ctx) {
   const ws = ctx.db.collection('workspaces').doc(ctx.TEAM_ID);
@@ -60,12 +75,13 @@ async function writeLine(ctx, ws, post, target, fields) {
   const a = await acc.resolve(ws, target);
   if (!a) throw new Error('no ledger ' + target);
   const id = 'site-' + post.id;
-  const t = { id, src: 'site', postId: post.id, thread: post.thread, date: post.date, ref: '', service: 'Shift WhatsApp', phone: '',
+  const t = { id, src: 'site', postId: post.id, thread: post.thread, date: post.date, ref: String(fields.ref || ''), service: 'Shift WhatsApp', phone: '',
     description: String(fields.description || post.text || '').slice(0, 160),
     debit: fields.side === 'debit' ? money(fields.amount) : 0, credit: fields.side === 'credit' ? money(fields.amount) : 0,
     analyticId: fields.analytic ? fields.analytic.id : null, analyticName: fields.analytic ? fields.analytic.name : '', analyticSrc: fields.analytic ? 'site' : '',
     partnerId: fields.partner ? fields.partner.id : (a.odooPartner ? a.odooPartner.id : null), partnerName: fields.partner ? fields.partner.name : (a.odooPartner ? a.odooPartner.name : ''), partnerSrc: fields.partner ? 'site' : (a.odooPartner ? 'auto' : ''),
     note: String(fields.note || ''), noteSrc: fields.note ? 'site' : '',
+    company: fields.company || '', companySrc: fields.company ? 'site' : '',
     review: true, excluded: true, waAccepted: false, waFrom: post.byAdmin ? 'mario' : 'them', waAt: post.at,
     docs: post.file ? [post.file] : [], createdAt: now(), createdBy: post.by, updatedAt: now(), updatedBy: post.by };
   // Mario, 2026-09-12: only stamp nature when the caller named one — otherwise leave it out so
@@ -92,7 +108,9 @@ async function digest(ctx, ws, ref, post, buf) {
         const partner = parsed.vendor ? parse.matchName(parsed.vendor, partners) : null;
         // a caption on a receipt photo rides along on the same line instead of spawning a second one (see below)
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense' });   // a receipt is always an expense — bookable right after ✓
+          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense',
+            // an official paper (SHIFT GROUP SARL + VAT) belongs to the SARL and carries it by itself
+            company: parse.officialCompany(parsed), ref: parsed.invoiceNo || '' });   // a receipt is always an expense — bookable right after ✓
       }
       // a site photo/video = progress; it is kept on the post and the Day report shows it under the day (part 2 hangs it on the attendance line)
     }
@@ -178,7 +196,14 @@ async function handle(req, res, url, user, ctx) {
         const ex = await acc.txCol(a).where('fromTxId', '==', p.line.txId).get();
         if (!ex.empty) p.line.extras = ex.docs.map(d => d.data()).map(x => ({ id: x.id, description: x.description || '', amount: (x.debit || 0) - (x.credit || 0), booked: !!x.bookedMove }));
       } catch (e) { console.error('site extras', p.line.txId, e.message); }
-      if (t) { p.line.debit = t.debit || 0; p.line.credit = t.credit || 0; p.line.section = t.section || ''; p.line.partnerName = t.partnerName || ''; p.line.company = t.company || ''; p.line.analyticName = t.analyticName || ''; p.line.move = t.bookedMove && t.bookedMove.name || ''; }
+      if (t) {
+        let bm = t.bookedMove || null;
+        if (bm && bm.id && !bm.paidBy) { try { bm = await settlement(ctx, acc.txCol(a).doc(p.line.txId), bm); } catch (e) { console.error('site settlement', p.line.txId, e.message); } }
+        p.line.debit = t.debit || 0; p.line.credit = t.credit || 0; p.line.section = t.section || ''; p.line.partnerName = t.partnerName || ''; p.line.company = t.company || ''; p.line.analyticName = t.analyticName || '';
+        p.line.move = bm && bm.name || ''; p.line.billRef = (bm && bm.ref) || t.ref || '';
+        p.line.paidBy = (bm && bm.paidBy || []).map(x => ({ name: x.name || '', ref: x.ref || '', amount: x.amount, date: x.date || '' }));
+        p.line.paymentState = bm && bm.paymentState || '';
+      }
     }));
     return json(res, 200, { posts: out });
   }
