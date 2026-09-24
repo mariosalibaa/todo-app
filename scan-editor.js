@@ -52,24 +52,33 @@ window.ScanEditor = (function () {
       let quad = detect(src), step = 1, warped = null, fit = null;
 
       // ── stage 1: the crop ──────────────────────────────────────────────
+      // The crop screen draws into a canvas as dense as the screen itself (a phone is 2x or 3x):
+      // at 1x the photo looked far worse here than in the camera — Mario, 2026-09-24.
+      const DPR = () => Math.min(3, window.devicePixelRatio || 1);
       function layout() {
         const box = stage.getBoundingClientRect();
         const s = Math.min((box.width - 12) / src.width, (box.height - 12) / src.height);
-        fit = { s, w: Math.round(src.width * s), h: Math.round(src.height * s) };
-        [view, over].forEach(c => { c.width = fit.w; c.height = fit.h; c.style.width = fit.w + 'px'; c.style.height = fit.h + 'px'; });
-        view.getContext('2d').drawImage(src, 0, 0, fit.w, fit.h);
+        fit = { s, w: Math.round(src.width * s), h: Math.round(src.height * s), dpr: DPR() };
+        [view, over].forEach(c => {
+          c.width = Math.round(fit.w * fit.dpr); c.height = Math.round(fit.h * fit.dpr);
+          c.style.width = fit.w + 'px'; c.style.height = fit.h + 'px';
+        });
+        const g = view.getContext('2d');
+        g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+        g.drawImage(src, 0, 0, view.width, view.height);
         drawQuad();
       }
       function drawQuad() {
-        const g = over.getContext('2d'); g.clearRect(0, 0, over.width, over.height);
-        const p = quad.map(([x, y]) => [x * fit.s, y * fit.s]);
+        const g = over.getContext('2d'), k = fit.s * fit.dpr, d = fit.dpr;
+        g.clearRect(0, 0, over.width, over.height);
+        const p = quad.map(([x, y]) => [x * k, y * k]);
         g.save();
         g.beginPath(); g.rect(0, 0, over.width, over.height);
         g.moveTo(p[0][0], p[0][1]); for (let i = 3; i >= 1; i--) g.lineTo(p[i][0], p[i][1]); g.closePath();
         g.fillStyle = 'rgba(16,18,21,.55)'; g.fill('evenodd'); g.restore();
         g.beginPath(); g.moveTo(p[0][0], p[0][1]); p.slice(1).forEach(q => g.lineTo(q[0], q[1])); g.closePath();
-        g.strokeStyle = '#25d366'; g.lineWidth = 2; g.stroke();
-        p.forEach(q => { g.beginPath(); g.arc(q[0], q[1], 11, 0, 7); g.fillStyle = 'rgba(37,211,102,.25)'; g.fill(); g.strokeStyle = '#25d366'; g.lineWidth = 2.5; g.stroke(); });
+        g.strokeStyle = '#25d366'; g.lineWidth = 2 * d; g.stroke();
+        p.forEach(q => { g.beginPath(); g.arc(q[0], q[1], 11 * d, 0, 7); g.fillStyle = 'rgba(37,211,102,.25)'; g.fill(); g.strokeStyle = '#25d366'; g.lineWidth = 2.5 * d; g.stroke(); });
       }
       let drag = -1;
       over.addEventListener('pointerdown', e => {
@@ -91,7 +100,7 @@ window.ScanEditor = (function () {
         const busy = document.createElement('div'); busy.className = 'busy'; busy.textContent = 'Working…'; stage.appendChild(busy);
         setTimeout(() => {
           const box = stage.getBoundingClientRect();
-          const out = outSize(quad, Math.min(1800, Math.round(900 * Math.min(2, devicePixelRatio || 1))));
+          const out = outSize(quad, Math.min(2000, Math.round(Math.max(box.width, box.height) * Math.min(3, window.devicePixelRatio || 1))));
           const img = process(warp(src, quad, out.w, out.h, 1), prefs.mode, prefs.enhance);
           const s = Math.min((box.width - 12) / out.w, (box.height - 12) / out.h, 1);
           view.width = out.w; view.height = out.h;
