@@ -272,6 +272,18 @@ async function hubLines(db, TEAM_ID) {
   return lines;
 }
 
+// a hub line's division lives on the ledger line itself (tx.section), never in the overrides map — the site chat,
+// the accounts grid and this page then all read one single field (Mario 2026-09-24: "division in whatsapp and here
+// should read the same"). Returns false when the line is gone.
+async function writeHubSection(db, TEAM_ID, accId, txId, section) {
+  const ws = db.collection('workspaces').doc(TEAM_ID);
+  for (const col of ['accounts', 'whishAccounts']) {
+    const ref = ws.collection(col).doc(accId).collection('tx').doc(txId);
+    if ((await ref.get()).exists) { await ref.update({ section }); return true; }
+  }
+  return false;
+}
+
 const metaRef = (db, TEAM_ID) => db.collection('workspaces').doc(TEAM_ID).collection('ajaltounMeta').doc('sections');
 async function meta(db, TEAM_ID) {
   const d = (await metaRef(db, TEAM_ID).get()).data();
@@ -356,10 +368,17 @@ async function handle(req, res, url, user, ctx) {
       // the whole supplier: a rule at the front (first match wins), and the supplier's overrides cleared
       const p = String(b.forPartner).toLowerCase();
       mt.rules = [{ partner: p, section: b.section }, ...mt.rules.filter(r => r.partner !== p)];
-      const ids = [...(cache.data ? cache.data.lines : []), ...lastHub].filter(l => (l.partner || '').toLowerCase() === p).map(l => l.id);
-      for (const id of ids) delete mt.overrides[id];
+      const hit = [...(cache.data ? cache.data.lines : []), ...lastHub].filter(l => (l.partner || '').toLowerCase() === p);
+      for (const l of hit) delete mt.overrides[l.id];
+      // the supplier's hub lines carry their own division — move them too, or they would keep the old one
+      for (const l of hit.filter(l => l.hub)) { await writeHubSection(db, TEAM_ID, l.accId, l.txId, b.section).catch(() => {}); l.txSection = b.section; }
     } else if (b.lineId) {
-      mt.overrides[String(b.lineId).slice(0, 200)] = b.section;   // a number (Odoo analytic line) or 'hub:<acc>:<tx>'
+      const hub = String(b.lineId).match(/^hub:([^:]+):(.+)$/);
+      if (hub) {
+        if (!await writeHubSection(db, TEAM_ID, hub[1], hub[2], b.section)) return json(res, 404, { error: 'that ledger line is gone' });
+        delete mt.overrides[String(b.lineId)];
+        const l = lastHub.find(x => x.id === b.lineId); if (l) l.txSection = b.section;
+      } else mt.overrides[String(b.lineId).slice(0, 200)] = b.section;   // a number (Odoo analytic line) or 'move:<bill>'
     } else return json(res, 400, { error: 'lineId or forPartner required' });
     await saveMeta(db, TEAM_ID, mt, user.email);
     return json(res, 200, { ok: true });
