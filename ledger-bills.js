@@ -1007,7 +1007,7 @@ async function moveFilesToMove(odooCall, account, t, move, companyId) {
 // own recipe, the one the odoo-vendor-bill skill writes by hand: journal 20 BILL1, 11% purchase tax 151,
 // 611100 raw materials (601101 for goods bought to sell on), price_unit = HT — the amount on the line is
 // what the paper totals, TTC. `ref` is the supplier's invoice number.
-const SARL_OFFICIAL = { companyId: 2, journal: 20, tax: 151, raw: 1094, resale: 1082, marioJournal: 21 };
+const SARL_OFFICIAL = { companyId: 2, journal: 20, tax: 151, raw: 1094, resale: 1082, marioJournal: 21, sett: 190 };
 const isOfficialSarl = t => !!(t && t.vat && (t.official || t.company === SARL_NAME) && t.debit > 0);
 const RESALE = /\b(ac|a\/c|split|unit|inverter|panel|module|pump|boiler|chiller)\b/i;
 
@@ -1041,7 +1041,13 @@ async function postOfficialSarl(ctx, account, t, who) {
     await odooCall('account.payment.register', 'action_create_payments', [[wiz]], { context: ctxP });
     paid = true;
     [bill] = await odooCall('account.move', 'read', [[bill.id], ['id', 'name', 'state', 'payment_state', 'amount_total', 'amount_residual']], { context: C });
-  } else why = 'paid from ' + (account.name || account.id) + ' — settle it in Odoo as paid by him';
+  } else if (account.odooPartner && account.odooPartner.id) {
+    // his own money paid an official SARL bill: settle it "Paid by him" through the SARL's Settlement
+    // journal 190, which carries the debt onto his payable there — the door the Pay window uses
+    await settlePaidBy(odooCall, C, bill.id, SARL_OFFICIAL.sett, t.date, account.odooPartner);
+    paid = true; why = 'settled paid by ' + account.odooPartner.name;
+    [bill] = await odooCall('account.move', 'read', [[bill.id], ['id', 'name', 'state', 'payment_state', 'amount_total', 'amount_residual']], { context: C });
+  } else why = 'paid from ' + (account.name || account.id) + ', which carries no Odoo partner — settle it by hand';
   await col.doc(t.id).set({ bookedMove: { id: bill.id, name: bill.name, ref, kind: 'official-sarl', at: now(), state: bill.state, paymentState: bill.payment_state },
     ref: ref, company: SARL_NAME, companySrc: 'odoo', service: 'SARL', partnerId: v.id, partnerName: v.name,
     updatedAt: now(), updatedBy: who }, { merge: true });

@@ -70,10 +70,10 @@
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
       <label>Money<select id="ls-side" ${lock ? 'disabled' : ''}><option value="debit" ${side === 'debit' ? 'selected' : ''}>out (paid)</option><option value="credit" ${side === 'credit' ? 'selected' : ''}>in (received)</option></select></label></div>
     <label>Note<input id="ls-note" value="${esc(t.note || '')}" placeholder="what it was for"></label>
-    <label>Partner (supplier)<input id="ls-partner" list="ls-partners" value="${esc(t.partnerName || '')}" placeholder="type to search Odoo partners" ${lock ? 'disabled' : ''}><datalist id="ls-partners">${(REFS.partners || []).slice(0, 3000).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></label>
+    <label>Partner (supplier)<span class="combo"><input id="ls-partner" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="type to search Odoo partners" ${lock ? 'disabled' : ''}>${lock ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-partner-menu" hidden></div></span></label>
     <div class="ls-row"><label>Company<select id="ls-co" ${lock ? 'disabled' : ''}><option value="">—</option>${(REFS.companies || []).map(c => `<option value="${esc(c.name)}" ${t.company === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}${t.company && !(REFS.companies || []).some(c => c.name === t.company) ? `<option selected>${esc(t.company)}</option>` : ''}</select></label>
       <label>Project<span class="combo"><input id="ls-proj" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="type or pick a project" ${lock ? 'disabled' : ''}>${lock ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-proj-menu" hidden></div></span></label></div>
-    <label id="ls-div-wrap" ${isAj ? '' : 'hidden'}>Division (Ajaltoun work section — type a new name to create one)<input id="ls-div" list="ls-divs" value="${esc(secName(t.section))}" placeholder="prefab, excavation, stone walls…"><datalist id="ls-divs">${(REFS.sections || []).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></label>
+    <label id="ls-div-wrap" ${isAj ? '' : 'hidden'}>Division (Ajaltoun work section — type a new name to create one)<span class="combo"><input id="ls-div" autocomplete="off" value="${esc(secName(t.section))}" placeholder="prefab, excavation, stone walls…"><button type="button" class="caret" tabindex="-1">▾</button><div class="menu" id="ls-div-menu" hidden></div></span></label>
     ${lock ? '' : `<div class="ls-extra"><div class="hint">Additional expenses on the same paper — each becomes its own line on this ledger (one Odoo bill per line)</div>
       ${S.extra.map((x, i) => `<div class="ls-row"><input placeholder="e.g. transport" value="${esc(x.description)}" oninput="LineSheet.S.extra[${i}].description=this.value"><input type="number" step="0.01" inputmode="decimal" placeholder="25" value="${x.amount || ''}" oninput="LineSheet.S.extra[${i}].amount=this.value" style="max-width:110px"><button class="x" onclick="LineSheet.S.extra.splice(${i},1);LineSheet.draw()">✕</button></div>`).join('')}
       <button class="ls-add" onclick="LineSheet.S.extra.push({description:'',amount:''});LineSheet.draw();setTimeout(()=>{const l=document.querySelectorAll('.ls-extra input');l[l.length-2]&&l[l.length-2].focus()},0)">+ add an expense</button></div>`}
@@ -89,29 +89,27 @@
   }
   // Project autocomplete: type to filter, tap to choose, ▾ shows them all. Plain divs, so it
   // works on the iPhone (a <datalist> does not) and the list is readable with one thumb.
-  function wireProjCombo() {
-    const inp = g('ls-proj'), menu = g('ls-proj-menu'); if (!inp || !menu || inp.disabled) return;
+  // One combobox, used by Partner, Project and Division: type to filter, tap to choose, ▾ for the whole
+  // list, arrows + Enter on a keyboard. Plain divs, because Safari on the iPhone ignores <datalist>.
+  function combo(inputId, items, onPick) {
+    const inp = g(inputId), menu = g(inputId + '-menu'); if (!inp || !menu || inp.disabled) return;
     const caret = menu.parentNode.querySelector('.caret');
     let hi = -1, shown = [];
-    const all = () => (REFS.analytic || []);
     const hide = () => { menu.hidden = true; hi = -1; };
     function show(list) {
       shown = list.slice(0, 60);
       menu.innerHTML = shown.length
         ? shown.map((x, i) => `<div data-i="${i}" class="${i === hi ? 'on' : ''}">${esc(x.name)}</div>`).join('')
-        : '<div class="none">no project matches</div>';
+        : `<div class="none">no match — what you type is kept</div>`;
       menu.hidden = false;
       menu.querySelectorAll('div[data-i]').forEach(d => {
-        d.onmousedown = e => e.preventDefault();                 // keep the focus, let the click land
+        d.onmousedown = e => e.preventDefault();
         d.onclick = () => pick(shown[+d.dataset.i]);
       });
     }
-    function filter() {
-      const q = inp.value.trim().toLowerCase();
-      show(!q ? all() : all().filter(x => x.name.toLowerCase().includes(q)));
-    }
-    function pick(x) { if (!x) return; inp.value = x.name; hide(); projChanged(); }
-    inp.oninput = () => { filter(); projChanged(); };
+    const filter = () => { const q = inp.value.trim().toLowerCase(); const all = items(); show(!q ? all : all.filter(x => x.name.toLowerCase().includes(q))); };
+    function pick(x) { if (!x) return; inp.value = x.name; hide(); if (onPick) onPick(x); }
+    inp.oninput = () => { filter(); if (onPick) onPick(null); };
     inp.onfocus = () => filter();
     inp.onblur = () => setTimeout(hide, 180);
     inp.onkeydown = e => {
@@ -123,6 +121,11 @@
       else if (e.key === 'Escape') hide();
     };
     if (caret) caret.onclick = () => { if (menu.hidden) { inp.focus(); filter(); } else hide(); };
+  }
+  function wireProjCombo() {
+    combo('ls-partner', () => REFS.partners || []);
+    combo('ls-proj', () => REFS.analytic || [], () => projChanged());
+    combo('ls-div', () => REFS.sections || []);
   }
   function projChanged() {
     const name = g('ls-proj').value.trim();
