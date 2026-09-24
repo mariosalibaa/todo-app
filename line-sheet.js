@@ -162,6 +162,8 @@
     if (t.bookedMove) return t.bookedMove.name || '';
     const byRow = async () => { const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/book-row`, { txId }); return r.move || ''; };
     const byPay = async () => {
+      // an official SARL bill that was refused for a missing project must NOT slip out as a plain payment
+      if (t.vat && (t.official || t.company === 'SHIFT GROUP SARL (USD)')) throw new Error('official bill — fix what the message above says, it books in the SARL');
       if (!t.partnerId) throw new Error('the partner is not one of Odoo\'s — pick it from the list');
       if (!t.company) throw new Error('the company is missing');
       const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/book`, { ids: [txId], post: true });

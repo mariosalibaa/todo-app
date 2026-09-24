@@ -82,6 +82,8 @@ async function writeLine(ctx, ws, post, target, fields) {
     partnerId: fields.partner ? fields.partner.id : (a.odooPartner ? a.odooPartner.id : null), partnerName: fields.partner ? fields.partner.name : (a.odooPartner ? a.odooPartner.name : ''), partnerSrc: fields.partner ? 'site' : (a.odooPartner ? 'auto' : ''),
     note: String(fields.note || ''), noteSrc: fields.note ? 'site' : '',
     company: fields.company || '', companySrc: fields.company ? 'site' : '',
+    // an official paper (SARL + VAT): the booking reads these two and makes the bill in the SARL
+    vat: !!fields.vat, official: !!fields.official,
     review: true, excluded: true, waAccepted: false, waFrom: post.byAdmin ? 'mario' : 'them', waAt: post.at,
     docs: post.file ? [post.file] : [], createdAt: now(), createdBy: post.by, updatedAt: now(), updatedBy: post.by };
   // Mario, 2026-09-12: only stamp nature when the caller named one — otherwise leave it out so
@@ -110,7 +112,7 @@ async function digest(ctx, ws, ref, post, buf) {
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
           { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense',
             // an official paper (SHIFT GROUP SARL + VAT) belongs to the SARL and carries it by itself
-            company: parse.officialCompany(parsed), ref: parsed.invoiceNo || '' });   // a receipt is always an expense — bookable right after ✓
+            company: parse.officialCompany(parsed), official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });   // a receipt is always an expense — bookable right after ✓
       }
       // a site photo/video = progress; it is kept on the post and the Day report shows it under the day (part 2 hangs it on the attendance line)
     }
@@ -203,6 +205,7 @@ async function handle(req, res, url, user, ctx) {
         p.line.move = bm && bm.name || ''; p.line.billRef = (bm && bm.ref) || t.ref || '';
         p.line.paidBy = (bm && bm.paidBy || []).map(x => ({ name: x.name || '', ref: x.ref || '', amount: x.amount, date: x.date || '' }));
         p.line.paymentState = bm && bm.paymentState || '';
+        p.line.official = !!t.official && !!t.vat;
       }
     }));
     return json(res, 200, { posts: out });

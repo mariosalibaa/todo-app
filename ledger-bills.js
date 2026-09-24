@@ -1001,6 +1001,53 @@ async function moveFilesToMove(odooCall, account, t, move, companyId) {
   }
   return A.map(a => ({ id: a.id, name: a.name }));
 }
+// ── An official paper: SHIFT GROUP SARL + VAT ─────────────────────────────────────────────
+// It belongs to the SARL and to nowhere else (Mario, 2026-09-24: "all official bills, holding shift
+// group sarl name and having tva, should automatically be registered on shift sarl"). The accountant's
+// own recipe, the one the odoo-vendor-bill skill writes by hand: journal 20 BILL1, 11% purchase tax 151,
+// 611100 raw materials (601101 for goods bought to sell on), price_unit = HT — the amount on the line is
+// what the paper totals, TTC. `ref` is the supplier's invoice number.
+const SARL_OFFICIAL = { companyId: 2, journal: 20, tax: 151, raw: 1094, resale: 1082, marioJournal: 21 };
+const isOfficialSarl = t => !!(t && t.vat && (t.official || t.company === SARL_NAME) && t.debit > 0);
+const RESALE = /\b(ac|a\/c|split|unit|inverter|panel|module|pump|boiler|chiller)\b/i;
+
+async function postOfficialSarl(ctx, account, t, who) {
+  const { txCol, odooCall } = ctx;
+  const col = txCol(account);
+  const C = { allowed_company_ids: [SARL_OFFICIAL.companyId], company_id: SARL_OFFICIAL.companyId };
+  const v = t.partnerId ? { id: t.partnerId, name: t.partnerName } : await vendorOf(odooCall, t, account).catch(() => null);
+  if (!v || !v.id) throw new Error('the supplier is not one of Odoo’s — pick it on the line first');
+  const an = t.analyticId ? { id: t.analyticId, name: t.analyticName } : null;
+  if (!an && !(Array.isArray(t.analyticSplit) && t.analyticSplit.length)) throw new Error('an official bill needs its project before it goes to Odoo');
+  const ttc = money(t.debit);
+  const ht = money(ttc / 1.11);                       // the tax makes the total back up: 26.92 + 11% = 29.88
+  const ref = String(t.ref || '').trim() || String(t.description || '').slice(0, 40);
+  const id = await odooCall('account.move', 'create', [{
+    move_type: 'in_invoice', company_id: SARL_OFFICIAL.companyId, journal_id: SARL_OFFICIAL.journal,
+    partner_id: v.id, invoice_date: t.date, date: t.date, ref,
+    narration: 'Official invoice read on Shift WhatsApp' + (t.postId ? ' (post ' + t.postId + ')' : '') + '. Made by Shift Hub.',
+    invoice_line_ids: [[0, 0, { name: t.date + ' · ' + (t.description || v.name).slice(0, 80), quantity: 1, price_unit: ht,
+      account_id: RESALE.test(t.description || '') ? SARL_OFFICIAL.resale : SARL_OFFICIAL.raw,
+      tax_ids: [[6, 0, [SARL_OFFICIAL.tax]]], analytic_distribution: distOf(t, an) }]],
+  }], { context: C });
+  await odooCall('account.move', 'action_post', [[id]], { context: C });
+  let [bill] = await odooCall('account.move', 'read', [[id], ['id', 'name', 'state', 'payment_state', 'amount_total', 'amount_residual']], { context: C });
+  // it was paid out of Mario's own cash; another ledger's money is settled Paid-by that man in Odoo
+  let paid = false, why = '';
+  if (t.date <= SARL_CLOSED_UNTIL) why = 'the SARL is closed up to ' + SARL_CLOSED_UNTIL + ' — the bill is posted, pay it by hand';
+  else if (account.id === 'mario-cash') {
+    const ctxP = { ...C, active_model: 'account.move', active_ids: [bill.id] };
+    const wiz = await odooCall('account.payment.register', 'create', [{ journal_id: SARL_OFFICIAL.marioJournal, payment_date: t.date, amount: money(bill.amount_residual || ttc) }], { context: ctxP });
+    await odooCall('account.payment.register', 'action_create_payments', [[wiz]], { context: ctxP });
+    paid = true;
+    [bill] = await odooCall('account.move', 'read', [[bill.id], ['id', 'name', 'state', 'payment_state', 'amount_total', 'amount_residual']], { context: C });
+  } else why = 'paid from ' + (account.name || account.id) + ' — settle it in Odoo as paid by him';
+  await col.doc(t.id).set({ bookedMove: { id: bill.id, name: bill.name, ref, kind: 'official-sarl', at: now(), state: bill.state, paymentState: bill.payment_state },
+    ref: ref, company: SARL_NAME, companySrc: 'odoo', service: 'SARL', partnerId: v.id, partnerName: v.name,
+    updatedAt: now(), updatedBy: who }, { merge: true });
+  return { official: true, move: bill.name, id: bill.id, ht, ttc, paid, note: why };
+}
+
 async function bookRow(ctx, account, txId, who) {
   const { txCol, odooCall } = ctx;
   const col = txCol(account);
@@ -1021,7 +1068,8 @@ async function bookRow(ctx, account, txId, who) {
   const CO = bookCo(account);
   const opts = { only: [txId], post: true };
   let out, kind = t.nature;
-  if (account.cashBox) { out = await postCashBox(ctx, account, who, { only: [txId] }); kind = 'cash box'; }
+  if (isOfficialSarl(t)) { out = await postOfficialSarl(ctx, account, t, who); kind = 'official SARL bill'; }
+  else if (account.cashBox) { out = await postCashBox(ctx, account, who, { only: [txId] }); kind = 'cash box'; }
   else if (t.nature === 'labour' || t.nature === 'expense' || t.nature === 'opening') {
     const part = t.nature === 'expense' ? 'expenses' : 'labour';
     out = await bookMonth(ctx, account, t.date.slice(0, 7), part, who, { post: true, redo: true });
@@ -1127,4 +1175,4 @@ async function pushAnalytic(ctx, account, t) {
   return { ...out, move: named.join(', '), distribution: dist, already: !changed.length, changed };
 }
 
-module.exports = { suppliersPublic: suppliers, handVendorPublic: handVendor, pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+module.exports = { postOfficialSarl, isOfficialSarl, suppliersPublic: suppliers, handVendorPublic: handVendor, pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };

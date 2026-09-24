@@ -374,7 +374,7 @@ function lineTag(p) {
     ['Amount', esc(amount)],
     ['Account', esc(accName(L.accountId)) + (bal ? ` <span class="q">balance ${bal.balance.toFixed(2)}</span>` : '')],
     ['Partner', esc(L.partnerName || '') || miss],
-    ['Company', esc(L.company || '') || miss],
+    ['Company', (esc(L.company || '') || miss) + (L.official ? ' <span class="q">official · VAT</span>' : '')],
     ['Project', esc(L.analyticName || '') || miss],
     ['Division', esc(sectionName(L.section)) || (isAjaltoun(L) ? miss : '<span class="q">—</span>')],
     ...(L.extras || []).map(x => ['+ ' + esc((x.description || '').split(' · ')[0]), `${Math.abs(x.amount).toFixed(2)} ${cur}${x.booked ? ' <span class="q">in Odoo ✓✓</span>' : ''}`]),
