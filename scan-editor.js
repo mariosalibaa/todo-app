@@ -10,7 +10,8 @@
 // Returns a Promise: the JPEG Blob, or null when Mario cancels.
 window.ScanEditor = (function () {
   const LS = 'scanEditor.prefs';
-  const SIZES = { s: 1200, m: 1600, l: 2200 };
+  const SIZES = { s: 1600, m: 2200, l: 3000 };
+  const SRC_PIXELS = 12e6;   // how much of the phone's photo we keep for the warp (an iPhone shot is ~12 MP)
   const prefs = Object.assign({ mode: 'color', enhance: true, size: 'm', auto: true }, readPrefs());
   function readPrefs() { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch { return {}; } }
   function savePrefs() { try { localStorage.setItem(LS, JSON.stringify(prefs)); } catch {} }
@@ -39,7 +40,7 @@ window.ScanEditor = (function () {
         const st = document.createElement('style'); st.id = 'scanx-css'; st.textContent = CSS; document.head.appendChild(st);
       }
       let src;                                        // working ImageData-bearing canvas (rotations applied)
-      try { src = await loadCanvas(file, 2600); } catch { return resolve(file); }
+      try { src = await loadCanvas(file); } catch { return resolve(file); }
 
       const root = document.createElement('div'); root.className = 'scanx';
       root.innerHTML = `
@@ -90,8 +91,8 @@ window.ScanEditor = (function () {
         const busy = document.createElement('div'); busy.className = 'busy'; busy.textContent = 'Working…'; stage.appendChild(busy);
         setTimeout(() => {
           const box = stage.getBoundingClientRect();
-          const out = outSize(quad, 900);
-          const img = process(warp(src, quad, out.w, out.h), prefs.mode, prefs.enhance);
+          const out = outSize(quad, Math.min(1800, Math.round(900 * Math.min(2, devicePixelRatio || 1))));
+          const img = process(warp(src, quad, out.w, out.h, 1), prefs.mode, prefs.enhance);
           const s = Math.min((box.width - 12) / out.w, (box.height - 12) / out.h, 1);
           view.width = out.w; view.height = out.h;
           view.style.width = Math.round(out.w * s) + 'px'; view.style.height = Math.round(out.h * s) + 'px';
@@ -147,12 +148,15 @@ window.ScanEditor = (function () {
         }
         const busy = document.createElement('div'); busy.className = 'busy'; busy.textContent = 'Preparing…'; stage.appendChild(busy);
         await new Promise(r => setTimeout(r, 10));
-        const out = outSize(quad, SIZES[prefs.size] || 1600);
-        const img = process(warp(src, quad, out.w, out.h), prefs.mode, prefs.enhance);
+        const out = outSize(quad, SIZES[prefs.size] || 2200);
+        const img = process(warp(src, quad, out.w, out.h, subFor(quad, out.w, out.h)), prefs.mode, prefs.enhance);
         const c = document.createElement('canvas'); c.width = out.w; c.height = out.h;
         c.getContext('2d').putImageData(img, 0, 0);
-        const q = prefs.mode === 'bw' ? 0.9 : 0.85;
-        c.toBlob(blob => close(blob || null), 'image/jpeg', q);
+        // the hub refuses anything over 4 MB, so a big colour page steps the quality down rather than the size
+        const jpeg = q => new Promise(r => c.toBlob(r, 'image/jpeg', q));
+        let blob = await jpeg(prefs.mode === 'bw' ? 0.95 : 0.92);
+        for (const q of [0.85, 0.78, 0.7]) { if (!blob || blob.size <= 3.6e6) break; blob = await jpeg(q); }
+        close(blob || null);
       };
 
       if (!prefs.auto) quad = fullQuad(src);
@@ -161,11 +165,14 @@ window.ScanEditor = (function () {
   }
 
   // ── image loading ────────────────────────────────────────────────────────
-  function loadCanvas(file, max) {
+  // The photo is kept at its own resolution (only a very large one is trimmed to ~12 MP, the ceiling
+  // Safari on the iPhone allows for a canvas). Shrinking here first is what used to cost the detail:
+  // the paper is only a part of the frame, so a 2600 px frame left a 1800 px paper to blow up again.
+  function loadCanvas(file) {
     return new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => {
-        const s = Math.min(1, max / Math.max(img.width, img.height));
+        const s = Math.min(1, Math.sqrt(SRC_PIXELS / (img.width * img.height)));
         const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(img.src); res(c);
@@ -242,7 +249,10 @@ window.ScanEditor = (function () {
     const s = Math.min(1, max / Math.max(w, h));
     return { w: Math.max(8, Math.round(w * s)), h: Math.max(8, Math.round(h * s)) };
   }
-  function warp(cv, quad, outW, outH) {
+  // `sub` = how many samples per output pixel on a side (2 → a 2×2 average). Reducing a sharp photo with
+  // one bilinear sample per pixel is what makes the text look noisy; averaging 4 gives a clean shrink.
+  function warp(cv, quad, outW, outH, sub) {
+    sub = Math.max(1, sub | 0);
     const sw = cv.width, sh = cv.height;
     const sd = cv.getContext('2d').getImageData(0, 0, sw, sh).data;
     const [x0, y0] = quad[0], [x1, y1] = quad[1], [x2, y2] = quad[2], [x3, y3] = quad[3];
@@ -257,24 +267,35 @@ window.ScanEditor = (function () {
       a = x1 - x0 + g * x1; b = x3 - x0 + h * x3; c = x0;
       dd = y1 - y0 + g * y1; e = y3 - y0 + h * y3; f = y0;
     }
-    const out = new ImageData(outW, outH), od = out.data;
+    const out = new ImageData(outW, outH), od = out.data, n = sub * sub, step = 1 / sub;
     for (let j = 0, o = 0; j < outH; j++) {
-      const v = (j + 0.5) / outH;
       for (let i = 0; i < outW; i++, o += 4) {
-        const u = (i + 0.5) / outW, w = g * u + h * v + 1;
-        let X = (a * u + b * v + c) / w, Y = (dd * u + e * v + f) / w;
-        X = clamp(X, 0, sw - 1.001); Y = clamp(Y, 0, sh - 1.001);
-        const xi = X | 0, yi = Y | 0, fx = X - xi, fy = Y - yi;
-        const p00 = (yi * sw + xi) * 4, p10 = p00 + 4, p01 = p00 + sw * 4, p11 = p01 + 4;
-        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
-        od[o] = sd[p00] * w00 + sd[p10] * w10 + sd[p01] * w01 + sd[p11] * w11;
-        od[o + 1] = sd[p00 + 1] * w00 + sd[p10 + 1] * w10 + sd[p01 + 1] * w01 + sd[p11 + 1] * w11;
-        od[o + 2] = sd[p00 + 2] * w00 + sd[p10 + 2] * w10 + sd[p01 + 2] * w01 + sd[p11 + 2] * w11;
-        od[o + 3] = 255;
+        let r = 0, gg = 0, bb = 0;
+        for (let sj = 0; sj < sub; sj++) {
+          const v = (j + (sj + 0.5) * step) / outH;
+          for (let si = 0; si < sub; si++) {
+            const u = (i + (si + 0.5) * step) / outW, w = g * u + h * v + 1;
+            let X = (a * u + b * v + c) / w, Y = (dd * u + e * v + f) / w;
+            X = clamp(X, 0, sw - 1.001); Y = clamp(Y, 0, sh - 1.001);
+            const xi = X | 0, yi = Y | 0, fx = X - xi, fy = Y - yi;
+            const p00 = (yi * sw + xi) * 4, p10 = p00 + 4, p01 = p00 + sw * 4, p11 = p01 + 4;
+            const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+            r += sd[p00] * w00 + sd[p10] * w10 + sd[p01] * w01 + sd[p11] * w11;
+            gg += sd[p00 + 1] * w00 + sd[p10 + 1] * w10 + sd[p01 + 1] * w01 + sd[p11 + 1] * w11;
+            bb += sd[p00 + 2] * w00 + sd[p10 + 2] * w10 + sd[p01 + 2] * w01 + sd[p11 + 2] * w11;
+          }
+        }
+        od[o] = r / n; od[o + 1] = gg / n; od[o + 2] = bb / n; od[o + 3] = 255;
       }
     }
     return out;
   }
+  // how many samples an output of this size deserves: only worth it while the photo still has the detail
+  const subFor = (quad, outW, outH) => {
+    const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+    const srcW = (d(quad[0], quad[1]) + d(quad[3], quad[2])) / 2;
+    return srcW / outW >= 1.5 ? 2 : 1;
+  };
 
   // ── the scanner look ─────────────────────────────────────────────────────
   // Enhance = divide the picture by its own blurred self (that kills the shadow of the
