@@ -19,6 +19,7 @@ const CTX = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
 const MIME_OK = {
   photo: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   video: ['video/mp4', 'video/quicktime', 'video/webm'],
+  doc: ['application/pdf'],
   voice: ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/x-m4a'],
 };
 const readBody = (req, max = 35e6) => new Promise((resolve, reject) => {
@@ -101,6 +102,18 @@ async function digest(ctx, ws, ref, post, buf) {
   try {
     let text = post.text || '', parsed = {}, line = null;
     if (post.kind === 'voice') { text = await parse.whisper(buf, post.file.mime); parsed.transcript = text; }
+    if (post.kind === 'doc') {
+      // a PDF: the supplier sent the invoice itself, no camera involved
+      Object.assign(parsed, await parse.pdfRead(buf));
+      if (post.receiptOverride != null) parsed.receipt = !!post.receiptOverride;
+      if (parsed.receipt && (parsed.amount || post.receiptOverride === true)) {
+        const { partners } = await refs(ctx);
+        const partner = parsed.vendor ? parse.matchName(parsed.vendor, partners) : null;
+        line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
+          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense',
+            company: parse.officialCompany(parsed), official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });
+      }
+    }
     if (post.kind === 'photo' || post.kind === 'video') {
       if (post.kind === 'photo') Object.assign(parsed, await parse.visionRead(buf, post.file.mime));
       else parsed.receipt = false;
@@ -215,7 +228,7 @@ async function handle(req, res, url, user, ctx) {
     const thread = m[1];
     if (!(await threadsFor(ctx)).some(t => t.id === thread)) return json(res, 403, { error: 'not your thread' });
     const b = await readBody(req);
-    const kind = ['text', 'photo', 'video', 'voice'].includes(b.kind) ? b.kind : 'text';
+    const kind = ['text', 'photo', 'video', 'voice', 'doc'].includes(b.kind) ? b.kind : 'text';
     const text = String(b.text || '').trim().slice(0, 2000);
     const id = newId();
     const post = { id, thread, by: who, at: now(), date: /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : beirutDay(), kind, text, byAdmin: !!access.admin };
@@ -295,7 +308,7 @@ async function handle(req, res, url, user, ctx) {
     const ref = ws.collection('site').doc(m[1]).collection('posts').doc(m[2]);
     const d = await ref.get(); if (!d.exists) return json(res, 404, { error: 'no post' });
     const post = d.data();
-    if (post.kind !== 'photo' && post.kind !== 'video') return json(res, 400, { error: 'not a picture' });
+    if (!['photo', 'video', 'doc'].includes(post.kind)) return json(res, 400, { error: 'not a picture or a document' });
     if (post.digesting && post.digestingAt && Date.now() - Date.parse(post.digestingAt) < 120e3) return json(res, 409, { error: 'still reading the picture — try again in a moment' });
     if (post.line) { const a = await acc.resolve(ws, post.line.accountId); if (a) await acc.txCol(a).doc('site-' + post.id).delete(); }
     const receiptOverride = !(post.receiptOverride != null ? post.receiptOverride : (post.parsed && post.parsed.receipt));

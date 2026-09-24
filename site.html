@@ -99,7 +99,9 @@
   .sheet .card.attach{flex-direction:row;justify-content:space-around;padding:22px 12px calc(22px + env(safe-area-inset-bottom));}
   .sheet .card.attach button{background:transparent;border:0;color:var(--text);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;}
   .sheet .card.attach button i{font-style:normal;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;}
-  .sheet .card.attach button i.c1{background:#e0417c;} .sheet .card.attach button i.c2{background:#bf59cf;} .sheet .card.attach button i.c3{background:#f26b3a;}
+  .sheet .card.attach button i.c1{background:#e0417c;} .sheet .card.attach button i.c2{background:#bf59cf;} .sheet .card.attach button i.c3{background:#f26b3a;} .sheet .card.attach button i.c4{background:#5b7cfa;}
+  .post .doc{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.05);color:inherit;text-decoration:none;max-width:280px;}
+  .post .doc .ic{font-size:1.5rem;} .post .doc .nm{font-size:.86rem;word-break:break-word;} .post .doc .sz{font-size:.72rem;color:var(--sub);}
   .empty{color:var(--overlay0);text-align:center;padding:60px 20px;font-size:.9rem;}
   .post.gone{font-style:italic;color:var(--overlay0);}
   .post{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;} .post.gone,.post .line{user-select:text;}
@@ -179,8 +181,8 @@ const initial = t => t.kind === 'general' ? 'M' : (t.name || '?').trim().charAt(
 function previewText(t) {
   const p = t.preview; if (!p) return '<span style="color:var(--overlay0)">No messages yet</span>';
   const who = p.by === me.email ? '' : esc((p.by || '').split('@')[0]) + ': ';
-  const icon = p.kind === 'voice' ? '🎤 ' : p.kind === 'photo' ? '📷 ' : p.kind === 'video' ? '🎬 ' : '';
-  const body = p.kind === 'deleted' ? '🚫 This message was deleted' : icon + (esc(p.text) || (p.kind === 'voice' ? 'Voice message' : p.kind === 'photo' ? 'Photo' : p.kind === 'video' ? 'Video' : ''));
+  const icon = p.kind === 'voice' ? '🎤 ' : p.kind === 'photo' ? '📷 ' : p.kind === 'video' ? '🎬 ' : p.kind === 'doc' ? '📄 ' : '';
+  const body = p.kind === 'deleted' ? '🚫 This message was deleted' : icon + (esc(p.text) || (p.kind === 'voice' ? 'Voice message' : p.kind === 'photo' ? 'Photo' : p.kind === 'video' ? 'Video' : p.kind === 'doc' ? 'Document' : ''));
   return who + body;
 }
 async function loadThreads() {
@@ -362,7 +364,14 @@ function lineTag(p) {
   // shouldn't sit on "reading…" forever — offer the same retry after 2 minutes
   if (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3) return `<div class="line">reading took too long · <a href="#" onclick="retry('${esc(p.id)}');return false;">retry</a></div>`;
   if (!p.digestedAt) return `<div class="line">reading…</div>`;
-  if (!p.line) return p.parsed && p.parsed.receipt === false && (p.kind === 'photo' || p.kind === 'video') ? `<div class="line" style="background:#26352a;color:var(--green)">progress photo · <a href="#" onclick="flip('${esc(p.id)}');return false;">this is a receipt</a></div>` : '';
+  if (!p.line) {
+    if (p.parsed && p.parsed.receipt === false && (p.kind === 'photo' || p.kind === 'video'))
+      return `<div class="line" style="background:#26352a;color:var(--green)">progress photo · <a href="#" onclick="flip('${esc(p.id)}');return false;">this is a receipt</a></div>`;
+    // a PDF that carries no money (a drawing, a contract): it stays filed on the chat, nothing to book
+    if (p.kind === 'doc')
+      return `<div class="line">${esc((p.parsed && p.parsed.note) || 'no amount read')} · <a href="#" onclick="flip('${esc(p.id)}');return false;">this is a receipt</a></div>`;
+    return '';
+  }
   const L = p.line, bal = balances[L.accountId];
   const state = L.state === 'booked' ? 'in Odoo ✓✓' : L.state === 'accepted' ? 'accepted ✓ — on the ledger, not in Odoo yet' : L.state === 'dismissed' ? 'dismissed' : 'waiting for your ✓';
   const cur = (p.parsed && p.parsed.currency) || 'USD';
@@ -389,7 +398,7 @@ function lineTag(p) {
   ].filter(r => r[1]);
   const acts = [
     me.admin ? `<a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : '',
-    (p.kind === 'photo' && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
+    ((p.kind === 'photo' || p.kind === 'doc') && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
     // cancel takes the line off the ledger and out of the balance; the photo and the message stay (Mario, 2026-09-24)
     me.admin && L.state !== 'booked' && L.state !== 'dismissed' ? `<a href="#" onclick="cancelEntry('${esc(p.id)}');return false;">cancel entry</a>` : '',
     me.admin && L.state === 'dismissed' ? `<a href="#" onclick="restoreEntry('${esc(p.id)}');return false;">put it back</a>` : '',
@@ -407,6 +416,7 @@ function draw() {
     if (p.kind === 'start' || p.kind === 'finish') return `${dayHdr}<div class="post tap" data-id="${esc(p.id)}">${p.kind === 'start' ? '▶' : '■'} <b>${p.kind === 'start' ? 'Started' : 'Finished'} ${hhmm(p.at)}</b>${p.siteName ? ' · 📍 ' + esc(p.siteName) : p.loc ? ' · outside every site' : ' · no location'}${p.distanceM != null ? ` <span title="from the site’s centre">(${p.distanceM} m)</span>` : ''}${p.manual ? ` · entered by hand at ${hhmm(p.enteredAt)}` : ''}${p.noStart ? ' · ⚠ no Start before it' : ''}</div>`;
     const body = p.kind === 'photo' ? `<a href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><img src="/api/site/${cur}/posts/${p.id}/file" ${ix >= posts.length - 8 ? '' : 'loading="lazy"'} onload="feedGrew()"></a>`
       : p.kind === 'video' ? `<video src="/api/site/${cur}/posts/${p.id}/file" controls preload="metadata"></video>`
+      : p.kind === 'doc' ? `<a class="doc" href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><span class="ic">📄</span><span><span class="nm">${esc((p.file && p.file.name) || 'document.pdf')}</span><span class="sz">${p.file && p.file.size ? Math.round(p.file.size / 1024) + ' KB · ' : ''}PDF</span></span></a>`
       : p.kind === 'voice' ? `<audio src="/api/site/${cur}/posts/${p.id}/file" controls></audio>${p.parsed && p.parsed.transcript ? `<div style="margin-top:6px;font-style:italic">${esc(p.parsed.transcript)}</div>` : ''}`
       : esc(p.text);
     const canDel = mine || me.admin;
@@ -478,7 +488,8 @@ function attachSheet() {
   sh.innerHTML = `<div class="card attach">
     <button onclick="closeSheet();pick('image/*','photo')"><i class="c1">📷</i>Camera</button>
     <button onclick="closeSheet();pick('video/*','video')"><i class="c2">🎥</i>Video</button>
-    <button onclick="closeSheet();pick('image/*,video/*','any',false)"><i class="c3">🖼</i>Gallery</button></div>`;
+    <button onclick="closeSheet();pick('image/*,video/*','any',false)"><i class="c3">🖼</i>Gallery</button>
+    <button onclick="closeSheet();pick('application/pdf','doc',false)"><i class="c4">📄</i>Document</button></div>`;
   sh.onclick = e => { if (e.target === sh) closeSheet(); };
   document.body.appendChild(sh);
 }
@@ -487,6 +498,7 @@ async function sendFile(file, kind) {
   if (!file || !cur) return;
   let blob = file, mime = file.type, name = file.name;
   // a photo goes through the scanner first (crop, flatten, colour/B&W, size) — Mario, 2026-09-24
+  if (kind === 'doc' && !/pdf$/i.test(mime || '')) return alert('Only a PDF can be attached as a document.');
   if (kind === 'photo') {
     if (window.ScanEditor) { const scanned = await ScanEditor.open(file); if (!scanned) return; blob = scanned; }
     else blob = await shrink(file, 1600);

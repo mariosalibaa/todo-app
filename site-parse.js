@@ -54,6 +54,16 @@ async function visionRead(buf, mime) {
     note: String(out.note || '').slice(0, 160) };
 }
 
+// A PDF invoice (Mario, 2026-09-24: "allow to attach pdf") — the same questions as visionRead, asked of
+// the document itself. Claude reads the PDF pages; amount = the TOTAL to pay, the way the paper prints it.
+async function pdfRead(buf) {
+  const out = await anthropic({ model: 'claude-sonnet-5', max_tokens: 400,
+    system: 'You read one PDF a Lebanese contractor received. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","date":"yyyy-mm-dd"|null,"invoiceNo":string|null,"billedTo":string|null,"vat":true|false,"note":string}. amount = the final total to pay (TTC when VAT is charged). billedTo = the customer the paper is made out to, copied as printed, null when there is none. vat = true only when it charges VAT/TVA (a VAT line, ض.ق.م, or 11%). If it is not a receipt or an invoice (a drawing, a contract, a catalogue) return {"receipt":false,"note":one line saying what the document is}. JSON only.',
+    messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buf.toString('base64') } }] }] });
+  return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', date: out.date || null,
+    invoiceNo: String(out.invoiceNo || '').slice(0, 40), billedTo: String(out.billedTo || '').slice(0, 80), vat: !!out.vat,
+    note: String(out.note || '').slice(0, 160) };
+}
 // An official paper — made out to SHIFT GROUP SARL and charging VAT — belongs to the SARL and nowhere
 // else (Mario, 2026-09-24; the same rule the accountant works by). It carries the company by itself,
 // so no one has to pick it on every receipt.
@@ -87,4 +97,4 @@ async function whisper(buf, mime) {
   return String(j.text || '').trim();
 }
 
-module.exports = { quickParse, matchName, claudeParse, visionRead, fuelRead, whisper, anthropic, officialCompany, SARL };
+module.exports = { quickParse, matchName, claudeParse, visionRead, pdfRead, fuelRead, whisper, anthropic, officialCompany, SARL };
