@@ -979,11 +979,27 @@ const handler = async (req, res) => {
 
   // Allowlist gate: a valid Google/session token is not enough — the email
   // must be approved. (Local mode's synthetic user gets everything.)
-  const access = machine
+  let access = machine
     ? (machineSite ? { email: user.email, apps: ['site'], admin: true } : { email: user.email, apps: ['accounting'], admin: false })
     : AUTH_DISABLED
       ? { email: user.email || '', apps: APPS.slice(), admin: true }
       : await accessFor(user.email);
+
+  // ── View as (Mario, 2026-09-25: "add view as on all pages"). An admin can look at the hub through
+  // someone else's eyes — Ziad sees one chat, the accountant sees the reports. It is READ-ONLY: nothing
+  // may be written while the view is on, so an impersonated click can never change the books.
+  const viewAsCookie = /(?:^|;s*)hub_view_as=([^;]*)/.exec(req.headers.cookie || '');
+  let viewAs = viewAsCookie ? decodeURIComponent(viewAsCookie[1] || '').toLowerCase() : '';
+  if (viewAs && access && access.admin && viewAs !== String(access.email || '').toLowerCase()) {
+    const target = await accessFor(viewAs);
+    if (target) access = { ...target, viewAs, viewedBy: access.email, readOnly: true };
+    else viewAs = '';
+  } else viewAs = '';
+  if (access && access.readOnly && req.method !== 'GET' && url.startsWith('/api/')) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'view_as_read_only', message: 'You are viewing the hub as ' + viewAs + ' — leave that view to change anything.' }));
+    return;
+  }
   if (!access) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'not_allowed', email: user.email || '' }));
@@ -994,7 +1010,10 @@ const handler = async (req, res) => {
   if (url === '/api/me') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ email: access.email, name: user.name || user.displayName || access.name || access.email,
-      apps: access.apps, admin: access.admin, local: AUTH_DISABLED }));
+      apps: access.apps, admin: access.admin, local: AUTH_DISABLED,
+      viewAs: access.viewAs || '', viewedBy: access.viewedBy || '', readOnly: !!access.readOnly,
+      // the admin behind the view gets the list to switch with (name, email, what they may open)
+      people: access.viewAs || access.admin ? [...(await allowlistMap()).values()].map(x => ({ email: x.email, name: x.name || '', apps: x.apps, account: x.account || '' })) : [] }));
     return;
   }
 

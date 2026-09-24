@@ -169,6 +169,7 @@
         return true;
       }
       if (!ready) { ready = true; overlay(''); onReady(me); }
+      A.viewAsBar();
       return true;
     } catch (e) {
       if (e.status === 403) {
@@ -181,6 +182,44 @@
     }
   }
 
+
+  // ── View as (Mario, 2026-09-25: "add view as on all pages") ──────────────────────────────
+  // An admin looks at the hub through someone else's eyes — Ziad sees only his own chat, the
+  // accountant only the reports. The server decides the rights; while the view is on it refuses
+  // every write, so nothing can be changed by mistake from inside somebody else’s account.
+  const VIEW_COOKIE = 'hub_view_as';
+  A.viewAs = function (email) {
+    document.cookie = VIEW_COOKIE + '=' + encodeURIComponent(email || '') + ';path=/;max-age=' + (email ? 7200 : 0) + ';samesite=lax';
+    location.reload();
+  };
+  A.viewAsBar = function () {
+    const me = A.me || {};
+    if (!me.admin && !me.viewAs) return;
+    const old = document.getElementById('view-as-bar'); if (old) old.remove();
+    const people = (me.people || []).filter(x => x.email !== me.viewedBy);
+    if (!me.viewAs && !people.length) return;
+    const bar = document.createElement('div');
+    bar.id = 'view-as-bar';
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:1400;display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 12px;font:inherit;font-size:.8rem;background:' + (me.viewAs ? '#8a5a00' : 'transparent') + ';color:' + (me.viewAs ? '#fff' : 'inherit') + ';pointer-events:none;';
+    const box = document.createElement('div');
+    box.style.cssText = 'pointer-events:auto;display:flex;align-items:center;gap:8px;background:' + (me.viewAs ? 'transparent' : 'rgba(0,0,0,.06)') + ';border-radius:999px;padding:4px 10px;';
+    if (me.viewAs) {
+      const who = (people.find(x => x.email === me.viewAs) || {}).name || me.viewAs;
+      box.append(Object.assign(document.createElement('span'), { textContent: '👁 Viewing as ' + who + ' — read-only' }));
+      const out = Object.assign(document.createElement('button'), { textContent: 'Leave' });
+      out.style.cssText = 'border:0;border-radius:999px;padding:3px 10px;font:inherit;font-size:.78rem;cursor:pointer;background:#fff;color:#8a5a00;';
+      out.onclick = () => A.viewAs('');
+      box.append(out);
+    } else {
+      const sel = document.createElement('select');
+      sel.style.cssText = 'border:1px solid rgba(128,128,128,.4);border-radius:999px;padding:3px 8px;font:inherit;font-size:.78rem;background:transparent;color:inherit;cursor:pointer;';
+      sel.innerHTML = '<option value="">👁 View as…</option>' + people.map(x => `<option value="${esc(x.email)}">${esc(x.name || x.email)}${x.account ? ' · ' + esc(x.account) : ''}</option>`).join('');
+      sel.onchange = () => sel.value && A.viewAs(sel.value);
+      box.append(sel);
+    }
+    bar.append(box);
+    document.body.append(bar);
+  };
   // Gate a page: app = 'todo' | 'accounting' | null (hub: any approved account)
   A.require = function (app, onReady) {
     A.app = app;
@@ -192,7 +231,10 @@
       if (cfg.authDisabled) {   // local machine: no sign-in, everything open
         A.disabled = true;
         A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm'], admin: true, local: true };
-        ready = true; overlay(''); onReady(A.me); return;
+        ready = true; overlay(''); onReady(A.me);
+        // the local machine still asks who the hub thinks we are, so "View as" works here too
+        A.api('GET', '/api/me').then(me => { A.me = { ...A.me, ...me, admin: me.viewAs ? !!me.admin : true }; A.viewAsBar(); }).catch(() => {});
+        return;
       }
       overlay(card('Checking session…'));
       if (A.session && await tryMe(onReady, pre)) return;
