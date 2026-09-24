@@ -155,7 +155,7 @@
 <input type="file" id="file" hidden>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="/admin-shared.js"></script><script src="/line-sheet.js"></script><script src="/phone-preview.js"></script><script src="/emoji-picker.js"></script>
+<script src="/admin-shared.js"></script><script src="/line-sheet.js"></script><script src="/phone-preview.js"></script><script src="/emoji-picker.js"></script><script src="/scan-editor.js"></script>
 <script>
 // Mario, 2026-09-12: no background digest on the server any more — the page awaits
 // POST .../digest right after a successful post (Vercel can freeze a function right
@@ -376,8 +376,11 @@ function lineTag(p) {
     ['Status', state],
   ].filter(r => r[1]);
   const acts = [
-    me.admin && L.state !== 'dismissed' ? `<a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : '',
+    me.admin ? `<a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : '',
     (p.kind === 'photo' && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
+    // cancel takes the line off the ledger and out of the balance; the photo and the message stay (Mario, 2026-09-24)
+    me.admin && L.state !== 'booked' && L.state !== 'dismissed' ? `<a href="#" onclick="cancelEntry('${esc(p.id)}');return false;">cancel entry</a>` : '',
+    me.admin && L.state === 'dismissed' ? `<a href="#" onclick="restoreEntry('${esc(p.id)}');return false;">put it back</a>` : '',
   ].filter(Boolean).join(' · ');
   return `<div class="line ${esc(L.state || 'waiting')}"><table class="lt">${rows.map(r => `<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</table>${acts ? `<div class="lt-act">${acts}</div>` : ''}</div>`;
 }
@@ -471,7 +474,12 @@ function attachSheet() {
 async function sendFile(file, kind) {
   if (!file || !cur) return;
   let blob = file, mime = file.type, name = file.name;
-  if (kind === 'photo') { blob = await shrink(file, 1600); mime = 'image/jpeg'; name = (name || 'photo').replace(/\.\w+$/, '') + '.jpg'; }
+  // a photo goes through the scanner first (crop, flatten, colour/B&W, size) — Mario, 2026-09-24
+  if (kind === 'photo') {
+    if (window.ScanEditor) { const scanned = await ScanEditor.open(file); if (!scanned) return; blob = scanned; }
+    else blob = await shrink(file, 1600);
+    mime = 'image/jpeg'; name = (name || 'photo').replace(/\.\w+$/, '') + '.jpg';
+  }
   if (kind === 'video') { const secs = await duration(file); if (secs > 60) return alert('Keep a video under 60 seconds.'); }
   if (blob.size > 4e6) return alert('The hub cannot take files over 4 MB yet — a photo is fine, keep videos for later.');
   const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
@@ -561,6 +569,22 @@ function recLock() { recState = 'locked'; lockedAt = Date.now(); recUI(true); if
 })();
 // /flip re-reads the picture the other way (progress ↔ receipt); a 409 means the previous
 // digest is still running — its `error` explains that, so surface it instead of retrying blind
+// the ledger line behind a card: cancelled (off the balance, paper kept) or put back as a proposal
+async function cancelEntry(id) {
+  const p = posts.find(x => x.id === id); if (!p || !p.line) return;
+  if (!confirm('Cancel this entry? It comes off the ledger and out of the balance. The photo stays in the chat.')) return;
+  await patchLine(p, { excluded: true, review: false, waAccepted: false });
+}
+async function restoreEntry(id) {
+  const p = posts.find(x => x.id === id); if (!p || !p.line) return;
+  await patchLine(p, { review: true });
+}
+async function patchLine(p, patch) {
+  try {
+    await Admin.api('PATCH', `/api/accounting/accounts/${p.line.accountId}/tx/${p.line.txId}`, patch);
+    await loadPosts(); await loadBalances(true);
+  } catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
+}
 async function flip(id) {
   try { const d = await Admin.api('POST', `/api/site/${cur}/posts/${id}/flip`, {}); replacePost(d); draw(); }
   catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }

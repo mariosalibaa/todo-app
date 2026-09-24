@@ -25,11 +25,17 @@
   @media(min-width:700px){.ls{border-radius:16px;}}
   .ls label{display:block;font-size:.72rem;color:var(--sub,var(--muted,#a6adc8));margin-top:8px;} .ls input,.ls select{display:block;width:100%;margin-top:3px;padding:8px 10px;font:inherit;font-size:.9rem;background:var(--crust,var(--base,#181825));color:inherit;border:1px solid var(--surface0,#45475a);border-radius:8px;box-sizing:border-box;}
   .ls .ls-row{display:flex;gap:8px;align-items:flex-end;} .ls .ls-row label{flex:1;} .ls .ls-row>input{margin-top:6px;}
-  .ls .ls-head{font-size:.92rem;margin-bottom:4px;} .ls .ls-state{display:block;font-size:.74rem;margin-top:2px;} .ls .ls-state.waiting{color:#e0a020;} .ls .ls-state.accepted{color:#3fb950;} .ls .ls-state.booked{color:#89b4fa;}
+  .ls .ls-head{font-size:.92rem;margin-bottom:4px;} .ls .ls-state{display:block;font-size:.74rem;margin-top:2px;} .ls .ls-state.waiting{color:#e0a020;} .ls .ls-state.accepted{color:#3fb950;} .ls .ls-state.booked{color:#89b4fa;} .ls .ls-state.cancelled{color:#f38ba8;}
   .ls .ls-extra{margin-top:10px;padding:8px 10px;border:1px dashed var(--surface1,#585b70);border-radius:10px;} .ls .hint{font-size:.74rem;color:var(--sub,var(--muted,#a6adc8));} .ls .ls-extra .ls-row{margin-top:6px;} .ls .ls-extra button.x{background:none;border:0;color:#f38ba8;font-size:1rem;cursor:pointer;} .ls .ls-add{margin-top:8px;background:none;border:1px solid var(--surface1,#585b70);border-radius:8px;padding:6px 10px;font:inherit;font-size:.8rem;color:inherit;cursor:pointer;}
   .ls .ls-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;} .ls .ls-actions button{padding:9px 14px;border-radius:10px;border:0;font:inherit;font-size:.88rem;cursor:pointer;background:var(--surface1,#585b70);color:inherit;} .ls .ls-actions button.ok{background:#128c7e;color:#fff;} .ls .ls-actions button.warn{background:#fde2e4;color:#b3261e;} .ls .ls-actions button.ghost{background:transparent;color:var(--sub,var(--muted,#a6adc8));} .ls .ls-actions button:disabled{opacity:.5;}
   .ls .err{color:#f38ba8;font-size:.78rem;margin-top:6px;white-space:pre-wrap;} .ls .ls-bal{font-weight:400;color:var(--sub,var(--muted,#a6adc8));}
-  .ls .ls-links{font-size:.76rem;margin-top:4px;} .ls .ls-links a{color:#89b4fa;}`;
+  .ls .ls-links{font-size:.76rem;margin-top:4px;} .ls .ls-links a{color:#89b4fa;}
+  /* a real dropdown, not <datalist>: Safari on the iPhone shows nothing for a datalist (Mario, 2026-09-24) */
+  .ls .combo{position:relative;display:block;} .ls .combo input{padding-right:30px;}
+  .ls .combo .caret{position:absolute;right:2px;top:3px;bottom:0;width:28px;background:none;border:0;color:var(--sub,#a6adc8);font-size:.8rem;cursor:pointer;}
+  .ls .combo .menu{position:absolute;left:0;right:0;top:100%;margin-top:2px;z-index:6;background:var(--crust,#181825);border:1px solid var(--surface0,#45475a);border-radius:8px;max-height:210px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.35);-webkit-overflow-scrolling:touch;}
+  .ls .combo .menu div{padding:9px 10px;font-size:.88rem;cursor:pointer;border-bottom:1px solid var(--surface0,#45475a);} .ls .combo .menu div:last-child{border-bottom:0;}
+  .ls .combo .menu div.on,.ls .combo .menu div:hover{background:var(--surface1,#585b70);} .ls .combo .menu .none{color:var(--sub,#a6adc8);cursor:default;}`;
   let S = null;   // { acc, txId, t, extra: [], onChange, bal }
   const g = id => document.getElementById(id);
   function close() { const o = g('ls-overlay'); if (o) o.remove(); S = null; }
@@ -54,10 +60,11 @@
     const t = S.t, amt = t.debit || t.credit || 0, side = t.debit ? 'debit' : 'credit';
     const isAj = AJ_IDS.has(+t.analyticId);
     const booked = !!t.bookedMove, accepted = !!t.waAccepted, odoo = t.src === 'odoo';
-    const stateTxt = booked ? `in Odoo ✓✓ ${esc(t.bookedMove.name || '')}` : odoo ? 'an Odoo entry' : accepted ? 'accepted ✓ — counts on the ledger, not in Odoo yet' : 'proposal — not counted until you accept it';
+    const cancelled = !booked && !odoo && !!t.excluded && !t.review;
+    const stateTxt = booked ? `in Odoo ✓✓ ${esc(t.bookedMove.name || '')}` : odoo ? 'an Odoo entry' : cancelled ? 'cancelled — off the ledger, kept on the paper' : accepted ? 'accepted ✓ — counts on the ledger, not in Odoo yet' : 'proposal — not counted until you accept it';
     const lock = booked || odoo;
     o.querySelector('.ls').innerHTML = `
-    <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
+    <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : cancelled ? 'cancelled' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
       <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/web#model=account.move&view_type=form&id=${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
     <label>Description<input id="ls-desc" value="${esc(t.description || '')}" ${lock ? 'disabled' : ''}></label>
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
@@ -65,7 +72,7 @@
     <label>Note<input id="ls-note" value="${esc(t.note || '')}" placeholder="what it was for"></label>
     <label>Partner (supplier)<input id="ls-partner" list="ls-partners" value="${esc(t.partnerName || '')}" placeholder="type to search Odoo partners" ${lock ? 'disabled' : ''}><datalist id="ls-partners">${(REFS.partners || []).slice(0, 3000).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></label>
     <div class="ls-row"><label>Company<select id="ls-co" ${lock ? 'disabled' : ''}><option value="">—</option>${(REFS.companies || []).map(c => `<option value="${esc(c.name)}" ${t.company === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}${t.company && !(REFS.companies || []).some(c => c.name === t.company) ? `<option selected>${esc(t.company)}</option>` : ''}</select></label>
-      <label>Project<input id="ls-proj" list="ls-projects" value="${esc(t.analyticName || '')}" placeholder="analytic account" ${lock ? 'disabled' : ''} oninput="LineSheet.projChanged()"><datalist id="ls-projects">${(REFS.analytic || []).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></label></div>
+      <label>Project<span class="combo"><input id="ls-proj" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="type or pick a project" ${lock ? 'disabled' : ''}>${lock ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-proj-menu" hidden></div></span></label></div>
     <label id="ls-div-wrap" ${isAj ? '' : 'hidden'}>Division (Ajaltoun work section — type a new name to create one)<input id="ls-div" list="ls-divs" value="${esc(secName(t.section))}" placeholder="prefab, excavation, stone walls…"><datalist id="ls-divs">${(REFS.sections || []).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></label>
     ${lock ? '' : `<div class="ls-extra"><div class="hint">Additional expenses on the same paper — each becomes its own line on this ledger (one Odoo bill per line)</div>
       ${S.extra.map((x, i) => `<div class="ls-row"><input placeholder="e.g. transport" value="${esc(x.description)}" oninput="LineSheet.S.extra[${i}].description=this.value"><input type="number" step="0.01" inputmode="decimal" placeholder="25" value="${x.amount || ''}" oninput="LineSheet.S.extra[${i}].amount=this.value" style="max-width:110px"><button class="x" onclick="LineSheet.S.extra.splice(${i},1);LineSheet.draw()">✕</button></div>`).join('')}
@@ -74,8 +81,48 @@
       <button onclick="LineSheet.save()">Save</button>
       ${!accepted && !lock ? `<button class="ok" onclick="LineSheet.save('accept')">✓ Accept</button>` : ''}
       ${accepted && !lock ? `<button class="ok" onclick="LineSheet.save('book')">✓ Book in Odoo</button><button class="warn" onclick="LineSheet.hold()">↩ hold</button>` : ''}
+      ${!lock && !cancelled ? `<button class="warn" onclick="LineSheet.cancelEntry()">✕ Cancel entry</button>` : ''}
+      ${cancelled ? `<button onclick="LineSheet.restoreEntry()">↩ Put it back</button>` : ''}
       <button class="ghost" onclick="LineSheet.close()">Close</button></div>
     <div class="err" id="ls-err"></div>`;
+    wireProjCombo();
+  }
+  // Project autocomplete: type to filter, tap to choose, ▾ shows them all. Plain divs, so it
+  // works on the iPhone (a <datalist> does not) and the list is readable with one thumb.
+  function wireProjCombo() {
+    const inp = g('ls-proj'), menu = g('ls-proj-menu'); if (!inp || !menu || inp.disabled) return;
+    const caret = menu.parentNode.querySelector('.caret');
+    let hi = -1, shown = [];
+    const all = () => (REFS.analytic || []);
+    const hide = () => { menu.hidden = true; hi = -1; };
+    function show(list) {
+      shown = list.slice(0, 60);
+      menu.innerHTML = shown.length
+        ? shown.map((x, i) => `<div data-i="${i}" class="${i === hi ? 'on' : ''}">${esc(x.name)}</div>`).join('')
+        : '<div class="none">no project matches</div>';
+      menu.hidden = false;
+      menu.querySelectorAll('div[data-i]').forEach(d => {
+        d.onmousedown = e => e.preventDefault();                 // keep the focus, let the click land
+        d.onclick = () => pick(shown[+d.dataset.i]);
+      });
+    }
+    function filter() {
+      const q = inp.value.trim().toLowerCase();
+      show(!q ? all() : all().filter(x => x.name.toLowerCase().includes(q)));
+    }
+    function pick(x) { if (!x) return; inp.value = x.name; hide(); projChanged(); }
+    inp.oninput = () => { filter(); projChanged(); };
+    inp.onfocus = () => filter();
+    inp.onblur = () => setTimeout(hide, 180);
+    inp.onkeydown = e => {
+      if (menu.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return filter();
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        hi = Math.max(0, Math.min(shown.length - 1, hi + (e.key === 'ArrowDown' ? 1 : -1)));
+        show(shown); menu.children[hi] && menu.children[hi].scrollIntoView({ block: 'nearest' }); e.preventDefault();
+      } else if (e.key === 'Enter') { if (!menu.hidden && hi >= 0) { pick(shown[hi]); e.preventDefault(); } }
+      else if (e.key === 'Escape') hide();
+    };
+    if (caret) caret.onclick = () => { if (menu.hidden) { inp.focus(); filter(); } else hide(); };
   }
   function projChanged() {
     const name = g('ls-proj').value.trim();
@@ -175,9 +222,32 @@
       try { S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`); if (S.onChange) await S.onChange(); } catch {}
     }
   }
+  // Cancel an entry (Mario, 2026-09-24): the line leaves the ledger and the balance but the paper,
+  // the photo and the chat message stay — nothing is deleted, and "put it back" undoes it.
+  // A line already in Odoo cannot be cancelled here: that entry is deleted in Odoo.
+  async function cancelEntry() {
+    if (!S) return;
+    if (S.t.bookedMove) { g('ls-err').textContent = 'this one is already in Odoo — delete it there first'; return; }
+    if (!confirm('Cancel this entry? It comes off the ledger and out of the balance. The photo stays.')) return;
+    try {
+      await A.api('PATCH', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`, { excluded: true, review: false, waAccepted: false });
+      S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`);
+      if (S.onChange) { try { await S.onChange(); } catch {} }
+      draw(); const ok = g('ls-err'); if (ok) { ok.style.color = '#3fb950'; ok.textContent = 'cancelled — off the ledger'; }
+    } catch (e) { g('ls-err').textContent = e.message; }
+  }
+  async function restoreEntry() {
+    if (!S) return;
+    try {
+      await A.api('PATCH', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`, { review: true });
+      S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`);
+      if (S.onChange) { try { await S.onChange(); } catch {} }
+      draw(); const ok = g('ls-err'); if (ok) { ok.style.color = '#3fb950'; ok.textContent = 'back as a proposal — waiting for your ✓'; }
+    } catch (e) { g('ls-err').textContent = e.message; }
+  }
   async function hold() {
     try { await A.api('PATCH', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`, { waAccepted: false }); S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`); if (S.onChange) await S.onChange(); draw(); }
     catch (e) { g('ls-err').textContent = e.message; }
   }
-  window.LineSheet = { open, close, draw, save, hold, projChanged, get S() { return S; } };
+  window.LineSheet = { open, close, draw, save, hold, cancelEntry, restoreEntry, projChanged, get S() { return S; } };
 })();
