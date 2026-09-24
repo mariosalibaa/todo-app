@@ -201,12 +201,23 @@ function drawList() {
       <div class="t">${whenLabel(t.last)}${t.kind === 'general' ? '<span class="pin">📌</span>' : ''}</div>
     </div>`).join('') || '<div class="empty">No chat matches</div>';
 }
+// the chat and the ledger are two views of the same money: Mario's chat is Mario cash, a worker's chat is his own
+// (Mario, 2026-09-25: "allow to open accounts from here")
+const ledgerOf = t => t.kind === 'general' ? 'mario-cash' : t.id;
 function drawChatBar() {
   const t = threads.find(x => x.id === cur); if (!t) { el('chatbar').innerHTML = ''; return; }
-  el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'}</div></div>`;
+  el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'} · <a href="/accounting/accounts?id=${encodeURIComponent(ledgerOf(t))}" target="_blank" rel="noopener" title="Open this cash ledger">ledger ↗</a></div></div>`;
 }
 function showList() { document.body.classList.remove('in-chat'); history.replaceState(null, '', location.pathname); }
-function open_(id) { pinned = true; cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts(); loadDay(); }
+function open_(id, wantPost) { pinned = true; cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts().then(() => wantPost && jumpTo(wantPost)); loadDay(); }
+// a link from the accounts grid names one message: scroll to it and flash it
+function jumpTo(postId) {
+  const box = document.querySelector('.post[data-id="' + (window.CSS && CSS.escape ? CSS.escape(postId) : postId) + '"]');
+  if (!box) return;
+  pinned = false;
+  box.scrollIntoView({ block: 'center' });
+  try { box.animate([{ background: 'rgba(242,169,59,.45)' }, { background: 'transparent' }], { duration: 2200 }); } catch {}
+}
 
 // ── attendance: Start / Finish with location (part 2) ─────────────────────────
 let day = null;
@@ -383,7 +394,7 @@ function lineTag(p) {
     ['Amount', esc(amount)],
     ['Account', esc(accName(L.accountId)) + (bal ? ` <span class="q">balance ${bal.balance.toFixed(2)}</span>` : '')],
     ['Partner', esc(L.partnerName || '') || miss],
-    ['Company', (esc(L.company || '') || miss) + (L.official ? ' <span class="q">official · VAT</span>' : '')],
+    ['Company', (esc(Admin.coShort(L.company || '')) || miss) + (L.official ? ' <span class="q">official · VAT</span>' : '')],
     ['Project', esc(L.analyticName || '') || miss],
     ['Division', esc(sectionName(L.section)) || (isAjaltoun(L) ? miss : '<span class="q">—</span>')],
     ...(L.extras || []).map(x => ['+ ' + esc((x.description || '').split(' · ')[0]), `${Math.abs(x.amount).toFixed(2)} ${cur}${x.booked ? ' <span class="q">in Odoo ✓✓</span>' : ''}`]),
@@ -620,8 +631,8 @@ Admin.require('site', async m => {
   el('who').innerHTML = el('whofoot').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   document.body.classList.add('has-composer');
   await loadThreads();
-  const h = location.hash.slice(1);
-  if (h && threads.some(t => t.id === h)) open_(h);
+  const [h, want] = decodeURIComponent(location.hash.slice(1)).split('/');
+  if (h && threads.some(t => t.id === h)) open_(h, want);
   else if (innerWidth > 800 && threads[0]) open_(threads[0].id);
 });
 </script></body></html>

@@ -961,10 +961,14 @@ const handler = async (req, res) => {
   // No key configured = nothing opens.
   const machineKey = process.env.ACCOUNTING_API_KEY;
   const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const machine = !!machineKey && bearer.length >= 32 && bearer === machineKey && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest');
+  const keyed = !!machineKey && bearer.length >= 32 && bearer === machineKey;
+  // the laptop forwarding a WhatsApp message into Shift WhatsApp carries the same key (Mario, 2026-09-25:
+  // "allow to forward to shift whatsapp accounts") — that door writes chat posts, so it goes in as an admin
+  const machineSite = keyed && url.startsWith('/api/site/');
+  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite);
 
   // All API endpoints require auth
-  const user = machine ? { uid: 'whish-watcher', email: 'whish-watcher@shift-group.co' } : await verifyToken(req);
+  const user = machine ? { uid: machineSite ? 'wa-archive' : 'whish-watcher', email: machineSite ? 'archive@shift-group.co' : 'whish-watcher@shift-group.co' } : await verifyToken(req);
   if (!user) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -976,7 +980,7 @@ const handler = async (req, res) => {
   // Allowlist gate: a valid Google/session token is not enough — the email
   // must be approved. (Local mode's synthetic user gets everything.)
   const access = machine
-    ? { email: user.email, apps: ['accounting'], admin: false }
+    ? (machineSite ? { email: user.email, apps: ['site'], admin: true } : { email: user.email, apps: ['accounting'], admin: false })
     : AUTH_DISABLED
       ? { email: user.email || '', apps: APPS.slice(), admin: true }
       : await accessFor(user.email);

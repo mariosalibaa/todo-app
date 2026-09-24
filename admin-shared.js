@@ -229,6 +229,17 @@
 
   A.esc = esc;
 
+  // The Odoo company names are long and the columns are narrow, so the screen says what Mario says:
+  // SHIFT GROUP SARL (USD) → S SARL (2026-09-25). Only the label — the stored value stays the Odoo name.
+  const CO_SHORT = {
+    'SHIFT GROUP SARL (USD)': 'S SARL',
+    'SHIFT GROUP SARL': 'S SARL',
+    'SHIFT GROUP SARL (LBP)': 'S SARL LBP',
+    'SHIFT DEVELOPMENT': 'S DEV',
+    'SHIFT GROUP OFFSHORE SAL': 'S OFFSHORE',
+  };
+  A.coShort = n => CO_SHORT[String(n == null ? '' : n).trim()] || n || '';
+
   // Dictate (a spoken/typed note → a form's fields) lives in /dictate.js so todo.html, which has its own
   // Firebase + apiCall, can use it too; this is the shortcut for the pages signed in through here.
   A.dictate = function (opts) { return window.Dictate ? window.Dictate({ api: A.api, ...opts }) : null; };
