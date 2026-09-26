@@ -194,10 +194,19 @@
   };
   A.viewAsBar = function () {
     const me = A.me || {};
-    if (!me.admin && !me.viewAs) return;
+    const apps = me.apps || [];
+    const here = location.pathname.replace(/\/+$/, '') || '/';
+    // WhatsApp within reach of every page (Mario, 2026-09-26: "allow to launch whatsapp from here"):
+    // the hub's own chats, and the phone archive (admin only — the relay refuses anyone else).
+    const waLauncher = [
+      { href: '/accounting/accounts', label: '▦ Accounts', title: 'The cash and bank ledgers', ok: apps.includes('accounting') },
+      { href: '/site', label: '⚑ Shift WhatsApp', title: 'The hub chats: Mario, and each worker', ok: apps.includes('site') || me.admin },
+      { href: '/whatsapp', label: '💬 WhatsApp archive', title: 'The phone archive, 2013 → today (both lines)', ok: me.admin },
+    ].filter(x => x.ok && !here.startsWith(x.href));
+    if (!me.admin && !me.viewAs && !waLauncher.length) return;
     const old = document.getElementById('view-as-bar'); if (old) old.remove();
     const people = (me.people || []).filter(x => x.email !== me.viewedBy);
-    if (!me.viewAs && !people.length) return;
+    if (!me.viewAs && !people.length && !waLauncher.length) return;
     const bar = document.createElement('div');
     bar.id = 'view-as-bar';
     bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:1400;display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 12px;font:inherit;font-size:.8rem;background:' + (me.viewAs ? '#8a5a00' : 'transparent') + ';color:' + (me.viewAs ? '#fff' : 'inherit') + ';pointer-events:none;';
@@ -217,7 +226,14 @@
       sel.onchange = () => sel.value && A.viewAs(sel.value);
       box.append(sel);
     }
-    bar.append(box);
+    // the launchers sit next to the view-as control, in the same pill row
+    for (const x of waLauncher) {
+      const a = document.createElement('a');
+      a.href = x.href; a.title = x.title; a.textContent = x.label;
+      a.style.cssText = 'pointer-events:auto;text-decoration:none;font-size:.78rem;padding:4px 10px;border-radius:999px;background:' + (me.viewAs ? 'rgba(255,255,255,.18)' : 'rgba(0,0,0,.06)') + ';color:inherit;';
+      bar.append(a);
+    }
+    if (people.length || me.viewAs) bar.append(box);
     document.body.append(bar);
   };
   // Gate a page: app = 'todo' | 'accounting' | null (hub: any approved account)
