@@ -55,8 +55,10 @@
   @media (max-width:640px){
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
     .wide{display:none;} .hint{display:block;}
-    body.t-all .fl{display:none;} body.t-all .sh{display:inline;} body.t-all td small{display:none;} body.t-all .unit{display:block;}
-    body.t-all table{font-size:.7rem;} body.t-all th{padding:6px 2px;font-size:.5rem;letter-spacing:0;} body.t-all td{padding:7px 2px;}
+    /* Mario 2026-09-26: kWh on the phone too — a smaller font instead of MWh */
+    body.t-all td small{display:none;}
+    body.t-all table{font-size:.6rem;letter-spacing:-.01em;} body.t-all th{padding:6px 1px;font-size:.46rem;letter-spacing:0;} body.t-all td{padding:7px 1px;}
+    body.t-all td:first-child,body.t-all th:first-child{padding-left:6px;} body.t-all td:last-child,body.t-all th:last-child{padding-right:6px;}
     table{font-size:.74rem;} th{padding:7px 4px;font-size:.56rem;} td{padding:7px 4px;}
     td:first-child,th:first-child{padding-left:10px;} td:last-child,th:last-child{padding-right:10px;}
   }
@@ -82,7 +84,7 @@
   <div id="ptr">↓ Pull to refresh</div>
   <div id="msg">Loading…</div>
   <div class="card"><table id="tbl"></table></div>
-  <p class="hint muted small"><span class="unit">On the phone the month-by-month table is in MWh (thousands of kWh). </span>Tap a month for the detail.</p>
+  <p class="hint muted small">Tap a month for the detail.</p>
   <div class="note" id="notes"></div>
 </main>
 <script>
