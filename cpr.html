@@ -196,8 +196,17 @@ const pct = (a, b) => (a && b ? Math.round((b - a) / a * 100) : null);
 // each tab: columns (phone = the ones without wide) + the detail line a tapped row opens
 const VIEWS = {
   all: {
-    head: ['School', 'Church', ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', 'Gen', ['Supply', '', 'sum']],
-    row: m => { const s = VIEWS.sup.row(m); return [mv(m, 'school'), mv(m, 'church'), sumv(m, ['liqaa', 'hotel']), [sumv(m, ['school', 'church', 'liqaa', 'hotel']), 'sum'], [s[0], 'gs'], s[1], s[2], [s[5][0], 'sum']]; },
+    // Mario 2026-09-26: here the church is only what we supply (church − the church generator, which the church pays);
+    // so the generator column leaves the church generator out too, and the two totals stay comparable
+    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum']],
+    row: m => {
+      const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
+      const church = co == null ? { v: null } : { v: co, est: ch.est };
+      const bld = sumv(m, ['school', 'liqaa', 'hotel']); if (bld.v != null && co != null) bld.v += co;
+      const gen = sumv(m, ['genBig', 'genSmall']);
+      const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
+      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [s[0], 'gs'], s[1], gen, [sup, 'sum']];
+    },
     det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m),
   },
   bld: {
