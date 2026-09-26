@@ -47,7 +47,7 @@
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
   #msg .warn{color:var(--amber);}
   /* the phone: every table fits the width — the extra columns go into the line a row opens when tapped */
-  .wide{} .hint{display:none;}
+  .wide{} .hint{display:none;} .adm{display:none;} body.admin .adm{display:inline;}
   @media (max-width:640px){
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
     .wide{display:none;} .hint{display:block;}
@@ -62,7 +62,7 @@
 </header>
 <main>
   <h1>CPR — energy per month</h1>
-  <p class="lead">kWh per calendar month, Beirut time. Buildings and generators from the Metrel meters on site, solar and the EDL net metering from the three Deye inverters. <span class="est">≈</span> = a logger was offline part of that month (estimated).</p>
+  <p class="lead">kWh per calendar month, Beirut time. Buildings and generators from the Metrel meters on site, solar and the EDL net metering from the three Deye inverters.<span class="adm"> <span class="est">≈</span> = a logger was offline part of that month (estimated) — admin only.</span></p>
   <div class="tabs" id="tabs"></div>
   <div class="bar">
     <select id="range" onchange="render()"></select>
@@ -83,7 +83,12 @@ const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-const TABS = [['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye'], ['dsl', 'Diesel']];
+const TABS = [['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
+// Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
+// Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
+// them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
+let ADMIN = false;
+fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { ADMIN = !!(me && me.admin); document.body.classList.toggle('admin', ADMIN); if (M) render(); }).catch(() => {});
 let D = null, M = null, tab = store.get('cpr.tab') || 'bld', open = new Set();
 
 async function load(fresh) {
@@ -146,8 +151,8 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
 const edlOf = m => m < EDL_OK && dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn'), note: 'Deye' } : mv(m, 'edl');
-const cell = (x, cls = '') => x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
-  : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + f0(x.v) + '</span>' : f0(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`;
+const cell = (x0, cls = '') => { const x = ADMIN ? x0 : { ...x0, est: false, note: /missing/.test(x0.note || '') ? '' : x0.note }; return x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
+  : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + f0(x.v) + '</span>' : f0(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`; };
 // share of the month's total (Mario 2026-09-26: "% of each building out of the total consumption")
 // Mario 2026-09-26: the church pays the church generator itself — what we supply is the church minus that generator
 const churchOurs = m => { const c = mv(m, 'church').v, g = mv(m, 'genChurch').v; return c == null ? null : Math.max(0, c - (g || 0)); };
@@ -191,7 +196,8 @@ const VIEWS = {
 };
 
 function render() {
-  document.getElementById('tabs').innerHTML = TABS.map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
+  if (!ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'bld';
+  document.getElementById('tabs').innerHTML = TABS.filter(t => ADMIN || !t[2]).map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
   document.getElementById('set').innerHTML = tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty.</span>`
     : '';
@@ -212,7 +218,8 @@ function render() {
   const notes = (D.notes || []).slice();
   if (tab === 'cmp' || tab === 'sup') notes.unshift('The EDL meter was wired wrong until April 2026: phase B current transformer reversed (its power read negative), phase C on the wrong voltage — so it counted only about half of what came from EDL. Supply uses Deye for EDL until April 2026; Meters vs Deye still shows the raw meter.');
   if (tab === 'cmp' || tab === 'sup') notes.unshift('Deye (the three inverters, 3 × 50 kW): solar, the generator input, the grid input (EDL) and what goes back to EDL under net metering, the UPS load. From Feb 2026 Deye keeps solar and generator apart; before that its "production" mixes them.');
-  document.getElementById('notes').innerHTML = '<b>About these figures</b><ul>' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
+  document.getElementById('notes').style.display = ADMIN ? '' : 'none';
+  document.getElementById('notes').innerHTML = '<b>About these figures · admin</b><ul>' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
 }
 function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
 function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }
