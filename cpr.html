@@ -30,7 +30,7 @@
   td.sum,th.sum{color:var(--amber);font-weight:600;background:rgba(242,169,59,.06);}
   td .est{color:var(--sub);font-style:italic;}
   td .none{color:var(--overlay0);font-size:.72rem;}
-  td small.pc{color:var(--sub);}
+  td small.pc{color:var(--sub);} td small.ours{color:var(--amber);}
   td small,th small{display:block;color:var(--overlay0);font-size:.64rem;font-weight:400;text-transform:none;letter-spacing:0;}
   td .pair{display:block;} td .d{font-size:.66rem;color:var(--overlay0);} td .d.big{color:var(--amber);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
@@ -137,8 +137,10 @@ function mv(m, key) {
 const sumv = (m, keys) => { const xs = keys.map(k => mv(m, k)); const have = xs.filter(x => x.v != null); return have.length ? { v: have.reduce((s, x) => s + x.v, 0), est: have.some(x => x.est) } : { v: null }; };
 const dv = (m, f) => { const o = M.by[m].d; return o.n ? o[f] : null; };
 const cell = (x, cls = '') => x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
-  : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + f0(x.v) + '</span>' : f0(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`;
+  : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + f0(x.v) + '</span>' : f0(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`;
 // share of the month's total (Mario 2026-09-26: "% of each building out of the total consumption")
+// Mario 2026-09-26: the church pays the church generator itself — what we supply is the church minus that generator
+const churchOurs = m => { const c = mv(m, 'church').v, g = mv(m, 'genChurch').v; return c == null ? null : Math.max(0, c - (g || 0)); };
 const share = (xs, t) => xs.map(x => { const [v, c] = Array.isArray(x) ? x : [x, '']; const o = t && v.v != null ? { ...v, pct: v.v / t * 100 } : v; return c ? [o, c] : o; });
 const num = (v, cls = '') => v == null ? `<td class="${cls}"><span class="none">—</span></td>` : `<td class="${cls}">${f0(v)}</td>`;
 const monthCell = m => `<td>${mLabel(m)}${m === today().slice(0, 7) ? `<small>to ${+today().slice(8)} ${MON[+today().slice(5, 7) - 1]}</small>` : ''}</td>`;
@@ -149,9 +151,9 @@ const VIEWS = {
   bld: {
     head: ['School', 'Church', ['Kamal', 'Liqaa + Hotel'], ['Liqaa', '', 'wide'], ['Hotel', '', 'wide'], ['Total', '', 'sum']],
     row: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']);
-      return [...share([mv(m, 'school'), mv(m, 'church'), sumv(m, ['liqaa', 'hotel']), [mv(m, 'liqaa'), 'wide'], [mv(m, 'hotel'), 'wide']], t.v), [t, 'sum']]; },
+      return [...share([mv(m, 'school'), { ...mv(m, 'church'), ours: churchOurs(m) }, sumv(m, ['liqaa', 'hotel']), [mv(m, 'liqaa'), 'wide'], [mv(m, 'hotel'), 'wide']], t.v), [t, 'sum']]; },
     pct: true,
-    det: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, p = k => t ? ' (' + (mv(m, k).v / t * 100).toFixed(0) + ' %)' : ''; return `Liqaa <b>${f0(mv(m, 'liqaa').v)}</b>${p('liqaa')} · Hotel <b>${f0(mv(m, 'hotel').v)}</b>${p('hotel')} kWh — together Kamal's <b>${f0(sumv(m, ['liqaa', 'hotel']).v)}</b>`; },
+    det: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, p = k => t ? ' (' + (mv(m, k).v / t * 100).toFixed(0) + ' %)' : ''; return `Church <b>${f0(mv(m, 'church').v)}</b> − its generator <b>${f0(mv(m, 'genChurch').v)}</b> = <b>${f0(churchOurs(m))}</b> kWh from us · Liqaa <b>${f0(mv(m, 'liqaa').v)}</b>${p('liqaa')} · Hotel <b>${f0(mv(m, 'hotel').v)}</b>${p('hotel')} kWh — together Kamal's <b>${f0(sumv(m, ['liqaa', 'hotel']).v)}</b>`; },
   },
   sup: {
     head: ['Solar', 'EDL', ['Gen', 'meters'], ['Gen church', '', 'wide'], ['Gen big', '', 'wide'], ['Total', '', 'sum'], ['Sold', 'to EDL']],
@@ -195,7 +197,7 @@ function render() {
     }).join('');
     return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` : '');
   }).join('');
-  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && h[2] === 'wide' ? 'wide' : ''}">${tot[i].any ? f0(tot[i].v) : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
+  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && h[2] === 'wide' ? 'wide' : ''}">${tot[i].any ? f0(tot[i].v) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
   document.getElementById('tbl').innerHTML = `<thead><tr><th>Month</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
   const notes = (D.notes || []).slice();
   if (tab === 'cmp' || tab === 'sup') notes.unshift('Deye (the three inverters, 3 × 50 kW): solar, the generator input, the grid input (EDL) and what goes back to EDL under net metering, the UPS load. From Feb 2026 Deye keeps solar and generator apart; before that its "production" mixes them.');
