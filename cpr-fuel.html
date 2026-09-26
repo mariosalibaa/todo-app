@@ -20,7 +20,15 @@
   form{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px;display:grid;gap:12px;}
   label{display:grid;gap:5px;font-size:.78rem;color:var(--sub);}
   input,select,textarea{background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:11px 12px;font-size:1rem;font-family:inherit;width:100%;}
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;} .two > label{min-width:0;}
+  input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;height:46px;line-height:22px;text-align:left;}
+  input[type=date]::-webkit-date-and-time-value{text-align:left;}
+  #read{font-size:.8rem;color:var(--amber);min-height:1em;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;overflow:hidden;}
+  th{font-size:.58rem;letter-spacing:.06em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px 5px;border-bottom:1px solid var(--surface0);}
+  td{padding:8px 5px;border-bottom:1px solid var(--surface0);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;padding-left:10px;} th:last-child,td:last-child{padding-right:10px;}
+  td.k{color:var(--amber);font-weight:600;} th small{display:block;text-transform:none;letter-spacing:0;font-weight:400;}
   .photo{display:flex;gap:10px;align-items:center;}
   .photo button{flex:1;}
   button{cursor:pointer;background:var(--surface0);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:12px;font-size:.95rem;font-family:inherit;}
@@ -59,6 +67,7 @@
     </div>
     <input type="file" id="cam" accept="image/*" capture="environment" hidden onchange="got(this.files[0])">
     <input type="file" id="gal" accept="image/*,application/pdf" hidden onchange="got(this.files[0])">
+    <div id="read"></div>
     <div class="two">
       <label>Date <input type="date" id="date" required></label>
       <label>Generator <select id="gen"></select></label>
@@ -71,6 +80,8 @@
     <button class="go" id="go">Save the fill</button>
     <div id="msg"></div>
   </form>
+  <h2>By month</h2>
+  <div id="months"></div>
   <h2>Fills</h2>
   <div class="tot" id="tot"></div>
   <div id="list"></div>
@@ -107,6 +118,22 @@ async function got(file) {
   const t = document.getElementById('thumb');
   if (/^image\//.test(blob.type || 'image/jpeg')) { t.src = URL.createObjectURL(blob); t.style.display = 'block'; } else t.style.display = 'none';
   document.getElementById('cam').value = ''; document.getElementById('gal').value = '';
+  readBill();
+}
+// Mario 2026-09-26: "allow to read the image" — Claude reads the bill; only empty boxes are filled, Kamal checks and saves
+async function readBill() {
+  const rd = document.getElementById('read');
+  if (!blob || /pdf$/.test(blob.type || '')) { rd.textContent = ''; return; }
+  rd.textContent = 'Reading the bill…';
+  try {
+    const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+    const x = await api('POST', '/api/cpr/fuel/read', { dataBase64: b64, mime: blob.type || 'image/jpeg' });
+    const set = (id, v) => { const el = document.getElementById(id); if (v != null && v !== '' && (!el.value || el.value === '0')) el.value = v; };
+    set('litres', x.litres); set('usd', x.usd); set('note', x.note);
+    if (x.date) document.getElementById('date').value = x.date;
+    if (x.gen) document.getElementById('gen').value = x.gen;
+    rd.textContent = (x.litres || x.usd) ? '✓ Read from the photo — check the boxes before saving.' : 'Could not read the figures — type them in.';
+  } catch (e) { if (!e.quiet) rd.textContent = 'Could not read the photo (' + e.message + ') — type the figures in.'; }
 }
 
 async function send(e) {
@@ -124,7 +151,7 @@ async function send(e) {
     }
     await api('POST', '/api/cpr/fuel', { date: document.getElementById('date').value, gen: document.getElementById('gen').value, litres, usd, note: document.getElementById('note').value, ...file });
     msg.className = 'ok'; msg.textContent = '✓ Saved';
-    blob = null; document.getElementById('thumb').style.display = 'none';
+    blob = null; document.getElementById('thumb').style.display = 'none'; document.getElementById('read').textContent = '';
     for (const id of ['litres', 'usd', 'note']) document.getElementById(id).value = '';
     load();
   } catch (err) { msg.className = 'err'; msg.textContent = err.message; }
@@ -138,6 +165,7 @@ async function load() {
     const sel = document.getElementById('gen'); if (!sel.options.length) sel.innerHTML = Object.entries(GENS).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
     const L = d.list.reduce((s, x) => s + (x.litres || 0), 0), U = d.list.reduce((s, x) => s + (x.usd || 0), 0);
     document.getElementById('tot').textContent = d.list.length ? `${d.list.length} fill${d.list.length > 1 ? 's' : ''} · ${f2(L)} L · $${f2(U)}` : 'No fill yet.';
+    monthTable(d.list);
     document.getElementById('list').innerHTML = d.list.map(x => {
       const img = x.file ? (/pdf$/.test(x.file.mime) ? `<a class="ph" href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank">📄</a>` : `<a href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank"><img loading="lazy" src="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" alt=""></a>`) : '<div class="ph">—</div>';
       const per = x.litres && x.usd ? ` · $${f2(x.usd / x.litres)}/L` : '';
@@ -145,6 +173,17 @@ async function load() {
         <div class="v">${x.litres ? f2(x.litres) + ' L' : ''}<b>${x.usd ? '$' + f2(x.usd) : ''}</b>${ADMIN ? `<button class="del" onclick="del('${x.id}')">delete</button>` : ''}</div></div>`;
     }).join('');
   } catch (e) { if (e.quiet) return; document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
+}
+// Mario 2026-09-26: the quantities and prices by month, against the kWh the generators produced (meters, /api/cpr)
+let GENKWH = null;
+async function monthTable(list) {
+  if (!GENKWH) { try { const d = await (await fetch('/api/cpr')).json(); GENKWH = {}; d.days.forEach((day, i) => { const m = day.slice(0, 7); let s = 0; for (const k of ['genBig', 'genChurch', 'genSmall']) { const v = d.data[k] && d.data[k][i]; if (v) s += v[0]; } GENKWH[m] = (GENKWH[m] || 0) + s; }); } catch (e) { GENKWH = {}; } }
+  const by = {};
+  for (const x of list) { const m = x.date.slice(0, 7); const o = by[m] || (by[m] = { n: 0, l: 0, usd: 0, lp: 0, up: 0 }); o.n++; o.l += x.litres || 0; o.usd += x.usd || 0; if (x.litres && x.usd) { o.lp += x.litres; o.up += x.usd; } }
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const rows = Object.keys(by).sort().reverse().map(m => { const o = by[m], kwh = GENKWH[m];
+    return `<tr><td>${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}</td><td>${o.n}</td><td>${f2(o.l)}</td><td>${o.usd ? '$' + f2(o.usd) : ''}</td><td>${o.lp ? '$' + (o.up / o.lp).toFixed(2) : ''}</td><td>${kwh != null ? Math.round(kwh).toLocaleString('en-US') : '—'}</td><td class="k">${kwh && o.l ? (kwh / o.l).toFixed(2) : '—'}</td></tr>`; }).join('');
+  document.getElementById('months').innerHTML = rows ? `<table><thead><tr><th>Month</th><th>Fills</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Gen kWh<small>meters</small></th><th>kWh / L</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tot">No fill yet.</div>';
 }
 async function del(id) { if (!confirm('Delete this fill and its photo?')) return; await api('DELETE', '/api/cpr/fuel/' + id); load(); }
 load();

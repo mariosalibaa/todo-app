@@ -52,6 +52,30 @@ async function handle(req, res, url, ctx) {
     await col.doc(id).set(doc);
     return json(res, 200, { ...doc, file: doc.file ? { name: doc.file.name, mime: doc.file.mime } : null });
   }
+  // read the bill (Mario 2026-09-26: "allow to read the image") — the page fills the boxes, Kamal checks and saves
+  if (p === '/api/cpr/fuel/read' && req.method === 'POST') {
+    const b = await readBody(req);
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json(res, 501, { error: 'no_api_key' });
+    const data = String(b.dataBase64 || '').replace(/^data:[^,]*,/, '');
+    const mime = /^image\/(jpeg|png|webp|gif)$/.test(b.mime || '') ? b.mime : 'image/jpeg';
+    if (!data) return json(res, 400, { error: 'no image' });
+    const today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+    const system = `You read a diesel (mazout) bill or a handwritten note for filling a generator in Lebanon. Today is ${today}. ` +
+      'Answer ONLY with JSON: {"litres": number|null, "usd": number|null, "date": "YYYY-MM-DD"|null, "gen": "big"|"church"|"small"|null, "note": string}. ' +
+      'usd = the total in US dollars (if only LBP is written, put null and the LBP total in note). litres = total litres. ' +
+      'gen from words like "Gen Big", "church", "small". note: the supplier and the price per litre if written, a few words. Unknown → null.';
+    const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, system,
+        messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data } }, { type: 'text', text: 'Read this bill.' }] }] }) });
+    const out = await r.json();
+    if (!r.ok) return json(res, 502, { error: 'Claude: ' + (out.error && out.error.message || r.status) });
+    const raw = (out.content || []).map(c => c.text || '').join(''); const mm = raw.match(/\{[\s\S]*\}/);
+    let f = {}; try { f = mm ? JSON.parse(mm[0]) : {}; } catch (e) {}
+    return json(res, 200, { litres: +f.litres > 0 ? +f.litres : null, usd: +f.usd > 0 ? +f.usd : null,
+      date: /^\d{4}-\d{2}-\d{2}$/.test(f.date || '') ? f.date : null, gen: GENS[f.gen] ? f.gen : null, note: String(f.note || '').slice(0, 200) });
+  }
   if ((m = /^\/api\/cpr\/fuel\/([\w-]+)\/file$/.exec(p)) && req.method === 'GET') {
     const d = await col.doc(m[1]).get();
     if (!d.exists || !d.data().file) { res.writeHead(404); res.end('not found'); return true; }
