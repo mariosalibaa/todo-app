@@ -229,15 +229,15 @@ const VIEWS = {
     det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL <b>${f0(edlOf(m).v)}</b> (${dv(m, 'gridIn') != null ? 'Deye' : 'meter'}; the EDL meter read <b>${f0(mv(m, 'edl').v)}</b>) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
   cmp: {
-    head: [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Load', 'SD · openHAB · Deye']],
+    head: [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Buildings', 'SD · openHAB']],
     row: m => {
       const tri = (keys, deyeV) => {
         const sd = srcv(m, 'sd', keys), oh = srcv(m, 'oh', keys);
         const xs = [sd.v, oh.v, deyeV].filter(v => v != null && v > 0); const spread = xs.length > 1 ? (Math.max(...xs) - Math.min(...xs)) / Math.min(...xs) : 0;
         const line = (lab, x, part) => `<span class="tri"><i>${lab}</i>${x == null ? '—' : f0(x)}${part ? '<i> part</i>' : ''}</span>`;
-        return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${line('Deye', deyeV)}</span>` };
+        return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${deyeV === undefined ? '' : line('Deye', deyeV)}</span>` };
       };
-      return [tri(['edl'], dv(m, 'gridIn')), tri(['genChurch', 'genBig', 'genSmall'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], dv(m, 'use'))];
+      return [tri(['edl'], dv(m, 'gridIn')), tri(['genChurch', 'genBig', 'genSmall'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], undefined) /* no Deye: its load is no measure of the buildings, which also take EDL / generator directly (Mario 2026-09-26) */];
     },
     rowOld: m => {
       const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });

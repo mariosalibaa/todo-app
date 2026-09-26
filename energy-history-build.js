@@ -55,7 +55,11 @@ const SPEC = {
   edl: [seg(T('2025-09-01T00:00:00Z'), END, ohLive('Meter8_EPImp'), sd('M8'))],
 };
 const build = pick => Object.fromEntries(Object.entries(SPEC).map(([k, sgs]) => [k, sgs.map(g => ({ from: g.from, to: g.to, pts: C.cleanPoints(pick(g), g.from, g.to) }))]));
-const SEGMENTS = build(g => [...g.o, ...g.s]);
+// Mario 2026-09-26: the SD card first, openHAB only where the SD card has nothing (before it starts, after it ends,
+// or across a gap of more than 6 h in it)
+const sdFirst = g => { if (!g.s.length) return g.o; const s = g.s.slice().sort((a, b) => a[0] - b[0]); const gaps = []; for (let i = 1; i < s.length; i++) if (s[i][0] - s[i - 1][0] > 6 * 3600e3) gaps.push([s[i - 1][0], s[i][0]]);
+  return [...s, ...g.o.filter(([t]) => t < s[0][0] || t > s[s.length - 1][0] || gaps.some(([a, b]) => t > a && t < b))]; };
+const SEGMENTS = build(sdFirst);
 const BY = { oh: build(g => g.o), sd: build(g => g.s) };
 
 const first = C.dayOf(Math.min(...Object.values(SEGMENTS).flat().filter(s => s.pts.length).map(s => s.pts[0][0])));
