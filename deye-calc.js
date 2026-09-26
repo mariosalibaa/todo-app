@@ -23,7 +23,7 @@ async function dayRecords(token, ymd) {
 
 // one day's records → { pv, gen, gridIn, gridOut, use, charge, discharge, n } in kWh
 function integrate(recs) {
-  const out = { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, charge: 0, discharge: 0, n: recs.length };
+  const out = { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, charge: 0, discharge: 0, n: recs.length, prod: 0 };
   if (!recs.length) return out;
   const steps = []; for (let i = 1; i < recs.length; i++) steps.push(recs[i].dateTime - recs[i - 1].dateTime);
   const step = steps.length ? steps.slice().sort((a, b) => a - b)[Math.floor(steps.length / 2)] : 300;   // the sampling step (median)
@@ -34,9 +34,12 @@ function integrate(recs) {
     out.gen += Math.max(0, w('generatorPower'));
     const g = w('wirePower'); if (g > 0) out.gridIn += g; else out.gridOut -= g;
     out.use += Math.max(0, w('usePower'));
+    out.prod += Math.max(0, w('generationPower'));   // Deye's "production" = solar + generator
     const b = w('batteryPower'); if (b > 0) out.discharge += b; else out.charge -= b;
   });
   for (const k of Object.keys(out)) if (k !== 'n') out[k] = Math.round(out[k] * 10) / 10;
+  // before Apr 2025 Deye recorded only the total (no pvPower / generatorPower): no split, not 0
+  if (!recs.some(r => r.pvPower != null || r.generatorPower != null)) { out.pv = null; out.gen = null; }
   return out;
 }
 

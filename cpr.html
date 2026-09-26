@@ -106,7 +106,7 @@ async function load(fresh) {
 // days → months. Meters: kWh + estimated flag + first day with data. Deye: kWh sums + days covered.
 function months() {
   const by = {};
-  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, n: 0 } });
+  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, n: 0, noSplit: 0 } });
   D.days.forEach((d, i) => {
     const o = mo(d.slice(0, 7));
     for (const b of D.buildings) {
@@ -119,7 +119,8 @@ function months() {
     D.deye.days.forEach((d, i) => {
       const v = D.deye.data[i]; if (!v) return;
       const o = mo(d.slice(0, 7)).d;
-      F.forEach((f, j) => { if (f in o && f !== 'n') o[f] += +v[j] || 0; });
+      F.forEach((f, j) => { if (f in o && f !== 'n' && f !== 'noSplit') o[f] += +v[j] || 0; });
+      if (v[F.indexOf('pv')] == null) o.noSplit++;   // Deye kept no solar / generator split that day (before Apr 2025, some short days)
       o.n++;
     });
   }
@@ -136,6 +137,13 @@ function mv(m, key) {
 }
 const sumv = (m, keys) => { const xs = keys.map(k => mv(m, k)); const have = xs.filter(x => x.v != null); return have.length ? { v: have.reduce((s, x) => s + x.v, 0), est: have.some(x => x.est) } : { v: null }; };
 const dv = (m, f) => { const o = M.by[m].d; return o.n ? o[f] : null; };
+// solar / generator from Deye: null when no day of the month has the split, ≈ when only some do
+const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) return { v: null }; return { v: o[f], est: o.noSplit > 0, note: o.noSplit ? o.noSplit + ' d missing' : '' }; };
+// The EDL meter was wired wrong until April 2026 (phase B current transformer reversed, phase C on the wrong
+// voltage — its kWh left out most of two phases; openHAB shows phase B negative up to Apr 2026, never after).
+// Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
+const EDL_OK = '2026-05';
+const edlOf = m => m < EDL_OK && dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn'), note: 'Deye' } : mv(m, 'edl');
 const cell = (x, cls = '') => x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
   : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + f0(x.v) + '</span>' : f0(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`;
 // share of the month's total (Mario 2026-09-26: "% of each building out of the total consumption")
@@ -158,17 +166,17 @@ const VIEWS = {
   sup: {
     head: ['Solar', 'EDL', ['Gen', 'meters'], ['Gen church', '', 'wide'], ['Gen big', '', 'wide'], ['Total', '', 'sum'], ['Sold', 'to EDL']],
     row: m => {
-      const gen = sumv(m, ['genChurch', 'genBig', 'genSmall']), edl = mv(m, 'edl'), pv = dv(m, 'pv');
-      const tot = (pv || 0) + (edl.v || 0) + (gen.v || 0);
-      return [{ v: pv }, edl, gen, [mv(m, 'genChurch'), 'wide'], [mv(m, 'genBig'), 'wide'], [{ v: tot || null, est: edl.est || gen.est }, 'sum'], { v: dv(m, 'gridOut') }];
+      const gen = sumv(m, ['genChurch', 'genBig', 'genSmall']), edl = edlOf(m), pv = dsplit(m, 'pv');
+      const tot = (pv.v || 0) + (edl.v || 0) + (gen.v || 0);
+      return [pv, edl, gen, [mv(m, 'genChurch'), 'wide'], [mv(m, 'genBig'), 'wide'], [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }];
     },
-    det: m => `Solar <b>${f0(dv(m, 'pv'))}</b> (Deye) · EDL <b>${f0(mv(m, 'edl').v)}</b> (meter) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
+    det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL <b>${f0(edlOf(m).v)}</b> (${m < EDL_OK ? 'Deye — the EDL meter read ~half until Apr 2026' : 'meter'}) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
   cmp: {
     head: [['EDL', 'meter · Deye'], ['Generator', 'meters · Deye'], ['Load', 'buildings · Deye']],
     row: m => {
       const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });
-      return [pair(mv(m, 'edl').v, dv(m, 'gridIn')), pair(sumv(m, ['genChurch', 'genBig', 'genSmall']).v, dv(m, 'gen')), pair(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, dv(m, 'use'))];
+      return [pair(mv(m, 'edl').v, dv(m, 'gridIn')), pair(sumv(m, ['genChurch', 'genBig', 'genSmall']).v, dsplit(m, 'gen').v), pair(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, dv(m, 'use'))];
     },
     det: m => `EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
   },
@@ -200,6 +208,7 @@ function render() {
   const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && h[2] === 'wide' ? 'wide' : ''}">${tot[i].any ? f0(tot[i].v) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
   document.getElementById('tbl').innerHTML = `<thead><tr><th>Month</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
   const notes = (D.notes || []).slice();
+  if (tab === 'cmp' || tab === 'sup') notes.unshift('The EDL meter was wired wrong until April 2026: phase B current transformer reversed (its power read negative), phase C on the wrong voltage — so it counted only about half of what came from EDL. Supply uses Deye for EDL until April 2026; Meters vs Deye still shows the raw meter.');
   if (tab === 'cmp' || tab === 'sup') notes.unshift('Deye (the three inverters, 3 × 50 kW): solar, the generator input, the grid input (EDL) and what goes back to EDL under net metering, the UPS load. From Feb 2026 Deye keeps solar and generator apart; before that its "production" mixes them.');
   document.getElementById('notes').innerHTML = '<b>About these figures</b><ul>' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
 }
