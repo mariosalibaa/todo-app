@@ -6,7 +6,7 @@
 //   POST   /api/cpr/fuel                { date, gen, litres, usd, note, who, dataBase64?, mime?, name? }
 //   GET    /api/cpr/fuel/<id>/file      the photo
 //   DELETE /api/cpr/fuel/<id>           admin only
-// Who may: the 6-digit code (CPR_FUEL_KEY; Kamal types it once on /cpr → ⛽ Diesel fills, the browser keeps it;
+// Who may: anyone with the /cpr link (no code since 2026-09-26); DELETE = hub admin. The 6-digit code (CPR_FUEL_KEY)
 // sent as ?k= or x-cpr-key) or a hub admin. A wrong code waits 2 s, so guessing six digits is slow.
 
 const files = require('./hub-files');
@@ -25,7 +25,9 @@ async function handle(req, res, url, ctx) {
   const q = new URL(req.url, 'http://x').searchParams;
   const key = q.get('k') || req.headers['x-cpr-key'] || '';
   const keyOk = !!process.env.CPR_FUEL_KEY && key === process.env.CPR_FUEL_KEY;
-  if (!keyOk && !isAdmin) { if (key) await new Promise(r => setTimeout(r, 2000)); return json(res, 401, { error: key ? 'Wrong code.' : 'code', needCode: true }); }
+  // Mario 2026-09-26: "no need for diesel code" — anyone with the /cpr link may add and see fills; deleting stays admin.
+  // (the code check is kept behind CPR_FUEL_REQUIRE_CODE=1 in case it is wanted back)
+  if (process.env.CPR_FUEL_REQUIRE_CODE === '1' && !keyOk && !isAdmin) { if (key) await new Promise(r => setTimeout(r, 2000)); return json(res, 401, { error: key ? 'Wrong code.' : 'code', needCode: true }); }
   const col = db.collection('workspaces').doc(TEAM_ID).collection('cprFuel');
   const p = url.split('?')[0];
   let m;
