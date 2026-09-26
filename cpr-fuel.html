@@ -44,6 +44,10 @@
   .fill .v{text-align:right;font-variant-numeric:tabular-nums;} .fill .v b{display:block;color:var(--amber);}
   #viewAs{font-size:.76rem;padding:7px 10px;} #viewAs.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
   .adminbar{font-size:.74rem;color:var(--amber);margin:0 0 10px;}
+  table.fills td small{display:block;color:var(--overlay0);font-size:.66rem;white-space:normal;max-width:150px;}
+  table.fills .thumb{display:inline-block;width:40px;height:40px;border-radius:6px;overflow:hidden;background:var(--surface0);text-align:center;line-height:40px;text-decoration:none;}
+  table.fills .thumb img{width:40px;height:40px;object-fit:cover;display:block;}
+  table.fills .none{color:var(--overlay0);}
   .del{background:none;border:0;color:var(--overlay0);padding:4px;font-size:.8rem;}
   .tot{font-size:.8rem;color:var(--sub);margin:4px 0 10px;}
 </style>
@@ -178,12 +182,13 @@ async function load() {
     document.getElementById('tot').textContent = d.list.length ? `${d.list.length} fill${d.list.length > 1 ? 's' : ''} · ${f2(L)} L · $${f2(U)}` : 'No fill yet.';
     monthTable(d.list);
     document.getElementById('adminbar').textContent = ADMIN ? 'Admin: each fill has a delete button.' : '';
-    document.getElementById('list').innerHTML = d.list.map(x => {
-      const img = x.file ? (/pdf$/.test(x.file.mime) ? `<a class="ph" href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank">📄</a>` : `<a href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank"><img loading="lazy" src="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" alt=""></a>`) : '<div class="ph">—</div>';
-      const per = x.litres && x.usd ? ` · $${f2(x.usd / x.litres)}/L` : '';
-      return `<div class="fill">${img}<div><div class="t">${esc(x.date)} · ${esc(GENS[x.gen] || x.gen)}</div><div class="s">${esc(x.who)}${x.note ? ' · ' + esc(x.note) : ''}${per}</div></div>
-        <div class="v">${x.litres ? f2(x.litres) + ' L' : ''}<b>${x.usd ? '$' + f2(x.usd) : ''}</b>${ADMIN ? `<button class="del" onclick="del('${x.id}')">🗑 delete</button>` : ''}</div></div>`;
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const rows = d.list.map(x => {
+      const src = `/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}`;
+      const img = x.file ? (/pdf$/.test(x.file.mime) ? `<a class="thumb pdf" href="${src}" target="_blank">📄</a>` : `<a class="thumb" href="${src}" target="_blank"><img loading="lazy" src="${src}" alt=""></a>`) : '<span class="none">—</span>';
+      return `<tr><td>${+x.date.slice(8)} ${MON[+x.date.slice(5, 7) - 1]} ${x.date.slice(2, 4)}${x.note ? `<small>${esc(x.note)}</small>` : ''}</td><td>${x.litres ? f2(x.litres) : ''}</td><td>${x.usd ? '$' + f2(x.usd) : ''}</td><td>${x.litres && x.usd ? '$' + (x.usd / x.litres).toFixed(2) : ''}</td><td>${img}</td>${ADMIN ? `<td><button class="del" onclick="del('${x.id}')" title="Delete this fill">🗑</button></td>` : ''}</tr>`;
     }).join('');
+    document.getElementById('list').innerHTML = rows ? `<table class="fills"><thead><tr><th>Date</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Bill</th>${ADMIN ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table>` : '';
   } catch (e) { if (e.quiet) return; document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
 }
 // Mario 2026-09-26: the quantities and prices by month, against the kWh the generators produced (meters, /api/cpr)
