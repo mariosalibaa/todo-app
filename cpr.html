@@ -12,6 +12,7 @@
   html,body{background:var(--base);}
   body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);background:var(--base);}
+  #viewAs{font-size:.76rem;} #viewAs.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
   .hleft{display:flex;align-items:center;gap:14px;}
   .hback{color:var(--amber);text-decoration:none;font-size:.88rem;font-weight:600;white-space:nowrap;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;} .hback:hover{background:var(--surface0);}
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
@@ -62,6 +63,7 @@
 <body>
 <header>
   <div class="hleft"><a class="hback" href="/admin" onclick="if (history.length > 1 && document.referrer.startsWith(location.origin)) { history.back(); return false; }">‹ Back</a><div class="wordmark">SHIFT <span>GROUP</span><small>CPR · ENERGY</small></div></div>
+  <button id="viewAs" style="display:none" onclick="togglePublic()" title="See the page the way the public sees it — on this laptop and in the 📱 phone preview"></button>
 </header>
 <main>
   <h1>CPR — energy per month</h1>
@@ -91,8 +93,21 @@ const TABS = [['all', 'Month by month'], ['bld', 'Buildings'], ['sup', 'Supply']
 // Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
 // Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
 // them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
-let ADMIN = false;
-fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { ADMIN = !!(me && me.admin); document.body.classList.toggle('admin', ADMIN); if (M) render(); }).catch(() => {});
+let ADMIN = false, REAL_ADMIN = false;
+// "View as public" (admin only, top right): the page drops to what everyone sees; kept in localStorage so the 📱 preview follows
+function applyView() {
+  const asPublic = store.get('cpr.public') === '1';
+  ADMIN = REAL_ADMIN && !asPublic;
+  document.body.classList.toggle('admin', ADMIN);
+  const b = document.getElementById('viewAs');
+  b.style.display = REAL_ADMIN ? '' : 'none';
+  b.textContent = asPublic ? '👁 Public view — back to admin' : '👁 View as public';
+  b.classList.toggle('on', asPublic);
+  if (M) render();
+}
+function togglePublic() { store.set('cpr.public', store.get('cpr.public') === '1' ? '0' : '1'); applyView(); }
+addEventListener('storage', e => { if (e.key === 'cpr.public') applyView(); });   // the preview frame follows a switch made outside it
+fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { REAL_ADMIN = !!(me && me.admin); applyView(); }).catch(() => {});
 let D = null, M = null, tab = store.get('cpr.tab') || 'all', open = new Set();
 
 async function load(fresh) {
