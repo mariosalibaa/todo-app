@@ -46,6 +46,11 @@
 <main>
   <h1>Diesel for the generators</h1>
   <p class="lead">Each time a generator is filled: a photo of the bill, the litres and the amount in dollars.</p>
+  <form id="codef" onsubmit="setCode(event)" style="display:none">
+    <label>The diesel code (ask Mario) <input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="6 digits"></label>
+    <button class="go">Open</button>
+    <div id="codemsg" class="err"></div>
+  </form>
   <form id="f" onsubmit="send(event)">
     <div class="photo">
       <img id="thumb" alt="">
@@ -75,10 +80,14 @@
 // the link's key: kept in this browser after the first visit, so the page works from the home screen too
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const qk = new URLSearchParams(location.search).get('k'); if (qk) store.set('cpr.fuelKey', qk);
-const KEY = qk || store.get('cpr.fuelKey') || '';
+let KEY = qk || store.get('cpr.fuelKey') || '';
+// no code yet (or a wrong one): ask for it once, keep it in this browser
+function askCode(msg) { document.getElementById('f').style.display = 'none'; document.getElementById('codef').style.display = ''; document.getElementById('codemsg').textContent = msg || ''; document.getElementById('list').innerHTML = ''; document.getElementById('tot').textContent = ''; }
+function setCode(e) { e.preventDefault(); KEY = document.getElementById('code').value.trim(); store.set('cpr.fuelKey', KEY); document.getElementById('codef').style.display = 'none'; document.getElementById('f').style.display = ''; load(); }
 const api = async (method, path, body) => {
   const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(KEY), { method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
+  if (j.needCode) { askCode(KEY ? 'Wrong code.' : ''); throw Object.assign(new Error(''), { quiet: true }); }
   if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
   return j;
 };
@@ -135,7 +144,7 @@ async function load() {
       return `<div class="fill">${img}<div><div class="t">${esc(x.date)} · ${esc(GENS[x.gen] || x.gen)}</div><div class="s">${esc(x.who)}${x.note ? ' · ' + esc(x.note) : ''}${per}</div></div>
         <div class="v">${x.litres ? f2(x.litres) + ' L' : ''}<b>${x.usd ? '$' + f2(x.usd) : ''}</b>${ADMIN ? `<button class="del" onclick="del('${x.id}')">delete</button>` : ''}</div></div>`;
     }).join('');
-  } catch (e) { document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
+  } catch (e) { if (e.quiet) return; document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
 }
 async function del(id) { if (!confirm('Delete this fill and its photo?')) return; await api('DELETE', '/api/cpr/fuel/' + id); load(); }
 load();

@@ -6,7 +6,8 @@
 //   POST   /api/cpr/fuel                { date, gen, litres, usd, note, who, dataBase64?, mime?, name? }
 //   GET    /api/cpr/fuel/<id>/file      the photo
 //   DELETE /api/cpr/fuel/<id>           admin only
-// Who may: the private link's key (?k= or x-cpr-key = CPR_FUEL_KEY, the link Mario sends Kamal) or a hub admin.
+// Who may: the 6-digit code (CPR_FUEL_KEY; Kamal types it once on /cpr → ⛽ Diesel fills, the browser keeps it;
+// sent as ?k= or x-cpr-key) or a hub admin. A wrong code waits 2 s, so guessing six digits is slow.
 
 const files = require('./hub-files');
 const GENS = { big: 'Generator big', church: 'Generator church', small: 'Generator small', other: 'Other' };
@@ -24,7 +25,7 @@ async function handle(req, res, url, ctx) {
   const q = new URL(req.url, 'http://x').searchParams;
   const key = q.get('k') || req.headers['x-cpr-key'] || '';
   const keyOk = !!process.env.CPR_FUEL_KEY && key === process.env.CPR_FUEL_KEY;
-  if (!keyOk && !isAdmin) return json(res, 401, { error: 'This link needs its key — ask Mario for the diesel link.' });
+  if (!keyOk && !isAdmin) { if (key) await new Promise(r => setTimeout(r, 2000)); return json(res, 401, { error: key ? 'Wrong code.' : 'code', needCode: true }); }
   const col = db.collection('workspaces').doc(TEAM_ID).collection('cprFuel');
   const p = url.split('?')[0];
   let m;

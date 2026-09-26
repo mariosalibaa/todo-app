@@ -24,6 +24,7 @@
   .bar .sp{flex:1;}
   select,button,input{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:6px 10px;font-size:.8rem;font-family:inherit;}
   button{cursor:pointer;} button:hover{border-color:var(--amber);}
+  .fuelbtn{background:var(--mantle);color:var(--amber);border:1px solid var(--surface0);border-radius:7px;padding:6px 10px;font-size:.8rem;text-decoration:none;white-space:nowrap;} .fuelbtn:hover{border-color:var(--amber);}
   .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
   .tabs button{border-radius:999px;} .tabs button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
   .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;overflow:hidden;}
@@ -87,6 +88,7 @@
   <div class="bar">
     <select id="range" onchange="render()"></select>
     <span class="sp"></span>
+    <a href="/cpr/diesel" class="fuelbtn" title="Kamal: a photo of the bill, the litres and the dollars each time a generator is filled">⛽ Diesel fills</a>
     <button onclick="exportCsv()" title="The table shown, as a CSV">⬇ CSV</button>
     <button onclick="load(true)" title="Read the meters and Deye again (or pull the page down)">↻ Refresh</button>
   </div>
