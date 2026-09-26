@@ -11,6 +11,7 @@ const decisions = require('./decisions');
 const crm = require('./crm');                  // /api/crm/* + /api/meta/webhook (client conversations: WhatsApp dev line, Instagram, Messenger)      // /api/decisions/* (a question to a partner, answered from a link; Telegram to Mario)
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 const procurement = require('./procurement');  // /api/procurement/* (the price book: supplier, item, price, description — admin only)
+const energy = require('./energy');            // /api/energy (CPR meters: kWh per building per day, history + live from openHAB — admin only)
 const aiFill = require('./ai-fill');            // POST /api/ai/fill — Dictate: a voice/typed note → a form's fields (any member; extraction only)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
@@ -732,7 +733,8 @@ const handler = async (req, res) => {
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
-    '/procurement': 'procurement.html' };   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
+    '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
+    '/energy': 'energy.html' };   // CPR meters — kWh per building per month, table + chart (Mario, 2026-09-26)
   // /whatsapp — the WhatsApp Archive (whatsapp-local on Mario's laptop, 2013 → today, refreshed from
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
   // the archive-daemon heartbeat (meta/whatsappArchive) and the short-lived token it gets is signed
@@ -1128,6 +1130,12 @@ const handler = async (req, res) => {
   if (url === '/api/ai/fill') {
     try { if ((await aiFill.handle(req, res)) === false) { res.writeHead(405); res.end('method'); } }
     catch (e) { console.error('ai-fill error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+  if (url.startsWith('/api/energy')) {
+    if (!access.admin) return noApp('admin');
+    try { const handled = await energy.handle(req, res, url, user, { access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
+    catch (e) { console.error('energy error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   if (url.startsWith('/api/procurement')) {

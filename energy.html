@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>CPR Energy · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;
+    /* one colour per meter, the same in both charts, the table and the chips (dataviz reference palette, dark steps — validated on #181825) */
+    --s-school:#3987e5;--s-church:#d95926;--s-liqaa:#199e70;--s-hotel:#c98500;--s-genChurch:#d55181;--s-genSmall:#008300;--s-genBig:#9085e9;--s-edl:#e66767;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1280px;margin:0 auto;padding:22px 20px 60px;}
+  h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 16px;line-height:1.5;}
+  h2{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);font-weight:600;margin:0 0 8px;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .bar .sp{flex:1;}
+  select,button{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:6px 10px;font-size:.8rem;font-family:inherit;}
+  button{cursor:pointer;} button:hover{border-color:var(--amber);}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.76rem;}
+  .chip i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  .chip.off{opacity:.4;} .chip.off i{background:transparent!important;border:1px solid var(--overlay0);}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  @media (max-width:900px){.charts{grid-template-columns:1fr;}}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;}
+  .card.tbl{overflow-x:auto;padding:0;}
+  .cv{position:relative;height:300px;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px 10px;border-bottom:1px solid var(--surface0);white-space:nowrap;position:sticky;top:0;background:var(--mantle);}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--mantle);z-index:1;}
+  th.grp{text-align:center;color:var(--sub);letter-spacing:.14em;border-bottom:0;padding-bottom:0;}
+  th .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:1px;}
+  td{padding:6px 10px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  td.sum,th.sum{background:rgba(242,169,59,.06);color:var(--amber);font-weight:600;}
+  td.first-src,th.first-src{border-left:2px solid var(--surface1);}
+  td .est{color:var(--sub);font-style:italic;}
+  td .none{color:var(--overlay0);font-size:.72rem;}
+  td small{color:var(--overlay0);font-size:.68rem;font-weight:400;margin-left:4px;}
+  tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);background:rgba(242,169,59,.10);}
+  tbody tr:hover td{background:var(--surface0);}
+  .muted{color:var(--overlay0);} .small{font-size:.74rem;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
+  .note ul{margin:6px 0 0;padding-left:18px;}
+  #msg{font-size:.8rem;color:var(--sub);margin:8px 0 12px;}
+  #msg .warn{color:var(--amber);}
+  @media (max-width:600px){ header{padding:12px 16px;} main{padding:16px 16px 50px;} .cv{height:240px;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><a class="hback" href="/admin">‹ Hub</a><div class="wordmark">SHIFT <span>GROUP</span><small>ENERGY</small></div></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1>CPR — consumption per month</h1>
+  <p class="lead">kWh counted by each Metrel ME437 meter, per calendar month (Beirut time). Buildings on the left, where the power comes from (the generators and EDL) on the right. <span class="est">≈</span> = the logger was offline part of that month; the meter kept counting, and what it counted meanwhile is spread evenly over the days offline.</p>
+  <div class="bar">
+    <select id="year" onchange="render()"></select>
+    <div class="chips" id="chips"></div>
+    <span class="sp"></span>
+    <button onclick="exportCsv()" title="The table shown, as a CSV Excel opens">⬇ CSV</button>
+    <button onclick="load(true)" title="Read openHAB again now">↻ Refresh</button>
+  </div>
+  <div id="msg">Loading…</div>
+  <div class="charts">
+    <div class="card"><h2>Buildings · kWh per month</h2><div class="cv"><canvas id="c-load"></canvas></div></div>
+    <div class="card"><h2>Supply · kWh per month</h2><div class="cv"><canvas id="c-source"></canvas></div></div>
+  </div>
+  <div class="card tbl"><table id="tbl"></table></div>
+  <div class="note" id="notes"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const mLabel = m => MON[+m.slice(5) - 1] + ' ' + m.slice(0, 4);
+const f0 = n => Math.round(n).toLocaleString('en-US');
+const color = k => getComputedStyle(document.documentElement).getPropertyValue('--s-' + k).trim();
+const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+const daysIn = m => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5), 0)).getUTCDate();
+let D = null, M = null, hidden = new Set(), charts = {};
+try { hidden = new Set(JSON.parse(localStorage.getItem('energy.hidden') || '[]')); } catch (e) {}
+
+Admin.require(null, me => {   // admin only — the server refuses /api/energy to anyone else
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  load(false);
+});
+
+async function load(fresh) {
+  document.getElementById('msg').textContent = fresh ? 'Reading openHAB again…' : 'Loading…';
+  try {
+    D = await Admin.api('GET', '/api/energy' + (fresh ? '?fresh=1' : ''));
+    months();
+    const yrs = [...new Set(M.list.map(m => m.slice(0, 4)))].reverse();
+    const sel = document.getElementById('year'), cur = sel.value;
+    sel.innerHTML = '<option value="">All months</option>' + yrs.map(y => `<option value="${y}">${y}</option>`).join('') + '<option value="12">Last 12 months</option>';
+    sel.value = cur || '12';
+    const lastDay = D.days[D.days.length - 1];
+    document.getElementById('msg').innerHTML = D.live
+      ? `Live from openHAB · read ${esc(when(D.pulledAt))}${D.cached ? ' (kept 10 min)' : ''} · up to today, ${esc(lastDay)}`
+      : `<span class="warn">openHAB not reachable (${esc(D.liveError || '?')}) — showing the stored history up to ${esc(D.historyTo)}.</span>`;
+    render();
+  } catch (e) { document.getElementById('msg').innerHTML = `<span style="color:var(--red)">Could not load: ${esc(e.message || String(e))}</span>`; }
+}
+
+// days → months: kWh, estimated?, days covered (a meter's first month, the current month and "no meter" show as such)
+function months() {
+  const by = {};
+  D.days.forEach((d, i) => {
+    const m = d.slice(0, 7); const o = by[m] || (by[m] = { days: 0, last: d });
+    o.days++; o.last = d;
+    for (const b of D.buildings) {
+      const v = D.data[b.key][i]; const c = o[b.key] || (o[b.key] = { kwh: 0, n: 0, est: false, first: null });
+      if (v) { c.kwh += v[0]; c.n++; if (v[1]) c.est = true; if (!c.first) c.first = d; }
+    }
+  });
+  M = { by, list: Object.keys(by).sort() };
+}
+
+function shown() {
+  const y = document.getElementById('year').value;
+  if (!y) return M.list;
+  if (y === '12') return M.list.slice(-12);
+  return M.list.filter(m => m.startsWith(y));
+}
+const vis = g => D.buildings.filter(b => b.group === g && !hidden.has(b.key));
+
+function cellInfo(m, b) {
+  const c = M.by[m][b.key];
+  const nm = D.noMeter && D.noMeter[b.key];
+  if (!c || !c.n) return nm && m >= nm.slice(0, 7) ? { v: 0, note: 'off' } : { txt: '—', v: null };   // Gen Small: not running (Mario, 2026-09-26), and no meter on it since May 2026
+  let note = '';
+  if (c.first && c.first > m + '-01') note = 'from ' + (+c.first.slice(8)) + ' ' + MON[+c.first.slice(5, 7) - 1];
+  return { v: c.kwh, est: c.est, note };
+}
+
+function render() {
+  const list = shown();
+  const today = D.days[D.days.length - 1], curM = today.slice(0, 7);
+  // chips — click to hide a meter from the charts and the totals
+  document.getElementById('chips').innerHTML = D.buildings.map(b =>
+    `<span class="chip ${hidden.has(b.key) ? 'off' : ''}" style="cursor:pointer;border:1px solid var(--surface0)" onclick="toggle('${b.key}')" title="Show / hide ${esc(b.name)}"><i style="background:${color(b.key)}"></i>${esc(b.name)}</span>`).join('');
+  // charts: one per group, stacked, the same colour for a meter everywhere
+  for (const g of ['load', 'source']) {
+    const bs = vis(g);
+    const ds = bs.map(b => ({ label: b.name, key: b.key, data: list.map(m => { const c = cellInfo(m, b); return c.v == null ? null : Math.round(c.v); }),
+      backgroundColor: color(b.key), borderColor: '#181825', borderWidth: { top: 2 }, borderSkipped: 'bottom', maxBarThickness: 44, stack: g }));
+    const labels = list.map(m => mLabel(m) + (m === curM ? ' ·' : ''));
+    if (charts[g]) { charts[g].data.labels = labels; charts[g].data.datasets = ds; charts[g].update(); continue; }
+    charts[g] = new Chart(document.getElementById('c-' + g), {
+      type: 'bar', data: { labels, datasets: ds },
+      options: {
+        maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { color: '#a6adc8', font: { size: 10 }, maxRotation: 0, autoSkip: true } },
+          y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(108,112,134,.18)' }, border: { display: false }, ticks: { color: '#6c7086', font: { size: 10 }, callback: v => v >= 1000 ? (v / 1000) + 'k' : v } },
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#cdd6f4', boxWidth: 10, boxHeight: 10, font: { size: 11 } }, onClick: (e, it, lg) => toggle(lg.chart.data.datasets[it.datasetIndex].key) },
+          tooltip: { backgroundColor: '#11111b', borderColor: '#45475a', borderWidth: 1, titleColor: '#cdd6f4', bodyColor: '#cdd6f4', footerColor: '#F2A93B', padding: 10,
+            filter: it => it.raw != null,
+            callbacks: {
+              label: it => ` ${it.dataset.label}: ${f0(it.raw)} kWh${M.by[list[it.dataIndex]][it.dataset.key]?.est ? ' ≈' : ''}`,
+              footer: its => 'Total: ' + f0(its.reduce((s, it) => s + (it.raw || 0), 0)) + ' kWh',
+            } },
+        },
+      },
+    });
+  }
+  // table — newest month on top
+  const loads = vis('load'), srcs = vis('source');
+  const cell = (m, b, cls = '') => {
+    const c = cellInfo(m, b);
+    if (c.v == null) return `<td class="${cls}"><span class="none">${c.txt}</span></td>`;
+    return `<td class="${cls}"${c.est ? ' title="Logger offline part of this month — estimated"' : ''}>${c.est ? '<span class="est">≈ ' + f0(c.v) + '</span>' : f0(c.v)}${c.note ? `<small>${c.note}</small>` : ''}</td>`;
+  };
+  const sum = (m, bs) => bs.reduce((s, b) => s + (cellInfo(m, b).v || 0), 0);
+  const tot = { }; D.buildings.forEach(b => tot[b.key] = 0); let totL = 0, totS = 0;
+  const rows = list.slice().reverse().map(m => {
+    D.buildings.forEach(b => tot[b.key] += cellInfo(m, b).v || 0);
+    const sL = sum(m, loads), sS = sum(m, srcs); totL += sL; totS += sS;
+    const lab = mLabel(m) + (m === curM ? `<small>to ${+today.slice(8)} ${MON[+today.slice(5, 7) - 1]}</small>` : '');
+    return `<tr><td>${lab}</td>${loads.map(b => cell(m, b)).join('')}<td class="sum">${f0(sL)}</td>${srcs.map((b, i) => cell(m, b, i ? '' : 'first-src')).join('')}<td class="sum">${f0(sS)}</td></tr>`;
+  }).join('');
+  const hd = b => `<th><span class="sw" style="background:${color(b.key)}"></span>${esc(b.name)}</th>`;
+  document.getElementById('tbl').innerHTML =
+    `<thead><tr><th></th><th class="grp" colspan="${loads.length + 1}">Buildings</th><th class="grp first-src" colspan="${srcs.length + 1}">Supply</th></tr>
+     <tr><th>Month</th>${loads.map(hd).join('')}<th class="sum">Total</th>${srcs.map((b, i) => hd(b).replace('<th>', i ? '<th>' : '<th class="first-src">')).join('')}<th class="sum">Total</th></tr></thead>
+     <tbody>${rows}<tr class="tot"><td>Total · ${list.length} month${list.length > 1 ? 's' : ''}</td>${loads.map(b => `<td>${f0(tot[b.key])}</td>`).join('')}<td>${f0(totL)}</td>${srcs.map((b, i) => `<td class="${i ? '' : 'first-src'}">${f0(tot[b.key])}</td>`).join('')}<td>${f0(totS)}</td></tr></tbody>`;
+  document.getElementById('notes').innerHTML = '<b>About these figures</b><ul>' + (D.notes || []).map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
+}
+
+function toggle(k) {
+  hidden.has(k) ? hidden.delete(k) : hidden.add(k);
+  try { localStorage.setItem('energy.hidden', JSON.stringify([...hidden])); } catch (e) {}
+  render();
+}
+
+function exportCsv() {
+  const list = shown().slice().reverse();
+  const bs = D.buildings;
+  const lines = [['Month', ...bs.map(b => b.name + ' kWh'), 'Buildings total', 'Supply total', 'Estimated'].join(',')];
+  for (const m of list) {
+    const v = bs.map(b => { const c = cellInfo(m, b); return c.v == null ? '' : Math.round(c.v); });
+    const est = bs.filter(b => cellInfo(m, b).est).map(b => b.name).join(' / ');
+    const s = g => bs.filter(b => b.group === g).reduce((a, b) => a + (cellInfo(m, b).v || 0), 0);
+    lines.push([m, ...v, Math.round(s('load')), Math.round(s('source')), '"' + est + '"'].join(','));
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = `CPR energy per month ${D.days[D.days.length - 1]}.csv`; a.click();
+}
+</script>
+</body>
+</html>
