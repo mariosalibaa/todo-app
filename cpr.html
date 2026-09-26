@@ -46,7 +46,7 @@
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
   .note ul{margin:6px 0 0;padding-left:18px;}
   .set{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:.78rem;color:var(--sub);margin:0 0 10px;}
-  .set input{width:80px;}
+  .set input{width:80px;} .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
   #msg .warn{color:var(--amber);}
@@ -183,6 +183,13 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // voltage — its kWh left out most of two phases; openHAB shows phase B negative up to Apr 2026, never after).
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
+const CMP = {
+  school: { name: 'M1 School', keys: ['school'] }, church: { name: 'M2 Church', keys: ['church'] }, liqaa: { name: 'M3 Liqaa', keys: ['liqaa'] },
+  hotel: { name: 'M4 Hotel', keys: ['hotel'] }, genChurch: { name: 'M5 Gen church', keys: ['genChurch'] }, genSmall: { name: 'M6 Gen small', keys: ['genSmall'] },
+  genBig: { name: 'M7 Gen big', keys: ['genBig'] }, edl: { name: 'M8 EDL', keys: ['edl'], deye: m => dv(m, 'gridIn') },
+  gens: { name: 'Generators M5–M7', keys: ['genChurch', 'genBig', 'genSmall'], deye: m => dsplit(m, 'gen').v },
+};
+const cmpKey = () => store.get('cpr.cmp') || '';
 // Mario 2026-09-26: EDL may feed Liqaa / the Hotel without passing the inverters, so the EDL meter is the right
 // measure — from May 2026, once it was rewired; before that, Deye's grid input.
 const edlOf = m => m < EDL_OK && dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn'), note: 'Deye' } : mv(m, 'edl');
@@ -230,8 +237,16 @@ const VIEWS = {
     det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL <b>${f0(edlOf(m).v)}</b> (${dv(m, 'gridIn') != null ? 'Deye' : 'meter'}; the EDL meter read <b>${f0(mv(m, 'edl').v)}</b>) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
   cmp: {
-    head: [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Buildings', 'SD · openHAB']],
+    // Mario 2026-09-26: each meter M1–M8, SD card against openHAB; Deye next to EDL and the generators
+    head: () => { const c = CMP[cmpKey()]; if (!c) return [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Buildings', 'SD · openHAB']];
+      return ['SD card', 'openHAB', ...(c.deye ? ['Deye'] : []), ['oH vs SD', '%']]; },
     row: m => {
+      const c = CMP[cmpKey()];
+      if (c) {
+        const sd = srcv(m, 'sd', c.keys), oh = srcv(m, 'oh', c.keys), dy = c.deye ? c.deye(m) : undefined;
+        const p = sd.v && oh.v != null && !sd.part ? (oh.v - sd.v) / sd.v * 100 : null;
+        return [{ v: sd.v, note: sd.part ? 'part' : '' }, { v: oh.v }, ...(c.deye ? [{ v: dy }] : []), { html: p == null ? '<span class="none">—</span>' : `<span class="${Math.abs(p) > 5 ? 'd big' : 'd'}">${p > 0 ? '+' : ''}${p.toFixed(1)} %</span>` }];
+      }
       const tri = (keys, deyeV) => {
         const sd = srcv(m, 'sd', keys), oh = srcv(m, 'oh', keys);
         const xs = [sd.v, oh.v, deyeV].filter(v => v != null && v > 0); const spread = xs.length > 1 ? (Math.max(...xs) - Math.min(...xs)) / Math.min(...xs) : 0;
@@ -244,7 +259,7 @@ const VIEWS = {
       const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });
       return [pair(mv(m, 'edl').v, dv(m, 'gridIn')), pair(sumv(m, ['genChurch', 'genBig', 'genSmall']).v, dsplit(m, 'gen').v), pair(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, dv(m, 'use'))];
     },
-    det: m => `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
+    det: m => (CMP[cmpKey()] ? `${CMP[cmpKey()].name}: ` : '') + `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
   },
   dsl: {
     head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈']],
@@ -258,10 +273,12 @@ function render() {
   document.body.classList.toggle('t-all', tab === 'all');
   if (!ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'all';
   document.getElementById('tabs').innerHTML = TABS.filter(t => ADMIN || !t[2]).map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
-  document.getElementById('set').innerHTML = tab === 'dsl'
+  document.getElementById('set').innerHTML = tab === 'cmp'
+    ? `<div class="chips">${[['', 'Summary'], ...Object.entries(CMP).map(([k, c]) => [k, c.name])].map(([k, n]) => `<button class="${k === cmpKey() ? 'on' : ''}" onclick="store.set('cpr.cmp', '${k}'); render()">${n}</button>`).join('')}</div>`
+    : tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty.</span>`
     : '';
-  const V = VIEWS[tab], list = shown().slice().reverse();
+  const V0 = VIEWS[tab], V = { ...V0, head: typeof V0.head === 'function' ? V0.head() : V0.head }, list = shown().slice().reverse();
   const hd = h => { const [t, s, c] = Array.isArray(h) ? h : [h, '', '']; return `<th class="${c || ''}">${t}${s ? `<small>${s}</small>` : ''}</th>`; };
   const cols = V.head.length + 1;
   const tot = V.head.map(() => ({ v: 0, any: false }));
@@ -285,7 +302,7 @@ function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
 function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }
 
 function exportCsv() {
-  const V = VIEWS[tab], list = shown().slice().reverse();
+  const V0 = VIEWS[tab], V = { ...V0, head: typeof V0.head === 'function' ? V0.head() : V0.head }, list = shown().slice().reverse();
   const heads = V.head.map(h => Array.isArray(h) ? (h[0] + (h[1] ? ' (' + h[1] + ')' : '')) : h);
   const lines = [['Month', ...heads].join(',')];
   for (const m of list) lines.push([m, ...V.row(m).map(x => { const v = Array.isArray(x) ? x[0] : x; return v && v.html != null ? '"' + v.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() + '"' : v && v.v != null ? Math.round(v.v) : ''; })].join(','));
