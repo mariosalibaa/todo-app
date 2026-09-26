@@ -183,8 +183,9 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // voltage — its kWh left out most of two phases; openHAB shows phase B negative up to Apr 2026, never after).
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
-// Mario 2026-09-26: "consider Deye data the correct one" — EDL is Deye's grid input every month; the meter only where Deye has nothing
-const edlOf = m => dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn') } : { ...mv(m, 'edl'), note: 'meter' };
+// Mario 2026-09-26: EDL may feed Liqaa / the Hotel without passing the inverters, so the EDL meter is the right
+// measure — from May 2026, once it was rewired; before that, Deye's grid input.
+const edlOf = m => m < EDL_OK && dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn'), note: 'Deye' } : mv(m, 'edl');
 const num2 = v => tab === 'all' ? `<span class="fl">${f0(v)}</span><span class="sh">${(v / 1000).toFixed(1)}</span>` : f0(v);
 const cell = (x0, cls = '') => { const x = ADMIN ? x0 : { ...x0, est: false, note: /missing/.test(x0.note || '') ? '' : x0.note }; return x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
   : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + num2(x.v) + '</span>' : num2(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`; };
@@ -201,14 +202,14 @@ const VIEWS = {
   all: {
     // Mario 2026-09-26: here the church is only what we supply (church − the church generator, which the church pays);
     // so the generator column leaves the church generator out too, and the two totals stay comparable
-    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum']],
+    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL']],
     row: m => {
       const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
       const church = co == null ? { v: null } : { v: co, est: ch.est };
       const bld = sumv(m, ['school', 'liqaa', 'hotel']); if (bld.v != null && co != null) bld.v += co;
       const gen = sumv(m, ['genBig', 'genSmall']);
       const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
-      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [s[0], 'gs'], s[1], gen, [sup, 'sum']];
+      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }];
     },
     det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m),
   },
@@ -275,7 +276,7 @@ function render() {
   const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && (h[2] === 'wide' || h[2] === 'gs') ? h[2] : ''}">${tot[i].any ? num2(tot[i].v) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
   document.getElementById('tbl').innerHTML = `<thead><tr><th>Month</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
   const notes = (D.notes || []).slice();
-  if (tab === 'cmp' || tab === 'sup') notes.unshift('The EDL meter was wired wrong until April 2026: phase B current transformer reversed (its power read negative), phase C on the wrong voltage — so it counted only about half of what came from EDL. EDL on this page is the Deye grid input (taken as the correct figure); Meters vs Deye still shows the meter next to it.');
+  if (tab === 'cmp' || tab === 'sup') notes.unshift('The EDL meter was wired wrong until April 2026: phase B current transformer reversed (its power read negative), phase C on the wrong voltage — so it counted only about half of what came from EDL. EDL on this page is the EDL meter from May 2026 and the Deye grid input before that; Meters vs Deye shows both.');
   if (tab === 'cmp' || tab === 'sup') notes.unshift('Deye (the three inverters, 3 × 50 kW): solar, the generator input, the grid input (EDL) and what goes back to EDL under net metering, the UPS load. From Feb 2026 Deye keeps solar and generator apart; before that its "production" mixes them.');
   document.getElementById('notes').style.display = ADMIN ? '' : 'none';
   document.getElementById('notes').innerHTML = '<b>About these figures · admin</b><ul>' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
