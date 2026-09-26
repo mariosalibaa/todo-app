@@ -46,7 +46,17 @@
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
   .note ul{margin:6px 0 0;padding-left:18px;}
   .set{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:.78rem;color:var(--sub);margin:0 0 10px;}
-  .set input{width:80px;} .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
+  .set input{width:80px;}
+  /* year summary (Mario 2026-09-26: "give me the year summary, one dashboard") */
+  #dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;}
+  .yc{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;}
+  .yc h2{margin:0;font-size:1.3rem;color:var(--amber);} .yc .cov{font-size:.72rem;color:var(--overlay0);margin:2px 0 8px;}
+  .yc h3{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin:12px 0 6px;font-weight:600;display:flex;justify-content:space-between;} .yc h3 b{color:var(--text);font-size:.9rem;letter-spacing:0;}
+  .yr{display:grid;grid-template-columns:1fr auto 44px;gap:2px 10px;align-items:center;font-size:.82rem;padding:3px 0;}
+  .yr .n{text-align:right;font-variant-numeric:tabular-nums;} .yr .p{text-align:right;color:var(--sub);font-size:.72rem;}
+  .yr .bar{grid-column:1/4;height:4px;border-radius:2px;background:var(--surface0);overflow:hidden;} .yr .bar i{display:block;height:100%;background:var(--amber);opacity:.75;}
+  .yk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;} .yk div{background:var(--base);border-radius:10px;padding:8px;} .yk b{display:block;font-size:1rem;} .yk span{font-size:.64rem;color:var(--overlay0);}
+  @media (max-width:640px){ #dash{grid-template-columns:1fr;} } .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
   #msg .warn{color:var(--amber);}
@@ -83,7 +93,8 @@
   <div class="set" id="set"></div>
   <div id="ptr">↓ Pull to refresh</div>
   <div id="msg">Loading…</div>
-  <div class="card"><table id="tbl"></table></div>
+  <div id="dash"></div>
+  <div class="card" id="tblcard"><table id="tbl"></table></div>
   <p class="hint muted small">Tap a month for the detail.</p>
   <div class="note" id="notes"></div>
 </main>
@@ -94,7 +105,7 @@ const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-const TABS = [['all', 'Month by month'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
+const TABS = [['yr', 'Year summary'], ['all', 'Month by month'], ['day', 'Daily'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
 // Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
 // Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
 // them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
@@ -113,7 +124,7 @@ function applyView() {
 function togglePublic() { store.set('cpr.public', store.get('cpr.public') === '1' ? '0' : '1'); applyView(); }
 addEventListener('storage', e => { if (e.key === 'cpr.public') applyView(); });   // the preview frame follows a switch made outside it
 fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { REAL_ADMIN = !!(me && me.admin); applyView(); }).catch(() => {});
-let D = null, M = null, tab = store.get('cpr.tab') || 'all', open = new Set();
+let D = null, M = null, MD = null, tab = store.get('cpr.tab') || 'yr', open = new Set();
 
 async function load(fresh) {
   document.getElementById('msg').textContent = fresh ? 'Reading the meters again…' : 'Loading…';
@@ -135,12 +146,12 @@ async function load(fresh) {
 }
 
 // days → months. Meters: kWh + estimated flag + first day with data. Deye: kWh sums + days covered.
-function months() {
+function months(len = 7) {
   const by = {};
   const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, n: 0, noSplit: 0 }, src: { sd: {}, oh: {} }, days: 0 });
   const BS = D.bySource || {}, nHist = BS.oh ? BS.oh.school.length : 0;
   D.days.forEach((d, i) => {
-    const o = mo(d.slice(0, 7)); o.days++;
+    const o = mo(d.slice(0, len)); o.days++;
     // one source alone: SD card / openHAB (live days after the history are openHAB)
     for (const b of D.buildings) for (const s of ['sd', 'oh']) {
       const v = i < nHist ? (BS[s] && BS[s][b.key][i]) : (s === 'oh' && D.data[b.key][i] ? D.data[b.key][i][0] : null);
@@ -156,13 +167,15 @@ function months() {
     const F = D.deye.fields;
     D.deye.days.forEach((d, i) => {
       const v = D.deye.data[i]; if (!v) return;
-      const o = mo(d.slice(0, 7)).d;
+      const o = mo(d.slice(0, len)).d;
       F.forEach((f, j) => { if (f in o && f !== 'n' && f !== 'noSplit') o[f] += +v[j] || 0; });
       if (v[F.indexOf('pv')] == null) o.noSplit++;   // Deye kept no solar / generator split that day (before Apr 2025, some short days)
       o.n++;
     });
   }
-  M = { by, list: Object.keys(by).sort() };
+  const R = { by, list: Object.keys(by).sort() };
+  if (len === 7) { M = R; MD = months(10); }
+  return R;
 }
 const shown = () => { const y = document.getElementById('range').value; return y === '12' ? M.list.slice(-12) : y ? M.list.filter(m => m.startsWith(y)) : M.list; };
 const today = () => D.days[D.days.length - 1];
@@ -192,11 +205,12 @@ const CMP = {
   genBig: { name: 'M7 Gen big', keys: ['genBig'] }, edl: { name: 'M8 EDL', keys: ['edl'], deye: m => dv(m, 'gridIn') },
   gens: { name: 'Generators M5–M7', keys: ['genChurch', 'genBig', 'genSmall'], deye: m => dsplit(m, 'gen').v },
 };
+const dayMonth = () => { const v = store.get('cpr.dayMonth'); return v && M && M.list.includes(v) ? v : (M ? M.list[M.list.length - 1] : ''); };
 const cmpKey = () => store.get('cpr.cmp') || '';
 // Mario 2026-09-26: EDL may feed Liqaa / the Hotel without passing the inverters, so the EDL meter is the right
 // measure — from May 2026, once it was rewired; before that, Deye's grid input.
 const edlOf = m => m < EDL_OK && dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn'), note: 'Deye' } : mv(m, 'edl');
-const num2 = v => tab === 'all' ? `<span class="fl">${f0(v)}</span><span class="sh">${(v / 1000).toFixed(1)}</span>` : f0(v);
+const num2 = v => false ? `<span class="fl">${f0(v)}</span><span class="sh">${(v / 1000).toFixed(1)}</span>` : f0(v);
 const cell = (x0, cls = '') => { const x = ADMIN ? x0 : { ...x0, est: false, note: /missing/.test(x0.note || '') ? '' : x0.note }; return x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
   : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + num2(x.v) + '</span>' : num2(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`; };
 // share of the month's total (Mario 2026-09-26: "% of each building out of the total consumption")
@@ -204,7 +218,8 @@ const cell = (x0, cls = '') => { const x = ADMIN ? x0 : { ...x0, est: false, not
 const churchOurs = m => { const c = mv(m, 'church').v, g = mv(m, 'genChurch').v; return c == null ? null : Math.max(0, c - (g || 0)); };
 const share = (xs, t) => xs.map(x => { const [v, c] = Array.isArray(x) ? x : [x, '']; const o = t && v.v != null ? { ...v, pct: v.v / t * 100 } : v; return c ? [o, c] : o; });
 const num = (v, cls = '') => v == null ? `<td class="${cls}"><span class="none">—</span></td>` : `<td class="${cls}">${f0(v)}</td>`;
-const monthCell = m => `<td>${mLabel(m)}${m === today().slice(0, 7) ? `<small>to ${+today().slice(8)} ${MON[+today().slice(5, 7) - 1]}</small>` : ''}</td>`;
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const monthCell = m => m.length === 10 ? `<td>${DOW[new Date(m + 'T12:00:00Z').getUTCDay()]} ${+m.slice(8)}</td>` : `<td>${mLabel(m)}${m === today().slice(0, 7) ? `<small>to ${+today().slice(8)} ${MON[+today().slice(5, 7) - 1]}</small>` : ''}</td>`;
 const pct = (a, b) => (a && b ? Math.round((b - a) / a * 100) : null);
 
 // each tab: columns (phone = the ones without wide) + the detail line a tapped row opens
@@ -273,15 +288,28 @@ const VIEWS = {
 };
 
 function render() {
-  document.body.classList.toggle('t-all', tab === 'all');
+  document.body.classList.toggle('t-all', tab === 'all' || tab === 'day');
   if (!ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'all';
   document.getElementById('tabs').innerHTML = TABS.filter(t => ADMIN || !t[2]).map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
-  document.getElementById('set').innerHTML = tab === 'cmp'
+  document.getElementById('set').innerHTML = tab === 'day'
+    ? `<label>Month <select onchange="store.set('cpr.dayMonth', this.value); render()">${M.list.slice().reverse().map(m => `<option value="${m}" ${m === dayMonth() ? 'selected' : ''}>${MON[+m.slice(5) - 1]} ${m.slice(0, 4)}</option>`).join('')}</select></label>`
+    : tab === 'cmp'
     ? `<div class="chips">${[['', 'Summary'], ...Object.entries(CMP).map(([k, c]) => [k, c.name])].map(([k, n]) => `<button class="${k === cmpKey() ? 'on' : ''}" onclick="store.set('cpr.cmp', '${k}'); render()">${n}</button>`).join('')}</div>`
     : tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty.</span>`
     : '';
-  const V0 = VIEWS[tab], V = { ...V0, head: typeof V0.head === 'function' ? V0.head() : V0.head }, list = shown().slice().reverse();
+  document.getElementById('dash').style.display = tab === 'yr' ? '' : 'none';
+  document.getElementById('tblcard').style.display = tab === 'yr' ? 'none' : '';
+  document.getElementById('range').style.display = tab === 'yr' || tab === 'day' ? 'none' : '';
+  document.querySelector('.hint').style.visibility = tab === 'yr' ? 'hidden' : '';
+  document.querySelector('button[onclick="exportCsv()"]').style.display = tab === 'yr' ? 'none' : '';
+  if (tab === 'yr') { document.getElementById('notes').style.display = 'none'; renderYears(); return; }
+  // Daily (Mario 2026-09-26: "see what is happening in Sep 26 daily"): the month-by-month columns, one line a day
+  const DAY = tab === 'day', MM = M, dm = dayMonth();
+  if (DAY) M = MD;
+  try {
+  const V0 = VIEWS[DAY ? 'all' : tab], V = { ...V0, head: typeof V0.head === 'function' ? V0.head() : V0.head };
+  const list = (DAY ? MD.list.filter(d => d.startsWith(dm)) : shown()).slice().reverse();
   const hd = h => { const [t, s, c] = Array.isArray(h) ? h : [h, '', '']; return `<th class="${c || ''}">${t}${s ? `<small>${s}</small>` : ''}</th>`; };
   const cols = V.head.length + 1;
   const tot = V.head.map(() => ({ v: 0, any: false }));
@@ -294,24 +322,50 @@ function render() {
     return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` : '');
   }).join('');
   const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && (h[2] === 'wide' || h[2] === 'gs') ? h[2] : ''}">${tot[i].any ? num2(tot[i].v) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
-  document.getElementById('tbl').innerHTML = `<thead><tr><th>Month</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
+  document.getElementById('tbl').innerHTML = `<thead><tr><th>${DAY ? 'Day' : 'Month'}</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
+  } finally { M = MM; }
   const notes = (D.notes || []).slice();
   if (tab === 'cmp' || tab === 'sup') notes.unshift('The EDL meter was wired wrong until April 2026: phase B current transformer reversed (its power read negative), phase C on the wrong voltage — so it counted only about half of what came from EDL. EDL on this page is the EDL meter from May 2026 and the Deye grid input before that; Meters vs Deye shows both.');
   if (tab === 'cmp' || tab === 'sup') notes.unshift('Deye (the three inverters, 3 × 50 kW): solar, the generator input, the grid input (EDL) and what goes back to EDL under net metering, the UPS load. From Feb 2026 Deye keeps solar and generator apart; before that its "production" mixes them.');
   document.getElementById('notes').style.display = ADMIN ? '' : 'none';
   document.getElementById('notes').innerHTML = '<b>About these figures · admin</b><ul>' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
 }
+// one card a year, from the month-by-month figures (church = what we supply, generators = ours)
+function renderYears() {
+  const yrs = [...new Set(M.list.map(m => m.slice(0, 4)))].reverse();
+  const val = x => { const v = Array.isArray(x) ? x[0] : x; return v && v.v != null ? v.v : 0; };
+  const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0;
+  document.getElementById('dash').innerHTML = yrs.map(y => {
+    const ms = M.list.filter(m => m.startsWith(y));
+    const s = Array(9).fill(0); let genAll = 0;
+    for (const m of ms) { VIEWS.all.row(m).forEach((x, i) => { s[i] += val(x); }); genAll += sumv(m, ['genChurch', 'genBig', 'genSmall']).v || 0; }
+    const [school, church, kamal, bld, solar, edl, gen, sup, sold] = s;
+    const first = ms[0], last = ms[ms.length - 1], td = today();
+    const cov = MON[+first.slice(5) - 1] + ' → ' + (last === td.slice(0, 7) ? +td.slice(8) + ' ' : '') + MON[+last.slice(5) - 1] + ' ' + y + ' · ' + ms.length + ' month' + (ms.length > 1 ? 's' : '');
+    const line = (lab, v, tot) => `<div class="yr"><span>${lab}</span><span class="n">${f0(v)}</span><span class="p">${tot ? Math.round(v / tot * 100) + ' %' : ''}</span><div class="bar"><i style="width:${tot ? Math.min(100, v / tot * 100) : 0}%"></i></div></div>`;
+    const dollars = usd ? 'USD ' + f0(genAll * lpk * usd) : '—';
+    return `<div class="yc"><h2>${y}</h2><div class="cov">${cov} · kWh</div>
+      <h3>Buildings <b>${f0(bld)}</b></h3>${line('School', school, bld)}${line('Church — from us', church, bld)}${line('Kamal — Liqaa + Hotel', kamal, bld)}
+      <h3>Supply <b>${f0(sup)}</b></h3>${line('Solar', solar, sup)}${line('EDL', edl, sup)}${line('Generators (ours)', gen, sup)}
+      <div class="yk"><div><b>${f0(sold)}</b><span>sold to EDL</span></div><div><b>${sup ? Math.round(solar / sup * 100) : 0} %</b><span>solar share</span></div><div><b>${f0(ms.length ? bld / ms.length : 0)}</b><span>buildings / month</span></div></div>
+      ${ADMIN ? `<div class="yk"><div><b>${f0(genAll)}</b><span>all generators kWh</span></div><div><b>${f0(genAll * lpk)}</b><span>diesel L ≈ (${lpk} L/kWh)</span></div><div><b>${dollars}</b><span>diesel cost ≈ · admin</span></div></div>` : ''}</div>`;
+  }).join('');
+}
 function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
 function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }
 
 function exportCsv() {
-  const V0 = VIEWS[tab], V = { ...V0, head: typeof V0.head === 'function' ? V0.head() : V0.head }, list = shown().slice().reverse();
+  if (tab === 'yr') return;
+  const DAY = tab === 'day', MM = M, dm = dayMonth(); if (DAY) M = MD;
+  try {
+  const V0 = VIEWS[DAY ? 'all' : tab], V = { ...V0, head: typeof V0.head === 'function' ? V0.head() : V0.head }, list = (DAY ? MD.list.filter(d => d.startsWith(dm)) : shown()).slice().reverse();
   const heads = V.head.map(h => Array.isArray(h) ? (h[0] + (h[1] ? ' (' + h[1] + ')' : '')) : h);
   const lines = [['Month', ...heads].join(',')];
   for (const m of list) lines.push([m, ...V.row(m).map(x => { const v = Array.isArray(x) ? x[0] : x; return v && v.html != null ? '"' + v.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() + '"' : v && v.v != null ? Math.round(v.v) : ''; })].join(','));
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
   a.download = `CPR ${TABS.find(t => t[0] === tab)[1]} ${today()}.csv`; a.click();
+  } finally { M = MM; }
 }
 load(false);
 
