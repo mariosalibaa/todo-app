@@ -194,8 +194,8 @@ async function monthTable(list) {
   for (const x of list) { const m = x.date.slice(0, 7); const o = by[m] || (by[m] = { n: 0, l: 0, usd: 0, lp: 0, up: 0 }); o.n++; o.l += x.litres || 0; o.usd += x.usd || 0; if (x.litres && x.usd) { o.lp += x.litres; o.up += x.usd; } }
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const rows = Object.keys(by).sort().reverse().map(m => { const o = by[m], kwh = GENKWH[m];
-    return `<tr><td>${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}</td><td>${o.n}</td><td>${f2(o.l)}</td><td>${o.usd ? '$' + f2(o.usd) : ''}</td><td>${o.lp ? '$' + (o.up / o.lp).toFixed(2) : ''}</td><td>${kwh != null ? Math.round(kwh).toLocaleString('en-US') : '—'}</td><td class="k">${kwh && o.l ? (kwh / o.l).toFixed(2) : '—'}</td></tr>`; }).join('');
-  document.getElementById('months').innerHTML = rows ? `<table><thead><tr><th>Month</th><th>Fills</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Gen big kWh<small>meter M7</small></th><th>kWh / L</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tot">No fill yet.</div>';
+    return `<tr><td>${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}</td><td>${o.n}</td><td>${f2(o.l)}</td><td>${o.usd ? '$' + f2(o.usd) : ''}</td><td>${o.lp ? '$' + (o.up / o.lp).toFixed(2) : ''}</td><td>${kwh != null ? Math.round(kwh).toLocaleString('en-US') : '—'}</td><td class="k">${kwh && o.usd ? '$' + (o.usd / kwh).toFixed(3) : '—'}</td></tr>`; }).join('');
+  document.getElementById('months').innerHTML = rows ? `<table><thead><tr><th>Month</th><th>Fills</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Gen big kWh<small>meter M7</small></th><th>$ / kWh<small>diesel cost</small></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tot">No fill yet.</div>';
 }
 async function del(id) {
   if (!confirm('Delete this fill and its photo?')) return;
