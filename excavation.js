@@ -112,6 +112,7 @@ async function build(ctx) {
     const mm = b.ref.match(/([\d,\.]+)\s*m3 of ([\d,\.]+)\s*m3/); if (mm) { row.m3 = +mm[1].replace(/,/g, ''); row.totalM3 = +mm[2].replace(/,/g, ''); }
     if (c.kind === 'D') { row.diesel += b.total; row.litres += litresOf[b.id] || 0; row.fillList = [...(row.fillList || []), ...(fillsOf[b.id] || [])]; row.fills = (b.ref.match(/\(([\d\-]+\.\.[\d\-]+)/) || [])[1] || ''; }
     else if (c.kind === 'R') row.retention += b.total;
+    else if (b.kind === 'days') { /* the day rate is its own bill: counted by date below, never inside the m3 price */ }
     else { row.contract += b.total; row.till = (b.ref.match(/till\s+([\d\-]+)/) || [])[1] || ''; row.certDate = b.date; }
   }
   // Mario's hand summary per cycle (2026-09-13): litres → L/m³ × $0.80 = what diesel eats out of Anthony's $5 (his net is the rest);
