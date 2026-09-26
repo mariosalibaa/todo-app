@@ -198,10 +198,12 @@
     const here = location.pathname.replace(/\/+$/, '') || '/';
     // WhatsApp within reach of every page (Mario, 2026-09-26: "allow to launch whatsapp from here"):
     // the hub's own chats, and the phone archive (admin only — the relay refuses anyone else).
+    // WhatsApp is one door now: the archive shows 03, 70 and the hub's own chats as its "internal" line,
+    // so an admin goes there; whoever only has the hub chats goes to /site (Mario, 2026-09-26: "let us simply say WhatsApp")
+    const waHref = me.admin ? '/whatsapp' : '/site';
     const waLauncher = [
       { href: '/accounting/accounts', label: '▦ Accounts', title: 'The cash and bank ledgers', ok: apps.includes('accounting') },
-      { href: '/site', label: '⚑ Shift WhatsApp', title: 'The hub chats: Mario, and each worker', ok: apps.includes('site') || me.admin },
-      { href: '/whatsapp', label: '💬 WhatsApp archive', title: 'The phone archive, 2013 → today (both lines)', ok: me.admin },
+      { href: waHref, label: '💬 WhatsApp', title: me.admin ? 'Every line in one page: 03 165 168, 70 165 168 and the hub chats' : 'The hub chats', ok: apps.includes('site') || me.admin },
     ].filter(x => x.ok && !here.startsWith(x.href));
     if (!me.admin && !me.viewAs && !waLauncher.length) return;
     const old = document.getElementById('view-as-bar'); if (old) old.remove();
@@ -235,6 +237,11 @@
     }
     if (people.length || me.viewAs) bar.append(box);
     document.body.append(bar);
+    // it floats over the page, so give the page that much room back (the grid's totals line was underneath it)
+    const pad = () => { document.body.style.paddingBottom = (bar.offsetHeight + 8) + 'px'; };
+    pad();
+    addEventListener('resize', pad);
+    if (window.ResizeObserver) new ResizeObserver(pad).observe(bar);
   };
   // Gate a page: app = 'todo' | 'accounting' | null (hub: any approved account)
   A.require = function (app, onReady) {

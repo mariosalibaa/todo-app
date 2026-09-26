@@ -1811,11 +1811,21 @@ function render() {
     `${all.length} row${all.length === 1 ? '' : 's'} match the filters; the grid draws ${PAGE} at a time.` + (hidden ? ` — ${hidden} hidden by the filters or by the 🟣 Odoo-lines toggle.` : '.'),
   ].join('\n\n') : '';
   const out = counted.reduce((a, t) => a + (t.debit || 0), 0), inn = counted.reduce((a, t) => a + (t.credit || 0), 0);
+  // Everything (all accounts) used to say "no totals: these accounts are in different currencies" and leave
+  // the three columns blank. What Mario wants is the sum of what the filter shows (Mario, 2026-09-26), so the
+  // lines are added per currency: one currency = the plain figures, several = each on its own line.
+  const perCurrency = (() => {
+    const g = {};
+    for (const t of counted) { const c = t._accCur || (account && account.currency) || 'USD'; (g[c] ||= { out: 0, inn: 0 }); g[c].out += t.debit || 0; g[c].inn += t.credit || 0; }
+    return Object.entries(g).sort((a, b) => (b[1].out + b[1].inn) - (a[1].out + a[1].inn));
+  })();
+  const curCell = pick => perCurrency.length <= 1 ? (perCurrency.length ? fmt(perCurrency[0][1][pick]) : '')
+    : perCurrency.map(([c, v]) => `${fmt(v[pick])}<span class="bal-note">${esc(c)}</span>`).join('<br>');
   const op = account && account.opening;
   const iOut = Math.max(1, COLS.findIndex(c => c.k === 'out'));   // Debit's own column, whatever precedes it
   document.getElementById('totals').innerHTML =
-    `<td colspan="${iOut}">${all.length} line${all.length === 1 ? '' : 's'}${all.length !== tx.length ? ' of ' + tx.length : ''}${all.length !== counted.length ? ` (${all.length - counted.length} not counted)` : ''}${isAll() ? ' — no totals: these accounts are in different currencies' : ''}</td>
-     <td class="num debit">${isAll() ? '' : fmt(out)}</td><td class="num credit">${isAll() ? '' : fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${fmt(closing())}${op || isAll() ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${Math.max(1, COLS.length - iOut - 3)}"><span id="stmtsum">${stmtSummary()}</span></td>`;
+    `<td colspan="${iOut}">${all.length} line${all.length === 1 ? '' : 's'}${all.length !== tx.length ? ' of ' + tx.length : ''}${all.length !== counted.length ? ` (${all.length - counted.length} not counted)` : ''}${isAll() && perCurrency.length > 1 ? ' — added per currency' : ''}</td>
+     <td class="num debit">${isAll() ? curCell('out') : fmt(out)}</td><td class="num credit">${isAll() ? curCell('inn') : fmt(inn)}</td><td class="num" title="${esc(op ? 'Pinned: ' + fmt(op.amount) + ' on ' + op.date + (op.note ? ' — ' + op.note : '') : isStatement() ? 'Closing balance of the statement' : 'No opening balance set: ⚙ to pin one')}">${isAll() ? (perCurrency.length <= 1 ? fmt(inn - out) : perCurrency.map(([c, v]) => `${fmt(v.inn - v.out)}<span class="bal-note">${esc(c)}</span>`).join('<br>')) : fmt(closing())}${op || isAll() ? '' : isStatement() ? '' : '<span class="bal-note">no opening</span>'}</td><td colspan="${Math.max(1, COLS.length - iOut - 3)}"><span id="stmtsum">${stmtSummary()}</span></td>`;
   { const b = document.getElementById('btn-stmt'); const ok = isExcelKept() && tx.some(t => t.period);
     b.style.display = ''; b.classList.toggle('off', !ok); b.disabled = !ok;
     if (!b.dataset.tip) b.dataset.tip = b.title || '';
