@@ -16,7 +16,9 @@ const CASH_COLLECTOR = 'Anthony Khalil (cash)';
 const CTX = { allowed_company_ids: [COMPANY] };
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const r2 = n => Math.round((+n || 0) * 100) / 100;
-// bill refs (Mario, 2026-09-13, short form): AJ4193-EXC-n (till d-m · Xm3 of Ym3) · -nD = diesel (fills · N L · …) · -nR = retention · -DAYS
+// bill refs: AJ4193-EXCAVATION-n (till d-m · Xm3 of Ym3) · AJ4193-DIESEL-n (fills · N L · …) · AJ4193-RETENTION-n · -DAYS
+// The word carries the kind (Mario, 2026-09-26: "EXCAVATION / RETENTION / DIESEL instead of EXC"), so typing one of
+// them anywhere in the hub isolates that group. The short form AJ4193-EXC-n with -nD / -nR still reads the same.
 const isDiesel = ref => /diesel/i.test(ref || '') || /EXC(?:AVATION)?-\d+D\b/i.test(ref || '');
 
 async function build(ctx) {
@@ -90,7 +92,13 @@ async function build(ctx) {
   const todayBeirut = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
   const tillDate = till => { const m = (till || '').match(/^(\d+)-(\d+)$/); return m ? `${new Date().getFullYear()}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''; };
   const cyc = {};
-  const cycOf = ref => { const m = (ref || '').match(/EXC(?:AVATION)?-(\d+)(R|D)?\b/i); return m ? { n: +m[1], kind: m[2] ? m[2].toUpperCase() : '' } : null; };
+  // which cycle a bill belongs to, and which of the three it is — by the word, or by the -nD / -nR suffix
+  const cycOf = ref => {
+    const m = (ref || '').match(/(EXC(?:AVATION)?|DIESEL|RETENTION)-(\d+)(R|D)?\b/i);
+    if (!m) return null;
+    const w = m[1].toUpperCase();
+    return { n: +m[2], kind: w === 'DIESEL' ? 'D' : w === 'RETENTION' ? 'R' : (m[3] ? m[3].toUpperCase() : '') };
+  };
   const litresOf = {}, fillsOf = {};
   for (const l of dl) {
     const b = bills.find(x => (x.invoice_line_ids || []).includes(l.id)); if (!b) continue;
