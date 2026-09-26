@@ -52,8 +52,8 @@
   <div class="wordmark">SHIFT <span>GROUP</span><small>CPR · DIESEL</small></div>
 </header>
 <main>
-  <h1>Diesel for the generators</h1>
-  <p class="lead">Each time a generator is filled: a photo of the bill, the litres and the amount in dollars.</p>
+  <h1>Diesel for the big generator</h1>
+  <p class="lead">Each time the big generator is filled: a photo of the bill, the litres and the amount in dollars.</p>
   <form id="codef" onsubmit="setCode(event)" style="display:none">
     <label>The diesel code (ask Mario) <input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="6 digits"></label>
     <button class="go">Open</button>
@@ -70,7 +70,7 @@
     <div id="read"></div>
     <div class="two">
       <label>Date <input type="date" id="date" required></label>
-      <label>Generator <select id="gen"></select></label>
+      <label>Generator <input type="text" value="Generator big" readonly><input type="hidden" id="gen" value="big"></label>
     </div>
     <div class="two">
       <label>Litres <input type="number" id="litres" inputmode="decimal" step="0.1" min="0" placeholder="0"></label>
@@ -131,7 +131,6 @@ async function readBill() {
     const set = (id, v) => { const el = document.getElementById(id); if (v != null && v !== '' && (!el.value || el.value === '0')) el.value = v; };
     set('litres', x.litres); set('usd', x.usd); set('note', x.note);
     if (x.date) document.getElementById('date').value = x.date;
-    if (x.gen) document.getElementById('gen').value = x.gen;
     rd.textContent = (x.litres || x.usd) ? '✓ Read from the photo — check the boxes before saving.' : 'Could not read the figures — type them in.';
   } catch (e) { if (!e.quiet) rd.textContent = 'Could not read the photo (' + e.message + ') — type the figures in.'; }
 }
@@ -162,7 +161,6 @@ async function load() {
   try {
     const d = await api('GET', '/api/cpr/fuel');
     GENS = d.gens; ADMIN = d.admin;
-    const sel = document.getElementById('gen'); if (!sel.options.length) sel.innerHTML = Object.entries(GENS).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
     const L = d.list.reduce((s, x) => s + (x.litres || 0), 0), U = d.list.reduce((s, x) => s + (x.usd || 0), 0);
     document.getElementById('tot').textContent = d.list.length ? `${d.list.length} fill${d.list.length > 1 ? 's' : ''} · ${f2(L)} L · $${f2(U)}` : 'No fill yet.';
     monthTable(d.list);
@@ -177,13 +175,13 @@ async function load() {
 // Mario 2026-09-26: the quantities and prices by month, against the kWh the generators produced (meters, /api/cpr)
 let GENKWH = null;
 async function monthTable(list) {
-  if (!GENKWH) { try { const d = await (await fetch('/api/cpr')).json(); GENKWH = {}; d.days.forEach((day, i) => { const m = day.slice(0, 7); let s = 0; for (const k of ['genBig', 'genChurch', 'genSmall']) { const v = d.data[k] && d.data[k][i]; if (v) s += v[0]; } GENKWH[m] = (GENKWH[m] || 0) + s; }); } catch (e) { GENKWH = {}; } }
+  if (!GENKWH) { try { const d = await (await fetch('/api/cpr')).json(); GENKWH = {}; d.days.forEach((day, i) => { const m = day.slice(0, 7); let s = 0; for (const k of ['genBig']) { const v = d.data[k] && d.data[k][i]; if (v) s += v[0]; } GENKWH[m] = (GENKWH[m] || 0) + s; }); } catch (e) { GENKWH = {}; } }
   const by = {};
   for (const x of list) { const m = x.date.slice(0, 7); const o = by[m] || (by[m] = { n: 0, l: 0, usd: 0, lp: 0, up: 0 }); o.n++; o.l += x.litres || 0; o.usd += x.usd || 0; if (x.litres && x.usd) { o.lp += x.litres; o.up += x.usd; } }
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const rows = Object.keys(by).sort().reverse().map(m => { const o = by[m], kwh = GENKWH[m];
     return `<tr><td>${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}</td><td>${o.n}</td><td>${f2(o.l)}</td><td>${o.usd ? '$' + f2(o.usd) : ''}</td><td>${o.lp ? '$' + (o.up / o.lp).toFixed(2) : ''}</td><td>${kwh != null ? Math.round(kwh).toLocaleString('en-US') : '—'}</td><td class="k">${kwh && o.l ? (kwh / o.l).toFixed(2) : '—'}</td></tr>`; }).join('');
-  document.getElementById('months').innerHTML = rows ? `<table><thead><tr><th>Month</th><th>Fills</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Gen kWh<small>meters</small></th><th>kWh / L</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tot">No fill yet.</div>';
+  document.getElementById('months').innerHTML = rows ? `<table><thead><tr><th>Month</th><th>Fills</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Gen big kWh<small>meter M7</small></th><th>kWh / L</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tot">No fill yet.</div>';
 }
 async function del(id) { if (!confirm('Delete this fill and its photo?')) return; await api('DELETE', '/api/cpr/fuel/' + id); load(); }
 load();
