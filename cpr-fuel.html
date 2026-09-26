@@ -42,6 +42,8 @@
   .fill img,.fill .ph{width:56px;height:56px;border-radius:8px;object-fit:cover;background:var(--surface0);display:flex;align-items:center;justify-content:center;color:var(--overlay0);font-size:1.3rem;}
   .fill .t{font-size:.9rem;} .fill .s{font-size:.74rem;color:var(--sub);margin-top:2px;}
   .fill .v{text-align:right;font-variant-numeric:tabular-nums;} .fill .v b{display:block;color:var(--amber);}
+  #viewAs{font-size:.76rem;padding:7px 10px;} #viewAs.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
+  .adminbar{font-size:.74rem;color:var(--amber);margin:0 0 10px;}
   .del{background:none;border:0;color:var(--overlay0);padding:4px;font-size:.8rem;}
   .tot{font-size:.8rem;color:var(--sub);margin:4px 0 10px;}
 </style>
@@ -50,6 +52,7 @@
 <header>
   <a class="hback" href="/cpr">‹ CPR</a>
   <div class="wordmark">SHIFT <span>GROUP</span><small>CPR · DIESEL</small></div>
+  <button id="viewAs" style="display:none;margin-left:auto" onclick="togglePublic()" title="See the page the way Kamal sees it"></button>
 </header>
 <main>
   <h1>Diesel for the big generator</h1>
@@ -83,6 +86,7 @@
   <h2>By month</h2>
   <div id="months"></div>
   <h2>Fills</h2>
+  <div class="adminbar" id="adminbar"></div>
   <div class="tot" id="tot"></div>
   <div id="list"></div>
 </main>
@@ -105,7 +109,16 @@ const api = async (method, path, body) => {
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const f2 = n => n == null ? '' : (+n).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const beirutToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
-let blob = null, GENS = {}, ADMIN = false;
+let blob = null, GENS = {}, ADMIN = false, REAL_ADMIN = false;
+function applyView() {
+  const asPublic = store.get('cpr.public') === '1';
+  ADMIN = REAL_ADMIN && !asPublic;
+  const b = document.getElementById('viewAs');
+  b.style.display = REAL_ADMIN ? '' : 'none';
+  b.textContent = asPublic ? '👁 Public view — back to admin' : '👁 View as public';
+  b.classList.toggle('on', asPublic);
+}
+function togglePublic() { store.set('cpr.public', store.get('cpr.public') === '1' ? '0' : '1'); applyView(); load(); }
 document.getElementById('date').value = beirutToday();
 
 function pick(how) { document.getElementById(how === 'camera' ? 'cam' : 'gal').click(); }
@@ -160,15 +173,16 @@ async function send(e) {
 async function load() {
   try {
     const d = await api('GET', '/api/cpr/fuel');
-    GENS = d.gens; ADMIN = d.admin;
+    GENS = d.gens; REAL_ADMIN = !!d.admin; applyView();
     const L = d.list.reduce((s, x) => s + (x.litres || 0), 0), U = d.list.reduce((s, x) => s + (x.usd || 0), 0);
     document.getElementById('tot').textContent = d.list.length ? `${d.list.length} fill${d.list.length > 1 ? 's' : ''} · ${f2(L)} L · $${f2(U)}` : 'No fill yet.';
     monthTable(d.list);
+    document.getElementById('adminbar').textContent = ADMIN ? 'Admin: each fill has a delete button.' : '';
     document.getElementById('list').innerHTML = d.list.map(x => {
       const img = x.file ? (/pdf$/.test(x.file.mime) ? `<a class="ph" href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank">📄</a>` : `<a href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank"><img loading="lazy" src="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" alt=""></a>`) : '<div class="ph">—</div>';
       const per = x.litres && x.usd ? ` · $${f2(x.usd / x.litres)}/L` : '';
       return `<div class="fill">${img}<div><div class="t">${esc(x.date)} · ${esc(GENS[x.gen] || x.gen)}</div><div class="s">${esc(x.who)}${x.note ? ' · ' + esc(x.note) : ''}${per}</div></div>
-        <div class="v">${x.litres ? f2(x.litres) + ' L' : ''}<b>${x.usd ? '$' + f2(x.usd) : ''}</b>${ADMIN ? `<button class="del" onclick="del('${x.id}')">delete</button>` : ''}</div></div>`;
+        <div class="v">${x.litres ? f2(x.litres) + ' L' : ''}<b>${x.usd ? '$' + f2(x.usd) : ''}</b>${ADMIN ? `<button class="del" onclick="del('${x.id}')">🗑 delete</button>` : ''}</div></div>`;
     }).join('');
   } catch (e) { if (e.quiet) return; document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
 }
@@ -183,7 +197,10 @@ async function monthTable(list) {
     return `<tr><td>${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}</td><td>${o.n}</td><td>${f2(o.l)}</td><td>${o.usd ? '$' + f2(o.usd) : ''}</td><td>${o.lp ? '$' + (o.up / o.lp).toFixed(2) : ''}</td><td>${kwh != null ? Math.round(kwh).toLocaleString('en-US') : '—'}</td><td class="k">${kwh && o.l ? (kwh / o.l).toFixed(2) : '—'}</td></tr>`; }).join('');
   document.getElementById('months').innerHTML = rows ? `<table><thead><tr><th>Month</th><th>Fills</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Gen big kWh<small>meter M7</small></th><th>kWh / L</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tot">No fill yet.</div>';
 }
-async function del(id) { if (!confirm('Delete this fill and its photo?')) return; await api('DELETE', '/api/cpr/fuel/' + id); load(); }
+async function del(id) {
+  if (!confirm('Delete this fill and its photo?')) return;
+  try { await api('DELETE', '/api/cpr/fuel/' + id); load(); } catch (e) { if (!e.quiet) alert('Could not delete: ' + e.message); }
+}
 load();
 </script>
 </body>

@@ -915,7 +915,14 @@ const handler = async (req, res) => {
   // Kamal's diesel fills — before the sign-in gate: the private link's key, or a hub admin by the session cookie
   if (url.startsWith('/api/cpr/fuel')) {
     let isAdmin = AUTH_DISABLED;
-    if (!isAdmin) { try { const u = await verifyToken(req); if (u) { const acc = await accessFor(u.email); isAdmin = !!(acc && acc.admin); } } catch (e) {} }
+    // GET: the usual check (it reads the session cookie); DELETE from the page: the same cookie, read here the way the
+    // WhatsApp relay does (SameSite=Lax, so another site cannot send it with a DELETE)
+    if (!isAdmin) { try {
+      let u = null;
+      if (req.method === 'GET') u = await verifyToken(req);
+      else { const c = /(?:^|;\s*)todo_session=([^;]+)/.exec(req.headers.cookie || ''); let tok = ''; if (c) { try { tok = decodeURIComponent(c[1]); } catch {} } u = tok.startsWith('st_') ? await verifySessionToken(tok) : await verifyToken(req); }
+      if (u) { const acc = await accessFor(u.email); isAdmin = !!(acc && acc.admin); }
+    } catch (e) {} }
     try { const handled = await cprFuel.handle(req, res, url, { db, admin, TEAM_ID, isAdmin }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('cpr fuel error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
