@@ -6,8 +6,8 @@
 //   POST   /api/cpr/fuel                { date, gen, litres, usd, note, who, dataBase64?, mime?, name? }
 //   GET    /api/cpr/fuel/<id>/file      the photo
 //   DELETE /api/cpr/fuel/<id>           admin only
-// Who may: anyone with the /cpr link (no code since 2026-09-26); DELETE = hub admin. The 6-digit code (CPR_FUEL_KEY)
-// sent as ?k= or x-cpr-key) or a hub admin. A wrong code waits 2 s, so guessing six digits is slow.
+// Who may: anyone with the /cpr link (no code since 2026-09-26, Mario); DELETE = hub admin. The 6-digit code
+// (CPR_FUEL_KEY, ?k= or x-cpr-key) only counts again with CPR_FUEL_REQUIRE_CODE=1; a wrong code then waits 2 s.
 
 const files = require('./hub-files');
 const GENS = { big: 'Generator big', church: 'Generator church', small: 'Generator small', other: 'Other' };
