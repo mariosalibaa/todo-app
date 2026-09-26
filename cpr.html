@@ -44,13 +44,16 @@
   .note ul{margin:6px 0 0;padding-left:18px;}
   .set{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:.78rem;color:var(--sub);margin:0 0 10px;}
   .set input{width:80px;}
+  #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
   #msg .warn{color:var(--amber);}
   /* the phone: every table fits the width — the extra columns go into the line a row opens when tapped */
-  .wide{} .hint{display:none;} .adm{display:none;} body.admin .adm{display:inline;}
+  .wide{} .hint{display:none;} .sh{display:none;} td.gs,th.gs{border-left:2px solid var(--surface1);} .unit{display:none;} .adm{display:none;} body.admin .adm{display:inline;}
   @media (max-width:640px){
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
     .wide{display:none;} .hint{display:block;}
+    body.t-all .fl{display:none;} body.t-all .sh{display:inline;} body.t-all td small{display:none;} body.t-all .unit{display:block;}
+    body.t-all table{font-size:.7rem;} body.t-all th{padding:6px 2px;font-size:.5rem;letter-spacing:0;} body.t-all td{padding:7px 2px;}
     table{font-size:.74rem;} th{padding:7px 4px;font-size:.56rem;} td{padding:7px 4px;}
     td:first-child,th:first-child{padding-left:10px;} td:last-child,th:last-child{padding-right:10px;}
   }
@@ -68,12 +71,13 @@
     <select id="range" onchange="render()"></select>
     <span class="sp"></span>
     <button onclick="exportCsv()" title="The table shown, as a CSV">⬇ CSV</button>
-    <button onclick="load(true)" title="Read the meters again">↻</button>
+    <button onclick="load(true)" title="Read the meters and Deye again (or pull the page down)">↻ Refresh</button>
   </div>
   <div class="set" id="set"></div>
+  <div id="ptr">↓ Pull to refresh</div>
   <div id="msg">Loading…</div>
   <div class="card"><table id="tbl"></table></div>
-  <p class="hint muted small">Tap a month for the detail.</p>
+  <p class="hint muted small"><span class="unit">On the phone the month-by-month table is in MWh (thousands of kWh). </span>Tap a month for the detail.</p>
   <div class="note" id="notes"></div>
 </main>
 <script>
@@ -83,13 +87,13 @@ const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-const TABS = [['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
+const TABS = [['all', 'Month by month'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
 // Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
 // Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
 // them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
 let ADMIN = false;
 fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { ADMIN = !!(me && me.admin); document.body.classList.toggle('admin', ADMIN); if (M) render(); }).catch(() => {});
-let D = null, M = null, tab = store.get('cpr.tab') || 'bld', open = new Set();
+let D = null, M = null, tab = store.get('cpr.tab') || 'all', open = new Set();
 
 async function load(fresh) {
   document.getElementById('msg').textContent = fresh ? 'Reading the meters again…' : 'Loading…';
@@ -151,8 +155,9 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
 const edlOf = m => m < EDL_OK && dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn'), note: 'Deye' } : mv(m, 'edl');
+const num2 = v => tab === 'all' ? `<span class="fl">${f0(v)}</span><span class="sh">${(v / 1000).toFixed(1)}</span>` : f0(v);
 const cell = (x0, cls = '') => { const x = ADMIN ? x0 : { ...x0, est: false, note: /missing/.test(x0.note || '') ? '' : x0.note }; return x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
-  : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + f0(x.v) + '</span>' : f0(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`; };
+  : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + num2(x.v) + '</span>' : num2(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`; };
 // share of the month's total (Mario 2026-09-26: "% of each building out of the total consumption")
 // Mario 2026-09-26: the church pays the church generator itself — what we supply is the church minus that generator
 const churchOurs = m => { const c = mv(m, 'church').v, g = mv(m, 'genChurch').v; return c == null ? null : Math.max(0, c - (g || 0)); };
@@ -163,6 +168,11 @@ const pct = (a, b) => (a && b ? Math.round((b - a) / a * 100) : null);
 
 // each tab: columns (phone = the ones without wide) + the detail line a tapped row opens
 const VIEWS = {
+  all: {
+    head: ['School', 'Church', 'Kamal', ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', 'Gen', ['Supply', '', 'sum']],
+    row: m => { const s = VIEWS.sup.row(m); return [mv(m, 'school'), mv(m, 'church'), sumv(m, ['liqaa', 'hotel']), [sumv(m, ['school', 'church', 'liqaa', 'hotel']), 'sum'], [s[0], 'gs'], s[1], s[2], [s[5][0], 'sum']]; },
+    det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m),
+  },
   bld: {
     head: ['School', 'Church', ['Kamal', 'Liqaa + Hotel'], ['Liqaa', '', 'wide'], ['Hotel', '', 'wide'], ['Total', '', 'sum']],
     row: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']);
@@ -196,7 +206,8 @@ const VIEWS = {
 };
 
 function render() {
-  if (!ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'bld';
+  document.body.classList.toggle('t-all', tab === 'all');
+  if (!ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'all';
   document.getElementById('tabs').innerHTML = TABS.filter(t => ADMIN || !t[2]).map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
   document.getElementById('set').innerHTML = tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty.</span>`
@@ -213,7 +224,7 @@ function render() {
     }).join('');
     return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` : '');
   }).join('');
-  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && h[2] === 'wide' ? 'wide' : ''}">${tot[i].any ? f0(tot[i].v) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
+  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && (h[2] === 'wide' || h[2] === 'gs') ? h[2] : ''}">${tot[i].any ? num2(tot[i].v) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
   document.getElementById('tbl').innerHTML = `<thead><tr><th>Month</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
   const notes = (D.notes || []).slice();
   if (tab === 'cmp' || tab === 'sup') notes.unshift('The EDL meter was wired wrong until April 2026: phase B current transformer reversed (its power read negative), phase C on the wrong voltage — so it counted only about half of what came from EDL. Supply uses Deye for EDL until April 2026; Meters vs Deye still shows the raw meter.');
@@ -234,6 +245,22 @@ function exportCsv() {
   a.download = `CPR ${TABS.find(t => t[0] === tab)[1]} ${today()}.csv`; a.click();
 }
 load(false);
+
+// pull-to-refresh on a phone: drag down from the top of the page, let go past 80 px → read again (Mario 2026-09-26)
+(function () {
+  const ptr = document.getElementById('ptr'); let y0 = null, dy = 0;
+  addEventListener('touchstart', e => { y0 = scrollY <= 0 ? e.touches[0].clientY : null; dy = 0; }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (y0 == null) return; dy = e.touches[0].clientY - y0; if (dy <= 0) return;
+    ptr.textContent = dy > 80 ? '↻ Release to refresh' : '↓ Pull to refresh';
+    ptr.style.transform = `translate(-50%, ${Math.min(dy, 100) - 60}px)`;
+  }, { passive: true });
+  addEventListener('touchend', () => {
+    if (y0 != null && dy > 80) { ptr.textContent = 'Refreshing…'; ptr.style.transform = 'translate(-50%, 0)'; load(true).finally(() => setTimeout(() => { ptr.style.transform = ''; }, 400)); }
+    else ptr.style.transform = '';
+    y0 = null; dy = 0;
+  });
+})();
 </script>
 <script src="/phone-preview.js"></script>   <!-- the 📱 button on a laptop (Shift+P); nothing on a phone -->
 </body>
