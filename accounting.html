@@ -2036,7 +2036,7 @@ function openStmt() {
     // "received from Mario", not the quote and the time behind it
     if (t.nature === 'transfer') return d.split(/\s+—\s+/)[0].slice(0, 60);
     // benzine: the car and the odometer, as the fuel view reads them
-    if (t.car || isFuel(d)) {
+    if ((t.car || isFuel(d)) && !machineDiesel(t)) {
       const km = t.odometer || (d.match(/(\d[\d,.]*)\s*km\b/i) || [])[1];
       const car = t.car || (/jeep/i.test(d) ? 'jeep' : /tacoma/i.test(d) ? 'Tacoma' : /cherokee|laredo/i.test(d) ? 'Laredo' : '');
       return ['benzine', [car, km ? (+String(km).replace(/,/g, '') ? (+String(km).replace(/,/g, '')).toLocaleString('en-US') : km) + ' km' : ''].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
@@ -2803,7 +2803,11 @@ const OWN_CAR = { abed: 'BMW', georges: 'RAV4' };
 const isFuel = s => /benzin|fuel|essence|petrol|gasoline|mazout|gasoil|diesel|\btank\b|⛽/i.test(s || '') && !/water tank/i.test(s || '');
 const carIn = s => { const m = String(s || '').match(/\b(bmw|rav ?4|laredo|tacoma)\b/i); return m ? CARS.find(c => c.toLowerCase() === m[1].replace(/\s/g, '').toLowerCase()) : ''; };
 const odometerIn = s => { const m = String(s || '').match(/odomet\w*\D{0,12}(\d{1,3}(?:[,. ]\d{3})+|\d{4,7})|(\d{1,3}(?:[,. ]\d{3})+|\d{5,7})\s*km\b/i); const v = m && (m[1] || m[2]); return v ? +v.replace(/[,. ]/g, '') : null; };
+// the excavator burns diesel too, but it has no odometer and no car: a line of the Ajaltoun excavation
+// is machine diesel and gets no fuel row (Mario, 2026-09-26: "no need to show the meter and the liter for diesel")
+const machineDiesel = t => t.section === 'excavation' || /georges el hajj|dib mokhtar|anthony khalil/i.test((t.partnerName || '') + ' ' + (t.description || ''));
 function fuelOf(t) {
+  if (machineDiesel(t) && !t.car) return null;
   if (!(t.car || isFuel([t.description, t.partnerName, t.note].join(' ')))) return null;
   const words = (t.description || '') + ' ' + (t.note || '');
   const car = t.car || carIn(words) || OWN_CAR[(account && account.owner) || ''] || '';
