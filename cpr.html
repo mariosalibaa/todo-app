@@ -171,8 +171,11 @@ const today = () => D.days[D.days.length - 1];
 function mv(m, key) {
   const c = M.by[m].m[key]; const nm = D.noMeter && D.noMeter[key];
   if (!c || !c.n) return nm && m >= nm.slice(0, 7) ? { v: 0, note: 'off' } : { v: null };
-  return { v: c.kwh, est: c.est, note: c.first && c.first > m + '-01' ? 'from ' + (+c.first.slice(8)) + ' ' + MON[+c.first.slice(5, 7) - 1] : '' };
+  // Mario 2026-09-26: EDL and the generators from openHAB (the buildings stay SD card first); ≈ as the month had it
+  const oh = OH_KEYS.has(key) && M.by[m].src && M.by[m].src.oh[key] && M.by[m].src.oh[key].n ? M.by[m].src.oh[key].kwh : null;
+  return { v: oh != null ? oh : c.kwh, est: c.est, note: c.first && c.first > m + '-01' ? 'from ' + (+c.first.slice(8)) + ' ' + MON[+c.first.slice(5, 7) - 1] : '' };
 }
+const OH_KEYS = new Set(['edl', 'genChurch', 'genBig', 'genSmall']);
 const sumv = (m, keys) => { const xs = keys.map(k => mv(m, k)); const have = xs.filter(x => x.v != null); return have.length ? { v: have.reduce((s, x) => s + x.v, 0), est: have.some(x => x.est) } : { v: null }; };
 // one source for a group of meters → { v, part } (part = the source covers only some days of the month)
 const srcv = (m, s, keys) => { const o = M.by[m]; const cs = keys.map(k => o.src[s][k]).filter(c => c && c.n); if (!cs.length) return { v: null }; return { v: cs.reduce((a, c) => a + c.kwh, 0), part: Math.max(...cs.map(c => c.n)) < o.days }; };
