@@ -10,8 +10,12 @@
 //   • live — every day after it, read from openHAB Cloud (myopenhab.org REST, basic auth with Mario's openHAB
 //     Cloud account: OPENHAB_USER / OPENHAB_PASS) and turned into days with the same rules (energy-calc.js).
 // No credentials or openHAB down → the history alone, with the reason (liveError) for the page to show.
+//
+// deye: the inverter plant (DeyeCloud) per day — solar, generator input, EDL in / out, UPS load, battery (deye.js).
+// Mario, 2026-09-26: "add the solar production … compare DeyeCloud EDL and generator with the meters".
 
 const C = require('./energy-calc');
+const deye = require('./deye');
 const HISTORY = require('./energy-history.json');   // a static require, so Vercel bundles it
 
 const OH_URL = (process.env.OPENHAB_URL || 'https://myopenhab.org').replace(/\/$/, '');
@@ -50,13 +54,14 @@ async function liveDays() {
   return { days, data, latest, outages: outs.map(([s, e]) => [new Date(s).toISOString(), new Date(e).toISOString()]) };
 }
 
-async function build() {
+async function build(ctx) {
   const out = {
     buildings: C.BUILDINGS.map(({ key, name, group }) => ({ key, name, group })),
     days: HISTORY.days.slice(), data: {}, noMeter: HISTORY.noMeter, notes: HISTORY.notes,
     historyTo: HISTORY.last, historyBuiltAt: HISTORY.builtAt, live: false, liveError: null, latest: {}, pulledAt: new Date().toISOString(),
   };
   for (const b of C.BUILDINGS) out.data[b.key] = HISTORY.data[b.key].slice();
+  const deyeP = deye.days(ctx);   // alongside openHAB, not after it
   try {
     const lv = await liveDays();
     out.days.push(...lv.days);
@@ -66,15 +71,16 @@ async function build() {
     out.liveError = String(e.message || e);
     console.error('energy live:', out.liveError);
   }
+  out.deye = { fields: deye.FIELDS, ...(await deyeP) };
   return out;
 }
 
 async function handle(req, res, url, user, ctx) {
   const [p, qs] = url.split('?');
   if (p === '/api/energy' && req.method === 'GET') {
-    const fresh = new URLSearchParams(qs || '').get('fresh') === '1';
+    const fresh = new URLSearchParams(qs || '').get('fresh') === '1' && Date.now() - cache.at > 60000;   // public page: a refresh at most once a minute
     if (!fresh && cache.data && Date.now() - cache.at < CACHE_MS) return json(res, 200, { ...cache.data, cached: true });
-    if (!cache.pending) cache.pending = build().then(d => { cache = { at: d.live ? Date.now() : Date.now() - CACHE_MS + 60000, data: d, pending: null }; return d; }, e => { cache.pending = null; throw e; });
+    if (!cache.pending) cache.pending = build(ctx).then(d => { cache = { at: d.live ? Date.now() : Date.now() - CACHE_MS + 60000, data: d, pending: null }; return d; }, e => { cache.pending = null; throw e; });
     return json(res, 200, { ...(await cache.pending), cached: false });
   }
   return false;

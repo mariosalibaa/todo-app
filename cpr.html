@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>CPR Energy · Shift Group</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;}
+  *{box-sizing:border-box;}
+  html,body{background:var(--base);}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);background:var(--base);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  main{max-width:1100px;margin:0 auto;padding:20px 20px 60px;}
+  h1{font-size:1.25rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.82rem;margin:0 0 14px;line-height:1.5;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .bar .sp{flex:1;}
+  select,button,input{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:6px 10px;font-size:.8rem;font-family:inherit;}
+  button{cursor:pointer;} button:hover{border-color:var(--amber);}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
+  .tabs button{border-radius:999px;} .tabs button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;table-layout:auto;}
+  th{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;background:var(--mantle);}
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:7px 8px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  td.sum,th.sum{color:var(--amber);font-weight:600;background:rgba(242,169,59,.06);}
+  td .est{color:var(--sub);font-style:italic;}
+  td .none{color:var(--overlay0);font-size:.72rem;}
+  td small,th small{display:block;color:var(--overlay0);font-size:.64rem;font-weight:400;text-transform:none;letter-spacing:0;}
+  td .pair{display:block;} td .d{font-size:.66rem;color:var(--overlay0);} td .d.big{color:var(--amber);}
+  tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
+  tr.det td{background:rgba(49,50,68,.45);color:var(--sub);font-size:.74rem;text-align:left;white-space:normal;padding:8px 12px;}
+  tr.det b{color:var(--text);font-weight:500;}
+  tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);background:rgba(242,169,59,.10);}
+  .muted{color:var(--overlay0);} .small{font-size:.74rem;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
+  .note ul{margin:6px 0 0;padding-left:18px;}
+  .set{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:.78rem;color:var(--sub);margin:0 0 10px;}
+  .set input{width:80px;}
+  #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
+  #msg .warn{color:var(--amber);}
+  /* the phone: every table fits the width — the extra columns go into the line a row opens when tapped */
+  .wide{} .hint{display:none;}
+  @media (max-width:640px){
+    header{padding:12px 16px;} main{padding:14px 12px 40px;}
+    .wide{display:none;} .hint{display:block;}
+    table{font-size:.74rem;} th{padding:7px 4px;font-size:.56rem;} td{padding:7px 4px;}
+    td:first-child,th:first-child{padding-left:10px;} td:last-child,th:last-child{padding-right:10px;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>CPR · ENERGY</small></div>
+</header>
+<main>
+  <h1>CPR — energy per month</h1>
+  <p class="lead">kWh per calendar month, Beirut time. Buildings and generators from the Metrel meters on site, solar and the EDL net metering from the three Deye inverters. <span class="est">≈</span> = a logger was offline part of that month (estimated).</p>
+  <div class="tabs" id="tabs"></div>
+  <div class="bar">
+    <select id="range" onchange="render()"></select>
+    <span class="sp"></span>
+    <button onclick="exportCsv()" title="The table shown, as a CSV">⬇ CSV</button>
+    <button onclick="load(true)" title="Read the meters again">↻</button>
+  </div>
+  <div class="set" id="set"></div>
+  <div id="msg">Loading…</div>
+  <div class="card"><table id="tbl"></table></div>
+  <p class="hint muted small">Tap a month for the detail.</p>
+  <div class="note" id="notes"></div>
+</main>
+<script>
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const mLabel = m => MON[+m.slice(5) - 1] + ' ' + m.slice(2, 4);
+const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const TABS = [['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye'], ['dsl', 'Diesel']];
+let D = null, M = null, tab = store.get('cpr.tab') || 'bld', open = new Set();
+
+async function load(fresh) {
+  document.getElementById('msg').textContent = fresh ? 'Reading the meters again…' : 'Loading…';
+  try {
+    const r = await fetch('/api/cpr' + (fresh ? '?fresh=1' : ''));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    D = await r.json();
+    months();
+    const sel = document.getElementById('range'), cur = sel.value;
+    const yrs = [...new Set(M.list.map(m => m.slice(0, 4)))].reverse();
+    sel.innerHTML = '<option value="12">Last 12 months</option>' + yrs.map(y => `<option value="${y}">${y}</option>`).join('') + '<option value="">All months</option>';
+    sel.value = cur || '12';
+    const bits = [];
+    bits.push(D.live ? `Meters live · read ${esc(when(D.pulledAt))}` : `<span class="warn">Meters not reachable (${esc(D.liveError)}) — history up to ${esc(D.historyTo)}</span>`);
+    bits.push(D.deye && !D.deye.error ? 'Deye live' : `<span class="warn">Deye not reachable${D.deye ? ' (' + esc(D.deye.error) + ')' : ''}</span>`);
+    document.getElementById('msg').innerHTML = bits.join(' · ');
+    render();
+  } catch (e) { document.getElementById('msg').innerHTML = `<span style="color:var(--red)">Could not load: ${esc(e.message || String(e))}</span>`; }
+}
+
+// days → months. Meters: kWh + estimated flag + first day with data. Deye: kWh sums + days covered.
+function months() {
+  const by = {};
+  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, n: 0 } });
+  D.days.forEach((d, i) => {
+    const o = mo(d.slice(0, 7));
+    for (const b of D.buildings) {
+      const v = D.data[b.key][i]; const c = o.m[b.key] || (o.m[b.key] = { kwh: 0, n: 0, est: false, first: null });
+      if (v) { c.kwh += v[0]; c.n++; if (v[1]) c.est = true; if (!c.first) c.first = d; }
+    }
+  });
+  if (D.deye && D.deye.days) {
+    const F = D.deye.fields;
+    D.deye.days.forEach((d, i) => {
+      const v = D.deye.data[i]; if (!v) return;
+      const o = mo(d.slice(0, 7)).d;
+      F.forEach((f, j) => { if (f in o && f !== 'n') o[f] += +v[j] || 0; });
+      o.n++;
+    });
+  }
+  M = { by, list: Object.keys(by).sort() };
+}
+const shown = () => { const y = document.getElementById('range').value; return y === '12' ? M.list.slice(-12) : y ? M.list.filter(m => m.startsWith(y)) : M.list; };
+const today = () => D.days[D.days.length - 1];
+
+// one meter in one month → { v, est, note } (v null = no data)
+function mv(m, key) {
+  const c = M.by[m].m[key]; const nm = D.noMeter && D.noMeter[key];
+  if (!c || !c.n) return nm && m >= nm.slice(0, 7) ? { v: 0, note: 'off' } : { v: null };
+  return { v: c.kwh, est: c.est, note: c.first && c.first > m + '-01' ? 'from ' + (+c.first.slice(8)) + ' ' + MON[+c.first.slice(5, 7) - 1] : '' };
+}
+const sumv = (m, keys) => { const xs = keys.map(k => mv(m, k)); const have = xs.filter(x => x.v != null); return have.length ? { v: have.reduce((s, x) => s + x.v, 0), est: have.some(x => x.est) } : { v: null }; };
+const dv = (m, f) => { const o = M.by[m].d; return o.n ? o[f] : null; };
+const cell = (x, cls = '') => x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
+  : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + f0(x.v) + '</span>' : f0(x.v)}${x.note ? `<small>${x.note}</small>` : ''}</td>`;
+const num = (v, cls = '') => v == null ? `<td class="${cls}"><span class="none">—</span></td>` : `<td class="${cls}">${f0(v)}</td>`;
+const monthCell = m => `<td>${mLabel(m)}${m === today().slice(0, 7) ? `<small>to ${+today().slice(8)} ${MON[+today().slice(5, 7) - 1]}</small>` : ''}</td>`;
+const pct = (a, b) => (a && b ? Math.round((b - a) / a * 100) : null);
+
+// each tab: columns (phone = the ones without wide) + the detail line a tapped row opens
+const VIEWS = {
+  bld: {
+    head: ['School', 'Church', ['Kamal', 'Liqaa + Hotel'], ['Liqaa', '', 'wide'], ['Hotel', '', 'wide'], ['Total', '', 'sum']],
+    row: m => [mv(m, 'school'), mv(m, 'church'), sumv(m, ['liqaa', 'hotel']), [mv(m, 'liqaa'), 'wide'], [mv(m, 'hotel'), 'wide'], [sumv(m, ['school', 'church', 'liqaa', 'hotel']), 'sum']],
+    det: m => `Liqaa <b>${f0(mv(m, 'liqaa').v)}</b> · Hotel <b>${f0(mv(m, 'hotel').v)}</b> kWh — together Kamal's <b>${f0(sumv(m, ['liqaa', 'hotel']).v)}</b>`,
+  },
+  sup: {
+    head: ['Solar', 'EDL', ['Gen', 'meters'], ['Gen church', '', 'wide'], ['Gen big', '', 'wide'], ['Total', '', 'sum'], ['Sold', 'to EDL']],
+    row: m => {
+      const gen = sumv(m, ['genChurch', 'genBig', 'genSmall']), edl = mv(m, 'edl'), pv = dv(m, 'pv');
+      const tot = (pv || 0) + (edl.v || 0) + (gen.v || 0);
+      return [{ v: pv }, edl, gen, [mv(m, 'genChurch'), 'wide'], [mv(m, 'genBig'), 'wide'], [{ v: tot || null, est: edl.est || gen.est }, 'sum'], { v: dv(m, 'gridOut') }];
+    },
+    det: m => `Solar <b>${f0(dv(m, 'pv'))}</b> (Deye) · EDL <b>${f0(mv(m, 'edl').v)}</b> (meter) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
+  },
+  cmp: {
+    head: [['EDL', 'meter · Deye'], ['Generator', 'meters · Deye'], ['Load', 'buildings · Deye']],
+    row: m => {
+      const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });
+      return [pair(mv(m, 'edl').v, dv(m, 'gridIn')), pair(sumv(m, ['genChurch', 'genBig', 'genSmall']).v, dv(m, 'gen')), pair(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, dv(m, 'use'))];
+    },
+    det: m => `EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
+  },
+  dsl: {
+    head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈']],
+    row: m => { const g = sumv(m, ['genChurch', 'genBig', 'genSmall']); const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0; const l = g.v == null ? null : g.v * lpk;
+      return [g, { v: l, est: g.est }, { v: l != null && usd ? l * usd : null, est: g.est }]; },
+    det: m => `Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> kWh — Deye sees <b>${f0(dv(m, 'gen'))}</b> kWh at the inverters' generator input`,
+  },
+};
+
+function render() {
+  document.getElementById('tabs').innerHTML = TABS.map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
+  document.getElementById('set').innerHTML = tab === 'dsl'
+    ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty.</span>`
+    : '';
+  const V = VIEWS[tab], list = shown().slice().reverse();
+  const hd = h => { const [t, s, c] = Array.isArray(h) ? h : [h, '', '']; return `<th class="${c || ''}">${t}${s ? `<small>${s}</small>` : ''}</th>`; };
+  const cols = V.head.length + 1;
+  const tot = V.head.map(() => ({ v: 0, any: false }));
+  const body = list.map(m => {
+    const cells = V.row(m).map((x, i) => {
+      const [val, cls] = Array.isArray(x) ? x : [x, ''];
+      if (val && val.v != null) { tot[i].v += val.v; tot[i].any = true; }
+      return val && val.html != null ? `<td class="${cls}">${val.html}</td>` : cell(val || { v: null }, cls + (V.head[i] && Array.isArray(V.head[i]) && V.head[i][2] ? ' ' + V.head[i][2] : ''));
+    }).join('');
+    return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` : '');
+  }).join('');
+  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && h[2] === 'wide' ? 'wide' : ''}">${tot[i].any ? f0(tot[i].v) : ''}</td>`).join('')}</tr>`;
+  document.getElementById('tbl').innerHTML = `<thead><tr><th>Month</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
+  const notes = (D.notes || []).slice();
+  if (tab === 'cmp' || tab === 'sup') notes.unshift('Deye (the three inverters, 3 × 50 kW): solar, the generator input, the grid input (EDL) and what goes back to EDL under net metering, the UPS load. From Feb 2026 Deye keeps solar and generator apart; before that its "production" mixes them.');
+  document.getElementById('notes').innerHTML = '<b>About these figures</b><ul>' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
+}
+function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
+function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }
+
+function exportCsv() {
+  const V = VIEWS[tab], list = shown().slice().reverse();
+  const heads = V.head.map(h => Array.isArray(h) ? (h[0] + (h[1] ? ' (' + h[1] + ')' : '')) : h);
+  const lines = [['Month', ...heads].join(',')];
+  for (const m of list) lines.push([m, ...V.row(m).map(x => { const v = Array.isArray(x) ? x[0] : x; return v && v.html != null ? '"' + v.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() + '"' : v && v.v != null ? Math.round(v.v) : ''; })].join(','));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = `CPR ${TABS.find(t => t[0] === tab)[1]} ${today()}.csv`; a.click();
+}
+load(false);
+</script>
+</body>
+</html>

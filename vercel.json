@@ -34,6 +34,10 @@
       "schedule": "30 4 * * *"
     },
     {
+      "path": "/api/cron/deye",
+      "schedule": "30 22 * * *"
+    },
+    {
       "path": "/api/cron/ajaltoun",
       "schedule": "0 5 * * *"
     }
