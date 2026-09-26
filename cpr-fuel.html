@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>CPR Diesel · Shift Group</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;}
+  *{box-sizing:border-box;}
+  html,body{background:var(--base);}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--surface0);}
+  .hback{color:var(--amber);text-decoration:none;font-size:.88rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  main{max-width:640px;margin:0 auto;padding:18px 16px 60px;}
+  h1{font-size:1.2rem;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 16px;line-height:1.5;}
+  form{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px;display:grid;gap:12px;}
+  label{display:grid;gap:5px;font-size:.78rem;color:var(--sub);}
+  input,select,textarea{background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:11px 12px;font-size:1rem;font-family:inherit;width:100%;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .photo{display:flex;gap:10px;align-items:center;}
+  .photo button{flex:1;}
+  button{cursor:pointer;background:var(--surface0);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:12px;font-size:.95rem;font-family:inherit;}
+  button.go{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:700;}
+  button:disabled{opacity:.5;}
+  #thumb{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--surface1);display:none;}
+  #msg{font-size:.84rem;min-height:1.2em;}
+  #msg.ok{color:var(--green);} #msg.err{color:var(--red);}
+  h2{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin:22px 0 8px;}
+  .fill{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:10px;margin-bottom:8px;}
+  .fill img,.fill .ph{width:56px;height:56px;border-radius:8px;object-fit:cover;background:var(--surface0);display:flex;align-items:center;justify-content:center;color:var(--overlay0);font-size:1.3rem;}
+  .fill .t{font-size:.9rem;} .fill .s{font-size:.74rem;color:var(--sub);margin-top:2px;}
+  .fill .v{text-align:right;font-variant-numeric:tabular-nums;} .fill .v b{display:block;color:var(--amber);}
+  .del{background:none;border:0;color:var(--overlay0);padding:4px;font-size:.8rem;}
+  .tot{font-size:.8rem;color:var(--sub);margin:4px 0 10px;}
+</style>
+</head>
+<body>
+<header>
+  <a class="hback" href="/cpr">‹ CPR</a>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>CPR · DIESEL</small></div>
+</header>
+<main>
+  <h1>Diesel for the generators</h1>
+  <p class="lead">Each time a generator is filled: a photo of the bill, the litres and the amount in dollars.</p>
+  <form id="f" onsubmit="send(event)">
+    <div class="photo">
+      <img id="thumb" alt="">
+      <button type="button" onclick="pick('camera')">📷 Photo of the bill</button>
+      <button type="button" onclick="pick('file')">🖼 From gallery</button>
+    </div>
+    <input type="file" id="cam" accept="image/*" capture="environment" hidden onchange="got(this.files[0])">
+    <input type="file" id="gal" accept="image/*,application/pdf" hidden onchange="got(this.files[0])">
+    <div class="two">
+      <label>Date <input type="date" id="date" required></label>
+      <label>Generator <select id="gen"></select></label>
+    </div>
+    <div class="two">
+      <label>Litres <input type="number" id="litres" inputmode="decimal" step="0.1" min="0" placeholder="0"></label>
+      <label>Amount $ <input type="number" id="usd" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></label>
+    </div>
+    <label>Note <input type="text" id="note" placeholder="optional — supplier, price per litre…"></label>
+    <button class="go" id="go">Save the fill</button>
+    <div id="msg"></div>
+  </form>
+  <h2>Fills</h2>
+  <div class="tot" id="tot"></div>
+  <div id="list"></div>
+</main>
+<script src="/scan-editor.js"></script>
+<script>
+// the link's key: kept in this browser after the first visit, so the page works from the home screen too
+const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const qk = new URLSearchParams(location.search).get('k'); if (qk) store.set('cpr.fuelKey', qk);
+const KEY = qk || store.get('cpr.fuelKey') || '';
+const api = async (method, path, body) => {
+  const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(KEY), { method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+  return j;
+};
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const f2 = n => n == null ? '' : (+n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const beirutToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+let blob = null, GENS = {}, ADMIN = false;
+document.getElementById('date').value = beirutToday();
+
+function pick(how) { document.getElementById(how === 'camera' ? 'cam' : 'gal').click(); }
+// a photo goes through the scanner of the Shift WhatsApp chat (crop, flatten, colour / B&W) — a PDF as it is
+async function got(file) {
+  if (!file) return;
+  if (/pdf$/i.test(file.type)) blob = file;
+  else if (window.ScanEditor) { const s = await ScanEditor.open(file); if (!s) return; blob = s; }
+  else blob = file;
+  const t = document.getElementById('thumb');
+  if (/^image\//.test(blob.type || 'image/jpeg')) { t.src = URL.createObjectURL(blob); t.style.display = 'block'; } else t.style.display = 'none';
+  document.getElementById('cam').value = ''; document.getElementById('gal').value = '';
+}
+
+async function send(e) {
+  e.preventDefault();
+  const msg = document.getElementById('msg'), go = document.getElementById('go');
+  const litres = +document.getElementById('litres').value, usd = +document.getElementById('usd').value;
+  if (!(litres > 0) && !(usd > 0)) { msg.className = 'err'; msg.textContent = 'Put the litres or the amount.'; return; }
+  go.disabled = true; msg.className = ''; msg.textContent = 'Saving…';
+  try {
+    let file = {};
+    if (blob) {
+      if (blob.size > 4e6) throw new Error('The photo is over 4 MB — take it again at Medium size.');
+      const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+      file = { dataBase64: b64, mime: blob.type || 'image/jpeg', name: 'diesel ' + document.getElementById('date').value + (/pdf$/.test(blob.type) ? '.pdf' : '.jpg') };
+    }
+    await api('POST', '/api/cpr/fuel', { date: document.getElementById('date').value, gen: document.getElementById('gen').value, litres, usd, note: document.getElementById('note').value, ...file });
+    msg.className = 'ok'; msg.textContent = '✓ Saved';
+    blob = null; document.getElementById('thumb').style.display = 'none';
+    for (const id of ['litres', 'usd', 'note']) document.getElementById(id).value = '';
+    load();
+  } catch (err) { msg.className = 'err'; msg.textContent = err.message; }
+  go.disabled = false;
+}
+
+async function load() {
+  try {
+    const d = await api('GET', '/api/cpr/fuel');
+    GENS = d.gens; ADMIN = d.admin;
+    const sel = document.getElementById('gen'); if (!sel.options.length) sel.innerHTML = Object.entries(GENS).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+    const L = d.list.reduce((s, x) => s + (x.litres || 0), 0), U = d.list.reduce((s, x) => s + (x.usd || 0), 0);
+    document.getElementById('tot').textContent = d.list.length ? `${d.list.length} fill${d.list.length > 1 ? 's' : ''} · ${f2(L)} L · $${f2(U)}` : 'No fill yet.';
+    document.getElementById('list').innerHTML = d.list.map(x => {
+      const img = x.file ? (/pdf$/.test(x.file.mime) ? `<a class="ph" href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank">📄</a>` : `<a href="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" target="_blank"><img loading="lazy" src="/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}" alt=""></a>`) : '<div class="ph">—</div>';
+      const per = x.litres && x.usd ? ` · $${f2(x.usd / x.litres)}/L` : '';
+      return `<div class="fill">${img}<div><div class="t">${esc(x.date)} · ${esc(GENS[x.gen] || x.gen)}</div><div class="s">${esc(x.who)}${x.note ? ' · ' + esc(x.note) : ''}${per}</div></div>
+        <div class="v">${x.litres ? f2(x.litres) + ' L' : ''}<b>${x.usd ? '$' + f2(x.usd) : ''}</b>${ADMIN ? `<button class="del" onclick="del('${x.id}')">delete</button>` : ''}</div></div>`;
+    }).join('');
+  } catch (e) { document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
+}
+async function del(id) { if (!confirm('Delete this fill and its photo?')) return; await api('DELETE', '/api/cpr/fuel/' + id); load(); }
+load();
+</script>
+</body>
+</html>

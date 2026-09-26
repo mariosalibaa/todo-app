@@ -82,7 +82,7 @@
 <main>
   <h1>CPR — energy per month</h1>
   <p class="full">CPR = <b>Complexe Patriarchale Rabwe</b> (Melkite Patriarchate, Rabwe)</p>
-  <p class="lead">kWh per calendar month, Beirut time. Buildings and generators from the Metrel meters on site, solar, EDL and the net metering from the three Deye inverters.<span class="adm"> <span class="est">≈</span> = a logger was offline part of that month (estimated) — admin only.</span></p>
+  <p class="lead">kWh per calendar month, Beirut time. Buildings and generators from the meters on site, solar, EDL and the net metering from the three Deye inverters.<span class="adm"> <span class="est">≈</span> = a logger was offline part of that month (estimated) — admin only.</span></p>
   <div class="tabs" id="tabs"></div>
   <div class="bar">
     <select id="range" onchange="render()"></select>
@@ -123,7 +123,10 @@ function applyView() {
 }
 function togglePublic() { store.set('cpr.public', store.get('cpr.public') === '1' ? '0' : '1'); applyView(); }
 addEventListener('storage', e => { if (e.key === 'cpr.public') applyView(); });   // the preview frame follows a switch made outside it
-fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { REAL_ADMIN = !!(me && me.admin); applyView(); }).catch(() => {});
+fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { REAL_ADMIN = !!(me && me.admin); applyView(); if (REAL_ADMIN) loadFuel(); }).catch(() => {});
+// Kamal's diesel fills (/cpr/diesel) summed per month — admin only
+let FUEL = {};
+function loadFuel() { fetch('/api/cpr/fuel', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(d => { FUEL = {}; for (const x of (d && d.list) || []) { const k = x.date.slice(0, 7); const o = FUEL[k] || (FUEL[k] = { l: 0, usd: 0, n: 0 }); o.l += x.litres || 0; o.usd += x.usd || 0; o.n++; } if (M) render(); }).catch(() => {}); }
 let D = null, M = null, MD = null, tab = store.get('cpr.tab') || 'yr', open = new Set();
 
 async function load(fresh) {
@@ -280,9 +283,9 @@ const VIEWS = {
     det: m => (CMP[cmpKey()] ? `${CMP[cmpKey()].name}: ` : '') + `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
   },
   dsl: {
-    head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈']],
-    row: m => { const g = sumv(m, ['genChurch', 'genBig', 'genSmall']); const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0; const l = g.v == null ? null : g.v * lpk;
-      return [g, { v: l, est: g.est }, { v: l != null && usd ? l * usd : null, est: g.est }]; },
+    head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈'], ['Bought', 'litres', 'gs'], ['Bought', '$']],
+    row: m => { const g = sumv(m, ['genChurch', 'genBig', 'genSmall']); const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0; const l = g.v == null ? null : g.v * lpk; const fu = FUEL[m.slice(0, 7)];
+      return [g, { v: l, est: g.est }, { v: l != null && usd ? l * usd : null, est: g.est }, [{ v: fu ? fu.l : null, note: fu ? fu.n + ' fill' + (fu.n > 1 ? 's' : '') : '' }, 'gs'], { v: fu ? fu.usd : null }]; },
     det: m => `Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> kWh — Deye sees <b>${f0(dv(m, 'gen'))}</b> kWh at the inverters' generator input`,
   },
 };
@@ -296,7 +299,7 @@ function render() {
     : tab === 'cmp'
     ? `<div class="chips">${[['', 'Summary'], ...Object.entries(CMP).map(([k, c]) => [k, c.name])].map(([k, n]) => `<button class="${k === cmpKey() ? 'on' : ''}" onclick="store.set('cpr.cmp', '${k}'); render()">${n}</button>`).join('')}</div>`
     : tab === 'dsl'
-    ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty.</span>`
+    ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
     : '';
   document.getElementById('dash').style.display = tab === 'yr' ? '' : 'none';
   document.getElementById('tblcard').style.display = tab === 'yr' ? 'none' : '';
