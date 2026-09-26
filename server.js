@@ -154,6 +154,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'public/rent-law/cas-82-inflation-2013-2022.pdf'));
   fs.readFileSync(path.join(__dirname, 'mechanical.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
+  fs.readFileSync(path.join(__dirname, 'energy.html'));
 }
 
 // Single shared team workspace — everyone who signs in works on the same board.
@@ -721,6 +722,7 @@ const handler = async (req, res) => {
     'decisions.html': path.join(__dirname, 'decisions.html'),
     'crm.html': path.join(__dirname, 'crm.html'),
     'procurement.html': path.join(__dirname, 'procurement.html'),
+    'energy.html': path.join(__dirname, 'energy.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/members': 'hub.html', '/ask': 'hub.html',   // members & access, the decisions desk (admin views of the hub page)
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
