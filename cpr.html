@@ -36,6 +36,7 @@
   td .none{color:var(--overlay0);font-size:.72rem;}
   td small.pc{color:var(--sub);} td small.ours{color:var(--amber);}
   td small,th small{display:block;color:var(--overlay0);font-size:.64rem;font-weight:400;text-transform:none;letter-spacing:0;}
+  td .tri{display:block;line-height:1.35;} td .tri i{font-style:normal;color:var(--overlay0);font-size:.62rem;margin-right:4px;} td .far .tri{color:var(--amber);}
   td .pair{display:block;} td .d{font-size:.66rem;color:var(--overlay0);} td .d.big{color:var(--amber);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
   tr.det td{background:rgba(49,50,68,.45);color:var(--sub);font-size:.74rem;text-align:left;white-space:normal;padding:8px 12px;}
@@ -134,9 +135,16 @@ async function load(fresh) {
 // days → months. Meters: kWh + estimated flag + first day with data. Deye: kWh sums + days covered.
 function months() {
   const by = {};
-  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, n: 0, noSplit: 0 } });
+  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, n: 0, noSplit: 0 }, src: { sd: {}, oh: {} }, days: 0 });
+  const BS = D.bySource || {}, nHist = BS.oh ? BS.oh.school.length : 0;
   D.days.forEach((d, i) => {
-    const o = mo(d.slice(0, 7));
+    const o = mo(d.slice(0, 7)); o.days++;
+    // one source alone: SD card / openHAB (live days after the history are openHAB)
+    for (const b of D.buildings) for (const s of ['sd', 'oh']) {
+      const v = i < nHist ? (BS[s] && BS[s][b.key][i]) : (s === 'oh' && D.data[b.key][i] ? D.data[b.key][i][0] : null);
+      const c = o.src[s][b.key] || (o.src[s][b.key] = { kwh: 0, n: 0 });
+      if (v != null) { c.kwh += v; c.n++; }
+    }
     for (const b of D.buildings) {
       const v = D.data[b.key][i]; const c = o.m[b.key] || (o.m[b.key] = { kwh: 0, n: 0, est: false, first: null });
       if (v) { c.kwh += v[0]; c.n++; if (v[1]) c.est = true; if (!c.first) c.first = d; }
@@ -164,6 +172,8 @@ function mv(m, key) {
   return { v: c.kwh, est: c.est, note: c.first && c.first > m + '-01' ? 'from ' + (+c.first.slice(8)) + ' ' + MON[+c.first.slice(5, 7) - 1] : '' };
 }
 const sumv = (m, keys) => { const xs = keys.map(k => mv(m, k)); const have = xs.filter(x => x.v != null); return have.length ? { v: have.reduce((s, x) => s + x.v, 0), est: have.some(x => x.est) } : { v: null }; };
+// one source for a group of meters → { v, part } (part = the source covers only some days of the month)
+const srcv = (m, s, keys) => { const o = M.by[m]; const cs = keys.map(k => o.src[s][k]).filter(c => c && c.n); if (!cs.length) return { v: null }; return { v: cs.reduce((a, c) => a + c.kwh, 0), part: Math.max(...cs.map(c => c.n)) < o.days }; };
 const dv = (m, f) => { const o = M.by[m].d; return o.n ? o[f] : null; };
 // solar / generator from Deye: null when no day of the month has the split, ≈ when only some do
 const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) return { v: null }; return { v: o[f], est: o.noSplit > 0, note: o.noSplit ? o.noSplit + ' d missing' : '' }; };
@@ -186,7 +196,7 @@ const pct = (a, b) => (a && b ? Math.round((b - a) / a * 100) : null);
 // each tab: columns (phone = the ones without wide) + the detail line a tapped row opens
 const VIEWS = {
   all: {
-    head: ['School', 'Church', 'Kamal', ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', 'Gen', ['Supply', '', 'sum']],
+    head: ['School', 'Church', ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', 'Gen', ['Supply', '', 'sum']],
     row: m => { const s = VIEWS.sup.row(m); return [mv(m, 'school'), mv(m, 'church'), sumv(m, ['liqaa', 'hotel']), [sumv(m, ['school', 'church', 'liqaa', 'hotel']), 'sum'], [s[0], 'gs'], s[1], s[2], [s[5][0], 'sum']]; },
     det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m),
   },
@@ -207,12 +217,21 @@ const VIEWS = {
     det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL <b>${f0(edlOf(m).v)}</b> (${m < EDL_OK ? 'Deye — the EDL meter read ~half until Apr 2026' : 'meter'}) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
   cmp: {
-    head: [['EDL', 'meter · Deye'], ['Generator', 'meters · Deye'], ['Load', 'buildings · Deye']],
+    head: [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Load', 'SD · openHAB · Deye']],
     row: m => {
+      const tri = (keys, deyeV) => {
+        const sd = srcv(m, 'sd', keys), oh = srcv(m, 'oh', keys);
+        const xs = [sd.v, oh.v, deyeV].filter(v => v != null && v > 0); const spread = xs.length > 1 ? (Math.max(...xs) - Math.min(...xs)) / Math.min(...xs) : 0;
+        const line = (lab, x, part) => `<span class="tri"><i>${lab}</i>${x == null ? '—' : f0(x)}${part ? '<i> part</i>' : ''}</span>`;
+        return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${line('Deye', deyeV)}</span>` };
+      };
+      return [tri(['edl'], dv(m, 'gridIn')), tri(['genChurch', 'genBig', 'genSmall'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], dv(m, 'use'))];
+    },
+    rowOld: m => {
       const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });
       return [pair(mv(m, 'edl').v, dv(m, 'gridIn')), pair(sumv(m, ['genChurch', 'genBig', 'genSmall']).v, dsplit(m, 'gen').v), pair(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, dv(m, 'use'))];
     },
-    det: m => `EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
+    det: m => `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
   },
   dsl: {
     head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈']],

@@ -58,7 +58,8 @@ async function build(ctx) {
   const out = {
     buildings: C.BUILDINGS.map(({ key, name, group }) => ({ key, name, group })),
     days: HISTORY.days.slice(), data: {}, noMeter: HISTORY.noMeter, notes: HISTORY.notes,
-    historyTo: HISTORY.last, historyBuiltAt: HISTORY.builtAt, live: false, liveError: null, latest: {}, pulledAt: new Date().toISOString(),
+    historyTo: HISTORY.last, historyBuiltAt: HISTORY.builtAt, bySource: HISTORY.bySource,   // the history days from the SD cards alone / openHAB alone (admin comparison)
+     live: false, liveError: null, latest: {}, pulledAt: new Date().toISOString(),
   };
   for (const b of C.BUILDINGS) out.data[b.key] = HISTORY.data[b.key].slice();
   const deyeP = deye.days(ctx);   // alongside openHAB, not after it

@@ -35,14 +35,16 @@ const START = T('2025-02-18T00:00:00Z');   // openHAB's first days were resets a
 const SWAP_GENSMALL = [T('2025-08-14T08:00:00Z'), T('2025-08-14T10:00:00Z')];
 const SWAP_HOTEL = T('2026-05-04T07:00:00Z');   // 3322261001 starts counting at 14:59 meter-time = 07:11 UTC; from then on it is the Hotel
 
-const seg = (from, to, ...sources) => ({ from, to, pts: C.cleanPoints(sources.flat(), from, to) });
-const SEGMENTS = {
+// each segment keeps its two sources apart (o = openHAB, s = SD card) so the page can compare them;
+// the figures shown use both together
+const seg = (from, to, o = [], s = []) => ({ from, to, o, s });
+const SPEC = {
   school: [seg(0, END, ohLive('Meter1_EPImp').filter(p => p[0] >= START), sd('M1'))],
   church: [seg(0, END, ohLive('Meter2_EPImp').filter(p => p[0] >= START), sd('M2'))],
   liqaa: [seg(0, END, ohLive('Meter3_EPImp').filter(p => p[0] >= START), sd('M3'))],
   hotel: [
     seg(0, SWAP_HOTEL, ohLive('Meter4_EPImp').filter(p => p[0] >= START), sd('M6')),            // meter 3323341004
-    seg(SWAP_HOTEL, END, sd('M4'), ohLive('Meter4_EPImp').filter(p => p[1] >= 111000)),        // meter 3322261001
+    seg(SWAP_HOTEL, END, ohLive('Meter4_EPImp').filter(p => p[1] >= 111000), sd('M4')),        // meter 3322261001
   ],
   genChurch: [seg(0, END, ohLive('Meter5_EPImp'), sd('M5'))],
   genSmall: [
@@ -52,15 +54,21 @@ const SEGMENTS = {
   genBig: [seg(T('2025-09-01T00:00:00Z'), END, ohLive('Meter7_EPImp'), sd('M7'))],   // their SD cards logged one line at installation (30 Jul) then nothing until September
   edl: [seg(T('2025-09-01T00:00:00Z'), END, ohLive('Meter8_EPImp'), sd('M8'))],
 };
+const build = pick => Object.fromEntries(Object.entries(SPEC).map(([k, sgs]) => [k, sgs.map(g => ({ from: g.from, to: g.to, pts: C.cleanPoints(pick(g), g.from, g.to) }))]));
+const SEGMENTS = build(g => [...g.o, ...g.s]);
+const BY = { oh: build(g => g.o), sd: build(g => g.s) };
 
 const first = C.dayOf(Math.min(...Object.values(SEGMENTS).flat().filter(s => s.pts.length).map(s => s.pts[0][0])));
 const lastDay = (() => { const d = C.dayOf(END); const [y, m, dd] = d.split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd - 1)).toISOString().slice(0, 10); })();   // yesterday, Beirut
 const days = []; for (let d = first; d <= lastDay; d = C.nextDay(d)) days.push(d);
 const data = {};
 for (const b of C.BUILDINGS) { const dl = C.daily(SEGMENTS[b.key], first, lastDay); data[b.key] = days.map(d => dl[d]); }
+// the same days from one source alone (Mario 2026-09-26: compare the SD cards, openHAB and Deye) — kWh only
+const bySource = {};
+for (const [src, SG] of Object.entries(BY)) { bySource[src] = {}; for (const b of C.BUILDINGS) { const dl = C.daily(SG[b.key], first, lastDay); bySource[src][b.key] = days.map(d => dl[d] ? dl[d][0] : null); } }
 
 const out = {
-  builtAt: new Date().toISOString(), first, last: lastDay, days, data,
+  builtAt: new Date().toISOString(), first, last: lastDay, days, data, bySource,
   // no meter from that day on; Mario 2026-09-26: the generator is not running — the page shows 0 · off
   noMeter: { genSmall: '2026-05-04' },
   // the counter each building's live days continue from (energy.js): openHAB item + the value floor that proves it is the right counter

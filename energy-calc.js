@@ -83,8 +83,11 @@ function daily(segments, firstDay, lastDay) {
 const flatRuns = s => { const r = []; for (let i = 0; i < s.length;) { let j = i; while (j + 1 < s.length && s[j + 1][1] === s[i][1]) j++; if (s[j][0] - s[i][0] >= 12 * 3600e3) r.push([s[i][0], s[j][0]]); i = j + 1; } return r; };
 const overlap = (X, Y) => { const o = []; for (const a of X) for (const b of Y) { const s = Math.max(a[0], b[0]), e = Math.min(a[1], b[1]); if (e - s >= 6 * 3600e3) o.push([s, e]); } return o; };
 const outages = (m1, m3, m4) => overlap(overlap(flatRuns(m1 || []), flatRuns(m3 || [])), flatRuns(m4 || []));
-// a series without the stale repeats (the first reading of a run is real, the rest is not)
-const dropStale = (s, outs) => (s || []).filter(([t]) => !outs.some(([a, e]) => t > a && t <= e));
+// a series without the stale repeats (the first reading of a run is real, the rest is not). openHAB keeps hourly
+// AVERAGES, so the first hour or two back online still mixes the stale value in (15 Jul 2026 03:00 read 19,583 on a
+// counter at 26,941) — those go too, else the whole outage lands in that one hour instead of across its days.
+const STALE_TAIL = 2 * 3600e3;
+const dropStale = (s, outs) => (s || []).filter(([t]) => !outs.some(([a, e]) => t > a && t <= e + STALE_TAIL));
 
 // The eight meters as openHAB names them (Mario's pages "M1 School" … "M8 EDL") — order = table order.
 // group: 'load' = a building, 'source' = where the power comes from (the generators, EDL).
