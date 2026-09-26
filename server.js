@@ -912,21 +912,40 @@ const handler = async (req, res) => {
 
   // /api/cpr — the CPR energy figures, PUBLIC and read-only (Mario 2026-09-26: the /cpr link open to everyone, no password).
   // Nothing but kWh per meter and per Deye source per day; ?fresh=1 is honoured at most once a minute (energy.js).
-  // Kamal's diesel fills — before the sign-in gate: the private link's key, or a hub admin by the session cookie
-  if (url.startsWith('/api/cpr/fuel')) {
+  // /cpr password (Mario 2026-09-26: "add a password", CPR_PASSWORD on Vercel). POST /api/cpr/login { password } sets
+  // cpr_ok = HMAC(password) for a year; /api/cpr and /api/cpr/fuel* answer 401 { needPassword } without it. A hub admin
+  // (session cookie) never needs it. A wrong password waits 1.5 s.
+  const cprToken = () => crypto.createHmac('sha256', String(process.env.CPR_PASSWORD || '')).update('cpr-ok').digest('hex').slice(0, 32);
+  const cprAccess = async () => {
     let isAdmin = AUTH_DISABLED;
-    // GET: the usual check (it reads the session cookie); DELETE from the page: the same cookie, read here the way the
-    // WhatsApp relay does (SameSite=Lax, so another site cannot send it with a DELETE)
+    // GET: the usual check (it reads the session cookie); a POST / DELETE from the page: the same cookie, read here
+    // the way the WhatsApp relay does (SameSite=Lax, so another site cannot send it)
     if (!isAdmin) { try {
       let u = null;
       if (req.method === 'GET') u = await verifyToken(req);
-      else { const c = /(?:^|;\s*)todo_session=([^;]+)/.exec(req.headers.cookie || ''); let tok = ''; if (c) { try { tok = decodeURIComponent(c[1]); } catch {} } u = tok.startsWith('st_') ? await verifySessionToken(tok) : await verifyToken(req); }
+      else { const c = /(?:^|;s*)todo_session=([^;]+)/.exec(req.headers.cookie || ''); let tok = ''; if (c) { try { tok = decodeURIComponent(c[1]); } catch {} } u = tok.startsWith('st_') ? await verifySessionToken(tok) : await verifyToken(req); }
       if (u) { const acc = await accessFor(u.email); isAdmin = !!(acc && acc.admin); }
     } catch (e) {} }
-    try { const handled = await cprFuel.handle(req, res, url, { db, admin, TEAM_ID, isAdmin }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
+    const pw = !process.env.CPR_PASSWORD || (/(?:^|;s*)cpr_ok=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1] === cprToken();
+    return { isAdmin, ok: isAdmin || pw };
+  };
+  if (url === '/api/cpr/login' && req.method === 'POST') {
+    let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }
+    let pw = ''; try { pw = String(JSON.parse(b || '{}').password || ''); } catch {}
+    if (!process.env.CPR_PASSWORD || pw !== process.env.CPR_PASSWORD) { await new Promise(r => setTimeout(r, 1500)); res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Wrong password' })); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `cpr_ok=${cprToken()}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax` });
+    res.end(JSON.stringify({ ok: true })); return;
+  }
+  const cprDenied = () => { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'password', needPassword: true })); };
+  // Kamal's diesel fills — behind the /cpr password; deleting = hub admin
+  if (url.startsWith('/api/cpr/fuel')) {
+    const acc = await cprAccess();
+    if (!acc.ok) return cprDenied();
+    try { const handled = await cprFuel.handle(req, res, url, { db, admin, TEAM_ID, isAdmin: acc.isAdmin }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('cpr fuel error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
+  if (url.split('?')[0] === '/api/cpr' && req.method === 'GET' && !(await cprAccess()).ok) return cprDenied();
   if (url.split('?')[0] === '/api/cpr' && req.method === 'GET') {
     try { await energy.handle(req, res, '/api/energy' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''), null, { db, TEAM_ID }); }
     catch (e) { console.error('cpr error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }

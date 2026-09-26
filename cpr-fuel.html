@@ -50,9 +50,16 @@
   table.fills .none{color:var(--overlay0);}
   .del{background:none;border:0;color:var(--overlay0);padding:4px;font-size:.8rem;}
   .tot{font-size:.8rem;color:var(--sub);margin:4px 0 10px;}
+  #pwgate{position:fixed;inset:0;background:var(--base);z-index:80;display:none;align-items:center;justify-content:center;padding:20px;}
+  #pwgate form{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:20px;width:min(340px,100%);display:grid;gap:12px;}
+  #pwgate h2{margin:0;font-size:1.05rem;color:var(--text);letter-spacing:0;text-transform:none;} #pwgate p{margin:0;font-size:.8rem;color:var(--sub);}
+  #pwgate input{background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:11px 12px;font-size:1rem;width:100%;}
+  #pwgate button{background:var(--amber);color:#1e1e2e;border:0;border-radius:10px;padding:11px;font-weight:700;font-size:.95rem;cursor:pointer;}
+  #pwmsg{color:var(--red);font-size:.8rem;min-height:1em;}
 </style>
 </head>
 <body>
+<div id="pwgate"><form onsubmit="cprLogin(event)"><h2>CPR — Complexe Patriarchale Rabwe</h2><p>This page needs the password.</p><input type="password" id="pw" autocomplete="current-password" placeholder="Password" autofocus><button>Open</button><div id="pwmsg"></div></form></div>
 <header>
   <a class="hback" href="/cpr">‹ CPR</a>
   <div class="wordmark">SHIFT <span>GROUP</span><small>CPR · DIESEL</small></div>
@@ -96,6 +103,14 @@
 </main>
 <script src="/scan-editor.js"></script>
 <script>
+// the /cpr password (Mario 2026-09-26): asked once, then a year-long cookie; a hub admin never sees it
+function needPassword() { document.getElementById('pwgate').style.display = 'flex'; setTimeout(() => document.getElementById('pw').focus(), 50); }
+async function cprLogin(e) {
+  e.preventDefault();
+  const m = document.getElementById('pwmsg'); m.textContent = '';
+  const r = await fetch('/api/cpr/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: document.getElementById('pw').value }) });
+  if (r.ok) location.reload(); else m.textContent = 'Wrong password.';
+}
 // the link's key: kept in this browser after the first visit, so the page works from the home screen too
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const qk = new URLSearchParams(location.search).get('k'); if (qk) store.set('cpr.fuelKey', qk);
@@ -106,6 +121,7 @@ function setCode(e) { e.preventDefault(); KEY = document.getElementById('code').
 const api = async (method, path, body) => {
   const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(KEY), { method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
+  if (j.needPassword) { needPassword(); throw Object.assign(new Error(''), { quiet: true }); }
   if (j.needCode) { askCode(KEY ? 'Wrong code.' : ''); throw Object.assign(new Error(''), { quiet: true }); }
   if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
   return j;
@@ -194,7 +210,7 @@ async function load() {
 // Mario 2026-09-26: the quantities and prices by month, against the kWh the generators produced (meters, /api/cpr)
 let GENKWH = null;
 async function monthTable(list) {
-  if (!GENKWH) { try { const d = await (await fetch('/api/cpr')).json(); GENKWH = {}; d.days.forEach((day, i) => { const m = day.slice(0, 7); let s = 0; for (const k of ['genBig']) { const v = d.data[k] && d.data[k][i]; if (v) s += v[0]; } GENKWH[m] = (GENKWH[m] || 0) + s; }); } catch (e) { GENKWH = {}; } }
+  if (!GENKWH) { try { const d = await (await fetch('/api/cpr', { credentials: 'same-origin' })).json(); GENKWH = {}; d.days.forEach((day, i) => { const m = day.slice(0, 7); let s = 0; for (const k of ['genBig']) { const v = d.data[k] && d.data[k][i]; if (v) s += v[0]; } GENKWH[m] = (GENKWH[m] || 0) + s; }); } catch (e) { GENKWH = {}; } }
   const by = {};
   for (const x of list) { const m = x.date.slice(0, 7); const o = by[m] || (by[m] = { n: 0, l: 0, usd: 0, lp: 0, up: 0 }); o.n++; o.l += x.litres || 0; o.usd += x.usd || 0; if (x.litres && x.usd) { o.lp += x.litres; o.up += x.usd; } }
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

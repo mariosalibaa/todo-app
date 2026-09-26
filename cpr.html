@@ -73,9 +73,16 @@
     table{font-size:.74rem;} th{padding:7px 4px;font-size:.56rem;} td{padding:7px 4px;}
     td:first-child,th:first-child{padding-left:10px;} td:last-child,th:last-child{padding-right:10px;}
   }
+  #pwgate{position:fixed;inset:0;background:var(--base);z-index:80;display:none;align-items:center;justify-content:center;padding:20px;}
+  #pwgate form{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:20px;width:min(340px,100%);display:grid;gap:12px;}
+  #pwgate h2{margin:0;font-size:1.05rem;color:var(--text);letter-spacing:0;text-transform:none;} #pwgate p{margin:0;font-size:.8rem;color:var(--sub);}
+  #pwgate input{background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:11px 12px;font-size:1rem;width:100%;}
+  #pwgate button{background:var(--amber);color:#1e1e2e;border:0;border-radius:10px;padding:11px;font-weight:700;font-size:.95rem;cursor:pointer;}
+  #pwmsg{color:var(--red);font-size:.8rem;min-height:1em;}
 </style>
 </head>
 <body>
+<div id="pwgate"><form onsubmit="cprLogin(event)"><h2>CPR — Complexe Patriarchale Rabwe</h2><p>This page needs the password.</p><input type="password" id="pw" autocomplete="current-password" placeholder="Password" autofocus><button>Open</button><div id="pwmsg"></div></form></div>
 <header>
   <div class="hleft"><a class="hback" href="/admin" onclick="if (history.length > 1 && document.referrer.startsWith(location.origin)) { history.back(); return false; }">‹ Back</a><div class="wordmark">SHIFT <span>GROUP</span><small>CPR · ENERGY</small></div></div>
   <button id="viewAs" style="display:none" onclick="togglePublic()" title="See the page the way the public sees it — on this laptop and in the 📱 phone preview"></button>
@@ -101,6 +108,14 @@
   <div class="note" id="notes"></div>
 </main>
 <script>
+// the /cpr password (Mario 2026-09-26): asked once, then a year-long cookie; a hub admin never sees it
+function needPassword() { document.getElementById('pwgate').style.display = 'flex'; setTimeout(() => document.getElementById('pw').focus(), 50); }
+async function cprLogin(e) {
+  e.preventDefault();
+  const m = document.getElementById('pwmsg'); m.textContent = '';
+  const r = await fetch('/api/cpr/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: document.getElementById('pw').value }) });
+  if (r.ok) location.reload(); else m.textContent = 'Wrong password.';
+}
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const mLabel = m => MON[+m.slice(5) - 1] + ' ' + m.slice(2, 4);
 const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
@@ -134,7 +149,8 @@ let D = null, M = null, MD = null, tab = store.get('cpr.tab') || 'yr', open = ne
 async function load(fresh) {
   document.getElementById('msg').textContent = fresh ? 'Reading the meters again…' : 'Loading…';
   try {
-    const r = await fetch('/api/cpr' + (fresh ? '?fresh=1' : ''));
+    const r = await fetch('/api/cpr' + (fresh ? '?fresh=1' : ''), { credentials: 'same-origin' });
+    if (r.status === 401) { document.getElementById('msg').textContent = ''; needPassword(); return; }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     D = await r.json();
     months();
