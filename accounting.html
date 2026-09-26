@@ -1421,7 +1421,8 @@ function ruleFor(t) {
 }
 function bookButton(t) {
   const bk = t.booked;
-  if (bk && bk.paymentState === 'paid') return `<a class="odoo-ok" target="_blank" href="${ODOO}${bk.moveId}" title="${esc('Booked from this page: ' + bk.move + (bk.payment ? ', paid by ' + bk.payment.name : ''))}">✓ ${esc(bk.move)}</a>`;
+  if (bk && bk.paymentState === 'paid') return `<a class="odoo-ok booked-ref" target="_blank" href="${ODOO}${bk.moveId}" title="${esc('Booked from this page: ' + bk.move + (bk.payment ? ', paid by ' + bk.payment.name : ''))}">✓ ${esc(bk.move)}</a>`
+    + (bk.ref && bk.ref !== bk.move ? `<div class="odoo-doc" title="The reference the hub gave it in Odoo">${esc(bk.ref)}</div>` : '');
   const r = ruleFor(t) || adHocRule(t);
   if (!r) return '';
   const what = [r.partnerName, r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · ');
