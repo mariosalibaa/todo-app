@@ -38,7 +38,7 @@ const money = n => Math.round(Number(n || 0) * 100) / 100;
 // "this number is always Patrick" or as tight as "$60 out, and only $60".
 const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName', 'book', 'accountId',
   'companyId', 'companyName', 'journalId', 'accountId', 'accountCode', 'analyticId', 'analyticName',
-  'paymentJournalId', 'paymentJournalName', 'description', 'active'];
+  'paymentJournalId', 'paymentJournalName', 'description', 'active', 'section'];
 
 // Does this line belong to this rule? The amount is compared to the cent, because
 // "about $60" is how a $600 transfer ends up booked as an internet bill.
@@ -223,6 +223,8 @@ async function handle(req, res, url, user, ctx) {
           const data = { booked };
           if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
           if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
+          if (t.analyticSrc !== 'manual' && rule.analyticId) { data.analyticId = rule.analyticId; data.analyticName = rule.analyticName || ''; data.analyticSrc = 'odoo'; data.analyticFrom = py.name; }
+          if (!t.section && rule.section) data.section = rule.section;
           await col.doc(id).set(data, { merge: true });
           out.push({ id, moveId: booked.moveId, move: py.name, amount: py.amount, state: py.state, paymentState: 'paid', payment, already, kind: 'payment' });
         } catch (e) {
@@ -300,6 +302,7 @@ async function handle(req, res, url, user, ctx) {
         if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
         if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
         if (t.analyticSrc !== 'manual' && rule.analyticId) { data.analyticId = rule.analyticId; data.analyticName = rule.analyticName; data.analyticSrc = 'odoo'; data.analyticFrom = mv.name; }
+        if (!t.section && rule.section) data.section = rule.section;
         await col.doc(id).set(data, { merge: true });
         out.push({ id, moveId, move: mv.name, amount: mv.amount_total, state: mv.state, paymentState: mv.payment_state, payment, already });
       } catch (e) {
