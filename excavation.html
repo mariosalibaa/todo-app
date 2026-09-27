@@ -209,11 +209,11 @@ function renderMsg() {
     const carry = Math.round(prev.reduce((t, x) => t + x.left, 0)), due = Math.round(c.m3 * c.price + (c.daysAmt || 0));
     const got = Math.round(c.counted - carry + provA), diff = got - due, above = Math.round(c.fillCash - c.at080), prevN = prev.length ? prev[prev.length - 1].n : 0;
     L.push(`${k++}. provision: ${N(provA)}$ asked to continue`, '');
-    L.push(`due to anthony : ${c.price}$*${N(c.m3)}m3=${N(c.m3 * c.price)}$${c.daysAmt ? ` + ${N(c.daysAmt)}$ days = ${N(due)}$` : ''}`);
-    L.push(`received by anthony : ${N(Math.round(c.counted))}$${carry < -0.5 ? ` + ${N(-carry)}$ ahead from cycle ${prevN}` : carry > 0.5 ? ` - ${N(carry)}$ still due from cycle ${prevN}` : ''} + ${N(provA)}$ requested = ${N(got)}$`);
+    L.push(`- due to anthony : ${c.price}$*${N(c.m3)}m3=${N(c.m3 * c.price)}$${c.daysAmt ? ` + ${N(c.daysAmt)}$ days = ${N(due)}$` : ''}`);
+    L.push(`- received by anthony : ${N(Math.round(c.counted))}$${carry < -0.5 ? ` + ${N(-carry)}$ ahead from cycle ${prevN}` : carry > 0.5 ? ` - ${N(carry)}$ still due from cycle ${prevN}` : ''} + ${N(provA)}$ requested = ${N(got)}$`);
     L.push(`=> ${diff > 0.5 ? N(diff) + '$ paid to anthony ahead' : diff < -0.5 ? N(-diff) + '$ still due to anthony' : 'settled'}`, '');
-    if (c.fillCash) L.push('additional diesel paid by mario above 0.8$/L', `${N(Math.round(c.fillCash))}$-${N(Math.round(c.at080))}$=${N(above)}$`, '');
-    L.push(`total paid by mario so far this cycle : ${N(got)}$ (anthony)${c.fillCash ? ` +${N(above)}$ (diesel above 0.8$/L)=${N(got + above)}$` : ''}`);
+    if (c.fillCash) L.push(`- additional diesel paid by mario above 0.8$/L : ${N(Math.round(c.fillCash))}$-${N(Math.round(c.at080))}$=${N(above)}$`, '');
+    L.push(`- total paid by mario so far this cycle : ${N(got)}$ (anthony)${c.fillCash ? ` +${N(above)}$ (diesel above 0.8$/L)=${N(got + above)}$` : ''}`);
     document.getElementById('msg').textContent = L.join('\n');
     return;
   }
