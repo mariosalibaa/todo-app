@@ -56,7 +56,7 @@
   .yr{display:grid;grid-template-columns:1fr auto 44px;gap:2px 10px;align-items:center;font-size:.82rem;padding:3px 0;}
   .yr .n{text-align:right;font-variant-numeric:tabular-nums;} .yr .p{text-align:right;color:var(--sub);font-size:.72rem;}
   .yr .bar{grid-column:1/4;height:4px;border-radius:2px;background:var(--surface0);overflow:hidden;} .yr .bar i{display:block;height:100%;background:var(--amber);opacity:.75;}
-  .yk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;} .yk div{background:var(--base);border-radius:10px;padding:8px;} .yk b{display:block;font-size:1rem;} .yk span{font-size:.64rem;color:var(--overlay0);}
+  .yk{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:12px;} .yk div{background:var(--base);border-radius:10px;padding:8px;} .yk b{display:block;font-size:1rem;} .yk span{font-size:.64rem;color:var(--overlay0);}
   @media (max-width:640px){ #dash{grid-template-columns:1fr;} } .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
@@ -169,7 +169,7 @@ async function load(fresh) {
 // days → months. Meters: kWh + estimated flag + first day with data. Deye: kWh sums + days covered.
 function months(len = 7) {
   const by = {};
-  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, n: 0, noSplit: 0 }, src: { sd: {}, oh: {} }, days: 0 });
+  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, discharge: 0, n: 0, noSplit: 0 }, src: { sd: {}, oh: {} }, days: 0 });
   const BS = D.bySource || {}, nHist = BS.oh ? BS.oh.school.length : 0;
   D.days.forEach((d, i) => {
     const o = mo(d.slice(0, len)); o.days++;
@@ -220,6 +220,7 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // voltage — its kWh left out most of two phases; openHAB shows phase B negative up to Apr 2026, never after).
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
+const BATT_KWH = 127.33;   // DeyeCloud station capacity; one cycle = one full discharge of it
 const CMP = {
   school: { name: 'M1 School', keys: ['school'] }, church: { name: 'M2 Church', keys: ['church'] }, liqaa: { name: 'M3 Liqaa', keys: ['liqaa'] },
   hotel: { name: 'M4 Hotel', keys: ['hotel'] }, genChurch: { name: 'M5 Gen church', keys: ['genChurch'] }, genSmall: { name: 'M6 Gen small', keys: ['genSmall'] },
@@ -248,16 +249,16 @@ const VIEWS = {
   all: {
     // Mario 2026-09-26: here the church is only what we supply (church − the church generator, which the church pays);
     // so the generator column leaves the church generator out too, and the two totals stay comparable
-    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL']],
+    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL'], ['Load', 'Deye', 'wide']],
     row: m => {
       const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
       const church = co == null ? { v: null } : { v: co, est: ch.est };
       const bld = sumv(m, ['school', 'liqaa', 'hotel']); if (bld.v != null && co != null) bld.v += co;
       const gen = sumv(m, ['genBig', 'genSmall']);
       const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
-      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }];
+      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }, [{ v: dv(m, 'use') }, 'wide']];
     },
-    det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m),
+    det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m) + `<br>Deye load (what the inverters supplied to the buildings) <b>${f0(dv(m, 'use'))}</b> kWh · battery <b>${f0(dv(m, 'discharge'))}</b> kWh discharged = <b>${((dv(m, 'discharge') || 0) / BATT_KWH).toFixed(1)}</b> cycles of ${BATT_KWH} kWh`,
   },
   bld: {
     head: ['School', 'Church', ['Kamal', 'Liqaa + Hotel'], ['Liqaa', '', 'wide'], ['Hotel', '', 'wide'], ['Total', '', 'sum']],
@@ -267,11 +268,11 @@ const VIEWS = {
     det: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, p = k => t ? ' (' + (mv(m, k).v / t * 100).toFixed(0) + ' %)' : ''; return `Church <b>${f0(mv(m, 'church').v)}</b> − its generator <b>${f0(mv(m, 'genChurch').v)}</b> = <b>${f0(churchOurs(m))}</b> kWh from us · Liqaa <b>${f0(mv(m, 'liqaa').v)}</b>${p('liqaa')} · Hotel <b>${f0(mv(m, 'hotel').v)}</b>${p('hotel')} kWh — together Kamal's <b>${f0(sumv(m, ['liqaa', 'hotel']).v)}</b>`; },
   },
   sup: {
-    head: ['Solar', 'EDL', ['Gen', 'meters'], ['Gen church', '', 'wide'], ['Gen big', '', 'wide'], ['Total', '', 'sum'], ['Sold', 'to EDL']],
+    head: ['Solar', 'EDL', ['Gen', 'meters'], ['Gen church', '', 'wide'], ['Gen big', '', 'wide'], ['Total', '', 'sum'], ['Sold', 'to EDL'], ['Battery', 'cycles']],
     row: m => {
       const gen = sumv(m, ['genChurch', 'genBig', 'genSmall']), edl = edlOf(m), pv = dsplit(m, 'pv');
       const tot = (pv.v || 0) + (edl.v || 0) + (gen.v || 0);
-      return [pv, edl, gen, [mv(m, 'genChurch'), 'wide'], [mv(m, 'genBig'), 'wide'], [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }];
+      return [pv, edl, gen, [mv(m, 'genChurch'), 'wide'], [mv(m, 'genBig'), 'wide'], [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }, { html: dv(m, 'discharge') ? (dv(m, 'discharge') / BATT_KWH).toFixed(1) : '<span class="none">—</span>', sum: dv(m, 'discharge') / BATT_KWH }];
     },
     det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL <b>${f0(edlOf(m).v)}</b> (${dv(m, 'gridIn') != null ? 'Deye' : 'meter'}; the EDL meter read <b>${f0(mv(m, 'edl').v)}</b>) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
@@ -337,12 +338,12 @@ function render() {
   const body = list.map(m => {
     const cells = V.row(m).map((x, i) => {
       const [val, cls] = Array.isArray(x) ? x : [x, ''];
-      if (val && val.v != null) { tot[i].v += val.v; tot[i].any = true; }
+      if (val && val.v != null) { tot[i].v += val.v; tot[i].any = true; } else if (val && val.sum != null && isFinite(val.sum)) { tot[i].v += val.sum; tot[i].any = true; tot[i].cyc = true; }
       return val && val.html != null ? `<td class="${cls}">${val.html}</td>` : cell(val || { v: null }, cls + (V.head[i] && Array.isArray(V.head[i]) && V.head[i][2] ? ' ' + V.head[i][2] : ''));
     }).join('');
     return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` : '');
   }).join('');
-  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && (h[2] === 'wide' || h[2] === 'gs') ? h[2] : ''}">${tot[i].any ? num2(tot[i].v) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
+  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && (h[2] === 'wide' || h[2] === 'gs') ? h[2] : ''}">${tot[i].any ? (tot[i].cyc ? tot[i].v.toFixed(0) : num2(tot[i].v)) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
   document.getElementById('tbl').innerHTML = `<thead><tr><th>${DAY ? 'Day' : 'Month'}</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
   } finally { M = MM; }
   const notes = (D.notes || []).slice();
@@ -368,7 +369,7 @@ function renderYears() {
     return `<div class="yc"><h2>${y}</h2><div class="cov">${cov} · kWh</div>
       <h3>Buildings <b>${f0(bld)}</b></h3>${line('School', school, bld)}${line('Church — from us', church, bld)}${line('Kamal — Liqaa + Hotel', kamal, bld)}
       <h3>Supply <b>${f0(sup)}</b></h3>${line('Solar', solar, sup)}${line('EDL', edl, sup)}${line('Generators (ours)', gen, sup)}
-      <div class="yk"><div><b>${f0(sold)}</b><span>sold to EDL</span></div><div><b>${sup ? Math.round(solar / sup * 100) : 0} %</b><span>solar share</span></div><div><b>${f0(ms.length ? bld / ms.length : 0)}</b><span>buildings / month</span></div></div>
+      <div class="yk"><div><b>${f0(sold)}</b><span>sold to EDL</span></div><div><b>${sup ? Math.round(solar / sup * 100) : 0} %</b><span>solar share</span></div><div><b>${Math.round(ms.reduce((a, m) => a + (M.by[m].d.discharge || 0), 0) / BATT_KWH)}</b><span>battery cycles</span></div></div>
       ${ADMIN ? `<div class="yk"><div><b>${f0(genAll)}</b><span>all generators kWh</span></div><div><b>${f0(genAll * lpk)}</b><span>diesel L ≈ (${lpk} L/kWh)</span></div><div><b>${dollars}</b><span>diesel cost ≈ · admin</span></div></div>` : ''}</div>`;
   }).join('');
 }
