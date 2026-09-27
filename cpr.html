@@ -455,22 +455,22 @@ function renderRacks() {
         <span>cell temp</span><b>${B.tMin != null ? B.tMin + '–' + B.tMax + ' °C' : (r.temp != null ? r.temp + ' °C' : '—')}</b><span>charged</span><b>${r.charge != null ? (r.charge / 1000).toFixed(1) + ' MWh' : '—'}</b><span>discharged</span><b>${r.discharge != null ? (r.discharge / 1000).toFixed(1) + ' MWh' : '—'}</b></div>
       <div class="mods">${mods}</div></div>`;
   }).join('');
-  const price = +store.get('cpr.battPrice') || 1000, rated = +store.get('cpr.battCycles') || 6000;
-  const perCycle = 12 * price / rated;                       // $ per rack cycle (12 batteries)
-  const bmsR = R.filter(r => r.bms && r.bms.cycles && r.discharge);
-  const kwhPerCyc = bmsR.length ? bmsR.reduce((a, r) => a + r.discharge, 0) / bmsR.reduce((a, r) => a + r.bms.cycles, 0) : perRack;   // kWh the inverter draws per BMS cycle
-  const usedNow = R.reduce((a, r) => a + ((r.bms && r.bms.cycles) || 0) * perCycle, 0);
-  // the pace: Deye's daily battery discharge over the last 365 / 30 days (whole bank), turned into rack cycles
+  // Battery wear, Mario's method (2026-09-27): a battery's lifetime energy = cycles × depth of discharge × kWh
+  // (6,000 × 90 % × 5.12 = 27,648 kWh) → cost per kWh = price ÷ that ($1,000 → $0.036); wear = kWh drawn × that
+  const price = +store.get('cpr.battPrice') || 1000, rated = +store.get('cpr.battCycles') || 6000, dod = +store.get('cpr.battDod') || 0.9, modKwh = +store.get('cpr.modKwh') || 5.12;
+  const lifeKwh = rated * dod * modKwh, perKwh = price / lifeKwh;
+  const usd = v => '$' + Math.round(v).toLocaleString('en-US');
   const dd = D.deye && D.deye.days ? D.deye.days.map((d, i) => [d, D.deye.data[i] ? D.deye.data[i][D.deye.fields.indexOf('discharge')] : null]).filter(x => x[1] != null) : [];
   const lastN = n => { const xs = dd.slice(-n - 1, -1); return xs.length ? xs.reduce((a, x) => a + x[1], 0) / xs.length : 0; };
-  const perDay = k => k / kwhPerCyc * perCycle;
-  const usd = v => '$' + Math.round(v).toLocaleString('en-US');
-  const wear = `<div class="tt" style="grid-column:1/-1"><table><thead><tr><th>Battery wear</th><th>to date</th><th>a year</th><th>a month</th><th>a day</th></tr></thead><tbody>
-    <tr><td>Value used up</td><td><b>${usd(usedNow)}</b></td><td>${usd(perDay(lastN(365)) * 365)}</td><td>${usd(perDay(lastN(30)) * 30)}</td><td>${usd(perDay(lastN(30)))}</td></tr>
-    <tr><td>Cycles (each rack, avg)</td><td>${Math.round(R.reduce((a, r) => a + ((r.bms && r.bms.cycles) || 0), 0) / (R.length || 1))}</td><td>${Math.round(lastN(365) / kwhPerCyc / 3 * 365)}</td><td>${Math.round(lastN(30) / kwhPerCyc / 3 * 30)}</td><td>${(lastN(30) / kwhPerCyc / 3).toFixed(2)}</td></tr>
-    </tbody></table><div class="st muted small" style="margin-top:6px">${usd(price)} a battery · ${rated.toLocaleString('en-US')} cycles rated · 36 batteries = ${usd(36 * price)} · one rack cycle = ${usd(perCycle)} (${kwhPerCyc.toFixed(1)} kWh drawn by the inverter per BMS cycle, ${(perCycle / kwhPerCyc).toFixed(3)} $/kWh) · a year = the last 365 days, a month and a day = the last 30 days
-    · life left at the last-30-day pace: ${R.map(r => r.bms && r.bms.cycles != null ? esc(r.name) + ' ' + ((rated - r.bms.cycles) / Math.max(0.01, lastN(30) / kwhPerCyc / 3) / 365).toFixed(1) + ' y' : '').filter(Boolean).join(' · ')}</div>
-    ${ADMIN ? `<div class="batset" style="margin-top:6px">$ a battery <input type="number" value="${price}" onchange="store.set('cpr.battPrice', this.value); render()"> rated cycles <input type="number" value="${rated}" onchange="store.set('cpr.battCycles', this.value); render()"> <span class="muted">· admin</span></div>` : ''}</div>`;
+  const drawn = R.reduce((a, r) => a + (r.discharge || 0), 0);
+  const rows = R.map(r => `<tr><td>${esc(r.name)}</td><td>${f0(r.discharge)}</td><td>${usd((r.discharge || 0) * perKwh)}</td><td>${Math.round((r.discharge || 0) / (12 * lifeKwh) * 100)} %</td><td>${r.bms && r.bms.cycles != null ? r.bms.cycles.toLocaleString('en-US') : '—'}</td></tr>`).join('');
+  const wear = `<div class="tt" style="grid-column:1/-1"><table><thead><tr><th>Battery wear</th><th>kWh drawn</th><th>value used</th><th>of life</th><th>BMS cycles</th></tr></thead><tbody>${rows}
+    <tr class="tot"><td>All 3 racks</td><td>${f0(drawn)}</td><td>${usd(drawn * perKwh)}</td><td>${Math.round(drawn / (36 * lifeKwh) * 100)} %</td><td></td></tr></tbody></table>
+    <table style="margin-top:10px"><thead><tr><th>Pace</th><th>a day</th><th>a month</th><th>a year</th></tr></thead><tbody>
+    <tr><td>kWh drawn from the battery</td><td>${f0(lastN(30))}</td><td>${f0(lastN(30) * 30)}</td><td>${f0(lastN(365) * 365)}</td></tr>
+    <tr><td>Battery value used</td><td>${usd(lastN(30) * perKwh)}</td><td>${usd(lastN(30) * 30 * perKwh)}</td><td>${usd(lastN(365) * 365 * perKwh)}</td></tr></tbody></table>
+    <div class="st muted small" style="margin-top:6px">One battery: ${rated.toLocaleString('en-US')} cycles × ${Math.round(dod * 100)} % × ${modKwh} kWh = <b>${f0(lifeKwh)} kWh</b> in its life → ${usd(price)} ÷ ${f0(lifeKwh)} = <b>$${perKwh.toFixed(3)} per kWh</b> drawn · 36 batteries = ${usd(36 * price)} for ${f0(36 * lifeKwh)} kWh · a day and a month = the last 30 days, a year = the last 365 · life left at the last-30-day pace: ${R.map(r => r.discharge != null ? esc(r.name) + ' ' + ((12 * lifeKwh - r.discharge) / Math.max(1, lastN(30) / 3) / 365).toFixed(1) + ' y' : '').filter(Boolean).join(' · ')}</div>
+    ${ADMIN ? `<div class="batset" style="margin-top:6px">$ a battery <input type="number" value="${price}" onchange="store.set('cpr.battPrice', this.value); render()"> kWh a battery <input type="number" step="0.01" value="${modKwh}" onchange="store.set('cpr.modKwh', this.value); render()"> rated cycles <input type="number" value="${rated}" onchange="store.set('cpr.battCycles', this.value); render()"> depth of discharge <input type="number" step="0.05" min="0.5" max="1" value="${dod}" onchange="store.set('cpr.battDod', this.value); render()"> <span class="muted">· admin</span></div>` : ''}</div>`;
   const set = ADMIN ? `<div class="batset">Battery capacity <input type="number" step="0.01" value="${total}" onchange="store.set('cpr.battKwh', this.value); render()"> kWh in all = ${perRack.toFixed(1)} kWh a rack, ${perMod.toFixed(2)} kWh a battery (5.12 kWh × 12 × 3 = ${BATT_KWH} kWh; DeyeCloud is set to 127.33). Cycles = the rack's lifetime discharge ÷ its capacity. <span class="muted">· admin</span></div>` : '';
   document.getElementById('dash').innerHTML = cards + wear + set + `<div class="batset muted">The 12 batteries of a rack are in series: they charge and discharge together, so each shows the rack's cycles (the BMS's own count). ▲ = the battery with the highest cell voltage, ▼ = the lowest, 🌡 = the hottest cell. The green fill = charge now.</div>`;
 }
