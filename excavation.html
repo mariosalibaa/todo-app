@@ -250,14 +250,12 @@ function renderJobMsg(R) {
   L.push(`${k++}. work`); for (const w of work) L.push(`- ${N(w.m3)}m3 * ${w.p}$/m3 = ${N(w.v)}$`);
   if (days) L.push(`- day rate ${N(days / 300 * 10) / 10} days * 300$ = ${N(days)}$`);
   L.push(`total ${N(worth)}$`, '');
-  L.push(`${k++}. paid to anthony ${N(cash)}$ cash`, '');
+  L.push(`${k++}. paid to anthony ${N(cash)}$`, '');
   L.push(`${k++}. diesel ${N(litres)}L * 0.8$/L = ${N(at080)}$ (inside your price; cycle 1 you fuelled yourself)`, '');
   L.push(`${k++}. total paid to anthony ${N(cash)}$ + ${N(at080)}$ = ${N(counted)}$`, '');
   L.push(`${k++}. ${N(worth)}$ - ${N(counted)}$ = ${bal < 0 ? '-' : ''}${N(Math.abs(bal))}$ → ${st(bal)}`, '');
   if (provLine(L, k, bal, true)) k++;
-  L.push('per cycle: worth / paid (cash + diesel at 0.8) / balance after');
-  let run = 0; for (const c of R) { run += c.left; L.push(`- ${c.n}. till ${c.till} · ${N(c.m3)}m3 · ${N(Math.round(c.worth))}$ / ${N(Math.round(c.counted))}$ · ${st(run).replace(' to anthony', '')}`); }
-  document.getElementById('msg').textContent = L.join('\n');
+  document.getElementById('msg').textContent = L.join('\n').trim();
 }
 async function copyMsg() { try { await navigator.clipboard.writeText(document.getElementById('msg').textContent); alert('Copied — paste it in WhatsApp.'); } catch (e) { alert('Select the text and copy it.'); } }
 // Provision: what is asked and not paid yet — Anthony's request and Dib's pending fills — and where we stand once paid
