@@ -57,6 +57,7 @@
   <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
   <div id="status" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
+  <div id="prov"></div>
   <div id="odoo-match"></div>
   <div id="cost"></div>
   <div id="cycles"></div>
@@ -206,12 +207,20 @@ function renderMsg() {
     L.push(`${k++}. ${parts.length > 1 ? '(' + parts.join(' ') + ') ' : parts[0] + ' '}/ ${c.price}$/m3 = ${N(cov)}m3 covered`);
     const d = Math.abs(c.m3 - cov);
     L.push(c.open && net > 0.5 ? `   this cycle ${N(c.m3)}m3 → ${N(Math.max(0, c.m3 - cov))}m3 remaining = ${N(net)}$${c.daysAmt ? ' (day rate included)' : ''}`
-      : `   this cycle ${N(c.m3)}m3 → ${net < -0.5 ? N(d) + 'm3 more than the cycle = ' + N(-net) + '$ paid ahead' : net > 0.5 ? N(d) + 'm3 short = ' + N(net) + '$ still due to anthony' : 'settled'}`, ''); }
+      : `   this cycle ${N(c.m3)}m3 → ${net < -0.5 ? N(d) + 'm3 more than the cycle = ' + N(-net) + '$ paid ahead' : net > 0.5 ? N(d) + 'm3 short = ' + N(net) + '$ still due to anthony' : 'settled'}`, '');
+    if (provLine(L, k, net, c.n === R[R.length - 1].n)) k++; }
   if (c.open) L.push(`${k++}. total job: ${N(doneBefore)}m3 certified till ${from} + ${N(c.covered)}m3 = ${N(doneBefore + c.covered)}m3 of ${N(total)}m3`, `   remaining to finish: ${N(Math.max(0, total - doneBefore - c.covered))}m3`);
   // the diesel those remaining m³ will take, at the L/m³ of the finished cycles and the last rate paid: his part at 0.80, Shift's above
   const rem = Math.max(0, total - doneBefore - c.covered), rate = (D.cost && D.cost.rateClosed) || 0, perL = (D.cost && D.cost.forecast && D.cost.forecast.lastPerL) || 0;
   if (c.open && rem && rate && perL) { const Lr = Math.round(rem * rate), cost = Math.round(Lr * perL), at080 = Math.round(Lr * 0.8); L.push('', `${k++}. diesel expected for the remaining ${N(rem)}m3 at ${rate}L/m3 = ${N(Lr)}L`, `   at ${perL}$/L = ${N(cost)}$ → ${N(at080)}$ at 0.8$/L counted to anthony + ${N(cost - at080)}$ above 0.8 paid by shift`, `   so the remaining ${N(rem)}m3 = ${N(rem * c.price)}$ − ${N(at080)}$ diesel = ${N(rem * c.price - at080)}$ cash to anthony`); const carry = Math.round(prev.reduce((t, x) => t + x.left, 0)), cash = Math.round(rem * c.price - at080 + carry); if (Math.abs(carry) > 0.5) L.push(`   with the previous cycles: ${N(Math.round(rem * c.price - at080))}$ ${carry < 0 ? '- ' + N(-carry) + '$ paid ahead' : '+ ' + N(carry) + '$ still due'} = ${cash > 0 ? N(cash) + '$ cash to anthony' : 'nothing more to pay him' + (cash < 0 ? ' (' + N(-cash) + '$ paid ahead)' : '')}`); }
   document.getElementById('msg').textContent = L.join('\n');
+}
+// the $ Anthony asked and is not paid yet (the provision), after the balance — pushed as its own step; true when it was
+function provLine(L, k, bal, last) {
+  const a = +((D.provision || {}).anthony) || 0; if (!a || !last) return false;
+  const after = Math.round(bal - a), st = v => v > 0.5 ? N(v) + '$ still due to anthony' : v < -0.5 ? N(-v) + '$ paid ahead to anthony' : 'settled';
+  L.push(`${k}. provision: ${N(a)}$ asked to continue`, `   ${bal < 0 ? '-' : ''}${N(Math.abs(Math.round(bal)))}$ - ${N(a)}$ = ${after < 0 ? '-' : ''}${N(Math.abs(after))}$ → after paying it: ${st(after)}`, '');
+  return true;
 }
 // the whole job in one message for Anthony (Mario, 2026-09-27: "what should I share with Anthony as summary for everything"):
 // what his work was worth, what he received (cash + the diesel at $0.80/L inside his price), the balance, and the cycles in short
@@ -229,12 +238,32 @@ function renderJobMsg(R) {
   L.push(`${k++}. diesel ${N(litres)}L * 0.8$/L = ${N(at080)}$ (inside your price; cycle 1 you fuelled yourself)`, '');
   L.push(`${k++}. total paid to anthony ${N(cash)}$ + ${N(at080)}$ = ${N(counted)}$`, '');
   L.push(`${k++}. ${N(worth)}$ - ${N(counted)}$ = ${bal < 0 ? '-' : ''}${N(Math.abs(bal))}$ → ${st(bal)}`, '');
+  if (provLine(L, k, bal, true)) k++;
   L.push('per cycle: worth / paid (cash + diesel at 0.8) / balance after');
   let run = 0; for (const c of R) { run += c.left; L.push(`- ${c.n}. till ${c.till} · ${N(c.m3)}m3 · ${N(Math.round(c.worth))}$ / ${N(Math.round(c.counted))}$ · ${st(run).replace(' to anthony', '')}`); }
   document.getElementById('msg').textContent = L.join('\n');
 }
 async function copyMsg() { try { await navigator.clipboard.writeText(document.getElementById('msg').textContent); alert('Copied — paste it in WhatsApp.'); } catch (e) { alert('Select the text and copy it.'); } }
-function renderLists() { renderStatement(); renderBills(); renderPays(); for (const id of ['stmt', 'bills', 'pays']) applyCols(id); }
+// Provision: what is asked and not paid yet — Anthony's request and Dib's pending fills — and where we stand once paid
+function renderProv() {
+  const T = D.totals, P = D.provision || {}, a = +P.anthony || 0, dib = T.dueDib || 0, el = document.getElementById('prov');
+  const R = anthonyRows(), left = Math.round(R.reduce((t, c) => t + c.left, 0) * 100) / 100, price = (R[R.length - 1] || {}).price || 5;
+  const open = Math.round((T.open + T.retentionOpen) * 100) / 100, after = Math.round((open - a - dib) * 100) / 100, side = Math.round((after - T.retentionOpen) * 100) / 100;
+  const st = v => v > 0.5 ? `<span class="bad">${f(v)} still due to him</span>` : v < -0.5 ? `${f(-v)} paid ahead` : 'settled';
+  if (!a && !dib && !(ME && ME.admin)) { el.innerHTML = ''; return; }
+  el.innerHTML = `<h2>Provision — where we stand after paying what is asked</h2><div class="card"><table class="prov"><tbody>
+    <tr><td>Anthony asks, to go on${P.note ? ` <span class="muted small">· ${esc(P.note)}</span>` : ''}</td><td class="n">${ME && ME.admin ? `$ <input id="prov-a" type="number" min="0" step="50" value="${a || ''}" style="width:90px" onchange="saveProv()">` : '$ ' + f(a)}</td></tr>
+    <tr><td>Dib, the fills not yet paid${(T.unpaidFills || []).length ? ` <span class="muted small">· ${esc(T.unpaidFills.map(x => x.date + ' ' + f(x.litres, 0) + ' L').join(', '))}</span>` : ''}</td><td class="n">$ ${f(dib)}</td></tr>
+    <tr class="tot"><td>To pay</td><td class="n">$ ${f(a + dib)}</td></tr>
+    <tr><td>Anthony — now ${st(left)}</td><td class="n">after: <b>${st(left - a)}</b>${left - a < -0.5 ? ` <span class="muted small">≈ ${f(-(left - a) / price, 0)} m³ at $${price}</span>` : ''}</td></tr>
+    <tr><td>Georges' ledger in Odoo — open now $ ${f(open)}</td><td class="n">after: <b>$ ${f(after)}</b> <span class="muted small">= commission ${f(T.retentionOpen)} held ${side < 0 ? '− ' + f(-side) + ' paid ahead on the Anthony / Georges side' : '+ ' + f(side) + ' due'}</span></td></tr>
+  </tbody></table><p class="small muted" style="margin:6px 0 0">A provision only: nothing is booked. The diesel is already counted to Anthony at $0.80/L, so paying Dib moves Georges' ledger, not Anthony's balance.</p></div>`;
+}
+async function saveProv() {
+  const v = +document.getElementById('prov-a').value || 0;
+  try { await Admin.api('PATCH', '/api/ajaltoun/excavation/provision', { anthony: v, note: (D.provision || {}).note || 'requested to continue' }); D.provision = { ...(D.provision || {}), anthony: v }; renderProv(); } catch (e) { alert('Not saved: ' + e.message); }
+}
+function renderLists() { renderProv(); renderStatement(); renderBills(); renderPays(); for (const id of ['stmt', 'bills', 'pays']) applyCols(id); }
 const f = (n, d = 2) => (+n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 // the page opens with the full Ajaltoun key or with 'excavation' alone (a partner sees this dashboard and nothing else of the project)
 Admin.require(['ajaltoun', 'excavation'], me => {

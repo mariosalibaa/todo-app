@@ -182,7 +182,10 @@ async function build(ctx) {
   // column widths Mario dragged on the tables, saved for every viewer — settings/excavationLayout { table: [px…] }
   const layDoc = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationLayout').get().catch(() => null);
   const layout = layDoc && layDoc.exists ? layDoc.data() : {};
-  return { layout, at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
+  // a payment not made yet, to see where things stand once it is (Mario, 2026-09-27: Anthony asks $600 to go on) — settings/excavationProvision
+  const provDoc = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationProvision').get().catch(() => null);
+  const provision = provDoc && provDoc.exists ? provDoc.data() : { anthony: 0, note: '' };
+  return { provision, layout, at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
 }
 
 const readBody = req => new Promise((ok, no) => { let s = ''; req.on('data', d => s += d).on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { no(e); } }).on('error', no); });
@@ -194,6 +197,12 @@ async function handle(req, res, url, user, ctx) {
     if (!key) return json(res, 400, { error: 'key' });
     await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationText').set({ [key]: { title: String(b.title || '').slice(0, 120), note: String(b.note || '').slice(0, 400) } }, { merge: true });
     return json(res, 200, { ok: true });
+  }
+  if (url.split('?')[0] === '/api/ajaltoun/excavation/provision' && req.method === 'PATCH') {   // { anthony, note }: what Anthony asked and is not paid yet
+    if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin only' });
+    const b = await readBody(req); const anthony = Math.max(0, Math.round((+b.anthony || 0) * 100) / 100);
+    await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationProvision').set({ anthony, note: String(b.note || '').slice(0, 200), at: new Date().toISOString() });
+    return json(res, 200, { ok: true, anthony });
   }
   if (url.split('?')[0] === '/api/ajaltoun/excavation/layout' && req.method === 'PATCH') {   // column widths, for all users (2026-09-13)
     if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin only' });
