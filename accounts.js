@@ -247,6 +247,10 @@ async function importOdoo(odooCall, account, who) {
   const existing = {};
   (await col.where('src', '==', 'odoo').get()).docs.forEach(d => { existing[d.id] = d.data(); });
   const madeFrom = {};   // Odoo move id → the Excel row it was booked from (bills, payments made by the hub)
+  // the hub's own lines (typed, WhatsApp, site) — an Odoo line whose memo names one of them was booked FROM it
+  const hubDocs = (await col.where('src', 'in', ['manual', 'site', 'whatsapp', 'telegram']).get()).docs.filter(d => !d.data().excluded);
+  const hubRows = new Set(hubDocs.map(d => d.id)), hubBooked = {};   // … and the bill / payment the hub booked from each (Attal's receipt paid with memo "73142")
+  hubDocs.forEach(d => { const b = d.data().bookedMove; if (b && b.id && !hubBooked[b.id]) hubBooked[b.id] = d.id; });
   (await col.where('src', '==', 'excel').get()).docs.forEach(d => { const b = d.data().bookedMove; if (b && b.id && !madeFrom[b.id]) madeFrom[b.id] = d.id; });
   const owner = ownerOf(account);
   const writes = [];
@@ -381,7 +385,15 @@ async function importOdoo(odooCall, account, who) {
           // a cents adjustment between the sheet and the supplier's invoice lives in Odoo only — never a line here (Mario, 2026-09-06)
           else if (/-ROUNDING-/i.test(String(m.ref || ''))) { t.odooOnly = false; t.dupOf = null; t.tiedBy = 'rounding'; }
           else { t.odooOnly = true; t.dupOf = null; }
-        } else if (paidBy && owner && paidBy !== owner && pi === 0) out.paidByOthers++;
+        } else {
+          // On an account Odoo keeps, a line booked from the hub (memo "MARIOCASH-site-…") is that same money: the hub line
+          // stays the one that counts, the Odoo line the evidence beside it — both counted put the Awkal $2,310 and
+          // Attal's two receipts in the balance twice (Mario, 2026-09-27: "check")
+          const hit = String([m.ref, m.narration, p && p.memo, lineName].join(' ')).match(new RegExp(account.id.toUpperCase().replace(/[^A-Z0-9]+/g, '') + '-([a-z]+-[\\w-]+)'));
+          const fromHub = hit && hubRows.has(hit[1]) ? hit[1] : hubBooked[m.id] || (part.bill ? [part.bill] : bills).map(b => hubBooked[b.id]).find(Boolean);
+          if (fromHub && prev.dupSrc !== 'manual') { t.excluded = true; t.dupOf = fromHub; t.dupSrc = 'auto'; t.tiedBy = hit ? 'ref' : 'made'; }
+          if (paidBy && owner && paidBy !== owner && pi === 0) out.paidByOthers++;
+        }
         if (existing[id]) out.updated++; else out.added++;
         if (split) out.split++;
         writes.push({ ref: col.doc(id), data: t });
