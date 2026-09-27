@@ -15,6 +15,7 @@ const COLLECTORS = { '96171800980': 'Anthony Khalil (Whish)', '96171324324': 'Di
 const CASH_COLLECTOR = 'Anthony Khalil (cash)';
 const CTX = { allowed_company_ids: [COMPANY] };
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
+const JOB_DONE_M3 = 7000;   // the whole job, dug (Mario, 2026-09-27)
 const r2 = n => Math.round((+n || 0) * 100) / 100;
 // bill refs, project · cycle · word (Mario, 2026-09-27): AJ4193-n-EXCAVATION (till d-m · Xm3 of Ym3) · AJ4193-n-DIESEL (fills · N L · …)
 // · AJ4193-n-RETENTION (till …) · AJ4193-n-EXCAVATION-DAYS; the older AJ4193-EXCAVATION-n order still reads
@@ -138,7 +139,8 @@ async function build(ctx) {
     return { ...c, days, paidAnthony, paidDib, dueDib, anthonyPays, fillList: c.fillList || [], contractPerM3: c.m3 ? r2((c.contract + c.retention) / c.m3) : 0, anthonyPerM3: c.m3 ? r2(c.contract / c.m3) : 0, dieselPerM3: c.m3 ? r2(c.diesel / c.m3) : 0, litresPerM3: c.m3 ? r2(c.litres / c.m3) : 0,
       dieselAt080PerM3: c.m3 ? r2(c.litres * 0.8 / c.m3) : 0, anthonyNetPerM3: c.m3 ? r2((c.contract - c.litres * 0.8) / c.m3) : 0,
       shiftPerM3: c.m3 ? r2((c.contract + c.retention + c.diesel) / c.m3) : 0, paid, billed, position: pos,
-      open: tillDate(c.till) > todayBeirut(),   // the cycle is still being dug: its m³ are billed but not yet executed (Mario, 2026-09-13)
+      // the cycle is still being dug: its m³ are billed but not yet executed (Mario, 2026-09-13) — none once the job's 7,000 m³ are dug (Mario, 2026-09-27: "consider the 7000m3 done")
+      open: tillDate(c.till) > todayBeirut() && !(c.totalM3 >= JOB_DONE_M3),
       note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }; });
   // Match with Odoo (Mario, 2026-09-13): the partner ledger as Odoo sums it — every posted payable / receivable line of
   // Georges in every company — so the hub shows the same debit, credit and balance as Reporting → Partner Ledger.
