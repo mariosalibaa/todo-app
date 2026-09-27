@@ -175,6 +175,8 @@ addEventListener('storage', e => { if (e.key === 'cpr.public') applyView(); }); 
 fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { REAL_ADMIN = !!(me && me.admin); applyView(); if (REAL_ADMIN) loadFuel(); }).catch(() => {});
 // Kamal's diesel fills (/cpr/diesel) summed per month — admin only
 let FUEL = {};
+// $ per litre: what Kamal's fills cost on average (Mario 2026-09-27), unless the admin typed a price
+const fuelPrice = () => { let l = 0, u = 0; for (const o of Object.values(FUEL)) { if (o.l && o.usd) { l += o.l; u += o.usd; } } return l ? u / l : 0; };
 function loadFuel() { fetch('/api/cpr/fuel', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(d => { FUEL = {}; for (const x of (d && d.list) || []) { const k = x.date.slice(0, 7); const o = FUEL[k] || (FUEL[k] = { l: 0, usd: 0, n: 0 }); o.l += x.litres || 0; o.usd += x.usd || 0; o.n++; } if (M) render(); }).catch(() => {}); }
 let D = null, M = null, MD = null, tab = store.get('cpr.tab') || 'live', open = new Set();
 
@@ -201,14 +203,22 @@ async function load(fresh) {
 // days → months. Meters: kWh + estimated flag + first day with data. Deye: kWh sums + days covered.
 function months(len = 7) {
   const by = {};
-  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, discharge: 0, n: 0, noSplit: 0, splitEst: 0 }, src: { sd: {}, oh: {} }, days: 0 });
+  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, discharge: 0, n: 0, noSplit: 0, splitEst: 0 }, src: { sd: {}, oh: {}, best: {} }, days: 0 });
   const BS = D.bySource || {}, nHist = BS.oh ? BS.oh.school.length : 0;
+  // days openHAB was offline (its figure there is the outage spread evenly): EDL and the generators take the SD card that day when it has one (Mario 2026-09-27)
+  const bday = t => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Asia/Beirut' }), offDays = new Set();
+  for (const [s, e] of D.histOutages || []) for (let t = Date.parse(s); t <= Date.parse(e) + 864e5; t += 864e5) { const x = bday(Math.min(t, Date.parse(e))); offDays.add(x); }
   D.days.forEach((d, i) => {
     const o = mo(d.slice(0, len)); o.days++;
     // one source alone: SD card / openHAB (live days after the history are openHAB)
     for (const b of D.buildings) for (const s of ['sd', 'oh']) {
       const v = i < nHist ? (BS[s] && BS[s][b.key][i]) : (s === 'oh' && D.data[b.key][i] ? D.data[b.key][i][0] : null);
       const c = o.src[s][b.key] || (o.src[s][b.key] = { kwh: 0, n: 0 });
+      if (v != null) { c.kwh += v; c.n++; }
+    }
+    for (const k of OH_KEYS) {
+      const sd = i < nHist && BS.sd ? BS.sd[k][i] : null, oh = i < nHist ? (BS.oh && BS.oh[k][i]) : (D.data[k][i] ? D.data[k][i][0] : null);
+      const v = offDays.has(d) && sd != null ? sd : oh, c = o.src.best[k] || (o.src.best[k] = { kwh: 0, n: 0 });
       if (v != null) { c.kwh += v; c.n++; }
     }
     for (const b of D.buildings) {
@@ -238,7 +248,7 @@ function mv(m, key) {
   const c = M.by[m].m[key]; const nm = D.noMeter && D.noMeter[key];
   if (!c || !c.n) return nm && m >= nm.slice(0, 7) ? { v: 0, note: 'off' } : { v: null };
   // Mario 2026-09-26: EDL and the generators from openHAB (the buildings stay SD card first); ≈ as the month had it
-  const oh = OH_KEYS.has(key) && M.by[m].src && M.by[m].src.oh[key] && M.by[m].src.oh[key].n ? M.by[m].src.oh[key].kwh : null;
+  const oh = OH_KEYS.has(key) && M.by[m].src && M.by[m].src.best[key] && M.by[m].src.best[key].n ? M.by[m].src.best[key].kwh : null;   // openHAB, the SD card on the days it was offline
   return { v: oh != null ? oh : c.kwh, est: c.est, note: c.first && c.first > m + '-01' ? 'from ' + (+c.first.slice(8)) + ' ' + MON[+c.first.slice(5, 7) - 1] : '' };
 }
 const OH_KEYS = new Set(['edl', 'genChurch', 'genBig', 'genSmall']);
@@ -345,7 +355,7 @@ const VIEWS = {
   },
   dsl: {
     head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈'], ['Bought', 'litres', 'gs'], ['Bought', '$']],
-    row: m => { const g = sumv(m, ['genChurch', 'genBig', 'genSmall']); const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0; const l = g.v == null ? null : g.v * lpk; const fu = FUEL[m.slice(0, 7)];
+    row: m => { const g = sumv(m, ['genChurch', 'genBig', 'genSmall']); const lpk = +store.get('cpr.lpk') || 0.3, usd = (+store.get('cpr.usd') || fuelPrice()); const l = g.v == null ? null : g.v * lpk; const fu = FUEL[m.slice(0, 7)];
       return [g, { v: l, est: g.est }, { v: l != null && usd ? l * usd : null, est: g.est }, [{ v: fu ? fu.l : null, note: fu ? fu.n + ' fill' + (fu.n > 1 ? 's' : '') : '' }, 'gs'], { v: fu ? fu.usd : null }]; },
     det: m => `Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> kWh — Deye sees <b>${f0(dv(m, 'gen'))}</b> kWh at the inverters' generator input`,
   },
@@ -360,7 +370,7 @@ function render() {
     : tab === 'cmp'
     ? `<div class="chips">${[['', 'Summary'], ...Object.entries(CMP).map(([k, c]) => [k, c.name])].map(([k, n]) => `<button class="${k === cmpKey() ? 'on' : ''}" onclick="store.set('cpr.cmp', '${k}'); render()">${n}</button>`).join('')}</div>`
     : tab === 'dsl'
-    ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
+    ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="${fuelPrice() ? fuelPrice().toFixed(2) + ' (fills)' : 'price'}" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
     : '';
   const DASH = tab === 'yr' || tab === 'bat' || tab === 'live';
   document.getElementById('dash').style.display = DASH ? '' : 'none';
@@ -407,13 +417,13 @@ function deyeYearCard(y, ms) {
   const line = (lab, v) => `<div class="yr"><span>${lab}</span><span class="n">${f0(v)}</span><span class="p"></span></div>`;
   const first = ms[0], last = ms[ms.length - 1];
   return `<div class="yc"><h2>${y}</h2><div class="cov">${MON[+first.slice(5) - 1]} → ${MON[+last.slice(5) - 1]} ${y} · ${ms.length} months · kWh · from the Deye inverters (the building meters start in Feb 2025)</div>
-    <h3>Inverters <b></b></h3>${line('Produced (solar + generator)', prod)}${line('— Solar', sum('pv'))}${line('— Generator (inverter generator input)', sum('gen'))}<div class="cov adm" style="display:none;margin:-2px 0 4px">≈ Deye kept only the total before Apr 2025; split from its 5-minute production (night output and generator runs = generator; checked on Apr 2025 – Sep 2026 against the real split: within about 3 % of the generator a month). Nothing at night in 2023–24: the generator was not on the inverters' generator input then — its power came in through the grid input (with EDL) or went to the buildings directly.</div>${line('Used — UPS load', use)}${line('Bought from EDL', buy)}${line('Sold to EDL', sold)}
+    <h3>Inverters <b></b></h3>${line('Produced (solar + generator)', prod)}${line('— Solar', sum('pv'))}${line('— Generator (inverter generator input)', sum('gen'))}<div class="cov adm" style="display:none;margin:-2px 0 4px">≈ Deye kept only the total before Apr 2025; split from its 5-minute production (night output and generator runs = generator; checked on Apr 2025 – Sep 2026 against the real split: within about 3 % of the generator a month). Nothing at night in 2023–24: the generator was not on the inverters' generator input then — it came in through the grid input, so "Grid input" in 2023–24 is EDL and the generator together (Mario, 2026-09-27).</div>${line('Used — UPS load', use)}${line('Grid input — EDL + generator', buy)}${line('Sold to EDL', sold)}
     <div class="yk"><div><b>${Math.round(dis / BATT_KWH)}</b><span>battery cycles</span></div><div><b>${f0(dis)}</b><span>kWh from the battery</span></div></div></div>`;
 }
 function renderYears() {
   const yrs = [...new Set(M.list.map(m => m.slice(0, 4)))].reverse();
   const val = x => { const v = Array.isArray(x) ? x[0] : x; return v && v.v != null ? v.v : 0; };
-  const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0;
+  const lpk = +store.get('cpr.lpk') || 0.3, usd = (+store.get('cpr.usd') || fuelPrice());
   document.getElementById('dash').innerHTML = ['all', ...yrs].map(y => {
     const metered = m => D.buildings.some(b => M.by[m].m[b.key] && M.by[m].m[b.key].n);
     const ms = y === 'all' ? M.list.filter(metered) : M.list.filter(m => m.startsWith(y));
