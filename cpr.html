@@ -94,7 +94,7 @@
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
   #msg .warn{color:var(--amber);}
   /* the phone: every table fits the width — the extra columns go into the line a row opens when tapped */
-  .wide{} .hint{display:none;} .sh{display:none;} td.gs,th.gs{border-left:2px solid var(--surface1);} .unit{display:none;} .adm{display:none;} body.admin .adm{display:inline;} .admc{display:none;} body.admin .admc{display:table-cell;}
+  .wide{} .hint{display:none;} .sh{display:none;} td.gs,th.gs{border-left:2px solid var(--surface1);} .unit{display:none;} .adm{display:none;} body.admin .adm{display:inline;} body.admin div.adm{display:block!important;} .admc{display:none;} body.admin .admc{display:table-cell;}
   @media (max-width:640px){
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
     .wide{display:none;} body.admin .wide.admc{display:none;} .hint{display:block;}
@@ -201,7 +201,7 @@ async function load(fresh) {
 // days → months. Meters: kWh + estimated flag + first day with data. Deye: kWh sums + days covered.
 function months(len = 7) {
   const by = {};
-  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, discharge: 0, n: 0, noSplit: 0 }, src: { sd: {}, oh: {} }, days: 0 });
+  const mo = m => by[m] || (by[m] = { m: {}, d: { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, prod: 0, discharge: 0, n: 0, noSplit: 0, splitEst: 0 }, src: { sd: {}, oh: {} }, days: 0 });
   const BS = D.bySource || {}, nHist = BS.oh ? BS.oh.school.length : 0;
   D.days.forEach((d, i) => {
     const o = mo(d.slice(0, len)); o.days++;
@@ -247,7 +247,7 @@ const sumv = (m, keys) => { const xs = keys.map(k => mv(m, k)); const have = xs.
 const srcv = (m, s, keys) => { const o = M.by[m]; const cs = keys.map(k => o.src[s][k]).filter(c => c && c.n); if (!cs.length) return { v: null }; return { v: cs.reduce((a, c) => a + c.kwh, 0), part: Math.max(...cs.map(c => c.n)) < o.days }; };
 const dv = (m, f) => { const o = M.by[m].d; return o.n ? o[f] : null; };
 // solar / generator from Deye: null when no day of the month has the split, ≈ when only some do
-const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) return { v: null }; return { v: o[f], est: o.noSplit > 0, note: o.noSplit ? o.noSplit + ' d missing' : '' }; };
+const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) return { v: null }; return { v: o[f], est: o.noSplit > 0 || o.splitEst > 0, note: o.noSplit ? o.noSplit + ' d missing' : '' }; };   // splitEst: before Apr 2025, split estimated from the 5-min production
 // The EDL meter was wired wrong until April 2026 (phase B current transformer reversed, phase C on the wrong
 // voltage — its kWh left out most of two phases; openHAB shows phase B negative up to Apr 2026, never after).
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
@@ -407,7 +407,7 @@ function deyeYearCard(y, ms) {
   const line = (lab, v) => `<div class="yr"><span>${lab}</span><span class="n">${f0(v)}</span><span class="p"></span></div>`;
   const first = ms[0], last = ms[ms.length - 1];
   return `<div class="yc"><h2>${y}</h2><div class="cov">${MON[+first.slice(5) - 1]} → ${MON[+last.slice(5) - 1]} ${y} · ${ms.length} months · kWh · from the Deye inverters (the building meters start in Feb 2025)</div>
-    <h3>Inverters <b></b></h3>${line('Produced (solar + generator)', prod)}${line('Used — UPS load', use)}${line('Bought from EDL', buy)}${line('Sold to EDL', sold)}
+    <h3>Inverters <b></b></h3>${line('Produced (solar + generator)', prod)}${line('— Solar', sum('pv'))}${line('— Generator (inverter generator input)', sum('gen'))}<div class="cov adm" style="display:none;margin:-2px 0 4px">≈ Deye kept only the total before Apr 2025; split from its 5-minute production (night output and generator runs = generator; checked on Apr 2025 – Sep 2026 against the real split: within about 3 % of the generator a month). Nothing at night in 2023–24: the generator was not on the inverters' generator input then — its power came in through the grid input (with EDL) or went to the buildings directly.</div>${line('Used — UPS load', use)}${line('Bought from EDL', buy)}${line('Sold to EDL', sold)}
     <div class="yk"><div><b>${Math.round(dis / BATT_KWH)}</b><span>battery cycles</span></div><div><b>${f0(dis)}</b><span>kWh from the battery</span></div></div></div>`;
 }
 function renderYears() {
