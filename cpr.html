@@ -62,10 +62,10 @@
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
   #msg .warn{color:var(--amber);}
   /* the phone: every table fits the width — the extra columns go into the line a row opens when tapped */
-  .wide{} .hint{display:none;} .sh{display:none;} td.gs,th.gs{border-left:2px solid var(--surface1);} .unit{display:none;} .adm{display:none;} body.admin .adm{display:inline;}
+  .wide{} .hint{display:none;} .sh{display:none;} td.gs,th.gs{border-left:2px solid var(--surface1);} .unit{display:none;} .adm{display:none;} body.admin .adm{display:inline;} .admc{display:none;} body.admin .admc{display:table-cell;}
   @media (max-width:640px){
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
-    .wide{display:none;} .hint{display:block;}
+    .wide{display:none;} body.admin .wide.admc{display:none;} .hint{display:block;}
     /* Mario 2026-09-26: kWh on the phone too — a smaller font instead of MWh */
     body.t-all td small{display:none;}
     body.t-all table{font-size:.6rem;letter-spacing:-.01em;} body.t-all th{padding:6px 1px;font-size:.46rem;letter-spacing:0;} body.t-all td{padding:7px 1px;}
@@ -249,16 +249,16 @@ const VIEWS = {
   all: {
     // Mario 2026-09-26: here the church is only what we supply (church − the church generator, which the church pays);
     // so the generator column leaves the church generator out too, and the two totals stay comparable
-    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL'], ['Load', 'Deye', 'wide']],
+    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Load', 'Deye', 'wide admc'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL']],
     row: m => {
       const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
       const church = co == null ? { v: null } : { v: co, est: ch.est };
       const bld = sumv(m, ['school', 'liqaa', 'hotel']); if (bld.v != null && co != null) bld.v += co;
       const gen = sumv(m, ['genBig', 'genSmall']);
       const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
-      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }, [{ v: dv(m, 'use') }, 'wide']];
+      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [{ v: dv(m, 'use') }, 'wide admc'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }];
     },
-    det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m) + `<br>Deye load (what the inverters supplied to the buildings) <b>${f0(dv(m, 'use'))}</b> kWh · battery <b>${f0(dv(m, 'discharge'))}</b> kWh discharged = <b>${((dv(m, 'discharge') || 0) / BATT_KWH).toFixed(1)}</b> cycles of ${BATT_KWH} kWh`,
+    det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m) + (ADMIN ? `<br>Deye load (what the inverters supplied to the buildings) <b>${f0(dv(m, 'use'))}</b> kWh · ` : '<br>') + `battery <b>${f0(dv(m, 'discharge'))}</b> kWh discharged = <b>${((dv(m, 'discharge') || 0) / BATT_KWH).toFixed(1)}</b> cycles of ${BATT_KWH} kWh`,
   },
   bld: {
     head: ['School', 'Church', ['Kamal', 'Liqaa + Hotel'], ['Liqaa', '', 'wide'], ['Hotel', '', 'wide'], ['Total', '', 'sum']],
@@ -343,7 +343,7 @@ function render() {
     }).join('');
     return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` : '');
   }).join('');
-  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && (h[2] === 'wide' || h[2] === 'gs') ? h[2] : ''}">${tot[i].any ? (tot[i].cyc ? tot[i].v.toFixed(0) : num2(tot[i].v)) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
+  const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && /wide|gs/.test(h[2] || '') ? h[2] : ''}">${tot[i].any ? (tot[i].cyc ? tot[i].v.toFixed(0) : num2(tot[i].v)) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
   document.getElementById('tbl').innerHTML = `<thead><tr><th>${DAY ? 'Day' : 'Month'}</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;
   } finally { M = MM; }
   const notes = (D.notes || []).slice();
@@ -359,9 +359,9 @@ function renderYears() {
   const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0;
   document.getElementById('dash').innerHTML = yrs.map(y => {
     const ms = M.list.filter(m => m.startsWith(y));
-    const s = Array(9).fill(0); let genAll = 0;
+    const s = Array(10).fill(0); let genAll = 0;
     for (const m of ms) { VIEWS.all.row(m).forEach((x, i) => { s[i] += val(x); }); genAll += sumv(m, ['genChurch', 'genBig', 'genSmall']).v || 0; }
-    const [school, church, kamal, bld, solar, edl, gen, sup, sold] = s;
+    const [school, church, kamal, bld, , solar, edl, gen, sup, sold] = s;
     const first = ms[0], last = ms[ms.length - 1], td = today();
     const cov = MON[+first.slice(5) - 1] + ' → ' + (last === td.slice(0, 7) ? +td.slice(8) + ' ' : '') + MON[+last.slice(5) - 1] + ' ' + y + ' · ' + ms.length + ' month' + (ms.length > 1 ? 's' : '');
     const line = (lab, v, tot) => `<div class="yr"><span>${lab}</span><span class="n">${f0(v)}</span><span class="p">${tot ? Math.round(v / tot * 100) + ' %' : ''}</span><div class="bar"><i style="width:${tot ? Math.min(100, v / tot * 100) : 0}%"></i></div></div>`;
