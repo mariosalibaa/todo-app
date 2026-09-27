@@ -51,6 +51,7 @@
   /* year summary (Mario 2026-09-26: "give me the year summary, one dashboard") */
   #dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;}
   .yc{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;}
+  .yc.all{border-color:var(--amber);} .yc.all h2{color:var(--text);}
   .yc h2{margin:0;font-size:1.3rem;color:var(--amber);} .yc .cov{font-size:.72rem;color:var(--overlay0);margin:2px 0 8px;}
   .yc h3{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin:12px 0 6px;font-weight:600;display:flex;justify-content:space-between;} .yc h3 b{color:var(--text);font-size:.9rem;letter-spacing:0;}
   .yr{display:grid;grid-template-columns:1fr auto 44px;gap:2px 10px;align-items:center;font-size:.82rem;padding:3px 0;}
@@ -260,14 +261,14 @@ const VIEWS = {
   all: {
     // Mario 2026-09-26: here the church is only what we supply (church − the church generator, which the church pays);
     // so the generator column leaves the church generator out too, and the two totals stay comparable
-    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Load', 'Deye', 'wide admc'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL']],
+    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Load', 'Deye', 'wide admc'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL'], ['Batt', 'cycles']],
     row: m => {
       const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
       const church = co == null ? { v: null } : { v: co, est: ch.est };
       const bld = sumv(m, ['school', 'liqaa', 'hotel']); if (bld.v != null && co != null) bld.v += co;
       const gen = sumv(m, ['genBig', 'genSmall']);
       const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
-      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [{ v: dv(m, 'use') }, 'wide admc'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }];
+      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [{ v: dv(m, 'use') }, 'wide admc'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }, s[s.length - 1]];
     },
     det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m) + (ADMIN ? `<br>Deye load (what the inverters supplied to the buildings) <b>${f0(dv(m, 'use'))}</b> kWh · ` : '<br>') + `battery <b>${f0(dv(m, 'discharge'))}</b> kWh discharged = <b>${((dv(m, 'discharge') || 0) / BATT_KWH).toFixed(1)}</b> cycles of ${BATT_KWH} kWh`,
   },
@@ -371,16 +372,16 @@ function renderYears() {
   const yrs = [...new Set(M.list.map(m => m.slice(0, 4)))].reverse();
   const val = x => { const v = Array.isArray(x) ? x[0] : x; return v && v.v != null ? v.v : 0; };
   const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0;
-  document.getElementById('dash').innerHTML = yrs.map(y => {
-    const ms = M.list.filter(m => m.startsWith(y));
+  document.getElementById('dash').innerHTML = ['all', ...yrs].map(y => {
+    const ms = y === 'all' ? M.list.slice() : M.list.filter(m => m.startsWith(y));
     const s = Array(10).fill(0); let genAll = 0;
     for (const m of ms) { VIEWS.all.row(m).forEach((x, i) => { s[i] += val(x); }); genAll += sumv(m, ['genChurch', 'genBig', 'genSmall']).v || 0; }
     const [school, church, kamal, bld, , solar, edl, gen, sup, sold] = s;
     const first = ms[0], last = ms[ms.length - 1], td = today();
-    const cov = MON[+first.slice(5) - 1] + ' → ' + (last === td.slice(0, 7) ? +td.slice(8) + ' ' : '') + MON[+last.slice(5) - 1] + ' ' + y + ' · ' + ms.length + ' month' + (ms.length > 1 ? 's' : '');
+    const cov = MON[+first.slice(5) - 1] + (y === 'all' ? ' ' + first.slice(0, 4) : '') + ' → ' + (last === td.slice(0, 7) ? +td.slice(8) + ' ' : '') + MON[+last.slice(5) - 1] + ' ' + last.slice(0, 4) + ' · ' + ms.length + ' month' + (ms.length > 1 ? 's' : '');
     const line = (lab, v, tot) => `<div class="yr"><span>${lab}</span><span class="n">${f0(v)}</span><span class="p">${tot ? Math.round(v / tot * 100) + ' %' : ''}</span><div class="bar"><i style="width:${tot ? Math.min(100, v / tot * 100) : 0}%"></i></div></div>`;
     const dollars = usd ? 'USD ' + f0(genAll * lpk * usd) : '—';
-    return `<div class="yc"><h2>${y}</h2><div class="cov">${cov} · kWh</div>
+    return `<div class="yc${y === 'all' ? ' all' : ''}"><h2>${y === 'all' ? 'All years' : y}</h2><div class="cov">${cov} · kWh</div>
       <h3>Buildings <b>${f0(bld)}</b></h3>${line('School', school, bld)}${line('Church — from us', church, bld)}${line('Kamal — Liqaa + Hotel', kamal, bld)}
       <h3>Supply <b>${f0(sup)}</b></h3>${line('Solar', solar, sup)}${line('EDL', edl, sup)}${line('Generators (ours)', gen, sup)}
       <div class="yk"><div><b>${f0(sold)}</b><span>sold to EDL</span></div><div><b>${sup ? Math.round(solar / sup * 100) : 0} %</b><span>solar share</span></div><div><b>${Math.round(ms.reduce((a, m) => a + (M.by[m].d.discharge || 0), 0) / BATT_KWH)}</b><span>battery cycles</span></div></div>
