@@ -199,12 +199,13 @@ function renderMsg() {
   L.push(`${k++}. ${N(c.paidAnthony)}$ paid to anthony`); for (const p of c.anthonyPays || []) L.push(`- ${N(p.amount)}$ ${dmy(p.date)}`); L.push('');
   if (c.at080) { L.push(`${k++}. ${N(c.litres)}L * 0.8$/L = ${N(c.at080)}$`, ''); L.push(`${k++}. total paid to anthony ${N(c.at080)}$ + ${N(c.paidAnthony)}$ = ${N(c.counted)}$`, ''); }
   if (c.daysAmt) L.push(`${k++}. day rate ${N(c.daysAmt / 300 * 10) / 10} days * 300$ = ${N(c.daysAmt)}$ (apart from the m3)`, '');
-  L.push(`${k++}. ${c.daysAmt ? `(${N(c.counted)}$ - ${N(c.daysAmt)}$ day rate) ` : N(c.counted) + '$ '}/ ${c.price}$/m3 = ${N(c.covered)}m3 covered`);
-  L.push(c.open ? `   this cycle ${N(c.m3)}m3 → ${N(Math.max(0, c.m3 - c.covered))}m3 remaining = ${N(Math.max(0, c.left))}$${c.daysAmt ? ' (day rate included)' : ''}` : `   this cycle ${N(c.m3)}m3 = ${N(c.contract)}$ → ${c.left > 0.5 ? N(c.left) + '$ still due to anthony' : c.left < -0.5 ? N(-c.left) + '$ paid ahead' : 'settled'}`, '');
-  // what the earlier cycles left over — paid ahead or still due — counts here too (Mario, 2026-09-27)
-  { const carry = Math.round(prev.reduce((t, x) => t + x.left, 0)), own = c.open ? Math.max(0, c.left) : c.left, net = Math.round(own + carry);
-    const st = v => v > 0.5 ? N(v) + '$ still due to anthony' : v < -0.5 ? N(-v) + '$ paid ahead' : 'settled';
-    if (Math.abs(carry) > 0.5) L.push(`   from the previous cycles (${prev.length > 1 ? '1 to ' + prev[prev.length - 1].n : '1'}): ${st(carry)}`, `   ${N(Math.round(own))}$ ${carry < 0 ? '- ' + N(-carry) : '+ ' + N(carry)}$ = ${net < 0 ? '-' : ''}${N(Math.abs(net))}$ → ${st(net)}`, ''); }
+  // what the earlier cycles left over counts in the m³ this cycle's money covers: paid ahead adds, still due takes off (Mario, 2026-09-27: "add 251$ => cover exceed 981m3")
+  { const carry = Math.round(prev.reduce((t, x) => t + x.left, 0)), cov = c.price ? Math.round((c.counted - (c.daysAmt || 0) - carry) / c.price) : 0, net = Math.round(c.left + carry);
+    const parts = [N(c.counted) + '$'].concat(c.daysAmt ? [`- ${N(c.daysAmt)}$ day rate`] : [], carry < -0.5 ? [`+ ${N(-carry)}$ paid ahead before`] : carry > 0.5 ? [`- ${N(carry)}$ still due before`] : []);
+    L.push(`${k++}. ${parts.length > 1 ? '(' + parts.join(' ') + ') ' : parts[0] + ' '}/ ${c.price}$/m3 = ${N(cov)}m3 covered`);
+    const d = Math.abs(c.m3 - cov);
+    L.push(c.open && net > 0.5 ? `   this cycle ${N(c.m3)}m3 → ${N(Math.max(0, c.m3 - cov))}m3 remaining = ${N(net)}$${c.daysAmt ? ' (day rate included)' : ''}`
+      : `   this cycle ${N(c.m3)}m3 → ${net < -0.5 ? N(d) + 'm3 more than the cycle = ' + N(-net) + '$ paid ahead' : net > 0.5 ? N(d) + 'm3 short = ' + N(net) + '$ still due to anthony' : 'settled'}`, ''); }
   if (c.open) L.push(`${k++}. total job: ${N(doneBefore)}m3 certified till ${from} + ${N(c.covered)}m3 = ${N(doneBefore + c.covered)}m3 of ${N(total)}m3`, `   remaining to finish: ${N(Math.max(0, total - doneBefore - c.covered))}m3`);
   // the diesel those remaining m³ will take, at the L/m³ of the finished cycles and the last rate paid: his part at 0.80, Shift's above
   const rem = Math.max(0, total - doneBefore - c.covered), rate = (D.cost && D.cost.rateClosed) || 0, perL = (D.cost && D.cost.forecast && D.cost.forecast.lastPerL) || 0;
