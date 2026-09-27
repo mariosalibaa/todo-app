@@ -5,7 +5,8 @@ const admin = require('firebase-admin');
 const accounting = require('./accounting');   // /api/accounting/* (Whish statements)
 const budget = require('./budget');           // /api/accounting/budget/* (HomeBudget replica)
 const wise = require('./wise');               // /api/accounting/wise/* (Wise statements)
-const whishRules = require('./whish-rules');  // standing orders: a Whish line -> a draft bill
+const whishRules = require('./whish-rules');
+const assistant = require('./assistant');   // the hub's own read-only assistant (/api/assistant)  // standing orders: a Whish line -> a draft bill
 const accounts = require('./accounts');        // cash & bank accounts, their lines, transfers
 const decisions = require('./decisions');
 const crm = require('./crm');                  // /api/crm/* + /api/meta/webhook (client conversations: WhatsApp dev line, Instagram, Messenger)      // /api/decisions/* (a question to a partner, answered from a link; Telegram to Mario)
@@ -143,6 +144,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'dictate.js'));
   fs.readFileSync(path.join(__dirname, 'emoji-picker.js'));
   fs.readFileSync(path.join(__dirname, 'line-sheet.js'));
+  fs.readFileSync(path.join(__dirname, 'ask.js'));
   fs.readFileSync(path.join(__dirname, 'scan-editor.js'));
   fs.readFileSync(path.join(__dirname, 'hub-history.js'));
   fs.readFileSync(path.join(__dirname, 'naccache.html'));
@@ -868,7 +870,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
@@ -1080,6 +1082,19 @@ const handler = async (req, res) => {
       viewAs: access.viewAs || '', viewedBy: access.viewedBy || '', readOnly: !!access.readOnly,
       // the admin behind the view gets the list to switch with (name, email, what they may open)
       people: access.viewAs || access.admin ? [...(await allowlistMap()).values()].map(x => ({ email: x.email, name: x.name || '', apps: x.apps, account: x.account || '' })) : [] }));
+    return;
+  }
+
+  // ── Ask: the chat box on every page. Read-only, scoped to whoever is signed in (assistant.js)
+  if (url === '/api/assistant' && req.method === 'POST') {
+    const b = await new Promise(resolve => { let d = ''; req.on('data', c => { d += c; if (d.length > 2e5) req.destroy(); }); req.on('end', () => { try { resolve(JSON.parse(d || '{}')); } catch { resolve({}); } }); });
+    try {
+      const out = await assistant.ask({ accounts, ws: db.collection('workspaces').doc(TEAM_ID), access }, b);
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out));
+    } catch (e) {
+      res.writeHead(e.status || 502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(e.message || e).slice(0, 200) }));
+    }
     return;
   }
 

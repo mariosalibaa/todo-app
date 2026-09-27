@@ -169,7 +169,7 @@
         return true;
       }
       if (!ready) { ready = true; overlay(''); onReady(me); }
-      A.viewAsBar();
+      A.viewAsBar(); A.askBox();
       return true;
     } catch (e) {
       if (e.status === 403) {
@@ -191,6 +191,11 @@
   A.viewAs = function (email) {
     document.cookie = VIEW_COOKIE + '=' + encodeURIComponent(email || '') + ';path=/;max-age=' + (email ? 7200 : 0) + ';samesite=lax';
     location.reload();
+  };
+  // the Ask box rides along with the bar, so it is on every page that loads this file
+  A.askBox = function () {
+    if (document.getElementById('ask-btn') || document.querySelector('script[data-ask]')) return;
+    const s = document.createElement('script'); s.src = '/ask.js'; s.defer = true; s.dataset.ask = '1'; document.head.append(s);
   };
   A.viewAsBar = function () {
     const me = A.me || {};
@@ -256,7 +261,7 @@
         A.me = { email: 'local@shift', name: 'Mario', apps: ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 'reports', 'excavation', 'crm'], admin: true, local: true };
         ready = true; overlay(''); onReady(A.me);
         // the local machine still asks who the hub thinks we are, so "View as" works here too
-        A.api('GET', '/api/me').then(me => { A.me = { ...A.me, ...me, admin: me.viewAs ? !!me.admin : true }; A.viewAsBar(); }).catch(() => {});
+        A.api('GET', '/api/me').then(me => { A.me = { ...A.me, ...me, admin: me.viewAs ? !!me.admin : true }; A.viewAsBar(); A.askBox(); }).catch(() => {});
         return;
       }
       overlay(card('Checking session…'));
