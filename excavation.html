@@ -191,6 +191,8 @@ function renderMsg() {
   const period = from + ' to ' + to;
   const L = [];
   L.push(`Cycle ${period} (${c.n === R.length ? 'last ' : ''}${N(c.m3)}m3 of the ${N(total)}m3)`, '');
+  // where Anthony stood before this cycle — due to him or paid ahead (Mario, 2026-09-27: "mention at the beginning")
+  { const before = Math.round(prev.reduce((t, x) => t + x.left, 0)); if (prev.length) L.push(`before this cycle (cycles ${prev.length > 1 ? '1 to ' + prev[prev.length - 1].n : '1'}): ${before > 0.5 ? N(before) + '$ still due to anthony' : before < -0.5 ? N(-before) + '$ paid ahead to anthony' : 'settled, nothing due'}`, ''); }
   let k = 1;
   if (c.fillList.length) { L.push(`${k++}. diesel paid ${N(c.litres)}L at cost ${N(c.fillCash)}$ at average ${N(c.perT)}$/T`); for (const x of c.fillList) L.push(`- ${x.amount}$ ${N(x.litres)}L ${x.date}${x.paid ? '' : ' (transfer to Dib pending)'}`); L.push(''); }
   else if (c.n === 1) L.push(`${k++}. diesel paid by Anthony himself in this cycle`, '');
