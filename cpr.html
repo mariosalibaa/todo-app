@@ -232,7 +232,8 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // voltage — its kWh left out most of two phases; openHAB shows phase B negative up to Apr 2026, never after).
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
-const BATT_KWH = 127.33;   // DeyeCloud station capacity; one cycle = one full discharge of it
+// Mario 2026-09-27: 5.12 kWh a battery × 12 a rack × 3 racks = 184.32 kWh (DeyeCloud is set to 127.33 — wrong)
+const BATT_KWH = 184.32;   // one cycle = one full discharge of it
 const CMP = {
   school: { name: 'M1 School', keys: ['school'] }, church: { name: 'M2 Church', keys: ['church'] }, liqaa: { name: 'M3 Liqaa', keys: ['liqaa'] },
   hotel: { name: 'M4 Hotel', keys: ['hotel'] }, genChurch: { name: 'M5 Gen church', keys: ['genChurch'] }, genSmall: { name: 'M6 Gen small', keys: ['genSmall'] },
@@ -401,7 +402,7 @@ function renderRacks() {
       <div class="kv"><span>charge now</span><b>${r.soc != null ? r.soc + ' %' : '—'}</b><span>health</span><b>${r.soh != null ? r.soh + ' %' : '—'}</b><span>temperature</span><b>${r.temp != null ? r.temp + ' °C' : '—'}</b><span>voltage</span><b>${r.volt != null ? r.volt + ' V' : '—'}</b><span>charged</span><b>${r.charge != null ? (r.charge / 1000).toFixed(1) + ' MWh' : '—'}</b><span>discharged</span><b>${r.discharge != null ? (r.discharge / 1000).toFixed(1) + ' MWh' : '—'}</b></div>
       <div class="mods">${mods}</div></div>`;
   }).join('');
-  const set = ADMIN ? `<div class="batset">Battery capacity <input type="number" step="0.01" value="${total}" onchange="store.set('cpr.battKwh', this.value); render()"> kWh in all = ${perRack.toFixed(1)} kWh a rack, ${perMod.toFixed(2)} kWh a battery (DeyeCloud's setting: ${BATT_KWH} kWh). Cycles = the rack's lifetime discharge ÷ its capacity. <span class="muted">· admin</span></div>` : '';
+  const set = ADMIN ? `<div class="batset">Battery capacity <input type="number" step="0.01" value="${total}" onchange="store.set('cpr.battKwh', this.value); render()"> kWh in all = ${perRack.toFixed(1)} kWh a rack, ${perMod.toFixed(2)} kWh a battery (5.12 kWh × 12 × 3 = ${BATT_KWH} kWh; DeyeCloud is set to 127.33). Cycles = the rack's lifetime discharge ÷ its capacity. <span class="muted">· admin</span></div>` : '';
   document.getElementById('dash').innerHTML = cards + set + `<div class="batset muted">The 12 batteries of a rack are in series: they charge and discharge together, so each shows the rack's cycles. The green fill = charge now.</div>`;
 }
 function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
