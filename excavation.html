@@ -180,12 +180,13 @@ function renderAnthony() {
     ${R.map(c => `<tr><td>${c.n}${c.open ? ' ⏳' : ''}</td><td>${esc(c.fills || ('till ' + c.till))}</td><td class="n">${f(c.m3, 0)}</td><td class="n">${f(c.price)}</td><td class="n">${f(c.worth, 0)}${c.daysAmt ? ` <span class="of">incl. ${f(c.daysAmt, 0)} days</span>` : ''}</td><td class="n">${c.litres ? f(c.litres, 0) : '—'}</td><td class="n">${c.fillCash ? f(c.fillCash, 0) : '—'}</td><td class="n">${c.perT ? f(c.perT, 0) : '—'}</td><td class="n">${f(c.paidAnthony, 0)}</td><td class="n">${c.at080 ? f(c.at080, 0) : '—'}</td><td class="n"><b>${f(c.counted, 0)}</b></td><td class="n">${f(c.covered, 0)}${c.open ? ` <span class="of">of ${f(c.m3, 0)}</span>` : ''}</td><td class="n" title="worth to him so far − counted to him so far">${f(R.filter(x => x.n <= c.n).reduce((t, x) => t + x.left, 0), 0)} <span class="of">${c.left >= 0 ? '+' : '−'}${f(Math.abs(c.left), 0)}</span></td></tr>`).join('')}</tbody>
     <tfoot><tr class="tot"><td colspan="2">All</td><td class="n">${f(tot.m3, 0)}</td><td></td><td class="n">${f(tot.contract, 0)}</td><td class="n">${f(tot.litres, 0)}</td><td class="n">${f(tot.fillCash, 0)}</td><td></td><td class="n">${f(tot.paidA, 0)}</td><td class="n">${f(tot.at080, 0)}</td><td class="n">${f(tot.counted, 0)}</td><td class="n">${f(tot.covered, 0)}</td><td class="n">${f(tot.left)}</td></tr></tfoot>`;
   const sel = document.getElementById('msg-cycle'); const cur = sel.value;
-  sel.innerHTML = R.map(c => `<option value="${c.n}">cycle ${c.n} · ${esc(c.fills || 'till ' + c.till)}${c.open ? ' (open)' : ''}</option>`).join('');
-  sel.value = cur && R.some(c => String(c.n) === cur) ? cur : String((R.find(c => c.open) || R[R.length - 1] || {}).n || '');
+  sel.innerHTML = R.map(c => `<option value="${c.n}">cycle ${c.n} · ${esc(c.fills || 'till ' + c.till)}${c.open ? ' (open)' : ''}</option>`).join('') + '<option value="all">whole job · summary</option>';
+  sel.value = cur === 'all' ? cur : cur && R.some(c => String(c.n) === cur) ? cur : String((R.find(c => c.open) || R[R.length - 1] || {}).n || '');
   renderMsg();
 }
 function renderMsg() {
-  const R = anthonyRows(), c = R.find(x => String(x.n) === document.getElementById('msg-cycle').value); if (!c) return;
+  const R = anthonyRows(); if (document.getElementById('msg-cycle').value === 'all') return renderJobMsg(R);
+  const c = R.find(x => String(x.n) === document.getElementById('msg-cycle').value); if (!c) return;
   const prev = R.filter(x => x.n < c.n), doneBefore = prev.reduce((t, x) => t + x.m3, 0), total = c.totalM3 || D.cost.m3;
   const from = prev.length ? prev[prev.length - 1].till : 'start', to = c.open ? dmy(new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10)) : c.till;
   const period = from + ' to ' + to;
@@ -210,6 +211,26 @@ function renderMsg() {
   // the diesel those remaining m³ will take, at the L/m³ of the finished cycles and the last rate paid: his part at 0.80, Shift's above
   const rem = Math.max(0, total - doneBefore - c.covered), rate = (D.cost && D.cost.rateClosed) || 0, perL = (D.cost && D.cost.forecast && D.cost.forecast.lastPerL) || 0;
   if (c.open && rem && rate && perL) { const Lr = Math.round(rem * rate), cost = Math.round(Lr * perL), at080 = Math.round(Lr * 0.8); L.push('', `${k++}. diesel expected for the remaining ${N(rem)}m3 at ${rate}L/m3 = ${N(Lr)}L`, `   at ${perL}$/L = ${N(cost)}$ → ${N(at080)}$ at 0.8$/L counted to anthony + ${N(cost - at080)}$ above 0.8 paid by shift`, `   so the remaining ${N(rem)}m3 = ${N(rem * c.price)}$ − ${N(at080)}$ diesel = ${N(rem * c.price - at080)}$ cash to anthony`); const carry = Math.round(prev.reduce((t, x) => t + x.left, 0)), cash = Math.round(rem * c.price - at080 + carry); if (Math.abs(carry) > 0.5) L.push(`   with the previous cycles: ${N(Math.round(rem * c.price - at080))}$ ${carry < 0 ? '- ' + N(-carry) + '$ paid ahead' : '+ ' + N(carry) + '$ still due'} = ${cash > 0 ? N(cash) + '$ cash to anthony' : 'nothing more to pay him' + (cash < 0 ? ' (' + N(-cash) + '$ paid ahead)' : '')}`); }
+  document.getElementById('msg').textContent = L.join('\n');
+}
+// the whole job in one message for Anthony (Mario, 2026-09-27: "what should I share with Anthony as summary for everything"):
+// what his work was worth, what he received (cash + the diesel at $0.80/L inside his price), the balance, and the cycles in short
+function renderJobMsg(R) {
+  const S = k => R.reduce((t, c) => t + (c[k] || 0), 0), m3 = S('m3'), days = S('daysAmt'), cash = S('paidAnthony'), litres = S('litres'), at080 = Math.round(S('at080')), counted = Math.round(S('counted'));
+  const byPrice = {}; for (const c of R) (byPrice[c.price] ||= { m3: 0 }).m3 += c.m3;
+  const work = Object.entries(byPrice).map(([p, x]) => ({ p: +p, m3: x.m3, v: x.m3 * p })), worth = Math.round(work.reduce((t, w) => t + w.v, 0) + days), bal = Math.round(worth - counted);
+  const st = v => v > 0.5 ? N(Math.round(v)) + '$ still due to anthony' : v < -0.5 ? N(Math.round(-v)) + '$ paid ahead to anthony' : 'settled';
+  const L = [`Excavation Ajaltoun — summary (${N(m3)}m3, job done)`, ''];
+  let k = 1;
+  L.push(`${k++}. work`); for (const w of work) L.push(`- ${N(w.m3)}m3 * ${w.p}$/m3 = ${N(w.v)}$`);
+  if (days) L.push(`- day rate ${N(days / 300 * 10) / 10} days * 300$ = ${N(days)}$`);
+  L.push(`total ${N(worth)}$`, '');
+  L.push(`${k++}. paid to anthony ${N(cash)}$ cash`, '');
+  L.push(`${k++}. diesel ${N(litres)}L * 0.8$/L = ${N(at080)}$ (inside your price; cycle 1 you fuelled yourself)`, '');
+  L.push(`${k++}. total paid to anthony ${N(cash)}$ + ${N(at080)}$ = ${N(counted)}$`, '');
+  L.push(`${k++}. ${N(worth)}$ - ${N(counted)}$ = ${bal < 0 ? '-' : ''}${N(Math.abs(bal))}$ → ${st(bal)}`, '');
+  L.push('per cycle: worth / paid (cash + diesel at 0.8) / balance after');
+  let run = 0; for (const c of R) { run += c.left; L.push(`- ${c.n}. till ${c.till} · ${N(c.m3)}m3 · ${N(Math.round(c.worth))}$ / ${N(Math.round(c.counted))}$ · ${st(run).replace(' to anthony', '')}`); }
   document.getElementById('msg').textContent = L.join('\n');
 }
 async function copyMsg() { try { await navigator.clipboard.writeText(document.getElementById('msg').textContent); alert('Copied — paste it in WhatsApp.'); } catch (e) { alert('Select the text and copy it.'); } }
