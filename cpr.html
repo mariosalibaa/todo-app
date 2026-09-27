@@ -264,7 +264,14 @@ const dayMonth = () => { const v = store.get('cpr.dayMonth'); return v && M && M
 const cmpKey = () => store.get('cpr.cmp') || '';
 // Mario 2026-09-26: EDL may feed Liqaa / the Hotel without passing the inverters, so the EDL meter is the right
 // measure — from May 2026, once it was rewired; before that, Deye's grid input.
-const edlOf = m => m < EDL_OK && dv(m, 'gridIn') != null ? { v: dv(m, 'gridIn'), note: 'Deye' } : mv(m, 'edl');
+// Mario 2026-09-27: Deye is the base for EDL and the generators (its history is complete). A month the meters read MORE
+// than Deye, the difference went straight to the buildings through the manual transfer switch, outside the Deye system;
+// a month they read less (installed late, offline, the EDL meter miswired until Apr 2026), Deye alone counts.
+const edlSplit = m => { const d = dv(m, 'gridIn'), me = mv(m, 'edl'); if (d == null) return { deye: null, direct: null, total: me.v, est: me.est, meter: me.v };
+  const direct = me.v != null ? Math.max(0, me.v - d) : 0; return { deye: d, direct, total: d + direct, meter: me.v }; };
+const genSplit = m => { const ds = dsplit(m, 'gen'), g = sumv(m, ['genChurch', 'genBig', 'genSmall']); if (ds.v == null) return { deye: null, direct: null, total: g.v, est: g.est, meter: g.v };
+  const direct = g.v != null ? Math.max(0, g.v - ds.v) : 0; return { deye: ds.v, direct, total: ds.v + direct, est: ds.est, meter: g.v }; };
+const edlOf = m => { const e = edlSplit(m); return { v: e.total, est: e.est, note: e.deye == null ? 'meter' : '' }; };
 const num2 = v => false ? `<span class="fl">${f0(v)}</span><span class="sh">${(v / 1000).toFixed(1)}</span>` : f0(v);
 const cell = (x0, cls = '') => { const x = ADMIN ? x0 : { ...x0, est: false, note: /missing/.test(x0.note || '') ? '' : x0.note }; return x.v == null ? `<td class="${cls}"><span class="none">—</span></td>`
   : `<td class="${cls}">${x.est ? '<span class="est">≈ ' + num2(x.v) + '</span>' : num2(x.v)}${x.pct != null ? `<small class="pc">${x.pct.toFixed(0)} %</small>` : ''}${x.ours != null ? `<small class="ours">${f0(x.ours)} from us</small>` : ''}${x.note ? `<small>${x.note}</small>` : ''}</td>`; };
@@ -287,7 +294,8 @@ const VIEWS = {
       const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
       const church = co == null ? { v: null } : { v: co, est: ch.est };
       const bld = sumv(m, ['school', 'liqaa', 'hotel']); if (bld.v != null && co != null) bld.v += co;
-      const gen = sumv(m, ['genBig', 'genSmall']);
+      const gs = genSplit(m), gc = mv(m, 'genChurch').v;
+      const gen = gs.total == null ? { v: null } : { v: Math.max(0, gs.total - (gc || 0)), est: gs.est };
       const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
       return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [{ v: dv(m, 'use') }, 'wide admc'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }, s[s.length - 1]];
     },
@@ -301,13 +309,14 @@ const VIEWS = {
     det: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, p = k => t ? ' (' + (mv(m, k).v / t * 100).toFixed(0) + ' %)' : ''; return `Church <b>${f0(mv(m, 'church').v)}</b> − its generator <b>${f0(mv(m, 'genChurch').v)}</b> = <b>${f0(churchOurs(m))}</b> kWh from us · Liqaa <b>${f0(mv(m, 'liqaa').v)}</b>${p('liqaa')} · Hotel <b>${f0(mv(m, 'hotel').v)}</b>${p('hotel')} kWh — together Kamal's <b>${f0(sumv(m, ['liqaa', 'hotel']).v)}</b>`; },
   },
   sup: {
-    head: ['Solar', 'EDL', ['Gen', 'meters'], ['Gen church', '', 'wide'], ['Gen big', '', 'wide'], ['Total', '', 'sum'], ['Sold', 'to EDL'], ['Battery', 'cycles']],
+    head: ['Solar', 'EDL', ['EDL', 'direct'], ['Gen', ''], ['Gen', 'direct'], ['Total', '', 'sum'], ['Sold', 'to EDL'], ['Battery', 'cycles']],
     row: m => {
-      const gen = sumv(m, ['genChurch', 'genBig', 'genSmall']), edl = edlOf(m), pv = dsplit(m, 'pv');
+      const e = edlSplit(m), g = genSplit(m), pv = dsplit(m, 'pv');
+      const edl = { v: e.total, est: e.est, note: e.deye == null && e.total != null ? 'meter' : '' }, gen = { v: g.total, est: g.est, note: g.deye == null && g.total != null ? 'meters' : '' };
       const tot = (pv.v || 0) + (edl.v || 0) + (gen.v || 0);
-      return [pv, edl, gen, [mv(m, 'genChurch'), 'wide'], [mv(m, 'genBig'), 'wide'], [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }, { html: dv(m, 'discharge') ? (dv(m, 'discharge') / BATT_KWH).toFixed(1) : '<span class="none">—</span>', sum: dv(m, 'discharge') / BATT_KWH }];
+      return [pv, edl, { v: e.direct }, gen, { v: g.direct }, [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }, { html: dv(m, 'discharge') ? (dv(m, 'discharge') / BATT_KWH).toFixed(1) : '<span class="none">—</span>', sum: dv(m, 'discharge') / BATT_KWH }];
     },
-    det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL <b>${f0(edlOf(m).v)}</b> (${dv(m, 'gridIn') != null ? 'Deye' : 'meter'}; the EDL meter read <b>${f0(mv(m, 'edl').v)}</b>) · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
+    det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL: Deye <b>${f0(edlSplit(m).deye)}</b>, meter <b>${f0(edlSplit(m).meter)}</b> → direct through the transfer switch <b>${f0(edlSplit(m).direct)}</b> · Generators: Deye <b>${f0(genSplit(m).deye)}</b>, meters <b>${f0(genSplit(m).meter)}</b> → direct <b>${f0(genSplit(m).direct)}</b> · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
   cmp: {
     // Mario 2026-09-26: each meter M1–M8, SD card against openHAB; Deye next to EDL and the generators
@@ -343,7 +352,7 @@ const VIEWS = {
 };
 
 function render() {
-  document.body.classList.toggle('t-all', tab === 'all' || tab === 'day');
+  document.body.classList.toggle('t-all', tab === 'all' || tab === 'day' || tab === 'sup');
   if (!ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'all';
   document.getElementById('tabs').innerHTML = TABS.filter(t => ADMIN || !t[2]).map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
   document.getElementById('set').innerHTML = tab === 'day'
@@ -410,7 +419,7 @@ function renderYears() {
     const ms = y === 'all' ? M.list.filter(metered) : M.list.filter(m => m.startsWith(y));
     if (y !== 'all' && !ms.some(metered)) return deyeYearCard(y, ms);
     const s = Array(10).fill(0); let genAll = 0;
-    for (const m of ms) { VIEWS.all.row(m).forEach((x, i) => { s[i] += val(x); }); genAll += sumv(m, ['genChurch', 'genBig', 'genSmall']).v || 0; }
+    for (const m of ms) { VIEWS.all.row(m).forEach((x, i) => { s[i] += val(x); }); genAll += genSplit(m).total || 0; }
     const [school, church, kamal, bld, , solar, edl, gen, sup, sold] = s;
     const first = ms[0], last = ms[ms.length - 1], td = today();
     const cov = MON[+first.slice(5) - 1] + (y === 'all' ? ' ' + first.slice(0, 4) : '') + ' → ' + (last === td.slice(0, 7) ? +td.slice(8) + ' ' : '') + MON[+last.slice(5) - 1] + ' ' + last.slice(0, 4) + ' · ' + ms.length + ' month' + (ms.length > 1 ? 's' : '');
@@ -418,10 +427,8 @@ function renderYears() {
     const dollars = usd ? 'USD ' + f0(genAll * lpk * usd) : '—';
     return `<div class="yc${y === 'all' ? ' all' : ''}"><h2>${y === 'all' ? 'All years <small style="font-size:.6rem;color:var(--overlay0);font-weight:400">since the building meters</small>' : y}</h2><div class="cov">${cov} · kWh</div>
       <h3>Buildings <b>${f0(bld)}</b></h3>${line('School', school, bld)}${line('Church — from us', church, bld)}${line('Kamal — Liqaa + Hotel', kamal, bld)}
-      <h3>Supply <b>${f0(sup)}</b></h3>${line('Solar', solar, sup)}${line('EDL', edl, sup)}${line('Generators (ours) — meters / openHAB', gen, sup)}${(() => { const dg = ms.reduce((a, m) => a + (M.by[m].d.noSplit < M.by[m].d.n ? M.by[m].d.gen : 0), 0), out = genAll - dg;
-      return `<h3>All generators <b>${f0(genAll)}</b></h3><div class="yr"><span>Through the inverters (Deye)</span><span class="n">${f0(dg)}</span><span class="p">${genAll ? Math.round(dg / genAll * 100) + ' %' : ''}</span></div>`
-        + `<div class="yr"><span>Outside the inverters (meters − Deye)</span><span class="n" style="${out < 0 ? 'color:var(--red)' : ''}">${f0(out)}</span><span class="p">${genAll && out >= 0 ? Math.round(out / genAll * 100) + ' %' : ''}</span></div>`
-        + (out < 0 ? `<div class="cov" style="color:var(--red)">Deye reads ${f0(-out)} kWh more than the meters — it should be less (check the meters or a gap in openHAB).</div>` : ''); })()}
+      <h3>Supply <b>${f0(sup)}</b></h3>${line('Solar', solar, sup)}${line('EDL', edl, sup)}${line('Generators (ours)', gen, sup)}${(() => { const eD = ms.reduce((a, m) => a + (edlSplit(m).direct || 0), 0), gD = ms.reduce((a, m) => a + (genSplit(m).direct || 0), 0);
+      return `<h3>Direct to the buildings <b>${f0(eD + gD)}</b></h3><div class="cov" style="margin:0 0 4px">through the manual transfer switch, outside the Deye system (the months the meters read more than Deye)</div>${line('EDL direct', eD, eD + gD)}${line('Generators direct', gD, eD + gD)}`; })()}
       <div class="yk"><div><b>${f0(sold)}</b><span>sold to EDL</span></div><div><b>${sup ? Math.round(solar / sup * 100) : 0} %</b><span>solar share</span></div><div><b>${Math.round(ms.reduce((a, m) => a + (M.by[m].d.discharge || 0), 0) / BATT_KWH)}</b><span>battery cycles</span></div></div>
       ${ADMIN ? `<div class="yk"><div><b>${f0(genAll)}</b><span>all generators kWh</span></div><div><b>${f0(genAll * lpk)}</b><span>diesel L ≈ (${lpk} L/kWh)</span></div><div><b>${dollars}</b><span>diesel cost ≈ · admin</span></div></div>` : ''}</div>`;
   }).join('');
