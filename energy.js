@@ -74,6 +74,7 @@ async function build(ctx) {
   }
   out.deye = { fields: deye.FIELDS, ...(await deyeP) };
   try { out.deye.racks = await deye.racks(ctx); } catch (e) { out.deye.racksError = String(e.message || e); }
+  try { out.deye.live = await deye.live(ctx); } catch (e) { out.deye.liveError = String(e.message || e); }
   return out;
 }
 

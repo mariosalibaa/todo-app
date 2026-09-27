@@ -67,7 +67,27 @@
   .rk .kv{display:grid;grid-template-columns:1fr auto;font-size:.7rem;color:var(--sub);gap:1px 6px;} .rk .kv b{color:var(--text);font-weight:500;text-align:right;font-variant-numeric:tabular-nums;}
   .rk .mods{display:flex;flex-direction:column;gap:3px;margin-top:4px;}
   .md{position:relative;height:26px;border:1px solid var(--surface1);border-radius:5px;overflow:hidden;background:var(--base);display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:.66rem;}
+  .md em{font-style:normal;font-size:.62rem;margin-left:2px;} .md em.hi{color:var(--amber);} .md em.lo{color:#89b4fa;}
   .md i{position:absolute;left:0;top:0;bottom:0;background:rgba(166,227,161,.22);} .md span{position:relative;color:var(--sub);} .md b{position:relative;font-weight:600;font-variant-numeric:tabular-nums;}
+  /* live flow (Mario 2026-09-27: DeyeCloud's Flow Graph on the hub) */
+  #dash.live{grid-template-columns:minmax(0,1fr);} #dash > *{min-width:0;}
+  .flow{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto;gap:14px 10px;align-items:center;justify-items:center;position:relative;}
+  .nd{background:var(--base);border:1px solid var(--surface1);border-radius:12px;padding:10px 8px;text-align:center;width:100%;max-width:170px;}
+  .nd .ic{font-size:1.4rem;line-height:1;} .nd .lb{font-size:.66rem;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;}
+  .nd .kw{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px;} .nd .st{font-size:.66rem;color:var(--overlay0);margin-top:2px;}
+  .nd.on{border-color:var(--amber);} .nd.inv{border-color:var(--amber);background:rgba(242,169,59,.08);}
+  .ar{font-size:1.2rem;color:var(--amber);} .ar.off{color:var(--surface1);}
+  .soc{height:6px;border-radius:3px;background:var(--surface0);overflow:hidden;margin-top:5px;} .soc i{display:block;height:100%;background:var(--green);}
+  .tt{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;overflow-x:auto;}
+  .tt table{width:100%;border-collapse:collapse;font-size:.8rem;} .tt th{font-size:.6rem;} .tt td:first-child{color:var(--sub);}
+  .big{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;}
+  .big div{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;} .big b{display:block;font-size:1.3rem;color:var(--amber);font-variant-numeric:tabular-nums;} .big span{font-size:.68rem;color:var(--sub);}
+  @media (max-width:640px){ .flow{padding:10px 6px;gap:10px 4px;} .nd{padding:8px 4px;} .nd .kw{font-size:1rem;} .nd .lb{font-size:.56rem;} }
+  .pf{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 12px 8px;}
+  .pf .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;} .pf .hd b{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);}
+  .pf .hd input{background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:7px;padding:4px 8px;font-size:.78rem;}
+  .pf .cv1{position:relative;height:260px;} .pf .cv2{position:relative;height:110px;margin-top:6px;}
+  @media (max-width:640px){ .pf .cv1{height:220px;} }
   .batset{grid-column:1/-1;font-size:.74rem;color:var(--sub);display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .batset input{width:80px;}
   @media (max-width:640px){ #dash.bat{gap:6px;} .rk{padding:10px 6px;} .rk .cyc{font-size:1.25rem;} .md{height:22px;font-size:.58rem;padding:0 4px;} .rk .kv{font-size:.6rem;} } .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
@@ -134,7 +154,7 @@ const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-const TABS = [['yr', 'Year summary'], ['bat', 'Battery'], ['all', 'Month by month'], ['day', 'Daily'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
+const TABS = [['live', 'Live'], ['yr', 'Year summary'], ['bat', 'Battery'], ['all', 'Month by month'], ['day', 'Daily'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
 // Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
 // Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
 // them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
@@ -156,7 +176,7 @@ fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : nul
 // Kamal's diesel fills (/cpr/diesel) summed per month — admin only
 let FUEL = {};
 function loadFuel() { fetch('/api/cpr/fuel', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(d => { FUEL = {}; for (const x of (d && d.list) || []) { const k = x.date.slice(0, 7); const o = FUEL[k] || (FUEL[k] = { l: 0, usd: 0, n: 0 }); o.l += x.litres || 0; o.usd += x.usd || 0; o.n++; } if (M) render(); }).catch(() => {}); }
-let D = null, M = null, MD = null, tab = store.get('cpr.tab') || 'yr', open = new Set();
+let D = null, M = null, MD = null, tab = store.get('cpr.tab') || 'live', open = new Set();
 
 async function load(fresh) {
   document.getElementById('msg').textContent = fresh ? 'Reading the meters again…' : 'Loading…';
@@ -333,14 +353,16 @@ function render() {
     : tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
     : '';
-  const DASH = tab === 'yr' || tab === 'bat';
+  const DASH = tab === 'yr' || tab === 'bat' || tab === 'live';
   document.getElementById('dash').style.display = DASH ? '' : 'none';
   document.getElementById('dash').classList.toggle('bat', tab === 'bat');
+  document.getElementById('dash').classList.toggle('live', tab === 'live');
   document.getElementById('tblcard').style.display = DASH ? 'none' : '';
   document.getElementById('range').style.display = DASH || tab === 'day' ? 'none' : '';
   document.querySelector('.hint').style.visibility = DASH ? 'hidden' : '';
   document.querySelector('button[onclick="exportCsv()"]').style.display = DASH ? 'none' : '';
   if (tab === 'bat') { document.getElementById('notes').style.display = 'none'; renderRacks(); return; }
+  if (tab === 'live') { document.getElementById('notes').style.display = 'none'; renderLive(); return; }
   if (tab === 'yr') { document.getElementById('notes').style.display = 'none'; renderYears(); return; }
   // Daily (Mario 2026-09-26: "see what is happening in Sep 26 daily"): the month-by-month columns, one line a day
   const DAY = tab === 'day', MM = M, dm = dayMonth();
@@ -369,12 +391,24 @@ function render() {
   document.getElementById('notes').innerHTML = '<b>About these figures · admin</b><ul>' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>';
 }
 // one card a year, from the month-by-month figures (church = what we supply, generators = ours)
+// a year before the building meters: DeyeCloud's inverter figures only
+function deyeYearCard(y, ms) {
+  const sum = f => ms.reduce((a, m) => a + (M.by[m].d[f] || 0), 0);
+  const prod = sum('prod'), use = sum('use'), buy = sum('gridIn'), sold = sum('gridOut'), dis = sum('discharge');
+  const line = (lab, v) => `<div class="yr"><span>${lab}</span><span class="n">${f0(v)}</span><span class="p"></span></div>`;
+  const first = ms[0], last = ms[ms.length - 1];
+  return `<div class="yc"><h2>${y}</h2><div class="cov">${MON[+first.slice(5) - 1]} → ${MON[+last.slice(5) - 1]} ${y} · ${ms.length} months · kWh · from the Deye inverters (the building meters start in Feb 2025)</div>
+    <h3>Inverters <b></b></h3>${line('Produced (solar + generator)', prod)}${line('Used — UPS load', use)}${line('Bought from EDL', buy)}${line('Sold to EDL', sold)}
+    <div class="yk"><div><b>${Math.round(dis / BATT_KWH)}</b><span>battery cycles</span></div><div><b>${f0(dis)}</b><span>kWh from the battery</span></div></div></div>`;
+}
 function renderYears() {
   const yrs = [...new Set(M.list.map(m => m.slice(0, 4)))].reverse();
   const val = x => { const v = Array.isArray(x) ? x[0] : x; return v && v.v != null ? v.v : 0; };
   const lpk = +store.get('cpr.lpk') || 0.3, usd = +store.get('cpr.usd') || 0;
   document.getElementById('dash').innerHTML = ['all', ...yrs].map(y => {
-    const ms = y === 'all' ? M.list.slice() : M.list.filter(m => m.startsWith(y));
+    const metered = m => D.buildings.some(b => M.by[m].m[b.key] && M.by[m].m[b.key].n);
+    const ms = y === 'all' ? M.list.filter(metered) : M.list.filter(m => m.startsWith(y));
+    if (y !== 'all' && !ms.some(metered)) return deyeYearCard(y, ms);
     const s = Array(10).fill(0); let genAll = 0;
     for (const m of ms) { VIEWS.all.row(m).forEach((x, i) => { s[i] += val(x); }); genAll += sumv(m, ['genChurch', 'genBig', 'genSmall']).v || 0; }
     const [school, church, kamal, bld, , solar, edl, gen, sup, sold] = s;
@@ -382,7 +416,7 @@ function renderYears() {
     const cov = MON[+first.slice(5) - 1] + (y === 'all' ? ' ' + first.slice(0, 4) : '') + ' → ' + (last === td.slice(0, 7) ? +td.slice(8) + ' ' : '') + MON[+last.slice(5) - 1] + ' ' + last.slice(0, 4) + ' · ' + ms.length + ' month' + (ms.length > 1 ? 's' : '');
     const line = (lab, v, tot) => `<div class="yr"><span>${lab}</span><span class="n">${f0(v)}</span><span class="p">${tot ? Math.round(v / tot * 100) + ' %' : ''}</span><div class="bar"><i style="width:${tot ? Math.min(100, v / tot * 100) : 0}%"></i></div></div>`;
     const dollars = usd ? 'USD ' + f0(genAll * lpk * usd) : '—';
-    return `<div class="yc${y === 'all' ? ' all' : ''}"><h2>${y === 'all' ? 'All years' : y}</h2><div class="cov">${cov} · kWh</div>
+    return `<div class="yc${y === 'all' ? ' all' : ''}"><h2>${y === 'all' ? 'All years <small style="font-size:.6rem;color:var(--overlay0);font-weight:400">since the building meters</small>' : y}</h2><div class="cov">${cov} · kWh</div>
       <h3>Buildings <b>${f0(bld)}</b></h3>${line('School', school, bld)}${line('Church — from us', church, bld)}${line('Kamal — Liqaa + Hotel', kamal, bld)}
       <h3>Supply <b>${f0(sup)}</b></h3>${line('Solar', solar, sup)}${line('EDL', edl, sup)}${line('Generators (ours)', gen, sup)}
       <div class="yk"><div><b>${f0(sold)}</b><span>sold to EDL</span></div><div><b>${sup ? Math.round(solar / sup * 100) : 0} %</b><span>solar share</span></div><div><b>${Math.round(ms.reduce((a, m) => a + (M.by[m].d.discharge || 0), 0) / BATT_KWH)}</b><span>battery cycles</span></div></div>
@@ -395,15 +429,105 @@ function renderRacks() {
   const total = +store.get('cpr.battKwh') || BATT_KWH, perRack = total / 3, perMod = perRack / 12;
   if (!R.length) { document.getElementById('dash').innerHTML = `<div class="rk">Battery racks not available${D.deye && D.deye.racksError ? ' (' + esc(D.deye.racksError) + ')' : ''}.</div>`; return; }
   const cards = R.map(r => {
-    const cyc = r.discharge != null ? r.discharge / perRack : null;
-    const mods = Array.from({ length: 12 }, (_, i) => `<div class="md"><i style="width:${Math.max(0, Math.min(100, r.soc || 0))}%"></i><span>B${i + 1}</span><b>${cyc != null ? Math.round(cyc) : '—'}</b></div>`).join('');
+    // the BMS's own counter first (Mario 2026-09-27: "Cycle Times 560" on the battery page); the estimate only without it
+    const B = r.bms || {}, est = r.discharge != null ? r.discharge / perRack : null;
+    const cyc = B.cycles != null ? B.cycles : est, soc = B.soc != null ? B.soc : r.soc;
+    // mark the battery holding the highest / lowest cell voltage and the hottest cell (the BMS names it 1–12)
+    const tag = i => [B.cellMaxBat === i + 1 ? '<em class="hi" title="highest cell voltage">▲</em>' : '', B.cellMinBat === i + 1 ? '<em class="lo" title="lowest cell voltage">▼</em>' : '', B.tMaxBat === i + 1 ? '<em class="ht" title="hottest cell">🌡</em>' : ''].join('');
+    const mods = Array.from({ length: 12 }, (_, i) => `<div class="md"><i style="width:${Math.max(0, Math.min(100, soc || 0))}%"></i><span>B${i + 1} ${tag(i)}</span><b>${cyc != null ? Math.round(cyc) : '—'}</b></div>`).join('');
+    const v3 = x => x == null ? '—' : x.toFixed(3) + ' V';
     return `<div class="rk"><h3>${esc(r.name)} <small>${esc(r.sn)}</small></h3>
-      <div class="cyc">${cyc != null ? Math.round(cyc).toLocaleString('en-US') : '—'}<span>cycles (each battery)</span></div>
-      <div class="kv"><span>charge now</span><b>${r.soc != null ? r.soc + ' %' : '—'}</b><span>health</span><b>${r.soh != null ? r.soh + ' %' : '—'}</b><span>temperature</span><b>${r.temp != null ? r.temp + ' °C' : '—'}</b><span>voltage</span><b>${r.volt != null ? r.volt + ' V' : '—'}</b><span>charged</span><b>${r.charge != null ? (r.charge / 1000).toFixed(1) + ' MWh' : '—'}</b><span>discharged</span><b>${r.discharge != null ? (r.discharge / 1000).toFixed(1) + ' MWh' : '—'}</b></div>
+      <div class="cyc">${cyc != null ? Math.round(cyc).toLocaleString('en-US') : '—'}<span>cycles · ${B.cycles != null ? 'the BMS count' : 'estimate'}</span></div>
+      <div class="kv"><span>charge now</span><b>${soc != null ? soc + ' %' : '—'}</b><span>health</span><b>${(B.soh != null ? B.soh : r.soh) != null ? (B.soh != null ? B.soh : r.soh) + ' %' : '—'}</b><span>battery voltage</span><b>${(B.volt || r.volt) != null ? (B.volt || r.volt).toFixed(1) + ' V' : '—'}</b>
+        <span>▲ max cell</span><b>${v3(B.cellMax)}${B.cellMaxBat ? ' · B' + B.cellMaxBat : ''}</b><span>▼ min cell</span><b>${v3(B.cellMin)}${B.cellMinBat ? ' · B' + B.cellMinBat : ''}</b><span>spread</span><b>${B.cellMax != null && B.cellMin != null ? Math.round((B.cellMax - B.cellMin) * 1000) + ' mV' : '—'}</b>
+        <span>cell temp</span><b>${B.tMin != null ? B.tMin + '–' + B.tMax + ' °C' : (r.temp != null ? r.temp + ' °C' : '—')}</b><span>charged</span><b>${r.charge != null ? (r.charge / 1000).toFixed(1) + ' MWh' : '—'}</b><span>discharged</span><b>${r.discharge != null ? (r.discharge / 1000).toFixed(1) + ' MWh' : '—'}</b></div>
       <div class="mods">${mods}</div></div>`;
   }).join('');
+  const price = +store.get('cpr.battPrice') || 1000, rated = +store.get('cpr.battCycles') || 6000;
+  const perCycle = 12 * price / rated;                       // $ per rack cycle (12 batteries)
+  const bmsR = R.filter(r => r.bms && r.bms.cycles && r.discharge);
+  const kwhPerCyc = bmsR.length ? bmsR.reduce((a, r) => a + r.discharge, 0) / bmsR.reduce((a, r) => a + r.bms.cycles, 0) : perRack;   // kWh the inverter draws per BMS cycle
+  const usedNow = R.reduce((a, r) => a + ((r.bms && r.bms.cycles) || 0) * perCycle, 0);
+  // the pace: Deye's daily battery discharge over the last 365 / 30 days (whole bank), turned into rack cycles
+  const dd = D.deye && D.deye.days ? D.deye.days.map((d, i) => [d, D.deye.data[i] ? D.deye.data[i][D.deye.fields.indexOf('discharge')] : null]).filter(x => x[1] != null) : [];
+  const lastN = n => { const xs = dd.slice(-n - 1, -1); return xs.length ? xs.reduce((a, x) => a + x[1], 0) / xs.length : 0; };
+  const perDay = k => k / kwhPerCyc * perCycle;
+  const usd = v => '$' + Math.round(v).toLocaleString('en-US');
+  const wear = `<div class="tt" style="grid-column:1/-1"><table><thead><tr><th>Battery wear</th><th>to date</th><th>a year</th><th>a month</th><th>a day</th></tr></thead><tbody>
+    <tr><td>Value used up</td><td><b>${usd(usedNow)}</b></td><td>${usd(perDay(lastN(365)) * 365)}</td><td>${usd(perDay(lastN(30)) * 30)}</td><td>${usd(perDay(lastN(30)))}</td></tr>
+    <tr><td>Cycles (each rack, avg)</td><td>${Math.round(R.reduce((a, r) => a + ((r.bms && r.bms.cycles) || 0), 0) / (R.length || 1))}</td><td>${Math.round(lastN(365) / kwhPerCyc / 3 * 365)}</td><td>${Math.round(lastN(30) / kwhPerCyc / 3 * 30)}</td><td>${(lastN(30) / kwhPerCyc / 3).toFixed(2)}</td></tr>
+    </tbody></table><div class="st muted small" style="margin-top:6px">${usd(price)} a battery · ${rated.toLocaleString('en-US')} cycles rated · 36 batteries = ${usd(36 * price)} · one rack cycle = ${usd(perCycle)} (${kwhPerCyc.toFixed(1)} kWh drawn by the inverter per BMS cycle, ${(perCycle / kwhPerCyc).toFixed(3)} $/kWh) · a year = the last 365 days, a month and a day = the last 30 days
+    · life left at the last-30-day pace: ${R.map(r => r.bms && r.bms.cycles != null ? esc(r.name) + ' ' + ((rated - r.bms.cycles) / Math.max(0.01, lastN(30) / kwhPerCyc / 3) / 365).toFixed(1) + ' y' : '').filter(Boolean).join(' · ')}</div>
+    ${ADMIN ? `<div class="batset" style="margin-top:6px">$ a battery <input type="number" value="${price}" onchange="store.set('cpr.battPrice', this.value); render()"> rated cycles <input type="number" value="${rated}" onchange="store.set('cpr.battCycles', this.value); render()"> <span class="muted">· admin</span></div>` : ''}</div>`;
   const set = ADMIN ? `<div class="batset">Battery capacity <input type="number" step="0.01" value="${total}" onchange="store.set('cpr.battKwh', this.value); render()"> kWh in all = ${perRack.toFixed(1)} kWh a rack, ${perMod.toFixed(2)} kWh a battery (5.12 kWh × 12 × 3 = ${BATT_KWH} kWh; DeyeCloud is set to 127.33). Cycles = the rack's lifetime discharge ÷ its capacity. <span class="muted">· admin</span></div>` : '';
-  document.getElementById('dash').innerHTML = cards + set + `<div class="batset muted">The 12 batteries of a rack are in series: they charge and discharge together, so each shows the rack's cycles. The green fill = charge now.</div>`;
+  document.getElementById('dash').innerHTML = cards + wear + set + `<div class="batset muted">The 12 batteries of a rack are in series: they charge and discharge together, so each shows the rack's cycles (the BMS's own count). ▲ = the battery with the highest cell voltage, ▼ = the lowest, 🌡 = the hottest cell. The green fill = charge now.</div>`;
+}
+// Live: DeyeCloud's flow now (kW), today and since commissioning (kWh); reread every minute while the tab is open
+let LIVE = null, liveTimer = null;
+async function loadLive() {
+  try { const r = await fetch('/api/cpr/live', { credentials: 'same-origin' }); if (r.status === 401) return needPassword(); LIVE = await r.json(); } catch (e) { LIVE = { error: String(e.message || e) }; }
+  if (tab === 'live') renderLive();
+}
+// Power profile (Mario 2026-09-27: DeyeCloud's chart on the hub) — one day of 5-min readings; kW on one chart,
+// the battery % on its own small chart below (never two scales on one chart). Colours = the page's palette.
+let PFDAY = null, PFCH = [];
+const pfToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+const pfDay = () => PFDAY || pfToday();
+async function loadProfile() {
+  let d; try { const r = await fetch('/api/cpr/profile?day=' + pfDay(), { credentials: 'same-origin' }); if (r.status === 401) return needPassword(); d = await r.json(); } catch (e) { return; }
+  if (!window.Chart || !document.getElementById('pfc') || !d.rows) return;
+  PFCH.forEach(c => c.destroy()); PFCH = [];
+  const lab = d.rows.map(r => new Date(r[0] * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }));
+  const S = [['Solar', 1, '#c98500'], ['Generator', 2, '#9085e9'], ['EDL', 3, '#e66767'], ['Battery', 4, '#199e70'], ['Load', 5, '#3987e5']];
+  const axis = { ticks: { color: '#6c7086', font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 }, grid: { color: 'rgba(108,112,134,.15)' }, border: { display: false } };
+  const tip = { backgroundColor: '#11111b', borderColor: '#45475a', borderWidth: 1, titleColor: '#cdd6f4', bodyColor: '#cdd6f4', padding: 8 };
+  PFCH.push(new Chart(document.getElementById('pfc'), { type: 'line',
+    data: { labels: lab, datasets: S.map(([n, i, c]) => ({ label: n, data: d.rows.map(r => r[i]), borderColor: c, backgroundColor: c, borderWidth: 2, pointRadius: 0, tension: 0.2 })) },
+    options: { maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: { ...axis, grid: { display: false } }, y: { ...axis, title: { display: true, text: 'kW', color: '#6c7086', font: { size: 10 } } } },
+      plugins: { legend: { position: 'bottom', labels: { color: '#cdd6f4', boxWidth: 10, boxHeight: 10, font: { size: 11 } } }, tooltip: { ...tip, callbacks: { label: it => ` ${it.dataset.label}: ${it.raw == null ? '—' : it.raw.toFixed(1)} kW` } } } } }));
+  PFCH.push(new Chart(document.getElementById('pfs'), { type: 'line',
+    data: { labels: lab, datasets: [{ label: 'Battery charge %', data: d.rows.map(r => r[6]), borderColor: '#a6e3a1', backgroundColor: 'rgba(166,227,161,.12)', fill: true, borderWidth: 2, pointRadius: 0, tension: 0.2 }] },
+    options: { maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: { ...axis, grid: { display: false } }, y: { ...axis, min: 0, max: 100, ticks: { ...axis.ticks, maxTicksLimit: 3, callback: v => v + ' %' } } },
+      plugins: { legend: { display: false }, tooltip: { ...tip, callbacks: { label: it => ` Battery: ${it.raw} %` } } } } }));
+}
+function renderLive() {
+  if (!liveTimer) { liveTimer = setInterval(() => { if (tab === 'live') loadLive(); }, 60000); }
+  if (!LIVE) { document.getElementById('dash').innerHTML = '<div class="tt">Reading DeyeCloud…</div>'; loadLive(); return; }
+  if (LIVE.error) { document.getElementById('dash').innerHTML = `<div class="tt">DeyeCloud not reachable (${esc(LIVE.error)}).</div>`; return; }
+  const n = LIVE.now, kw = v => v == null ? '—' : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)) + ' kW';
+  const on = v => v != null && Math.abs(v) > 0.05;
+  const bat = n.battery == null ? '' : n.battery < 0 ? 'charging' : n.battery > 0 ? 'discharging' : 'idle';
+  const grid = n.grid == null ? '' : n.grid > 0 ? 'buying' : n.grid < 0 ? 'selling' : 'idle';
+  const node = (ic, lb, v, st, extra = '') => `<div class="nd ${on(v) ? 'on' : ''}"><div class="ic">${ic}</div><div class="lb">${lb}</div><div class="kw">${kw(v == null ? null : Math.abs(v))}</div><div class="st">${st || '&nbsp;'}</div>${extra}</div>`;
+  const t = LIVE.today || {}, T = LIVE.total || {};
+  const row = (lab, a, b) => `<tr><td>${lab}</td><td>${f0(a)}</td><td>${f0(b)}</td></tr>`;
+  document.getElementById('dash').innerHTML = `
+    <div class="flow">
+      ${node('☀️', 'Solar', n.solar, '')}
+      <div></div>
+      ${node('🗼', 'EDL', n.grid, grid)}
+      <div class="ar ${on(n.solar) ? '' : 'off'}">↘</div>
+      <div class="nd inv"><div class="ic">⚡</div><div class="lb">Inverters</div><div class="kw">3 × 50 kW</div><div class="st">M1 · S2 · S3</div></div>
+      <div class="ar ${on(n.grid) ? '' : 'off'}">${n.grid < 0 ? '↗' : '↙'}</div>
+      ${node('🔋', 'Battery', n.battery, (n.soc != null ? n.soc + ' % · ' : '') + bat, n.soc != null ? `<div class="soc"><i style="width:${n.soc}%"></i></div>` : '')}
+      ${node('🏢', 'Load (UPS)', n.load, 'the buildings')}
+      ${node('⛽', 'Generator', n.gen, on(n.gen) ? 'running' : 'off')}
+    </div>
+    <div class="pf"><div class="hd"><b>Power profile · kW</b><input type="date" id="pfday" value="${pfDay()}" max="${pfToday()}" onchange="PFDAY = this.value; loadProfile()"></div><div class="cv1"><canvas id="pfc"></canvas></div><div class="cv2"><canvas id="pfs"></canvas></div></div>
+    <div class="st muted small" style="margin-top:-4px">Updated ${LIVE.at ? esc(when(LIVE.at)) : '—'} · refreshes every minute · kW now</div>
+    <div class="big">
+      <div><b>${f0(T.production)}</b><span>kWh produced since the start (solar + generator)</span></div>
+      <div><b>${f0(T.load)}</b><span>kWh used since the start</span></div>
+      <div><b>${f0(T.bought)}</b><span>kWh bought from EDL</span></div>
+      <div><b>${f0(T.sold)}</b><span>kWh sold to EDL</span></div>
+      <div><b>${T.discharge != null ? Math.round(T.discharge / BATT_KWH).toLocaleString('en-US') : '—'}</b><span>battery cycles since the start</span></div>
+    </div>
+    <div class="tt"><table><thead><tr><th>kWh</th><th>Today</th><th>Since the start</th></tr></thead><tbody>
+      ${row('Produced (solar + generator)', t.production, T.production)}${row('Used (UPS load)', t.load, T.load)}${row('Bought from EDL', t.bought, T.bought)}${row('Sold to EDL', t.sold, T.sold)}${row('Battery charged', t.charge, T.charge)}${row('Battery discharged', t.discharge, T.discharge)}
+    </tbody></table></div>`;
+  loadProfile();
 }
 function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
 function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }
@@ -439,6 +563,7 @@ load(false);
   });
 })();
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="/phone-preview.js"></script>   <!-- the 📱 button on a laptop (Shift+P); nothing on a phone -->
 </body>
 </html>

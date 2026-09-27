@@ -742,7 +742,8 @@ const handler = async (req, res) => {
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
-    '/cpr': 'cpr.html', '/energy': 'cpr.html',
+    '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
+   
     '/cpr/diesel': 'cpr-fuel.html' };   // Kamal's diesel fills (private link: /cpr/diesel?k=CPR_FUEL_KEY)   // CPR energy — kWh per building / source per month; PUBLIC, no sign-in, no hub bar (Mario, 2026-09-26: "open for everyone")
   // /whatsapp — the WhatsApp Archive (whatsapp-local on Mario's laptop, 2013 → today, refreshed from
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
@@ -948,6 +949,22 @@ const handler = async (req, res) => {
     return;
   }
   if (url.split('?')[0] === '/api/cpr' && req.method === 'GET' && !(await cprAccess()).ok) return cprDenied();
+  // the Live tab's Power Profile: one day of DeyeCloud 5-min records (?day=YYYY-MM-DD, Beirut)
+  if (url === '/api/cpr/profile' && req.method === 'GET') {
+    if (!(await cprAccess()).ok) return cprDenied();
+    const day = new URL(req.url, 'http://x').searchParams.get('day') || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) { res.writeHead(400); res.end('day'); return; }
+    try { const v = await require('./deye').profile({ db, TEAM_ID }, day); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
+    catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }   // the page shows "not reachable"
+    return;
+  }
+  // the Live tab: DeyeCloud now / today / since commissioning, refreshed every minute by the page
+  if (url === '/api/cpr/live' && req.method === 'GET') {
+    if (!(await cprAccess()).ok) return cprDenied();
+    try { const v = await require('./deye').live({ db, TEAM_ID }); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
+    catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }   // the page shows "not reachable"
+    return;
+  }
   if (url.split('?')[0] === '/api/cpr' && req.method === 'GET') {
     try { await energy.handle(req, res, '/api/energy' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''), null, { db, TEAM_ID }); }
     catch (e) { console.error('cpr error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }

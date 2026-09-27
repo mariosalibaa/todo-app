@@ -119,12 +119,72 @@ async function racks(ctx) {
     const r = await get('/device-s/device/originalData?deviceId=' + d.deviceId);
     const f = {}; const walk = o => { if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { if (v && typeof v === 'object') walk(v); else f[k] = v; } }; walk(r);
     const n = k => (f[k] == null || f[k] === '' ? null : +f[k]);
-    out.push({ name: d.deviceName || d.deviceSn, sn: d.deviceSn, charge: n('t_cg_n1'), discharge: n('t_dcg_n1'), soc: n('BMS_SOC'), soh: n('Li_B_SOH'), temp: n('BMST'), volt: n('BMS_B_V1'), at: d.collectionTime ? new Date(d.collectionTime * 1000).toISOString() : null });
+    out.push({ id: d.deviceId, name: d.deviceName || d.deviceSn, sn: d.deviceSn, charge: n('t_cg_n1'), discharge: n('t_dcg_n1'), soc: n('BMS_SOC'), soh: n('Li_B_SOH'), temp: n('BMST'), volt: n('BMS_B_V1'), at: d.collectionTime ? new Date(d.collectionTime * 1000).toISOString() : null });
     await sleep(400);
   }
+  // each rack's own BMS (Mario 2026-09-27: its "Cycle Times" is the real count; min / max cell voltages): the BATTERY
+  // devices <inverter SN>M01 carry one child each — the BMS — whose originalData has NUMcyc1 (cycles), MAX_C_V / MIN_C_V
+  // (cell V) with VCM_BCU / VCMN_BCU (which of the 12 batteries), T_C_MAX / T_C_MIN with TCM_BCU / TCMN_BCU, BV, BSC, BSH
+  try {
+    const bl = await get(`/maintain-s/power/deye/device/${D.STATION}/device-list?deviceType=BATTERY`);
+    for (const b of (bl.data || [])) for (const c of (b.childs || [])) {
+      const rack = out.find(r => r.id === b.parentId); if (!rack) continue;
+      const r = await get('/device-s/device/originalData?deviceId=' + c.deviceId);
+      const f = {}; const walk = o => { if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { if (v && typeof v === 'object') walk(v); else f[k] = v; } }; walk(r);
+      const n = k => (f[k] == null || f[k] === '' ? null : +f[k]);
+      rack.bms = { sn: c.deviceSn, cycles: n('NUMcyc1'), soc: n('BSC'), soh: n('BSH'), volt: n('BV'),
+        cellMax: n('MAX_C_V'), cellMaxBat: n('VCM_BCU'), cellMin: n('MIN_C_V'), cellMinBat: n('VCMN_BCU'),
+        tMax: n('T_C_MAX'), tMaxBat: n('TCM_BCU'), tMin: n('T_C_MIN'), tMinBat: n('TCMN_BCU') };
+      await sleep(400);
+    }
+  } catch (e) { console.error('deye bms:', e.message); }
   out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
   racksCache = { at: Date.now(), v: out };
   return out;
 }
 
-module.exports = { days, fill, racks, FIELDS };
+// Live flow + totals (Mario 2026-09-27: "show this on the hub" — DeyeCloud's Flow Graph — and "the total system
+// production in kWh"). /maintain-s/fast/system = now (W) and today (kWh); stats/total = since commissioning (kWh);
+// the last 5-min record of today splits the production into solar / generator. Kept 1 min.
+let liveCache = { at: 0, v: null };
+async function live(ctx) {
+  if (liveCache.v && Date.now() - liveCache.at < 60000) return liveCache.v;
+  const get = async (path, retried) => {
+    const tk = await token(ctx, retried);
+    const r = await fetch(BASE + path, { headers: { Authorization: 'bearer ' + tk, Accept: 'application/json' } });
+    if (r.status === 401 && !retried && process.env.DEYE_USER) return get(path, true);
+    if (!r.ok) throw new Error('DeyeCloud ' + r.status);
+    return r.json();
+  };
+  const f = await get(`/maintain-s/fast/system/${D.STATION}`);
+  const t = (await get(`/maintain-s/history/batteryPower/${D.STATION}/stats/total`)).statistics || {};
+  let last = null;
+  try { const recs = await D.dayRecords(await token(ctx), beirutToday()); last = recs[recs.length - 1] || null; } catch (e) {}
+  const kw = v => (v == null ? null : Math.round(+v / 10) / 100);
+  const v = {
+    at: f.lastUpdateTime ? new Date(f.lastUpdateTime * 1000).toISOString() : null,
+    now: { solar: last ? kw(last.pvPower) : null, gen: last ? kw(last.generatorPower) : null, production: kw(f.generationPower),
+      grid: kw(f.wirePower), load: kw(f.usePower), battery: kw(f.batteryPower), soc: f.batterySoc, wireStatus: f.wireStatus, batteryStatus: f.batteryStatus,
+      splitAt: last ? new Date(last.dateTime * 1000).toISOString() : null },
+    today: { production: f.generationValue, load: f.useValue, bought: f.buyValue, sold: f.gridValue, charge: f.chargeValue, discharge: f.dischargeValue },
+    total: { production: t.generationValue, load: t.useValue, bought: t.buyValue, sold: t.gridValue, charge: t.chargeValue, discharge: t.dischargeValue },
+  };
+  liveCache = { at: Date.now(), v };
+  return v;
+}
+
+// Power Profile for one day (Mario 2026-09-27: DeyeCloud's chart on the hub): the 5-min records as
+// [epoch s, solar, generator, EDL (+ buy / − sell), battery (+ discharge / − charge), load, SOC %] in kW.
+// A past day never changes — kept for the life of the instance; today is reread after a minute.
+const profCache = {};
+async function profile(ctx, ymd) {
+  const c = profCache[ymd], today = beirutToday();
+  if (c && (ymd < today || Date.now() - c.at < 60000)) return c.v;
+  const recs = await D.dayRecords(await token(ctx), ymd);
+  const kw = v => (v == null ? null : Math.round(+v / 10) / 100);
+  const v = { day: ymd, rows: recs.map(r => [r.dateTime, kw(r.pvPower), kw(r.generatorPower), kw(r.wirePower), kw(r.batteryPower), kw(r.usePower), r.batterySoc == null ? null : Math.round(+r.batterySoc)]) };
+  profCache[ymd] = { at: Date.now(), v };
+  return v;
+}
+
+module.exports = { days, fill, racks, live, profile, FIELDS };
