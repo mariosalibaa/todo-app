@@ -247,12 +247,25 @@ function render() {
     if (js.length > 1) for (const [j, v] of js.sort((a, b) => b[1] - a[1])) coll.push({ key: w.key.split(' ')[0] + ' · ' + j, amount: r2(v), sub: true });
   }
   const sub = (v, txt) => `<td class="n">${f(v)} <span class="small muted">${txt}</span></td>`;
+  // What is still open, split the way the bills are named (Mario, 2026-09-26): excavation (his m³ and the day
+  // rate), diesel (Dib’s fills above $0.80/L) and the retention that is held to the end.
+  const openByKind = (D.bills || []).reduce((g, b) => {
+    const k = b.kind === 'diesel' ? 'diesel' : b.kind === 'retention' ? 'retention' : 'excavation';
+    g[k] = r2((g[k] || 0) + (b.residual || 0)); return g;
+  }, {});
+  const openLines = [
+    sub(-(openByKind.excavation || 0), 'excavation open — Anthony Khalil'),
+    sub(-(openByKind.diesel || 0), 'diesel open — Dib Mokhtar'),
+    sub(-(openByKind.retention || 0), 'retention, held to project end'),
+    T.dueDib ? `<td class="n muted small">${f(-T.dueDib)} of the diesel already filled, not yet paid · fill${T.unpaidFills.length > 1 ? 's' : ''} ${esc(T.unpaidFills.map(x => x.date + ' (' + f(x.litres, 0) + ' L × $' + x.perL + ')').join(', '))}</td>` : '',
+    T.dueDib ? `<td class="n muted small">${f(-(T.open - T.dueDib))} left on the Anthony / Georges side once that is paid</td>` : '',
+  ];
   document.getElementById('odoo-match').innerHTML = !M ? '' : `<h2>Partner Ledger — Georges EL Hajj <span class="r muted">all time, the same three figures as Odoo → Reporting → Partner Ledger</span></h2>
     <div class="card"><table class="ledger"><thead><tr><th></th><th class="n">Debit (paid)</th><th class="n">Credit (billed)</th><th class="n">Balance</th></tr></thead><tbody>
       <tr class="tot"><td>Odoo partner ledger</td><td class="n">${f(Lg.debit)}</td><td class="n">${f(Lg.credit)}</td><td class="n ${Lg.balance < 0 ? 'bad' : 'ok'}">${f(Lg.balance)} <span class="small muted">${Lg.balance < 0 ? 'Shift owes Georges' : 'Georges is ahead'}</span></td></tr>
       ${mistake || refunds ? `<tr><td class="muted">of which the $${f(refunds)} sent to Anthony by mistake and returned — no bill behind it</td>${sub(mistake, 'paid by mistake')}${sub(refunds, 'returned')}<td class="n muted">${f(r2(mistake - refunds))}</td></tr>` : ''}
       <tr class="tot"><td>Payments on bills / bills</td>${sub(M.paymentsTotal, M.paymentsCount + ' payments')}${sub(M.billsTotal, M.billsCount + ' bills')}<td class="n ${M.paymentsTotal < M.billsTotal ? 'bad' : 'ok'}">${f(r2(M.paymentsTotal - M.billsTotal))} <span class="small muted">open</span></td></tr>
-      ${coll.map((c, i) => `<tr><td class="small muted">${i === 0 ? 'made of' : ''}</td>${c.sub ? `<td class="n muted small">${f(c.amount)} ${esc(c.key)}</td>` : sub(c.amount, esc(c.key))}${i === 0 ? sub(dueBills, 'excavation + diesel + day rate') : i === 1 ? sub(T.retention, 'commission (retention)') : '<td></td>'}${i === 0 ? sub(-T.open, 'due now') : i === 1 ? sub(-T.retentionOpen, 'retention, held to project end') : i === 2 && T.dueDib ? `<td class="n muted small">${f(-T.dueDib)} of it Dib · fill${T.unpaidFills.length > 1 ? 's' : ''} ${esc(T.unpaidFills.map(x => x.date + ' (' + f(x.litres, 0) + ' L × $' + x.perL + ')').join(', '))} — due, may be transferred any time</td>` : i === 3 && T.dueDib ? `<td class="n muted small">${f(-(T.open - T.dueDib))} Anthony / Georges</td>` : '<td></td>'}</tr>`).join('')}
+      ${coll.map((c, i) => `<tr><td class="small muted">${i === 0 ? 'made of' : ''}</td>${c.sub ? `<td class="n muted small">${f(c.amount)} ${esc(c.key)}</td>` : sub(c.amount, esc(c.key))}${i === 0 ? sub(dueBills, 'excavation + diesel + day rate') : i === 1 ? sub(T.retention, 'commission (retention)') : '<td></td>'}${openLines[i] || '<td></td>'}</tr>`).join('')}
     </tbody></table></div>
     ${M.others.length ? `<div class="note"><b>Odoo also counts ${M.others.length} line${M.others.length > 1 ? 's' : ''} that are not part of the excavation:</b> ${M.others.map(o => `${esc(o.date)} ${esc(o.name)} · ${esc(o.company)} · ${esc(o.account)} · ${o.debit ? 'debit ' + f(o.debit) : 'credit ' + f(o.credit)}${o.label ? ' · ' + esc(o.label) : ''}`).join('<br>')}<br>The ledger balance above includes them; the statement below does not.</div>` : ''}`;
   const C = D.cost;
