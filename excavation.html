@@ -255,6 +255,11 @@ function renderJobMsg(R) {
   L.push(`${k++}. total paid to anthony ${N(cash)}$ + ${N(at080)}$ = ${N(counted)}$`, '');
   L.push(`${k++}. ${N(worth)}$ - ${N(counted)}$ = ${bal < 0 ? '-' : ''}${N(Math.abs(bal))}$ → ${st(bal)}`, '');
   if (provLine(L, k, bal, true)) k++;
+  // what the diesel cost Mario (every fill, the ones still due to Dib included) and all he paid (Mario, 2026-09-27)
+  const fills = Math.round(S('fillCash')), above = fills - at080, provA = +((D.provision || {}).anthony) || 0;
+  if (fills) L.push(`${k++}. diesel paid by mario ${N(litres)}L = ${N(fills)}$${D.totals.dueDib ? ` (incl. ${N(Math.round(D.totals.dueDib))}$ still to transfer to Dib)` : ''}`, `   above 0.8$/L: ${N(fills)}$ - ${N(at080)}$ = ${N(above)}$`, '');
+  L.push(`${k++}. total paid by mario: ${N(counted)}$ (anthony) + ${N(above)}$ (diesel above 0.8$/L) = ${N(counted + above)}$`);
+  if (provA) L.push(`   with the ${N(provA)}$ provision: ${N(counted + above + provA)}$`);
   document.getElementById('msg').textContent = L.join('\n').trim();
 }
 async function copyMsg() { try { await navigator.clipboard.writeText(document.getElementById('msg').textContent); alert('Copied — paste it in WhatsApp.'); } catch (e) { alert('Select the text and copy it.'); } }
@@ -265,13 +270,14 @@ function renderProv() {
   const open = Math.round((T.open + T.retentionOpen) * 100) / 100, after = Math.round((open - a - dib) * 100) / 100, side = Math.round((after - T.retentionOpen) * 100) / 100;
   const st = v => v > 0.5 ? `<span class="bad">${f(v)} still due to him</span>` : v < -0.5 ? `${f(-v)} paid ahead` : 'settled';
   if (!a && !dib && !(ME && ME.admin)) { el.innerHTML = ''; return; }
+  const paidNote = P.paidBy ? `<p class="small muted" style="margin:6px 0 0">The $${f(P.asked)} Anthony asked was paid on ${esc(P.paidOn)} (${esc(P.paidBy)}): it is in the figures now, no longer a provision.</p>` : '';
   el.innerHTML = `<h2>Provision — where we stand after paying what is asked</h2><div class="card"><table class="prov"><tbody>
     <tr><td>Anthony asks, to go on${P.note ? ` <span class="muted small">· ${esc(P.note)}</span>` : ''}</td><td class="n">${ME && ME.admin ? `$ <input id="prov-a" type="number" min="0" step="50" value="${a || ''}" style="width:90px" onchange="saveProv()">` : '$ ' + f(a)}</td></tr>
     <tr><td>Dib, the fills not yet paid${(T.unpaidFills || []).length ? ` <span class="muted small">· ${esc(T.unpaidFills.map(x => x.date + ' ' + f(x.litres, 0) + ' L').join(', '))}</span>` : ''}</td><td class="n">$ ${f(dib)}</td></tr>
     <tr class="tot"><td>To pay</td><td class="n">$ ${f(a + dib)}</td></tr>
     <tr><td>Anthony — now ${st(left)}</td><td class="n">after: <b>${st(left - a)}</b>${left - a < -0.5 ? ` <span class="muted small">≈ ${f(-(left - a) / price, 0)} m³ at $${price}</span>` : ''}</td></tr>
     <tr><td>Georges' ledger in Odoo — open now $ ${f(open)}</td><td class="n">after: <b>$ ${f(after)}</b> <span class="muted small">= commission ${f(T.retentionOpen)} held ${side < 0 ? '− ' + f(-side) + ' paid ahead on the Anthony / Georges side' : '+ ' + f(side) + ' due'}</span></td></tr>
-  </tbody></table><p class="small muted" style="margin:6px 0 0">A provision only: nothing is booked. The diesel is already counted to Anthony at $0.80/L, so paying Dib moves Georges' ledger, not Anthony's balance.</p></div>`;
+  </tbody></table><p class="small muted" style="margin:6px 0 0">A provision only: nothing is booked. The diesel is already counted to Anthony at $0.80/L, so paying Dib moves Georges' ledger, not Anthony's balance.</p>${paidNote}</div>`;
 }
 async function saveProv() {
   const v = +document.getElementById('prov-a').value || 0;
@@ -302,7 +308,7 @@ function render() {
     ${grouped(D.collectors).map(g => K('in', '$ ' + f(g.amount + g.pending), 'by-' + g.key.toLowerCase().replace(/[^a-z]+/g, '-'), 'by ' + g.key, `${g.n} payment${g.n === 1 ? '' : 's'}${g.pending ? ` + ${g.pendingN} pending (${f(g.pending)})` : ''}${g.parts.length > 1 ? '<br>' + g.parts.map(c => `${esc(c.how)} ${f(c.amount + (c.pending || 0))} (${c.n + (c.pendingN || 0)})`).join(' · ') : ''}`)).join('')}
     ${K('out', '$ ' + f(T.bills), 'bills', 'His bills so far', `excavation ${f(T.excavation)} + commission ${f(T.retention)} + diesel difference ${f(T.diesel)}${T.days ? ` + day rate ${f(T.days)}` : ''}`)}
     ${T.dueDib ? K('out', '$ ' + f(T.dueDib), 'duedib', 'Due to Dib — may be transferred any time', `diesel filled, not yet paid: ${esc(T.unpaidFills.map(x => 'fill ' + x.date + ' · ' + f(x.litres, 0) + ' L × $' + x.perL + ' = $' + f(x.amount)).join(' + '))} — the rest of the open ${f(T.open)} is Anthony / Georges: ${f(T.open - T.dueDib)}`) : ''}
-    ${(D.provision || {}).anthony ? K('out', '$ ' + f(D.provision.anthony), 'provanthony', 'Requested by Anthony — not paid yet', `${esc(D.provision.note || 'asked to continue')} · a provision, nothing booked; after it he is ${(() => { const v = anthonyRows().reduce((t, c) => t + c.left, 0) - D.provision.anthony; return v < -0.5 ? f(-v) + ' paid ahead' : v > 0.5 ? f(v) + ' still due to him' : 'settled'; })()} — see the Provision below`) : ''}
+    ${(D.provision || {}).anthony ? K('out', '$ ' + f(D.provision.anthony), 'provanthony', D.provision.sentOn ? 'Requested by Anthony — sent on Whish ' + D.provision.sentOn.slice(8) + '-' + D.provision.sentOn.slice(5, 7) + ', not in Odoo yet' : 'Requested by Anthony — not paid yet', `${esc(D.provision.note || 'asked to continue')} · a provision, nothing booked; after it he is ${(() => { const v = anthonyRows().reduce((t, c) => t + c.left, 0) - D.provision.anthony; return v < -0.5 ? f(-v) + ' paid ahead' : v > 0.5 ? f(v) + ' still due to him' : 'settled'; })()} — see the Provision below`) : ''}
     ${K('eq', '$ ' + f(T.retentionOpen), 'retention', "Georges' commission (retention) still held", `of ${f(T.retention)} — released at project end`)}`;
   const M = D.odooMatch;
   // laid out the way Mario writes it by hand (2026-09-13): the ledger's three figures on top, then what each is made of

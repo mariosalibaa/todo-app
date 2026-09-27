@@ -185,6 +185,14 @@ async function build(ctx) {
   // a payment not made yet, to see where things stand once it is (Mario, 2026-09-27: Anthony asks $600 to go on) — settings/excavationProvision
   const provDoc = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('settings').doc('excavationProvision').get().catch(() => null);
   const provision = provDoc && provDoc.exists ? provDoc.data() : { anthony: 0, note: '' };
+  // once the money is really paid it stops being a provision: an Odoo payment to Anthony of that amount, on or after the day it was
+  // asked, takes its place (Mario, 2026-09-27: "I will pay now the 600$"); sent on Whish but not booked yet → still a provision, flagged
+  if (provision.anthony > 0) {
+    const since = String(provision.at || '').slice(0, 10), same = x => Math.abs(x.amount - provision.anthony) < 0.01 && x.date >= since;
+    const paid = payments.find(p => /anthony/i.test(p.collector) && same(p));
+    if (paid) Object.assign(provision, { asked: provision.anthony, anthony: 0, paidBy: paid.name, paidOn: paid.date });
+    else { const sent = pending.find(l => /anthony/i.test(l.collector) && same(l)); if (sent) provision.sentOn = sent.date; }
+  }
   return { provision, layout, at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
 }
 
