@@ -201,6 +201,18 @@ function renderMsg() {
   L.push(`${k++}. ${N(c.paidAnthony)}$ paid to anthony`); for (const p of c.anthonyPays || []) L.push(`- ${N(p.amount)}$ ${dmy(p.date)}`); L.push('');
   if (c.at080) { L.push(`${k++}. ${N(c.litres)}L * 0.8$/L = ${N(c.at080)}$`, ''); L.push(`${k++}. total paid to anthony ${N(c.at080)}$ + ${N(c.paidAnthony)}$ = ${N(c.counted)}$`, ''); }
   if (c.daysAmt) L.push(`${k++}. day rate ${N(c.daysAmt / 300 * 10) / 10} days * 300$ = ${N(c.daysAmt)}$ (apart from the m3)`, '');
+  // the last cycle with a provision set reads Mario's way (2026-09-27): the provision, then what goes to Anthony
+  // (paid + day rate + provision), the diesel above $800/T on top, and all this cycle costs Shift
+  const provA = +((D.provision || {}).anthony) || 0;
+  if (provA && c.n === R[R.length - 1].n) {
+    const toA = Math.round(c.counted + (c.daysAmt || 0) + provA), above = Math.round(c.fillCash - c.at080);
+    L.push(`${k++}. provision: ${N(provA)}$ asked to continue`, '');
+    L.push(`=> total to anthony = ${[N(c.counted) + '$'].concat(c.daysAmt ? [N(c.daysAmt) + '$'] : [], [N(provA) + '$']).join('+')}=${N(toA)}$`);
+    if (c.fillCash) L.push(`+ diesel above 800$/T = ${N(Math.round(c.fillCash))}$-${N(Math.round(c.at080))}$=${N(above)}$`);
+    L.push(`total paid this cycle = ${N(toA + (c.fillCash ? above : 0))}$`);
+    document.getElementById('msg').textContent = L.join('\n');
+    return;
+  }
   // what the earlier cycles left over counts in the m³ this cycle's money covers: paid ahead adds, still due takes off (Mario, 2026-09-27: "add 251$ => cover exceed 981m3")
   { const carry = Math.round(prev.reduce((t, x) => t + x.left, 0)), cov = c.price ? Math.round((c.counted - (c.daysAmt || 0) - carry) / c.price) : 0, net = Math.round(c.left + carry);
     const parts = [N(c.counted) + '$'].concat(c.daysAmt ? [`- ${N(c.daysAmt)}$ day rate`] : [], carry < -0.5 ? [`+ ${N(-carry)}$ paid ahead before`] : carry > 0.5 ? [`- ${N(carry)}$ still due before`] : []);
