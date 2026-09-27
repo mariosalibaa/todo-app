@@ -98,4 +98,33 @@ async function days(ctx) {
   return out;
 }
 
-module.exports = { days, fill, FIELDS };
+// The three battery racks (Mario 2026-09-27: "show the battery in 3 columns (3 racks), 12 batteries each, the cycles").
+// One rack per inverter (M1, S2, S3); DeyeCloud only knows the rack, through its inverter's BMS readings
+// (/device-s/device/originalData): t_cg_n1 / t_dcg_n1 = lifetime charge / discharge kWh, BMS_SOC, Li_B_SOH, BMST °C,
+// BMS_B_V1 V. The 12 modules of a rack are in series — they all see the same cycles.
+let racksCache = { at: 0, v: null };
+async function racks(ctx) {
+  if (racksCache.v && Date.now() - racksCache.at < 10 * 60000) return racksCache.v;
+  const get = async (path, retried) => {
+    const tk = await token(ctx, retried);
+    const r = await fetch(BASE + path, { headers: { Authorization: 'bearer ' + tk, Accept: 'application/json' } });
+    if (r.status === 401 && !retried && process.env.DEYE_USER) return get(path, true);
+    if (!r.ok) throw new Error('DeyeCloud ' + r.status);
+    return r.json();
+  };
+  const l = await get(`/maintain-s/power/deye/device/${D.STATION}/device-list?deviceType=INVERTER`);
+  const list = (l.data || l.records || l.list || l || []);
+  const out = [];
+  for (const d of list) {
+    const r = await get('/device-s/device/originalData?deviceId=' + d.deviceId);
+    const f = {}; const walk = o => { if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { if (v && typeof v === 'object') walk(v); else f[k] = v; } }; walk(r);
+    const n = k => (f[k] == null || f[k] === '' ? null : +f[k]);
+    out.push({ name: d.deviceName || d.deviceSn, sn: d.deviceSn, charge: n('t_cg_n1'), discharge: n('t_dcg_n1'), soc: n('BMS_SOC'), soh: n('Li_B_SOH'), temp: n('BMST'), volt: n('BMS_B_V1'), at: d.collectionTime ? new Date(d.collectionTime * 1000).toISOString() : null });
+    await sleep(400);
+  }
+  out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  racksCache = { at: Date.now(), v: out };
+  return out;
+}
+
+module.exports = { days, fill, racks, FIELDS };

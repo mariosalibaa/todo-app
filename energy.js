@@ -73,6 +73,7 @@ async function build(ctx) {
     console.error('energy live:', out.liveError);
   }
   out.deye = { fields: deye.FIELDS, ...(await deyeP) };
+  try { out.deye.racks = await deye.racks(ctx); } catch (e) { out.deye.racksError = String(e.message || e); }
   return out;
 }
 

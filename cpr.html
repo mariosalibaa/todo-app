@@ -57,7 +57,18 @@
   .yr .n{text-align:right;font-variant-numeric:tabular-nums;} .yr .p{text-align:right;color:var(--sub);font-size:.72rem;}
   .yr .bar{grid-column:1/4;height:4px;border-radius:2px;background:var(--surface0);overflow:hidden;} .yr .bar i{display:block;height:100%;background:var(--amber);opacity:.75;}
   .yk{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:12px;} .yk div{background:var(--base);border-radius:10px;padding:8px;} .yk b{display:block;font-size:1rem;} .yk span{font-size:.64rem;color:var(--overlay0);}
-  @media (max-width:640px){ #dash{grid-template-columns:1fr;} } .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
+  @media (max-width:640px){ #dash{grid-template-columns:1fr;} }
+  /* battery racks (Mario 2026-09-27: "the battery in 3 columns (3 racks), 12 each, the cycles") */
+  #dash.bat{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+  .rk{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 10px;display:flex;flex-direction:column;gap:6px;}
+  .rk h3{margin:0;font-size:1rem;color:var(--amber);display:flex;justify-content:space-between;align-items:baseline;} .rk h3 small{font-size:.62rem;color:var(--overlay0);font-weight:400;}
+  .rk .cyc{font-size:1.6rem;font-weight:700;line-height:1;} .rk .cyc span{font-size:.62rem;font-weight:400;color:var(--sub);display:block;margin-top:2px;}
+  .rk .kv{display:grid;grid-template-columns:1fr auto;font-size:.7rem;color:var(--sub);gap:1px 6px;} .rk .kv b{color:var(--text);font-weight:500;text-align:right;font-variant-numeric:tabular-nums;}
+  .rk .mods{display:flex;flex-direction:column;gap:3px;margin-top:4px;}
+  .md{position:relative;height:26px;border:1px solid var(--surface1);border-radius:5px;overflow:hidden;background:var(--base);display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:.66rem;}
+  .md i{position:absolute;left:0;top:0;bottom:0;background:rgba(166,227,161,.22);} .md span{position:relative;color:var(--sub);} .md b{position:relative;font-weight:600;font-variant-numeric:tabular-nums;}
+  .batset{grid-column:1/-1;font-size:.74rem;color:var(--sub);display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .batset input{width:80px;}
+  @media (max-width:640px){ #dash.bat{gap:6px;} .rk{padding:10px 6px;} .rk .cyc{font-size:1.25rem;} .md{height:22px;font-size:.58rem;padding:0 4px;} .rk .kv{font-size:.6rem;} } .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
   #msg .warn{color:var(--amber);}
@@ -122,7 +133,7 @@ const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-const TABS = [['yr', 'Year summary'], ['all', 'Month by month'], ['day', 'Daily'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
+const TABS = [['yr', 'Year summary'], ['bat', 'Battery'], ['all', 'Month by month'], ['day', 'Daily'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
 // Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
 // Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
 // them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
@@ -320,11 +331,14 @@ function render() {
     : tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="price" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
     : '';
-  document.getElementById('dash').style.display = tab === 'yr' ? '' : 'none';
-  document.getElementById('tblcard').style.display = tab === 'yr' ? 'none' : '';
-  document.getElementById('range').style.display = tab === 'yr' || tab === 'day' ? 'none' : '';
-  document.querySelector('.hint').style.visibility = tab === 'yr' ? 'hidden' : '';
-  document.querySelector('button[onclick="exportCsv()"]').style.display = tab === 'yr' ? 'none' : '';
+  const DASH = tab === 'yr' || tab === 'bat';
+  document.getElementById('dash').style.display = DASH ? '' : 'none';
+  document.getElementById('dash').classList.toggle('bat', tab === 'bat');
+  document.getElementById('tblcard').style.display = DASH ? 'none' : '';
+  document.getElementById('range').style.display = DASH || tab === 'day' ? 'none' : '';
+  document.querySelector('.hint').style.visibility = DASH ? 'hidden' : '';
+  document.querySelector('button[onclick="exportCsv()"]').style.display = DASH ? 'none' : '';
+  if (tab === 'bat') { document.getElementById('notes').style.display = 'none'; renderRacks(); return; }
   if (tab === 'yr') { document.getElementById('notes').style.display = 'none'; renderYears(); return; }
   // Daily (Mario 2026-09-26: "see what is happening in Sep 26 daily"): the month-by-month columns, one line a day
   const DAY = tab === 'day', MM = M, dm = dayMonth();
@@ -372,6 +386,22 @@ function renderYears() {
       <div class="yk"><div><b>${f0(sold)}</b><span>sold to EDL</span></div><div><b>${sup ? Math.round(solar / sup * 100) : 0} %</b><span>solar share</span></div><div><b>${Math.round(ms.reduce((a, m) => a + (M.by[m].d.discharge || 0), 0) / BATT_KWH)}</b><span>battery cycles</span></div></div>
       ${ADMIN ? `<div class="yk"><div><b>${f0(genAll)}</b><span>all generators kWh</span></div><div><b>${f0(genAll * lpk)}</b><span>diesel L ≈ (${lpk} L/kWh)</span></div><div><b>${dollars}</b><span>diesel cost ≈ · admin</span></div></div>` : ''}</div>`;
   }).join('');
+}
+// three racks, one per inverter; 12 modules in series each — every module sees the rack's cycles
+function renderRacks() {
+  const R = (D.deye && D.deye.racks) || [];
+  const total = +store.get('cpr.battKwh') || BATT_KWH, perRack = total / 3, perMod = perRack / 12;
+  if (!R.length) { document.getElementById('dash').innerHTML = `<div class="rk">Battery racks not available${D.deye && D.deye.racksError ? ' (' + esc(D.deye.racksError) + ')' : ''}.</div>`; return; }
+  const cards = R.map(r => {
+    const cyc = r.discharge != null ? r.discharge / perRack : null;
+    const mods = Array.from({ length: 12 }, (_, i) => `<div class="md"><i style="width:${Math.max(0, Math.min(100, r.soc || 0))}%"></i><span>B${i + 1}</span><b>${cyc != null ? Math.round(cyc) : '—'}</b></div>`).join('');
+    return `<div class="rk"><h3>${esc(r.name)} <small>${esc(r.sn)}</small></h3>
+      <div class="cyc">${cyc != null ? Math.round(cyc).toLocaleString('en-US') : '—'}<span>cycles (each battery)</span></div>
+      <div class="kv"><span>charge now</span><b>${r.soc != null ? r.soc + ' %' : '—'}</b><span>health</span><b>${r.soh != null ? r.soh + ' %' : '—'}</b><span>temperature</span><b>${r.temp != null ? r.temp + ' °C' : '—'}</b><span>voltage</span><b>${r.volt != null ? r.volt + ' V' : '—'}</b><span>charged</span><b>${r.charge != null ? (r.charge / 1000).toFixed(1) + ' MWh' : '—'}</b><span>discharged</span><b>${r.discharge != null ? (r.discharge / 1000).toFixed(1) + ' MWh' : '—'}</b></div>
+      <div class="mods">${mods}</div></div>`;
+  }).join('');
+  const set = ADMIN ? `<div class="batset">Battery capacity <input type="number" step="0.01" value="${total}" onchange="store.set('cpr.battKwh', this.value); render()"> kWh in all = ${perRack.toFixed(1)} kWh a rack, ${perMod.toFixed(2)} kWh a battery (DeyeCloud's setting: ${BATT_KWH} kWh). Cycles = the rack's lifetime discharge ÷ its capacity. <span class="muted">· admin</span></div>` : '';
+  document.getElementById('dash').innerHTML = cards + set + `<div class="batset muted">The 12 batteries of a rack are in series: they charge and discharge together, so each shows the rack's cycles. The green fill = charge now.</div>`;
 }
 function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
 function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }
