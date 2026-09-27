@@ -742,7 +742,7 @@ const ALL_COLS = [
   { k: 'sel',     l: '',                      f: 'sel',    v: t => selected.has(t.id) ? 1 : 0, c: 'c-sel' },
   { k: 'date',    l: 'Date / ref',            f: 'date',   v: t => t.date + ' ' + (t.ref || ''), c: 'c-date' },
   { k: 'acct',    l: 'Account',               f: 'select', v: t => t._accName || '', c: 'c-acct', only: 'all' },
-  { k: 'desc',    l: 'Description',           f: 'text',   v: t => [t.service, t.description, contactName(t).name, t.note].filter(Boolean).join(' '), c: 'c-desc' },
+  { k: 'desc',    l: 'Description',           f: 'text',   v: t => [t.service, t.description, contactName(t).name, t.note, t.src === 'odoo' && ((t.odoo && t.odoo.matches || []).find(x => x.chosen) || {}).memo].filter(Boolean).join(' '), c: 'c-desc' },   // an Odoo line also by its payment memo ("Anthony Khalil (cash) · …") — its own, never a match's
   { k: 'type',    l: 'Type',                  f: 'select', v: t => t.nature || '', c: 'c-type', only: 'ledger' },
   { k: 'out',     l: 'Debit',                 f: 'amount', v: t => t.debit || 0, num: true },
   { k: 'in',      l: 'Credit',                f: 'amount', v: t => t.credit || 0, num: true },
@@ -934,7 +934,8 @@ async function selectAccount(a) {
   document.getElementById('empty-hint').textContent = st ? 'Export the statement as PDF from the Whish app (up to 6 months) and upload it here.'
     : hasJ ? 'Press ⇄ Import Odoo to pull the journal lines, or ＋ Line to type one.' : 'Type a line with ＋ Line, or add Odoo journals to this account with ⚙.';
   resetSources();
-  if (isStatement()) { try { await loadContacts(); } catch (e) { say('Contacts not loaded: ' + e.message, 'err'); } }
+  // Everything filters the Whish lines by the contact's name too
+  if (isStatement() || isAll()) { try { await loadContacts(); } catch (e) { say('Contacts not loaded: ' + e.message, 'err'); } }
   await loadTx();
   await adoptOdooFacts();
   render();
