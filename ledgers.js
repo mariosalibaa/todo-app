@@ -618,7 +618,8 @@ async function importExcel(ctx, account, who) {
   if (sheetDette) accData.dette = { ...(account.dette || {}), amount: sheetDette.amount, fromSheet: true,
     sheetCell: sheetDette.cell, readAt: now() };
   await account.ref.set(accData, { merge: true });
-  return { rows: lines.length, added, updated, removed: gone.length, linkedToOdoo: linked, looseLinks: loose, whatsappFolded: waFolded, first, last, file, sheet, dette: sheetDette };
+  const adopted = await adoptTransfers(ctx, account);
+  return { rows: lines.length, added, updated, removed: gone.length, linkedToOdoo: linked, looseLinks: loose, whatsappFolded: waFolded, first, last, file, sheet, dette: sheetDette, transfersAdopted: adopted };
 }
 
 // ── WhatsApp ────────────────────────────────────────────────────────────────
@@ -772,7 +773,7 @@ async function absorbWaLines(ctx, account, who, lines) {
   // already accepted or booked (Khoder's days are born from WhatsApp): without those, every
   // hourly read proposed "200$ from mario" again next to the booked one (Mario, 2026-09-12).
   const owned = t => !!(t.waAccepted || t.reviewed || t.reviewedAt || t.ref || t.bookedMove || t.dupSrc === 'manual');
-  const targets = cur.docs.map(d => d.data()).filter(t => !t.excluded && (['odoo', 'excel', 'manual', 'telegram'].includes(t.src) || ((t.src === 'whatsapp' || t.src === 'site') && owned(t))));
+  const targets = cur.docs.map(d => d.data()).filter(t => !t.excluded && (['odoo', 'excel', 'manual', 'telegram', 'transfer'].includes(t.src) || ((t.src === 'whatsapp' || t.src === 'site') && owned(t))));
   const taken = new Set(Object.values(existing).filter(t => t.dupSrc === 'manual').map(t => t.dupOf).filter(Boolean));
   const dup = pairUp(lines, targets, { taken, maxDays: 4, loose: true });
   const partner = account.odooPartner && account.odooPartner.id ? { id: +account.odooPartner.id, name: String(account.odooPartner.name || '') } : null;
@@ -814,6 +815,34 @@ async function absorbWaLines(ctx, account, who, lines) {
 // "received from Ziad" and 100 leaving Ziad's. A line is paired with the account of the
 // person it names (Mario when it names nobody but is a transfer), each side used once.
 // Two Odoo lines of the same journal entry are the same movement for certain.
+// A transfer typed in the hub before his sheet caught up (Mario, 2026-09-29: "350$ from mario to
+// ziad now"): the hub made a stand-in line (tr-…) on his account. When the sheet's own row for that
+// money arrives — same amount, same side, within 4 days — the transfer moves onto the row and the
+// stand-in goes, so the money counts once and nobody has to link it by hand.
+async function adoptTransfers(ctx, account) {
+  const { ws, txCol } = ctx;
+  if (!ws) return 0;
+  const [tin, tout] = await Promise.all([ws.collection('transfers').where('toId', '==', account.id).get(), ws.collection('transfers').where('fromId', '==', account.id).get()]);
+  const open = [...tin.docs.map(d => ({ d, side: 'in' })).filter(x => !x.d.data().toTxId), ...tout.docs.map(d => ({ d, side: 'out' })).filter(x => !x.d.data().fromTxId)];
+  if (!open.length) return 0;
+  const col = txCol(account);
+  const rows = (await col.where('src', '==', 'excel').get()).docs.map(d => d.data()).filter(t => !t.excluded && !t.transferId);
+  const used = new Set(); let n = 0;
+  for (const { d, side } of open) {
+    const tr = d.data();
+    const hit = rows.filter(t => !used.has(t.id) && Math.abs((side === 'in' ? t.credit || 0 : t.debit || 0) - tr.amount) < 0.011 && days(t.date, tr.date) <= 4)
+      .sort((x, y) => days(x.date, tr.date) - days(y.date, tr.date))[0];
+    if (!hit) continue;
+    used.add(hit.id);
+    const b = ws.firestore.batch();
+    b.set(col.doc(hit.id), { transferId: tr.id, kind: 'transfer', kindSrc: 'transfer', updatedAt: now() }, { merge: true });
+    b.delete(col.doc('tr-' + tr.id));
+    b.set(d.ref, side === 'in' ? { toTxId: hit.id } : { fromTxId: hit.id }, { merge: true });
+    await b.commit(); n++;
+  }
+  return n;
+}
+
 async function linkTransfers(ctx, account, who, opts) {
   const { ws, listAccounts, txCol, resolve } = ctx;
   const owner = account.owner || '';
@@ -1061,4 +1090,4 @@ async function writeExcelRow(ctx, account, t, patch) {
   return { wrote, file: base, row: r };
 }
 
-module.exports = { importExcel, importWhatsapp, importWhatsappLive, linkTransfers, listGroups, readExcel, readTimesheet, rateAt, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };
+module.exports = { importExcel, adoptTransfers, importWhatsapp, importWhatsappLive, linkTransfers, listGroups, readExcel, readTimesheet, rateAt, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };
