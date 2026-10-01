@@ -76,7 +76,8 @@ async function fill(ctx, max) {
   const todo = [];
   for (let d = addDays(HISTORY.last, 1); d <= yesterday; d = addDays(d, 1)) {
     const h = have[d];
-    if (!h || (h.n < 280 && d >= addDays(yesterday, -3))) todo.push(d);
+    // a short day is read again at most every 3 h — a day Deye really has short (inverter offline) made every page load wait
+    if (!h || (h.n < 280 && d >= addDays(yesterday, -3) && !(h.at && Date.now() - Date.parse(h.at) < 3 * 3600e3))) todo.push(d);
   }
   const done = [];
   for (const d of todo.slice(0, max)) {

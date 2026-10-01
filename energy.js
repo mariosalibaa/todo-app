@@ -73,8 +73,9 @@ async function build(ctx) {
     console.error('energy live:', out.liveError);
   }
   out.deye = { fields: deye.FIELDS, ...(await deyeP) };
-  try { out.deye.racks = await deye.racks(ctx); } catch (e) { out.deye.racksError = String(e.message || e); }
-  try { out.deye.live = await deye.live(ctx); } catch (e) { out.deye.liveError = String(e.message || e); }
+  // the battery racks (≈10 DeyeCloud calls a few hundred ms apart) and the live flow are NOT read here any more —
+  // they made every page load wait ~10 s (Mario 2026-10-01: "loading is taking too much time"). The Battery tab
+  // reads /api/cpr/racks when opened, the Live tab /api/cpr/live.
   return out;
 }
 
@@ -105,6 +106,43 @@ async function meterDay(day) {
   return out;
 }
 
+// The Readings tab (Mario 2026-10-01: "the kWh on the meter at the beginning of the month and at the end") — each
+// meter's counter at Beirut midnight on the 1st and on the 1st of the next month (or now, for the month running).
+// openHAB only (history from Feb 2025). At the instant itself when readings surround it closely (≤ 2 h apart,
+// interpolated); else the nearest real reading within 3 days, with its time, so the page can say so. Stale repeats
+// while the Pi was offline are not readings. A swap inside the month = the counter fell (or jumped) — reported as is.
+const readCache = new Map();
+async function readings(month) {
+  if (!process.env.OPENHAB_USER || !process.env.OPENHAB_PASS) throw new Error('OPENHAB_USER / OPENHAB_PASS not set');
+  const first = month + '-01', next = C.nextDay(new Date(Date.UTC(+month.slice(0, 4), +month.slice(5), 0)).toISOString().slice(0, 10));
+  const t0 = C.dayStart(first), t1 = Math.min(C.dayStart(next), Date.now()), running = C.dayStart(next) > Date.now();
+  const hit = readCache.get(month);
+  if (hit && Date.now() - hit.at < (running ? 10 * 60000 : 24 * 3600e3)) return hit.data;
+  const W = 3 * 864e5, from = t0 - W, to = Math.min(t1 + W, Date.now() + 3600e3);
+  const series = {};
+  await Promise.all(C.BUILDINGS.map(async b => { series[b.item] = await ohSeries(b.item, from, to); }));
+  const outs = C.outages(series.Meter1_EPImp, series.Meter3_EPImp, series.Meter4_EPImp);
+  const at = (pts, t) => {
+    if (!pts.length) return null;
+    let i = pts.findIndex(p => p[0] >= t); if (i < 0) i = pts.length;
+    const a = pts[i - 1], b = pts[i];
+    if (a && b && b[0] - a[0] <= 2 * 3600e3) return { kwh: Math.round((a[1] + (b[1] - a[1]) * (t - a[0]) / (b[0] - a[0] || 1)) * 10) / 10, at: new Date(t).toISOString(), exact: true };
+    const c = [a, b].filter(Boolean).sort((x, y) => Math.abs(x[0] - t) - Math.abs(y[0] - t))[0];
+    return c && Math.abs(c[0] - t) <= W ? { kwh: Math.round(c[1] * 10) / 10, at: new Date(c[0]).toISOString(), exact: false } : null;
+  };
+  const meters = C.BUILDINGS.map(b => {
+    const pts = C.dropStale(series[b.item], outs).filter(p => Number.isFinite(p[1]) && p[1] > 0).sort((x, y) => x[0] - y[0]);
+    // a fall of the counter inside the month = another meter took over (a swap); the start then belongs to the old one
+    const inside = pts.filter(p => p[0] > t0 && p[0] < t1); let fell = false;
+    for (let i = 1; i < inside.length; i++) if (inside[i][1] < inside[i - 1][1] - 1) { fell = true; break; }
+    return { key: b.key, name: b.name, item: b.item, start: at(pts, t0), end: running ? (pts.length ? { kwh: Math.round(pts[pts.length - 1][1] * 10) / 10, at: new Date(pts[pts.length - 1][0]).toISOString(), exact: true, latest: true } : null) : at(pts, t1), fell };
+  });
+  const out = { month, from: new Date(t0).toISOString(), to: new Date(t1).toISOString(), running, meters };
+  readCache.set(month, { at: Date.now(), data: out });
+  if (readCache.size > 40) readCache.delete(readCache.keys().next().value);
+  return out;
+}
+
 async function handle(req, res, url, user, ctx) {
   const [p, qs] = url.split('?');
   if (p === '/api/energy' && req.method === 'GET') {
@@ -116,4 +154,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, meterDay };
+module.exports = { handle, meterDay, readings };

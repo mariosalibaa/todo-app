@@ -970,6 +970,22 @@ const handler = async (req, res) => {
     catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }   // the page shows "not reachable"
     return;
   }
+  // the Battery tab: the three racks + their BMS from DeyeCloud (slow — ~10 calls; kept 10 min in deye.racks)
+  if (url === '/api/cpr/racks' && req.method === 'GET') {
+    if (!(await cprAccess()).ok) return cprDenied();
+    try { const v = await require('./deye').racks({ db, TEAM_ID }); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ racks: v })); }
+    catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    return;
+  }
+  // the Readings tab: each meter's kWh counter at the start and the end of a month from openHAB (?month=YYYY-MM)
+  if (url === '/api/cpr/readings' && req.method === 'GET') {
+    if (!(await cprAccess()).ok) return cprDenied();
+    const month = new URL(req.url, 'http://x').searchParams.get('month') || '';
+    if (!/^\d{4}-\d{2}$/.test(month)) { res.writeHead(400); res.end('month'); return; }
+    try { const v = await energy.readings(month); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
+    catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }   // the page shows "not reachable"
+    return;
+  }
   // the Live tab: DeyeCloud now / today / since commissioning, refreshed every minute by the page
   if (url === '/api/cpr/live' && req.method === 'GET') {
     if (!(await cprAccess()).ok) return cprDenied();
