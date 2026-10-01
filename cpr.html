@@ -159,7 +159,7 @@ const TABS = [['live', 'Live'], ['chr', 'Charts'], ['yr', 'Year summary'], ['bat
 // Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
 // Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
 // them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
-let ADMIN = false, REAL_ADMIN = false;
+let ADMIN = false, REAL_ADMIN = false, ME_KNOWN = false;   // ME_KNOWN: /api/me answered — until then an admin tab is not swapped away
 // "View as public" (admin only, top right): the page drops to what everyone sees; kept in localStorage so the 📱 preview follows
 function applyView() {
   const asPublic = store.get('cpr.public') === '1';
@@ -173,7 +173,7 @@ function applyView() {
 }
 function togglePublic() { store.set('cpr.public', store.get('cpr.public') === '1' ? '0' : '1'); applyView(); }
 addEventListener('storage', e => { if (e.key === 'cpr.public') applyView(); });   // the preview frame follows a switch made outside it
-fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { REAL_ADMIN = !!(me && me.admin); applyView(); if (REAL_ADMIN) loadFuel(); }).catch(() => {});
+fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(me => { REAL_ADMIN = !!(me && me.admin); ME_KNOWN = true; applyView(); if (REAL_ADMIN) loadFuel(); }).catch(() => { ME_KNOWN = true; });
 // Kamal's diesel fills (/cpr/diesel) summed per month — admin only
 let FUEL = {};
 // $ per litre: what Kamal's fills cost on average (Mario 2026-09-27), unless the admin typed a price
@@ -263,6 +263,7 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // voltage — its kWh left out most of two phases; openHAB shows phase B negative up to Apr 2026, never after).
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
+const BYPASS_FROM = '2026-07';   // Meters vs Deye: the buildings' bypass line from this month (meters before it may have been installed wrong)
 // Mario 2026-09-27: 5.12 kWh a battery × 12 a rack × 3 racks = 184.32 kWh (DeyeCloud is set to 127.33 — wrong)
 const BATT_KWH = 184.32;
 // Mario 2026-10-01: what the month's cycles cost the batteries = cycles / rated cycles x $ a battery x 36 batteries (3 racks x 12) — $6 a cycle at $1,000 / 6,000; the Battery tab's inputs
@@ -342,11 +343,14 @@ const VIEWS = {
         const p = sd.v && oh.v != null && !sd.part ? (oh.v - sd.v) / sd.v * 100 : null;
         return [{ v: sd.v, note: sd.part ? 'part' : '' }, { v: oh.v }, ...(c.deye ? [{ v: dy }] : []), { html: p == null ? '<span class="none">—</span>' : `<span class="${Math.abs(p) > 5 ? 'd big' : 'd'}">${p > 0 ? '+' : ''}${p.toFixed(1)} %</span>` }];
       }
+      // Mario 2026-10-01: buildings above Deye's load = EDL / generator feeding Kamal (Liqaa + Hotel) through the bypass, outside Deye — from Jul 2026 only
+      // ("before July we may have had a wrong meters installation")
+      const bypassLine = () => { if (m < BYPASS_FROM) return ''; const bl = srcv(m, 'oh', ['school', 'church', 'liqaa', 'hotel']).v /* openHAB, the line above it */, dl = dv(m, 'use'); return bl == null || dl == null ? '' : `<span class="tri" style="color:var(--amber)"><i>Bypass → Kamal</i>${f0(Math.max(0, bl - dl))}</span>`; };
       const tri = (keys, deyeV, deyeApart) => {
         const sd = srcv(m, 'sd', keys), oh = srcv(m, 'oh', keys);
         const xs = [sd.v, oh.v, deyeApart ? null : deyeV].filter(v => v != null && v > 0); const spread = xs.length > 1 ? (Math.max(...xs) - Math.min(...xs)) / Math.min(...xs) : 0;
         const line = (lab, x, part) => `<span class="tri"><i>${lab}</i>${x == null ? '—' : f0(x)}${part ? '<i> part</i>' : ''}</span>`;
-        return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${deyeV === undefined ? '' : line(deyeApart ? 'Deye load' : 'Deye', deyeV)}</span>` };
+        return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${deyeV === undefined ? '' : line(deyeApart ? 'Deye load' : 'Deye', deyeV)}${deyeApart ? bypassLine() : ''}</span>` };
       };
       return [tri(['edl'], dv(m, 'gridIn')), tri(['genChurch', 'genBig', 'genSmall'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], dv(m, 'use'), true) /* Deye load beside them (Mario 2026-10-01) — shown, not in the amber test: the buildings also take EDL / generator directly (Mario 2026-09-26) */];
     },
@@ -354,7 +358,7 @@ const VIEWS = {
       const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });
       return [pair(mv(m, 'edl').v, dv(m, 'gridIn')), pair(sumv(m, ['genChurch', 'genBig', 'genSmall']).v, dsplit(m, 'gen').v), pair(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, dv(m, 'use'))];
     },
-    det: m => (CMP[cmpKey()] ? `${CMP[cmpKey()].name}: ` : '') + `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh. % = Deye against the meter.`,
+    det: m => (CMP[cmpKey()] ? `${CMP[cmpKey()].name}: ` : '') + `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh — what the buildings take above Deye's load = EDL / generator feeding Kamal (Liqaa + Hotel) through the bypass, outside Deye. % = Deye against the meter.`,
   },
   dsl: {
     head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈'], ['Bought', 'litres', 'gs'], ['Bought', '$']],
@@ -366,7 +370,7 @@ const VIEWS = {
 
 function render() {
   document.body.classList.toggle('t-all', tab === 'all' || tab === 'day' || tab === 'sup');
-  if (!ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'all';
+  if (ME_KNOWN && !ADMIN && TABS.find(t => t[0] === tab && t[2])) tab = 'all';
   document.getElementById('tabs').innerHTML = TABS.filter(t => ADMIN || !t[2]).map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('');
   document.getElementById('set').innerHTML = tab === 'day'
     ? `<label>Month <select onchange="store.set('cpr.dayMonth', this.value); render()">${M.list.slice().reverse().map(m => `<option value="${m}" ${m === dayMonth() ? 'selected' : ''}>${MON[+m.slice(5) - 1]} ${m.slice(0, 4)}</option>`).join('')}</select></label>`
