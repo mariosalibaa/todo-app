@@ -333,7 +333,7 @@ const VIEWS = {
   },
   cmp: {
     // Mario 2026-09-26: each meter M1–M8, SD card against openHAB; Deye next to EDL and the generators
-    head: () => { const c = CMP[cmpKey()]; if (!c) return [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Buildings', 'SD · openHAB']];
+    head: () => { const c = CMP[cmpKey()]; if (!c) return [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Buildings', 'SD · openHAB · Deye load']];
       return ['SD card', 'openHAB', ...(c.deye ? ['Deye'] : []), ['oH vs SD', '%']]; },
     row: m => {
       const c = CMP[cmpKey()];
@@ -342,13 +342,13 @@ const VIEWS = {
         const p = sd.v && oh.v != null && !sd.part ? (oh.v - sd.v) / sd.v * 100 : null;
         return [{ v: sd.v, note: sd.part ? 'part' : '' }, { v: oh.v }, ...(c.deye ? [{ v: dy }] : []), { html: p == null ? '<span class="none">—</span>' : `<span class="${Math.abs(p) > 5 ? 'd big' : 'd'}">${p > 0 ? '+' : ''}${p.toFixed(1)} %</span>` }];
       }
-      const tri = (keys, deyeV) => {
+      const tri = (keys, deyeV, deyeApart) => {
         const sd = srcv(m, 'sd', keys), oh = srcv(m, 'oh', keys);
-        const xs = [sd.v, oh.v, deyeV].filter(v => v != null && v > 0); const spread = xs.length > 1 ? (Math.max(...xs) - Math.min(...xs)) / Math.min(...xs) : 0;
+        const xs = [sd.v, oh.v, deyeApart ? null : deyeV].filter(v => v != null && v > 0); const spread = xs.length > 1 ? (Math.max(...xs) - Math.min(...xs)) / Math.min(...xs) : 0;
         const line = (lab, x, part) => `<span class="tri"><i>${lab}</i>${x == null ? '—' : f0(x)}${part ? '<i> part</i>' : ''}</span>`;
-        return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${deyeV === undefined ? '' : line('Deye', deyeV)}</span>` };
+        return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${deyeV === undefined ? '' : line(deyeApart ? 'Deye load' : 'Deye', deyeV)}</span>` };
       };
-      return [tri(['edl'], dv(m, 'gridIn')), tri(['genChurch', 'genBig', 'genSmall'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], undefined) /* no Deye: its load is no measure of the buildings, which also take EDL / generator directly (Mario 2026-09-26) */];
+      return [tri(['edl'], dv(m, 'gridIn')), tri(['genChurch', 'genBig', 'genSmall'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], dv(m, 'use'), true) /* Deye load beside them (Mario 2026-10-01) — shown, not in the amber test: the buildings also take EDL / generator directly (Mario 2026-09-26) */];
     },
     rowOld: m => {
       const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });
