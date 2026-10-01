@@ -264,7 +264,9 @@ const dsplit = (m, f) => { const o = M.by[m].d; if (!o.n || o.noSplit >= o.n) re
 // Until then the EDL figure is Deye's grid input (Mario 2026-09-26, checked against the SD logs and openHAB).
 const EDL_OK = '2026-05';
 // Mario 2026-09-27: 5.12 kWh a battery × 12 a rack × 3 racks = 184.32 kWh (DeyeCloud is set to 127.33 — wrong)
-const BATT_KWH = 184.32;   // one cycle = one full discharge of it
+const BATT_KWH = 184.32;
+// Mario 2026-10-01: what the month's cycles cost the batteries = cycles / rated cycles x $ a battery x 36 batteries (3 racks x 12) — $6 a cycle at $1,000 / 6,000; the Battery tab's inputs
+const battUsd = m => { const d = dv(m, 'discharge'); return d ? d / BATT_KWH / (+store.get('cpr.battCycles') || 6000) * (+store.get('cpr.battPrice') || 1000) * 36 : null; };   // one cycle = one full discharge of it
 const CMP = {
   school: { name: 'M1 School', keys: ['school'] }, church: { name: 'M2 Church', keys: ['church'] }, liqaa: { name: 'M3 Liqaa', keys: ['liqaa'] },
   hotel: { name: 'M4 Hotel', keys: ['hotel'] }, genChurch: { name: 'M5 Gen church', keys: ['genChurch'] }, genSmall: { name: 'M6 Gen small', keys: ['genSmall'] },
@@ -300,7 +302,7 @@ const VIEWS = {
   all: {
     // Mario 2026-09-26: here the church is only what we supply (church − the church generator, which the church pays);
     // so the generator column leaves the church generator out too, and the two totals stay comparable
-    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Load', 'Deye', 'wide admc'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL'], ['Batt', 'cycles']],
+    head: ['School', ['Church', 'from us'], ['Kamal', 'L + H'], ['Bldgs', '', 'sum'], ['Load', 'Deye', 'wide admc'], ['Solar', '', 'gs'], 'EDL', ['Gen', 'ours'], ['Supply', '', 'sum'], ['Sold', 'to EDL'], ['Batt', 'cycles'], ['Batt', 'cost $', 'wide']],
     row: m => {
       const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
       const church = co == null ? { v: null } : { v: co, est: ch.est };
@@ -308,9 +310,9 @@ const VIEWS = {
       const gs = genSplit(m), gc = mv(m, 'genChurch').v;
       const gen = gs.total == null ? { v: null } : { v: Math.max(0, gs.total - (gc || 0)), est: gs.est };
       const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
-      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [{ v: dv(m, 'use') }, 'wide admc'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }, s[s.length - 1]];
+      return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [{ v: dv(m, 'use') }, 'wide admc'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }, s[s.length - 2], [s[s.length - 1], 'wide']];
     },
-    det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m) + (ADMIN ? `<br>Deye load (what the inverters supplied to the buildings) <b>${f0(dv(m, 'use'))}</b> kWh · ` : '<br>') + `battery <b>${f0(dv(m, 'discharge'))}</b> kWh discharged = <b>${((dv(m, 'discharge') || 0) / BATT_KWH).toFixed(1)}</b> cycles of ${BATT_KWH} kWh`,
+    det: m => VIEWS.bld.det(m) + '<br>' + VIEWS.sup.det(m) + (ADMIN ? `<br>Deye load (what the inverters supplied to the buildings) <b>${f0(dv(m, 'use'))}</b> kWh · ` : '<br>') + `battery <b>${f0(dv(m, 'discharge'))}</b> kWh discharged = <b>${((dv(m, 'discharge') || 0) / BATT_KWH).toFixed(1)}</b> cycles of ${BATT_KWH} kWh` + (battUsd(m) ? ` = <b>$${f0(battUsd(m))}</b> of battery wear` : ''),
   },
   bld: {
     head: ['School', 'Church', ['Kamal', 'Liqaa + Hotel'], ['Liqaa', '', 'wide'], ['Hotel', '', 'wide'], ['Total', '', 'sum']],
@@ -320,12 +322,12 @@ const VIEWS = {
     det: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, p = k => t ? ' (' + (mv(m, k).v / t * 100).toFixed(0) + ' %)' : ''; return `Church <b>${f0(mv(m, 'church').v)}</b> − its generator <b>${f0(mv(m, 'genChurch').v)}</b> = <b>${f0(churchOurs(m))}</b> kWh from us · Liqaa <b>${f0(mv(m, 'liqaa').v)}</b>${p('liqaa')} · Hotel <b>${f0(mv(m, 'hotel').v)}</b>${p('hotel')} kWh — together Kamal's <b>${f0(sumv(m, ['liqaa', 'hotel']).v)}</b>`; },
   },
   sup: {
-    head: ['Solar', 'EDL', ['EDL', 'direct'], ['Gen', ''], ['Gen', 'direct'], ['Total', '', 'sum'], ['Sold', 'to EDL'], ['Battery', 'cycles']],
+    head: ['Solar', 'EDL', ['EDL', 'direct'], ['Gen', ''], ['Gen', 'direct'], ['Total', '', 'sum'], ['Sold', 'to EDL'], ['Battery', 'cycles'], ['Battery', 'cost $']],
     row: m => {
       const e = edlSplit(m), g = genSplit(m), pv = dsplit(m, 'pv');
       const edl = { v: e.total, est: e.est, note: e.deye == null && e.total != null ? 'meter' : '' }, gen = { v: g.total, est: g.est, note: g.deye == null && g.total != null ? 'meters' : '' };
       const tot = (pv.v || 0) + (edl.v || 0) + (gen.v || 0);
-      return [pv, edl, { v: e.direct }, gen, { v: g.direct }, [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }, { html: dv(m, 'discharge') ? (dv(m, 'discharge') / BATT_KWH).toFixed(1) : '<span class="none">—</span>', sum: dv(m, 'discharge') / BATT_KWH }];
+      return [pv, edl, { v: e.direct }, gen, { v: g.direct }, [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }, { html: dv(m, 'discharge') ? (dv(m, 'discharge') / BATT_KWH).toFixed(1) : '<span class="none">—</span>', sum: dv(m, 'discharge') / BATT_KWH }, { v: battUsd(m) }];
     },
     det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL: Deye <b>${f0(edlSplit(m).deye)}</b>, meter <b>${f0(edlSplit(m).meter)}</b> → direct through the transfer switch <b>${f0(edlSplit(m).direct)}</b> · Generators: Deye <b>${f0(genSplit(m).deye)}</b>, meters <b>${f0(genSplit(m).meter)}</b> → direct <b>${f0(genSplit(m).direct)}</b> · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
