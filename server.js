@@ -1087,13 +1087,16 @@ const handler = async (req, res) => {
   const machineKey = process.env.ACCOUNTING_API_KEY;
   const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const keyed = !!machineKey && bearer.length >= 32 && bearer === machineKey;
+  // the same key lets Render's site agent ("Shift", shift-hub bots/agent-site) post replies and run hub writes — see site-agent.js
+  const agentCall = keyed && url.startsWith('/api/site/agent/');
   // the laptop forwarding a WhatsApp message into Shift WhatsApp carries the same key (Mario, 2026-09-25:
   // "allow to forward to shift whatsapp accounts") — that door writes chat posts, so it goes in as an admin
-  const machineSite = keyed && url.startsWith('/api/site/');
-  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite);
+  const machineSite = keyed && url.startsWith('/api/site/') && !agentCall;
+  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall);
 
   // All API endpoints require auth
-  const user = machine ? { uid: machineSite ? 'wa-archive' : 'whish-watcher', email: machineSite ? 'archive@shift-group.co' : 'whish-watcher@shift-group.co' } : await verifyToken(req);
+  const user = agentCall ? { uid: 'shift-agent', email: 'shift@shift-group.co' }
+    : machine ? { uid: machineSite ? 'wa-archive' : 'whish-watcher', email: machineSite ? 'archive@shift-group.co' : 'whish-watcher@shift-group.co' } : await verifyToken(req);
   if (!user) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -1104,7 +1107,9 @@ const handler = async (req, res) => {
 
   // Allowlist gate: a valid Google/session token is not enough — the email
   // must be approved. (Local mode's synthetic user gets everything.)
-  let access = machine
+  let access = agentCall
+    ? { email: user.email, apps: ['site'], admin: false, agent: true }
+    : machine
     ? (machineSite ? { email: user.email, apps: ['site'], admin: true } : { email: user.email, apps: ['accounting'], admin: false })
     : AUTH_DISABLED
       ? { email: user.email || '', apps: APPS.slice(), admin: true }
