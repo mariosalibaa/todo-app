@@ -7,6 +7,7 @@ const acc = require('./accounts');
 const files = require('./hub-files');
 const parse = require('./site-parse');
 const attendance = require('./site-attendance');   // part 2: sites, Start/Finish, the self-written day
+const siteAgent = require('./site-agent');          // "Shift", the agent member of the chat
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const now = () => new Date().toISOString();
@@ -56,7 +57,8 @@ async function settlement(ctx, txRef, bm) {
 async function threadsFor(ctx) {
   const ws = ctx.db.collection('workspaces').doc(ctx.TEAM_ID);
   const people = (await acc.listAccounts(ws)).filter(a => a.daily && !a.archived);
-  const all = [{ id: 'general', name: 'Mario', kind: 'general' }, ...people.map(p => ({ id: p.id, name: p.name, kind: 'worker' }))];
+  // "Shift" (the agent) is a thread of its own, pinned under Mario — admin only (site-agent.js)
+  const all = [{ id: 'general', name: 'Mario', kind: 'general' }, { id: siteAgent.AGENT, name: 'Shift', kind: 'agent' }, ...people.map(p => ({ id: p.id, name: p.name, kind: 'worker' }))];
   return ctx.access.admin ? all : all.filter(t => t.kind === 'worker' && t.id === ctx.access.account);
 }
 
@@ -76,7 +78,7 @@ async function writeLine(ctx, ws, post, target, fields) {
   const a = await acc.resolve(ws, target);
   if (!a) throw new Error('no ledger ' + target);
   const id = 'site-' + post.id;
-  const t = { id, src: 'site', postId: post.id, thread: post.thread, date: post.date, ref: String(fields.ref || ''), service: 'Shift WhatsApp', phone: '',
+  const t = { id, src: fields.src || 'site', postId: post.id, thread: post.thread, date: post.date, ref: String(fields.ref || ''), service: 'Shift WhatsApp', phone: '',
     description: String(fields.description || post.text || '').slice(0, 160),
     debit: fields.side === 'debit' ? money(fields.amount) : 0, credit: fields.side === 'credit' ? money(fields.amount) : 0,
     analyticId: fields.analytic ? fields.analytic.id : null, analyticName: fields.analytic ? fields.analytic.name : '', analyticSrc: fields.analytic ? 'site' : '',
@@ -169,6 +171,9 @@ async function digest(ctx, ws, ref, post, buf) {
 async function handle(req, res, url, user, ctx) {
   const { db, TEAM_ID, access } = ctx;
   const ws = db.collection('workspaces').doc(TEAM_ID);
+  // the agent's routes first: /api/site/agent/* is machine-only and must not fall into the attendance matcher
+  const ag = await siteAgent.handle(req, res, url, user, { ...ctx, threadsFor, writeLine, refs });
+  if (ag !== false) return ag;
   const att = await attendance.handle(req, res, url, user, { ...ctx, threadsFor });
   if (att !== false) return att;
   const who = user.email || user.uid;
@@ -187,7 +192,7 @@ async function handle(req, res, url, user, ctx) {
       const last = await ws.collection('site').doc(t.id).collection('posts').orderBy('at', 'desc').limit(1).get();
       t.last = last.empty ? '' : last.docs[0].data().at;
       // the chat-list preview, WhatsApp style
-      if (!last.empty) { const p = last.docs[0].data(); t.preview = { kind: p.kind, by: p.by, text: p.deleted ? '' : p.kind === 'text' ? String(p.text || '').slice(0, 90) : (p.parsed && p.parsed.transcript ? String(p.parsed.transcript).slice(0, 90) : '') }; }
+      if (!last.empty) { const p = last.docs[0].data(); t.preview = { kind: p.kind, by: p.by, text: p.deleted ? '' : (p.kind === 'text' || p.kind === 'action') ? siteAgent.previewOf(p).slice(0, 90) : (p.parsed && p.parsed.transcript ? String(p.parsed.transcript).slice(0, 90) : '') }; }
     }));
     return json(res, 200, ts);
   }
@@ -291,6 +296,13 @@ async function handle(req, res, url, user, ctx) {
     const post = d.data();
     const b = await readBody(req);
     if (post.digestedAt && !b.force) return json(res, 200, post);
+    // a message meant for the agent is a question, not a ledger proposal: read a voice note, never write a line
+    if (post.by === siteAgent.AGENT || post.agentAsk || siteAgent.isTrigger(m[1], post.text, post.byAdmin)) {
+      const parsed = post.parsed || {};
+      if (post.kind === 'voice' && !parsed.transcript && post.file) { const buf = await readBytes(ctx, post.file); if (buf) parsed.transcript = await parse.whisper(buf, post.file.mime); }
+      await ref.set({ parsed, line: null, error: null, digestedAt: now(), digesting: false, agentAsk: !!post.byAdmin }, { merge: true });
+      return json(res, 200, (await ref.get()).data());
+    }
     // one read at a time (a double tap, a retry) — unless the last one died mid-way (a stale flag, > 2 min)
     if (post.digesting && !b.force && post.digestingAt && Date.now() - Date.parse(post.digestingAt) < 120e3) return json(res, 409, { error: 'still reading — try again in a moment' });
     // a forced re-read starts clean: the line it wrote before may sit on another ledger (paidFrom)
@@ -323,4 +335,4 @@ async function handle(req, res, url, user, ctx) {
 
   return false;
 }
-module.exports = { handle, sweep: attendance.sweep };
+module.exports = { handle, sweep: attendance.sweep, writeLine };
