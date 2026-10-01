@@ -961,6 +961,15 @@ const handler = async (req, res) => {
     catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }   // the page shows "not reachable"
     return;
   }
+  // the Charts tab's one-day chart: each meter's average kW per hour from openHAB (?day=YYYY-MM-DD, Beirut)
+  if (url === '/api/cpr/meters' && req.method === 'GET') {
+    if (!(await cprAccess()).ok) return cprDenied();
+    const day = new URL(req.url, 'http://x').searchParams.get('day') || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) { res.writeHead(400); res.end('day'); return; }
+    try { const v = await energy.meterDay(day); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
+    catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }   // the page shows "not reachable"
+    return;
+  }
   // the Live tab: DeyeCloud now / today / since commissioning, refreshed every minute by the page
   if (url === '/api/cpr/live' && req.method === 'GET') {
     if (!(await cprAccess()).ok) return cprDenied();

@@ -23,9 +23,9 @@ const CACHE_MS = 10 * 60000;
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 let cache = { at: 0, data: null, pending: null };
 
-async function ohSeries(item, from) {
+async function ohSeries(item, from, to = Date.now() + 3600e3) {
   const auth = 'Basic ' + Buffer.from(`${process.env.OPENHAB_USER}:${process.env.OPENHAB_PASS}`).toString('base64');
-  const r = await fetch(`${OH_URL}/rest/persistence/items/${item}?starttime=${new Date(from).toISOString()}&endtime=${new Date(Date.now() + 3600e3).toISOString()}`,
+  const r = await fetch(`${OH_URL}/rest/persistence/items/${item}?starttime=${new Date(from).toISOString()}&endtime=${new Date(to).toISOString()}`,
     { headers: { Authorization: auth, Accept: 'application/json' } });
   if (!r.ok) throw new Error(`openHAB ${r.status}${r.status === 401 ? ' (OPENHAB_USER / OPENHAB_PASS refused)' : ''}`);
   const j = await r.json();
@@ -78,6 +78,33 @@ async function build(ctx) {
   return out;
 }
 
+// The Charts tab's "one day" chart (Mario 2026-10-01: "develop the hub" instead of Grafana) — each meter's average kW
+// per hour of one Beirut day = the rise of its kWh counter over that hour. openHAB only, the same cleaning as the
+// days (stale repeats while the Pi was offline dropped); an hour the counter has no reading on both sides = null.
+const dayCache = new Map();
+async function meterDay(day) {
+  if (!process.env.OPENHAB_USER || !process.env.OPENHAB_PASS) throw new Error('OPENHAB_USER / OPENHAB_PASS not set');
+  const today = C.dayOf(Date.now()), hit = dayCache.get(day);
+  if (hit && Date.now() - hit.at < (day < today ? 6 * 3600e3 : 5 * 60000)) return hit.data;
+  const t0 = C.dayStart(day), t1 = Math.min(C.dayStart(C.nextDay(day)), Date.now());
+  const from = t0 - 24 * 3600e3, to = C.dayStart(C.nextDay(day)) + 3 * 3600e3;   // a day before for the outage test, a little after for the last hour
+  const series = {};
+  await Promise.all(C.BUILDINGS.map(async b => { series[b.item] = await ohSeries(b.item, from, to); }));
+  const outs = C.outages(series.Meter1_EPImp, series.Meter3_EPImp, series.Meter4_EPImp);
+  const hours = []; for (let t = t0; t < t1; t += 3600e3) hours.push(t);
+  const data = {};
+  for (const b of C.BUILDINGS) {
+    const pts = C.cleanPoints(C.dropStale(series[b.item], outs), from, to);
+    data[b.key] = hours.map(t => { const a = C.valueAt(pts, t), z = C.valueAt(pts, Math.min(t + 3600e3, t1));
+      return a == null || z == null ? null : Math.round(Math.max(0, z - a) * 3600e3 / (Math.min(t + 3600e3, t1) - t) * 100) / 100; });
+  }
+  const out = { day, hours: hours.map(t => new Date(t).toISOString()), data,
+    outages: outs.filter(([s, e]) => e > t0 && s < t1).map(([s, e]) => [new Date(s).toISOString(), new Date(e).toISOString()]) };
+  dayCache.set(day, { at: Date.now(), data: out });
+  if (dayCache.size > 60) dayCache.delete(dayCache.keys().next().value);
+  return out;
+}
+
 async function handle(req, res, url, user, ctx) {
   const [p, qs] = url.split('?');
   if (p === '/api/energy' && req.method === 'GET') {
@@ -89,4 +116,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle };
+module.exports = { handle, meterDay };

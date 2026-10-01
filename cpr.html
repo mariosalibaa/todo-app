@@ -92,7 +92,8 @@
   @media (max-width:640px){ #dash.bat{gap:6px;} .rk{padding:10px 6px;} .rk .cyc{font-size:1.25rem;} .md{height:22px;font-size:.58rem;padding:0 4px;} .rk .kv{font-size:.6rem;} } .set .chips{display:flex;gap:4px;flex-wrap:wrap;} .set .chips button{padding:4px 9px;font-size:.72rem;border-radius:999px;} .set .chips button.on{background:var(--surface1);border-color:var(--amber);color:var(--amber);}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   #msg{font-size:.78rem;color:var(--sub);margin:6px 0 10px;}
-  #msg .warn{color:var(--amber);}
+  #msg .warn,#ch4msg .warn{color:var(--amber);}
+  #dash .pf .hd select{background:var(--base);border-color:var(--surface1);padding:4px 8px;font-size:.78rem;}
   /* the phone: every table fits the width — the extra columns go into the line a row opens when tapped */
   .wide{} .hint{display:none;} .sh{display:none;} td.gs,th.gs{border-left:2px solid var(--surface1);} .unit{display:none;} .adm{display:none;} body.admin .adm{display:inline;} body.admin div.adm{display:block!important;} .admc{display:none;} body.admin .admc{display:table-cell;}
   @media (max-width:640px){
@@ -154,7 +155,7 @@ const f0 = n => (n == null ? '' : Math.round(n).toLocaleString('en-US'));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-const TABS = [['live', 'Live'], ['yr', 'Year summary'], ['bat', 'Battery'], ['all', 'Month by month'], ['day', 'Daily'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
+const TABS = [['live', 'Live'], ['chr', 'Charts'], ['yr', 'Year summary'], ['bat', 'Battery'], ['all', 'Month by month'], ['day', 'Daily'], ['bld', 'Buildings'], ['sup', 'Supply'], ['cmp', 'Meters vs Deye · admin', true], ['dsl', 'Diesel · admin', true]];
 // Mario 2026-09-26: the page is public; "Meters vs Deye", the ≈ marks and the notes are for him only.
 // Admin = signed in to the hub in this browser (the hub session cookie answers /api/me). The figures behind
 // them are public anyway (/api/cpr) — this keeps the public view simple, it is not a secret.
@@ -372,17 +373,18 @@ function render() {
     : tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="${fuelPrice() ? fuelPrice().toFixed(2) + ' (fills)' : 'price'}" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
     : '';
-  const DASH = tab === 'yr' || tab === 'bat' || tab === 'live';
+  const DASH = tab === 'yr' || tab === 'bat' || tab === 'live' || tab === 'chr';
   document.getElementById('dash').style.display = DASH ? '' : 'none';
   document.getElementById('dash').classList.toggle('bat', tab === 'bat');
-  document.getElementById('dash').classList.toggle('live', tab === 'live');
+  document.getElementById('dash').classList.toggle('live', tab === 'live' || tab === 'chr');
   document.getElementById('tblcard').style.display = DASH ? 'none' : '';
-  document.getElementById('range').style.display = DASH || tab === 'day' ? 'none' : '';
+  document.getElementById('range').style.display = (DASH && tab !== 'chr') || tab === 'day' ? 'none' : '';
   document.querySelector('.hint').style.visibility = DASH ? 'hidden' : '';
   document.querySelector('button[onclick="exportCsv()"]').style.display = DASH ? 'none' : '';
   if (tab === 'bat') { document.getElementById('notes').style.display = 'none'; renderRacks(); return; }
   if (tab === 'live') { document.getElementById('notes').style.display = 'none'; renderLive(); return; }
   if (tab === 'yr') { document.getElementById('notes').style.display = 'none'; renderYears(); return; }
+  if (tab === 'chr') { document.getElementById('notes').style.display = 'none'; renderCharts(); return; }
   // Daily (Mario 2026-09-26: "see what is happening in Sep 26 daily"): the month-by-month columns, one line a day
   const DAY = tab === 'day', MM = M, dm = dayMonth();
   if (DAY) M = MD;
@@ -550,6 +552,62 @@ function renderLive() {
       ${row('Produced (solar + generator)', t.production, T.production)}${row('Used (UPS load)', t.load, T.load)}${row('Bought from EDL', t.bought, T.bought)}${row('Sold to EDL', t.sold, T.sold)}${row('Battery charged', t.charge, T.charge)}${row('Battery discharged', t.discharge, T.discharge)}
     </tbody></table></div>`;
   loadProfile();
+}
+// Charts (Mario 2026-10-01: the hub instead of Grafana) — the page's own figures as charts: buildings per month,
+// where the power came from per month, day by day in one month, and one day hour by hour from openHAB (kW).
+// The months follow the range select; one chart per scale, colours fixed per meter / source.
+let CHC = [], CHDAY = null;
+const CH_B = [['school', 'School', '#3987e5'], ['church', 'Church', '#199e70'], ['liqaa', 'Liqaa', '#F2A93B'], ['hotel', 'Hotel', '#e67fb0']];
+const CH_S = [['Solar', '#c98500'], ['EDL', '#e66767'], ['Generators', '#9085e9']];
+const CH_M = [...CH_B, ['edl', 'EDL', '#e66767'], ['genBig', 'Gen big', '#9085e9'], ['genChurch', 'Gen church', '#b4a9ff'], ['genSmall', 'Gen small', '#6a5fd0']];
+const chAxis = { ticks: { color: '#6c7086', font: { size: 10 }, maxRotation: 0, autoSkipPadding: 6 }, grid: { color: 'rgba(108,112,134,.15)' }, border: { display: false } };
+const chTip = { backgroundColor: '#11111b', borderColor: '#45475a', borderWidth: 1, titleColor: '#cdd6f4', bodyColor: '#cdd6f4', padding: 8 };
+function chBar(id, labels, sets, unit, onPick) {
+  return new Chart(document.getElementById(id), { type: 'bar',
+    data: { labels, datasets: sets.map(([n, c, data]) => ({ label: n, data, backgroundColor: c, borderWidth: 0, borderRadius: 2, maxBarThickness: 46 })) },
+    options: { maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      onClick: onPick ? (e, els) => { if (els.length) onPick(els[0].index); } : undefined,
+      scales: { x: { ...chAxis, stacked: true, grid: { display: false } }, y: { ...chAxis, stacked: true, title: { display: true, text: unit, color: '#6c7086', font: { size: 10 } }, ticks: { ...chAxis.ticks, callback: v => v.toLocaleString('en-US') } } },
+      plugins: { legend: { position: 'bottom', labels: { color: '#cdd6f4', boxWidth: 10, boxHeight: 10, font: { size: 11 } } },
+        tooltip: { ...chTip, callbacks: { label: it => ` ${it.dataset.label}: ${it.raw == null ? '—' : f0(it.raw)} ${unit}`, footer: its => 'Total: ' + f0(its.reduce((a, it) => a + (it.raw || 0), 0)) + ' ' + unit } } } } });
+}
+const CH_TIP = 'Tap a bar in "Day by day" to open that day here. Tap a name under a chart to hide it.';
+function renderCharts() {
+  CHC.forEach(c => c.destroy()); CHC = [];
+  const ms = shown(), dm = dayMonth();
+  const card = (title, id, extra = '', h = 260) => `<div class="pf"><div class="hd"><b>${title}</b>${extra}</div><div style="position:relative;height:${h}px"><canvas id="${id}"></canvas></div></div>`;
+  document.getElementById('dash').innerHTML =
+    card('Buildings · kWh per month', 'ch1') +
+    card('Where the power came from · kWh per month', 'ch2') +
+    card('Day by day · kWh', 'ch3', `<select onchange="store.set('cpr.dayMonth', this.value); render()">${M.list.slice().reverse().map(m => `<option value="${m}" ${m === dm ? 'selected' : ''}>${MON[+m.slice(5) - 1]} ${m.slice(0, 4)}</option>`).join('')}</select>`) +
+    card('One day · average kW per hour (openHAB)', 'ch4', `<input type="date" value="${chDay()}" max="${pfToday()}" onchange="CHDAY = this.value; loadMeterDay()">`, 280) +
+    `<div class="st muted small" id="ch4msg" style="margin-top:-4px">Reading openHAB… ${CH_TIP}</div>`;
+  if (!window.Chart) { setTimeout(() => tab === 'chr' && renderCharts(), 300); return; }
+  const lab = ms.map(mLabel);
+  CHC.push(chBar('ch1', lab, CH_B.map(([k, n, c]) => [n, c, ms.map(m => mv(m, k).v)]), 'kWh'));
+  CHC.push(chBar('ch2', lab, CH_S.map(([n, c], i) => [n, c, ms.map(m => { const r = VIEWS.sup.row(m); return [r[0], r[1], r[3]][i].v; })]), 'kWh'));
+  // the days of the month: Daily's own figures (M swapped for the per-day table while reading them, as render() does)
+  const days = MD.list.filter(d => d.startsWith(dm)), MM = M; M = MD;
+  let sets; try { sets = CH_B.map(([k, n, c]) => [n, c, days.map(d => mv(d, k).v)]); } finally { M = MM; }
+  CHC.push(chBar('ch3', days.map(d => +d.slice(8)), sets, 'kWh', i => { CHDAY = days[i]; const inp = document.querySelector('#dash input[type=date]'); if (inp) inp.value = CHDAY; loadMeterDay(); }));
+  loadMeterDay();
+}
+const chDay = () => CHDAY || pfToday();
+async function loadMeterDay() {
+  const msg = () => document.getElementById('ch4msg'), day = chDay();
+  if (msg()) msg().textContent = 'Reading openHAB… ' + CH_TIP;
+  let d; try { const r = await fetch('/api/cpr/meters?day=' + day, { credentials: 'same-origin' }); if (r.status === 401) return needPassword(); d = await r.json(); } catch (e) { d = { error: String(e.message || e) }; }
+  if (tab !== 'chr' || !document.getElementById('ch4') || day !== chDay()) return;   // left the tab, or another day was picked meanwhile
+  const old = CHC.findIndex(c => c.canvas.id === 'ch4'); if (old >= 0) { CHC[old].destroy(); CHC.splice(old, 1); }
+  if (d.error) { msg().innerHTML = `<span class="warn">openHAB not reachable (${esc(d.error)})</span>`; return; }
+  const lab = d.hours.map(t => new Date(t).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }));
+  CHC.push(new Chart(document.getElementById('ch4'), { type: 'line',
+    data: { labels: lab, datasets: CH_M.map(([k, n, c]) => ({ label: n, data: d.data[k], borderColor: c, backgroundColor: c, borderWidth: 2, pointRadius: 0, tension: 0.25, spanGaps: false, hidden: /^gen/.test(k) && !(d.data[k] || []).some(v => v > 0.05) })) },
+    options: { maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: { ...chAxis, grid: { display: false }, ticks: { ...chAxis.ticks, maxTicksLimit: 8 } }, y: { ...chAxis, min: 0, title: { display: true, text: 'kW', color: '#6c7086', font: { size: 10 } } } },
+      plugins: { legend: { position: 'bottom', labels: { color: '#cdd6f4', boxWidth: 10, boxHeight: 10, font: { size: 11 } } },
+        tooltip: { ...chTip, callbacks: { label: it => ` ${it.dataset.label}: ${it.raw == null ? '—' : it.raw.toFixed(1)} kW` } } } } }));
+  msg().innerHTML = (d.outages && d.outages.length ? `<span class="warn">The Pi was offline part of this day (${d.outages.map(([s, e]) => esc(when(s)) + ' → ' + esc(when(e))).join(', ')}) — no line there.</span> ` : '') + CH_TIP;
 }
 function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
 function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }
