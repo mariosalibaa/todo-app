@@ -43,7 +43,20 @@
   .note b{color:var(--text);font-weight:600;}
   .err{color:var(--red);font-size:.8rem;margin:8px 0;}
   #login{max-width:320px;margin:60px auto;text-align:center;} #login input{width:100%;margin:10px 0;padding:10px;} #login button{width:100%;padding:10px;}
-  @media (max-width:640px){ .hide-sm{display:none;} td,th{padding:6px 5px;} }
+  #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
+  .ph{display:none;}
+  /* the phone: the table fits the width — days, battery and solar share move under the month name */
+  @media (max-width:640px){
+    header{padding:12px 16px;} main{padding:14px 12px 40px;}
+    h1{font-size:1.05rem;} .lead{font-size:.76rem;}
+    .kpis{grid-template-columns:1fr 1fr;gap:8px;} .kpi{padding:10px 12px;} .kpi b{font-size:1.1rem;} .kpi small{font-size:.64rem;}
+    .hide-sm{display:none;} .ph{display:block;color:var(--overlay0);font-size:.6rem;margin-top:1px;}
+    table{font-size:.74rem;} th{padding:7px 4px;font-size:.54rem;} td{padding:7px 4px;}
+    td:first-child,th:first-child{padding-left:10px;} td:last-child,th:last-child{padding-right:10px;}
+    tr.day td{font-size:.7rem;}
+    th small{display:none;} td:first-child{white-space:normal;} .ph{max-width:110px;line-height:1.3;}
+    .note{font-size:.74rem;}
+  }
 </style>
 </head>
 <body>
@@ -51,6 +64,7 @@
   <div class="wordmark">SHIFT <span>GROUP</span><small>MAKE THE SHIFT</small></div>
   <a class="hback" href="/" id="hubLink" hidden>Hub</a>
 </header>
+<div id="ptr">↓ Pull to refresh</div>
 <main>
   <div id="login" hidden>
     <h1>Taan · Machmouchi solar</h1>
@@ -127,7 +141,8 @@
       `<div class="kpi"><span>Consumption</span><b>${fmt(T.use)} kWh</b><small>${T.days} days</small></div>`;
     const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>Solar</th><th>EDL<small>grid port</small></th>` +
       `<th>Gen + EDL<small>gen port, from 2 Jul</small></th><th>Load</th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
-    const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}</td><td class="hide-sm">${t.days}</td>` +
+    const phx = t => `<span class="ph">${t.days} days · battery ${fmt(t.dis)} · solar ${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</span>`;
+    const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}${phx(t)}</td><td class="hide-sm">${t.days}</td>` +
       `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="mix">${fmt(t.mix + t.gen)}</td>` +
       `<td>${fmt(t.use)}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
     let rows = '';
@@ -137,7 +152,7 @@
       rows += line('row', `${MONTHS[+mo - 1]} ${y}${live ? ' <small>to today</small>' : ''}`, m.t, `data-m="${k}"`);
       if (open[k]) for (const s of m.list) {
         const dd = +s.day.slice(8), t = { ...s, days: '' };
-        rows += `<tr class="day${s.n < 280 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}</td><td class="hide-sm">${s.n < 280 ? s.n + '/288' : ''}</td>` +
+        rows += `<tr class="day${s.n < 280 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${s.n < 280 ? s.n + '/288 readings · ' : ''}solar ${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</span></td><td class="hide-sm">${s.n < 280 ? s.n + '/288' : ''}</td>` +
           `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td>${fmt1(s.use)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
       }
     }
@@ -161,7 +176,22 @@
   });
   $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('pwGo').click(); });
   load().catch(e => { $('err').textContent = String(e.message || e); $('app').hidden = false; });
+
+  // pull-to-refresh on a phone: drag down from the top, let go past 80 px → read again (as on /cpr)
+  const ptr = $('ptr'); let y0 = null, dy = 0;
+  addEventListener('touchstart', e => { y0 = scrollY <= 0 ? e.touches[0].clientY : null; dy = 0; }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (y0 == null) return; dy = e.touches[0].clientY - y0; if (dy <= 0) return;
+    ptr.textContent = dy > 80 ? '↻ Release to refresh' : '↓ Pull to refresh';
+    ptr.style.transform = `translate(-50%, ${Math.min(dy, 100) - 60}px)`;
+  }, { passive: true });
+  addEventListener('touchend', () => {
+    if (y0 != null && dy > 80) { ptr.textContent = 'Refreshing…'; ptr.style.transform = 'translate(-50%, 0)'; load().finally(() => setTimeout(() => { ptr.style.transform = ''; }, 400)); }
+    else ptr.style.transform = '';
+    y0 = null; dy = 0;
+  });
 })();
 </script>
+<script src="/phone-preview.js"></script>   <!-- the 📱 button on a laptop (Shift+P); nothing on a phone -->
 </body>
 </html>
