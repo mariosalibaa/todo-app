@@ -11,9 +11,9 @@
 const STATION = 61244864;
 const BASE = 'https://www.deyecloud.com';
 
-async function dayRecords(token, ymd) {
+async function dayRecords(token, ymd, station = STATION) {   // station: another plant on the same account (the Taan plant, /mahab)
   const [y, m, d] = ymd.split('-').map(Number);
-  const r = await fetch(`${BASE}/maintain-s/history/batteryPower/${STATION}/stats/daily?year=${y}&month=${m}&day=${d}`,
+  const r = await fetch(`${BASE}/maintain-s/history/batteryPower/${station}/stats/daily?year=${y}&month=${m}&day=${d}`,
     { headers: { Authorization: 'bearer ' + token, Accept: 'application/json' } });
   if (!r.ok) throw new Error(`DeyeCloud ${r.status}${r.status === 401 ? ' (DEYE_TOKEN expired — sign in to deyecloud.com and copy a new one)' : ''}`);
   const j = await r.json();
@@ -23,7 +23,7 @@ async function dayRecords(token, ymd) {
 
 // one day's records → { pv, gen, gridIn, gridOut, use, charge, discharge, n } in kWh
 function integrate(recs) {
-  const out = { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, charge: 0, discharge: 0, n: recs.length, prod: 0 };
+  const out = { pv: 0, gen: 0, gridIn: 0, gridOut: 0, use: 0, charge: 0, discharge: 0, n: recs.length, prod: 0, genOut: 0 };
   if (!recs.length) return out;
   const steps = []; for (let i = 1; i < recs.length; i++) steps.push(recs[i].dateTime - recs[i - 1].dateTime);
   const step = steps.length ? steps.slice().sort((a, b) => a - b)[Math.floor(steps.length / 2)] : 300;   // the sampling step (median)
@@ -31,7 +31,7 @@ function integrate(recs) {
     const dt = Math.min(step, i + 1 < recs.length ? recs[i + 1].dateTime - r.dateTime : step) / 3600;   // hours
     const w = k => (+r[k] || 0) * dt / 1000;
     out.pv += Math.max(0, w('pvPower'));
-    out.gen += Math.max(0, w('generatorPower'));
+    const gp = w('generatorPower'); if (gp > 0) out.gen += gp; else out.genOut -= gp;   // < 0 = sent back out through the generator port (the Taan plant's EDL sits on it)
     const g = w('wirePower'); if (g > 0) out.gridIn += g; else out.gridOut -= g;
     out.use += Math.max(0, w('usePower'));
     out.prod += Math.max(0, w('generationPower'));   // Deye's "production" = solar + generator

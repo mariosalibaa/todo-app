@@ -28,7 +28,14 @@ async function login() {
   const r = await fetch(`${BASE}/oauth-s/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) throw new Error('DeyeCloud sign-in refused: ' + (j.error_description || j.error || r.status));
-  return j.access_token;
+  // The password grant lands in the personal org 0, where every station call answers 500 SYSTEM_ERROR — the plants
+  // sit in the business org, so swap the token the way the site's org picker does (grant_type=switch_org).
+  // Found 2026-10-01: the 27 Sep renewal had silently stopped /cpr's Deye days.
+  const s = await fetch(`${BASE}/oauth-s/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'switch_org', access_token: j.access_token, client_id: 'test', org_id: process.env.DEYE_ORG || '10369392', data_center: process.env.DEYE_DC || 'eu' }) });
+  const k = await s.json().catch(() => ({}));
+  if (!s.ok || !k.access_token) throw new Error('DeyeCloud org switch refused: ' + (k.error_description || k.error || s.status));
+  return k.access_token;
 }
 
 async function token(ctx, fresh) {
@@ -36,11 +43,11 @@ async function token(ctx, fresh) {
   if (!fresh) {
     if (tokenMem) return tokenMem;
     const doc = (await ref.get()).data();
-    if (doc && doc.token) return (tokenMem = doc.token);
+    if (doc && doc.token && doc.org) return (tokenMem = doc.token);   // no org flag = an org-0 token from before the switch_org fix
   }
   if (process.env.DEYE_USER && process.env.DEYE_PASS) {
     tokenMem = await login();
-    await ref.set({ token: tokenMem, at: new Date().toISOString() });
+    await ref.set({ token: tokenMem, org: true, at: new Date().toISOString() });
     return tokenMem;
   }
   if (process.env.DEYE_TOKEN) return (tokenMem = process.env.DEYE_TOKEN);
@@ -187,4 +194,4 @@ async function profile(ctx, ymd) {
   return v;
 }
 
-module.exports = { days, fill, racks, live, profile, FIELDS };
+module.exports = { days, fill, racks, live, profile, token, FIELDS };

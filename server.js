@@ -159,6 +159,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
   fs.readFileSync(path.join(__dirname, 'cpr.html'));
   fs.readFileSync(path.join(__dirname, 'cpr-fuel.html'));
+  fs.readFileSync(path.join(__dirname, 'mahab.html'));
   fs.readFileSync(path.join(__dirname, 'scan-editor.js'));
 }
 
@@ -729,6 +730,7 @@ const handler = async (req, res) => {
     'procurement.html': path.join(__dirname, 'procurement.html'),
     'cpr.html': path.join(__dirname, 'cpr.html'),
     'cpr-fuel.html': path.join(__dirname, 'cpr-fuel.html'),
+    'mahab.html': path.join(__dirname, 'mahab.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/members': 'hub.html', '/ask': 'hub.html',   // members & access, the decisions desk (admin views of the hub page)
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
@@ -742,6 +744,7 @@ const handler = async (req, res) => {
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
+    '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
     '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
     '/cpr/diesel': 'cpr-fuel.html' };   // Kamal's diesel fills (private link: /cpr/diesel?k=CPR_FUEL_KEY)   // CPR energy — kWh per building / source per month; PUBLIC, no sign-in, no hub bar (Mario, 2026-09-26: "open for everyone")
@@ -926,10 +929,10 @@ const handler = async (req, res) => {
     if (!isAdmin) { try {
       let u = null;
       if (req.method === 'GET') u = await verifyToken(req);
-      else { const c = /(?:^|;s*)todo_session=([^;]+)/.exec(req.headers.cookie || ''); let tok = ''; if (c) { try { tok = decodeURIComponent(c[1]); } catch {} } u = tok.startsWith('st_') ? await verifySessionToken(tok) : await verifyToken(req); }
+      else { const c = /(?:^|;\s*)todo_session=([^;]+)/.exec(req.headers.cookie || ''); let tok = ''; if (c) { try { tok = decodeURIComponent(c[1]); } catch {} } u = tok.startsWith('st_') ? await verifySessionToken(tok) : await verifyToken(req); }
       if (u) { const acc = await accessFor(u.email); isAdmin = !!(acc && acc.admin); }
     } catch (e) {} }
-    const pw = !process.env.CPR_PASSWORD || (/(?:^|;s*)cpr_ok=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1] === cprToken();
+    const pw = !process.env.CPR_PASSWORD || (/(?:^|;\s*)cpr_ok=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1] === cprToken();
     return { isAdmin, ok: isAdmin || pw };
   };
   if (url === '/api/cpr/login' && req.method === 'POST') {
@@ -970,6 +973,25 @@ const handler = async (req, res) => {
     catch (e) { console.error('cpr error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
+  // /api/mahab — the Taan / Machmouchi plant per day (mahab.js). A hub admin always; anyone else with the
+  // MAHAB_PASSWORD cookie (mahab_ok, POST /api/mahab/login) — no password set = admins only.
+  if (url === '/api/mahab/login' && req.method === 'POST') {
+    let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }
+    let pw = ''; try { pw = String(JSON.parse(b || '{}').password || ''); } catch {}
+    if (!process.env.MAHAB_PASSWORD || pw !== process.env.MAHAB_PASSWORD) { await new Promise(r => setTimeout(r, 1500)); res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Wrong password' })); return; }
+    const tk = crypto.createHmac('sha256', process.env.MAHAB_PASSWORD).update('mahab-ok').digest('hex').slice(0, 32);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `mahab_ok=${tk}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax` });
+    res.end(JSON.stringify({ ok: true })); return;
+  }
+  if (url.split('?')[0] === '/api/mahab' && req.method === 'GET') {
+    const acc = await cprAccess();   // its isAdmin = the hub session check; the CPR password plays no part here
+    const tk = process.env.MAHAB_PASSWORD ? crypto.createHmac('sha256', process.env.MAHAB_PASSWORD).update('mahab-ok').digest('hex').slice(0, 32) : null;
+    const pw = !!tk && (/(?:^|;\s*)mahab_ok=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1] === tk;
+    if (!acc.isAdmin && !pw) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'password', needPassword: true, hasPassword: !!tk })); return; }
+    try { const v = await require('./mahab').days({ db, TEAM_ID }); v.isAdmin = acc.isAdmin; res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
+    catch (e) { console.error('mahab error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
   // 01:30 Beirut: yesterday's CPR inverter day from DeyeCloud into Firestore (energyDeye/<day>) for /cpr. Same guard.
   if (url === '/api/cron/deye') {
     const q = new URL(req.url, 'http://x').searchParams;
@@ -978,7 +1000,8 @@ const handler = async (req, res) => {
     if (!secret || given !== secret) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return; }
     try {
       const out = await require('./deye').fill({ db, TEAM_ID }, 35);
-      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, done: out.done, left: out.left }));
+      let mahab = null; try { mahab = (await require('./mahab').fill({ db, TEAM_ID }, 10)).done; } catch (e) { mahab = 'error: ' + e.message; }   // the Taan plant (/mahab), same account
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, done: out.done, left: out.left, mahab }));
     } catch (e) {
       console.error('deye cron:', e);
       res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) }));
@@ -1118,7 +1141,7 @@ const handler = async (req, res) => {
   // ── View as (Mario, 2026-09-25: "add view as on all pages"). An admin can look at the hub through
   // someone else's eyes — Ziad sees one chat, the accountant sees the reports. It is READ-ONLY: nothing
   // may be written while the view is on, so an impersonated click can never change the books.
-  const viewAsCookie = /(?:^|;s*)hub_view_as=([^;]*)/.exec(req.headers.cookie || '');
+  const viewAsCookie = /(?:^|;\s*)hub_view_as=([^;]*)/.exec(req.headers.cookie || '');
   let viewAs = viewAsCookie ? decodeURIComponent(viewAsCookie[1] || '').toLowerCase() : '';
   if (viewAs && access && access.admin && viewAs !== String(access.email || '').toLowerCase()) {
     const target = await accessFor(viewAs);

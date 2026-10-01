@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Taan · Machmouchi Solar · Shift Group</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--blue:#89b4fa;--red:#f38ba8;}
+  *{box-sizing:border-box;}
+  html,body{background:var(--base);}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  main{max-width:1100px;margin:0 auto;padding:20px 16px 60px;}
+  h1{font-size:1.25rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.82rem;margin:0 0 14px;line-height:1.5;}
+  select,button,input{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:6px 10px;font-size:.8rem;font-family:inherit;}
+  button{cursor:pointer;} button:hover{border-color:var(--amber);}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
+  .tabs button{border-radius:999px;} .tabs button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;}
+  .kpi b{display:block;font-size:1.35rem;font-variant-numeric:tabular-nums;} .kpi span{font-size:.68rem;color:var(--overlay0);text-transform:uppercase;letter-spacing:.06em;}
+  .kpi small{display:block;color:var(--sub);font-size:.7rem;margin-top:2px;}
+  .kpi.solar b{color:var(--amber);} .kpi.edl b{color:var(--blue);} .kpi.gen b{color:var(--red);} .kpi.mix b{color:#cba6f7;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  th small{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:.62rem;}
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:7px 8px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  td small{display:block;color:var(--overlay0);font-size:.64rem;}
+  td.mix{color:#cba6f7;} td.edl{color:var(--blue);} td.gen{color:var(--red);} td.sol{color:var(--amber);}
+  td .z{color:var(--surface1);}
+  tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
+  tr.day td{background:rgba(49,50,68,.35);font-size:.74rem;}
+  tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);background:rgba(242,169,59,.08);}
+  tr.short td:first-child::after{content:" ·";color:var(--red);}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
+  .note b{color:var(--text);font-weight:600;}
+  .err{color:var(--red);font-size:.8rem;margin:8px 0;}
+  #login{max-width:320px;margin:60px auto;text-align:center;} #login input{width:100%;margin:10px 0;padding:10px;} #login button{width:100%;padding:10px;}
+  @media (max-width:640px){ .hide-sm{display:none;} td,th{padding:6px 5px;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>MAKE THE SHIFT</small></div>
+  <a class="hback" href="/" id="hubLink" hidden>Hub</a>
+</header>
+<main>
+  <div id="login" hidden>
+    <h1>Taan · Machmouchi solar</h1>
+    <p class="lead" id="loginMsg">Enter the password.</p>
+    <input type="password" id="pw" placeholder="Password" autocomplete="current-password">
+    <button id="pwGo">Open</button>
+    <div class="err" id="pwErr"></div>
+  </div>
+  <div id="app" hidden>
+    <h1>Dr Nazih Taan &amp; Dr Mahab Machmouchi — 25 kWp</h1>
+    <p class="lead" id="lead">Energy per month from DeyeCloud (station 62112463), integrated from the 5-minute power readings.</p>
+    <div class="tabs" id="years"></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="card"><table id="tbl"></table></div>
+    <div class="err" id="err"></div>
+    <div class="note" id="note"></div>
+  </div>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmt = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : Math.round(v).toLocaleString('en-US'));
+  const fmt1 = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : (Math.round(v * 10) / 10).toLocaleString('en-US'));
+  const pc = (a, b) => b > 0 ? Math.round(a / b * 100) + ' %' : '';
+  let D = null, year = null, open = {};
+
+  // one day → the sources. Before the ATS (2 Jul 2026) EDL came in on the grid port and there was no generator;
+  // from then on EDL and both generators share the generator port, so that input is "EDL + generator".
+  function split(day, v) {
+    const r = { pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, gen: 0, mix: 0 };
+    if (day < D.atsFrom) r.gen = v.gen || 0; else r.mix = v.gen || 0;
+    return r;
+  }
+  const add = (a, b) => { for (const k of ['pv', 'use', 'dis', 'edl', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
+
+  async function load() {
+    const r = await fetch('/api/mahab', { credentials: 'same-origin' });
+    if (r.status === 401) {
+      const j = await r.json().catch(() => ({}));
+      $('login').hidden = false; $('app').hidden = true;
+      if (!j.hasPassword) { $('loginMsg').textContent = 'Sign in to the Shift Hub first (admins only for now).'; $('pw').hidden = $('pwGo').hidden = true; }
+      return;
+    }
+    D = await r.json();
+    if (D.isAdmin) $('hubLink').hidden = false;
+    $('login').hidden = true; $('app').hidden = false;
+    if (D.error) $('err').textContent = 'DeyeCloud not reachable right now (' + D.error + ') — showing the stored days.';
+    const ys = [...new Set(D.days.map(d => d.slice(0, 4)))];
+    if (!year) year = ys[ys.length - 1];
+    $('years').innerHTML = ys.map(y => `<button data-y="${y}" class="${y === year ? 'on' : ''}">${y}</button>`).join('');
+    render();
+  }
+
+  function render() {
+    const months = {};
+    const fi = D.fields.reduce((o, f, i) => (o[f] = i, o), {});
+    D.days.forEach((d, i) => {
+      if (d.slice(0, 4) !== year) return;
+      const a = D.data[i]; if (!a) return;
+      const v = {}; for (const f in fi) v[f] = a[fi[f]];
+      const s = split(d, v); s.day = d;
+      const k = d.slice(0, 7); (months[k] = months[k] || { list: [], t: {} }).list.push(s); add(months[k].t, s);
+    });
+    const keys = Object.keys(months).sort();
+    const T = keys.reduce((t, k) => add(t, months[k].t), {}); T.days = keys.reduce((n, k) => n + months[k].list.length, 0);
+    const anyGen = T.gen > 0.05, anyMix = T.mix > 0.05;
+    const supply = T.pv + T.edl + T.gen + T.mix;
+    $('kpis').innerHTML =
+      `<div class="kpi solar"><span>Solar</span><b>${fmt(T.pv)} kWh</b><small>${pc(T.pv, supply)} of supply</small></div>` +
+      `<div class="kpi edl"><span>EDL</span><b>${fmt(T.edl)} kWh</b><small>grid port${anyMix ? ', until 1 Jul' : ''}</small></div>` +
+      (anyGen ? `<div class="kpi gen"><span>Generator</span><b>${fmt(T.gen)} kWh</b></div>` : '') +
+      (anyMix ? `<div class="kpi mix"><span>EDL + generator</span><b>${fmt(T.mix)} kWh</b><small>shared input from 2 Jul — ${pc(T.mix, supply)} of supply</small></div>` : '') +
+      `<div class="kpi"><span>Consumption</span><b>${fmt(T.use)} kWh</b><small>${T.days} days</small></div>`;
+    const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>Solar</th><th>EDL<small>grid port</small></th>` +
+      `<th>Gen + EDL<small>gen port, from 2 Jul</small></th><th>Load</th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
+    const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}</td><td class="hide-sm">${t.days}</td>` +
+      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="mix">${fmt(t.mix + t.gen)}</td>` +
+      `<td>${fmt(t.use)}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
+    let rows = '';
+    for (const k of keys) {
+      const m = months[k], [y, mo] = k.split('-');
+      const live = D.today && D.today.startsWith(k);
+      rows += line('row', `${MONTHS[+mo - 1]} ${y}${live ? ' <small>to today</small>' : ''}`, m.t, `data-m="${k}"`);
+      if (open[k]) for (const s of m.list) {
+        const dd = +s.day.slice(8), t = { ...s, days: '' };
+        rows += `<tr class="day${s.n < 280 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}</td><td class="hide-sm">${s.n < 280 ? s.n + '/288' : ''}</td>` +
+          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td>${fmt1(s.use)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
+      }
+    }
+    rows += line('tot', 'Total ' + year, T);
+    $('tbl').innerHTML = head + rows;
+    $('note').innerHTML =
+      `<b>How it is wired.</b> Until 1 July 2026 EDL came into the inverter on its grid port and there was no generator. ` +
+      `Since 2 July EDL and the two generators go through ATSs into <b>one</b> input, the inverter's generator port (site sketch "20260704 mahab gen control"). ` +
+      `From that day DeyeCloud measures EDL and the generators <b>together</b> — the purple column — and cannot say how much of it was EDL. ` +
+      `Splitting it needs a meter on the generator side of the ATS, or the ATS position logged.<br>` +
+      `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
+      `Checked against DeyeCloud's own Excel export. Tap a month for its days.`;
+  }
+
+  $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; load(); });
+  $('tbl').addEventListener('click', e => { const tr = e.target.closest('tr.row'); if (!tr) return; open[tr.dataset.m] = !open[tr.dataset.m]; render(); });
+  $('pwGo').addEventListener('click', async () => {
+    $('pwErr').textContent = '';
+    const r = await fetch('/api/mahab/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('pw').value }) });
+    if (r.ok) load(); else $('pwErr').textContent = 'Wrong password';
+  });
+  $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('pwGo').click(); });
+  load().catch(e => { $('err').textContent = String(e.message || e); $('app').hidden = false; });
+})();
+</script>
+</body>
+</html>
