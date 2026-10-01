@@ -73,6 +73,18 @@
   .post .line.accepted{background:#dcf8c6;color:#0b6b2c;} .post .line.dismissed{background:#fde2e4;color:#b3261e;}
   .post .line a{color:inherit;}
   .post .err{font-size:.72rem;color:var(--red);margin-top:4px;}
+  /* "Shift", the agent (site-agent.js): dark avatar with the amber S; bubbles with an amber edge; action cards with ✓ / ✗ */
+  .chat-row .av.agent,.chatbar .av.agent{background:#15181C;color:#F2A93B;font-family:"Century Gothic","Trebuchet MS",sans-serif;}
+  .post.agent{border-left:3px solid var(--amber);white-space:pre-wrap;}
+  .post.agent.typing{color:var(--overlay0);font-style:italic;}
+  .post.sys{align-self:center;background:transparent;box-shadow:none;color:var(--overlay0);font-size:.75rem;text-align:center;}
+  .post .trig{color:var(--amber);font-weight:700;}
+  .card-a{margin-top:2px;border:1px solid var(--surface0);border-radius:10px;padding:8px 10px;background:#fff;white-space:normal;}
+  .card-a .s{font-size:.92rem;} .card-a .d{font-size:.72rem;color:var(--overlay0);margin-top:3px;white-space:pre-wrap;}
+  .card-a .b{display:flex;gap:8px;margin-top:8px;} .card-a .b button{flex:1;height:44px;border:0;border-radius:10px;font:inherit;font-weight:700;font-size:1rem;cursor:pointer;}
+  .card-a .ok{background:var(--amber);color:#fff;} .card-a .no{background:var(--surface0);color:var(--text);}
+  .card-a.done{border-color:#bfe6c8;background:#f1fbf3;} .card-a.declined .s{text-decoration:line-through;color:var(--overlay0);}
+  .card-a .r{font-size:.75rem;color:var(--green);margin-top:6px;} .card-a .e{font-size:.75rem;color:var(--red);margin-top:6px;} .card-a .r a{color:inherit;}
   .day{align-self:center;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--overlay0);margin:8px 0 2px;}
   .composer{position:fixed;bottom:0;left:0;right:0;z-index:890;background:var(--bar);border-top:1px solid var(--surface0);padding:10px 12px calc(10px + env(safe-area-inset-bottom));}
   /* Mario, 2026-09-12: the composer sits below the phone-preview button (z-index 900);
@@ -177,18 +189,21 @@ function whenLabel(iso) {
   const dd = Math.floor((now.setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / ONE_DAY);
   return dd <= 0 ? hhmm(iso) : dd === 1 ? 'Yesterday' : dd < 7 ? d.toLocaleDateString('en-GB', { weekday: 'long' }) : d.toLocaleDateString('en-GB');
 }
-const initial = t => t.kind === 'general' ? 'M' : (t.name || '?').trim().charAt(0).toUpperCase();
+const initial = t => t.kind === 'general' ? 'M' : t.kind === 'agent' ? 'S' : (t.name || '?').trim().charAt(0).toUpperCase();
+const avClass = t => t.kind === 'general' ? 'me' : t.kind === 'agent' ? 'agent' : '';
+const PIN = { general: 0, agent: 1 };   // Mario, then Shift, then the workers by last message
 function previewText(t) {
   const p = t.preview; if (!p) return '<span style="color:var(--overlay0)">No messages yet</span>';
-  const who = p.by === me.email ? '' : esc((p.by || '').split('@')[0]) + ': ';
+  const who = p.by === me.email ? '' : p.by === 'shift' ? 'Shift: ' : esc((p.by || '').split('@')[0]) + ': ';
+  if (p.kind === 'action') return who + esc(p.text);   // the server already prefixed ✓? / ✓ / ✗ (site-agent.js previewOf)
   const icon = p.kind === 'voice' ? '🎤 ' : p.kind === 'photo' ? '📷 ' : p.kind === 'video' ? '🎬 ' : p.kind === 'doc' ? '📄 ' : '';
   const body = p.kind === 'deleted' ? '🚫 This message was deleted' : icon + (esc(p.text) || (p.kind === 'voice' ? 'Voice message' : p.kind === 'photo' ? 'Photo' : p.kind === 'video' ? 'Video' : p.kind === 'doc' ? 'Document' : ''));
   return who + body;
 }
 async function loadThreads() {
   threads = await Admin.api('GET', '/api/site/threads');
-  // Mario's own chat (id general) stays pinned on top; the rest by last message
-  threads.sort((a, b) => (a.kind === 'general' ? -1 : b.kind === 'general' ? 1 : (b.last || '').localeCompare(a.last || '')));
+  // Mario's own chat (id general) stays pinned on top, Shift under it; the rest by last message
+  threads.sort((a, b) => (PIN[a.kind] ?? 9) - (PIN[b.kind] ?? 9) || (b.last || '').localeCompare(a.last || ''));
   drawList();
   setComposerEnabled(!!cur);
 }
@@ -196,9 +211,9 @@ function drawList() {
   const q = (el('q').value || '').trim().toLowerCase();
   const L = threads.filter(t => !q || t.name.toLowerCase().includes(q));
   el('chats').innerHTML = L.map(t => `<div class="chat-row ${t.id === cur ? 'on' : ''}" onclick="open_('${esc(t.id)}')">
-      <div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div>
+      <div class="av ${avClass(t)}">${initial(t)}</div>
       <div><div class="n">${esc(t.name)}</div><div class="p">${previewText(t)}</div></div>
-      <div class="t">${whenLabel(t.last)}${t.kind === 'general' ? '<span class="pin">📌</span>' : ''}</div>
+      <div class="t">${whenLabel(t.last)}${t.kind in PIN ? '<span class="pin">📌</span>' : ''}</div>
     </div>`).join('') || '<div class="empty">No chat matches</div>';
 }
 // the chat and the ledger are two views of the same money: Mario's chat is Mario cash, a worker's chat is his own
@@ -206,10 +221,10 @@ function drawList() {
 const ledgerOf = t => t.kind === 'general' ? 'mario-cash' : t.id;
 function drawChatBar() {
   const t = threads.find(x => x.id === cur); if (!t) { el('chatbar').innerHTML = ''; return; }
-  el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${t.kind === 'general' ? 'me' : ''}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'} · <a href="/accounting/accounts?id=${encodeURIComponent(ledgerOf(t))}" target="_blank" rel="noopener" title="Open this cash ledger">ledger ↗</a></div></div>`;
+  el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${avClass(t)}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'agent' ? 'Shift · ask anything; ✓ to act' : `${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'} · <a href="/accounting/accounts?id=${encodeURIComponent(ledgerOf(t))}" target="_blank" rel="noopener" title="Open this cash ledger">ledger ↗</a>`}</div></div>`;
 }
 function showList() { document.body.classList.remove('in-chat'); history.replaceState(null, '', location.pathname); }
-function open_(id, wantPost) { pinned = true; cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); loadPosts().then(() => wantPost && jumpTo(wantPost)); loadDay(); }
+function open_(id, wantPost) { pinned = true; cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); const lp = loadPosts().then(() => wantPost && jumpTo(wantPost)); loadDay(); return lp; }
 // a link from the accounts grid names one message: scroll to it and flash it
 function jumpTo(postId) {
   const box = document.querySelector('.post[data-id="' + (window.CSS && CSS.escape ? CSS.escape(postId) : postId) + '"]');
@@ -334,7 +349,11 @@ async function loadBalances(force) {
 }
 function replacePost(d) { const i = posts.findIndex(p => p.id === d.id); if (i >= 0) posts[i] = d; else posts.push(d); }
 async function digestOne(thread, id) {
-  try { const d = await Admin.api('POST', `/api/site/${thread}/posts/${id}/digest`, {}); if (thread === cur) { replacePost(d); draw(); } }
+  try {
+    const d = await Admin.api('POST', `/api/site/${thread}/posts/${id}/digest`, {}); if (thread === cur) { replacePost(d); draw(); }
+    // a voice note in the Shift thread is a question too, once Whisper has read it
+    if (me.admin && d.kind === 'voice' && thread === 'shift' && d.parsed && d.parsed.transcript && !d.askedAt) askOne(thread, d.id);
+  }
   catch (e) {
     console.error('digest', id, e.message);
     // Mario, 2026-09-12: don't swallow this — the post needs a visible retry, not a silent stall
@@ -363,10 +382,9 @@ async function retry(id) {
 })();
 async function loadPosts() {
   if (!cur) { el('feed').innerHTML = '<div class="empty">No thread is open to your account yet. Ask Mario.</div>'; setComposerEnabled(false); return; }
-  const r = await Admin.api('GET', `/api/site/${cur}/posts?limit=100`);
-  posts = r.posts; draw();
+  await fetchPosts(); draw();
   // a digest that never ran (e.g. the phone lost signal), or one that hung mid-way, gets one chance to run now
-  posts.filter(p => !p.error && (!p.digestedAt && !p.digesting || (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3))).forEach(p => digestOne(cur, p.id));
+  posts.filter(p => p.by !== 'shift' && !p.agentAsk && !p.error && (!p.digestedAt && !p.digesting || (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3))).forEach(p => digestOne(cur, p.id));
 }
 const isAjaltoun = L => /4193|ajaltoun/i.test(L.analyticName || '');
 function lineTag(p) {
@@ -416,6 +434,50 @@ function lineTag(p) {
   ].filter(Boolean).join(' · ');
   return `<div class="line ${esc(L.state || 'waiting')}"><table class="lt">${rows.map(r => `<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</table>${acts ? `<div class="lt-act">${acts}</div>` : ''}</div>`;
 }
+// ── "Shift", the agent ────────────────────────────────────────────────────────
+const isAskText = t => cur === 'shift' || /^@(shift|s)\b/i.test(t || '');
+const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">open ↗</a>');
+function agentPost(p) {
+  const meta = `<div class="meta"><span>Shift</span><span>${hhmm(p.at)}</span></div>`;
+  if (p.kind !== 'action') return `<div class="post agent" data-id="${esc(p.id)}">${esc(p.text)}${meta}</div>`;
+  const a = p.action || {}, st = p.status || 'pending';
+  const btns = st === 'pending' || st === 'error'
+    ? `<div class="b"><button class="ok" onclick="confirmCard('${esc(p.id)}',true)">✓ Do it</button><button class="no" onclick="confirmCard('${esc(p.id)}',false)">✗</button></div>`
+    : st === 'running' ? `<div class="d">working…</div>` : '';
+  const tail = st === 'done' ? `<div class="r">✓ done${p.receipt ? ' · ' + linkify(p.receipt) : ''}</div>`
+    : st === 'error' ? `${p.receipt ? `<div class="r">${linkify(p.receipt)}</div>` : ''}<div class="e">${esc(p.error || 'failed')}</div>`
+    : st === 'declined' ? `<div class="d">✗ not done</div>` : '';
+  return `<div class="post agent" data-id="${esc(p.id)}"><div class="card-a ${esc(st)}"><div class="s"><b>${esc(a.summary || p.text)}</b></div>${a.detail && a.detail !== a.summary && a.detail !== '1. ' + a.summary ? `<div class="d">${esc(a.detail)}</div>` : ''}${btns}${tail}</div>${meta}</div>`;
+}
+const asking = new Map();   // post id → deadline, while Shift is answering it
+function sysNote(text) { posts.push({ id: 'sys-' + Date.now(), kind: 'sys', text, at: new Date().toISOString(), date: posts.length ? posts[posts.length - 1].date : '', local: true }); }
+async function fetchPosts() { const r = await Admin.api('GET', `/api/site/${cur}/posts?limit=100`); posts = r.posts; }
+async function pollFor(thread, doneWhen, onTimeout, ms = 60e3) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    await new Promise(r => setTimeout(r, 2000));
+    if (cur !== thread) return;
+    try { await fetchPosts(); } catch { continue; }
+    if (doneWhen()) { draw(); loadThreads(); return; }
+    draw();
+  }
+  onTimeout(); draw();
+}
+async function askOne(thread, id) {
+  asking.set(id, Date.now() + 60e3); draw();
+  try { await Admin.api('POST', `/api/site/${thread}/posts/${id}/ask`, {}); }
+  catch (e) { asking.delete(id); sysNote(e.data && e.data.error ? e.data.error : e.message); draw(); return; }
+  await pollFor(thread, () => { const q = posts.find(p => p.id === id); return !!(q && q.answeredAt); }, () => sysNote('Shift is taking long — pull down to refresh, or send it again'));
+  asking.delete(id); draw();
+}
+async function confirmCard(id, ok) {
+  const p = posts.find(x => x.id === id); if (!p) return;
+  const thread = cur;
+  p.status = ok ? 'running' : 'declined'; draw();
+  try { const d = await Admin.api('POST', `/api/site/${thread}/posts/${id}/confirm`, { ok }); if (thread === cur) { replacePost(d); draw(); } }
+  catch (e) { p.status = 'error'; p.error = e.data && e.data.error ? e.data.error : e.message; draw(); return; }
+  if (ok) pollFor(thread, () => { const q = posts.find(x => x.id === id); return !!q && q.status !== 'running'; }, () => sysNote('Still working — pull down to refresh'));
+}
 function draw() {
   if (!posts.length) { el('feed').innerHTML = '<div class="empty">Nothing here yet. Write what happened, send a photo, or record.</div>'; return; }
   if (me.admin) loadBalances();
@@ -423,16 +485,19 @@ function draw() {
   el('feed').innerHTML = posts.map((p, ix) => {
     const dayHdr = p.date !== lastDay ? `<div class="day">${esc(dayLabel(p.date))}</div>` : ''; lastDay = p.date;
     const mine = p.by === me.email;
+    if (p.kind === 'sys') return `${dayHdr}<div class="post sys">${esc(p.text)}</div>`;
+    if (p.by === 'shift' && !p.deleted) return `${dayHdr}${agentPost(p)}`;
     if (p.deleted) return `${dayHdr}<div class="post ${mine ? 'me' : ''} gone" data-id="${esc(p.id)}">🚫 This message was deleted<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
     if (p.kind === 'start' || p.kind === 'finish') return `${dayHdr}<div class="post tap" data-id="${esc(p.id)}">${p.kind === 'start' ? '▶' : '■'} <b>${p.kind === 'start' ? 'Started' : 'Finished'} ${hhmm(p.at)}</b>${p.siteName ? ' · 📍 ' + esc(p.siteName) : p.loc ? ' · outside every site' : ' · no location'}${p.distanceM != null ? ` <span title="from the site’s centre">(${p.distanceM} m)</span>` : ''}${p.manual ? ` · entered by hand at ${hhmm(p.enteredAt)}` : ''}${p.noStart ? ' · ⚠ no Start before it' : ''}</div>`;
     const body = p.kind === 'photo' ? `<a href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><img src="/api/site/${cur}/posts/${p.id}/file" ${ix >= posts.length - 8 ? '' : 'loading="lazy"'} onload="feedGrew()"></a>`
       : p.kind === 'video' ? `<video src="/api/site/${cur}/posts/${p.id}/file" controls preload="metadata"></video>`
       : p.kind === 'doc' ? `<a class="doc" href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><span class="ic">📄</span><span><span class="nm">${esc((p.file && p.file.name) || 'document.pdf')}</span><span class="sz">${p.file && p.file.size ? Math.round(p.file.size / 1024) + ' KB · ' : ''}PDF</span></span></a>`
       : p.kind === 'voice' ? `<audio src="/api/site/${cur}/posts/${p.id}/file" controls></audio>${p.parsed && p.parsed.transcript ? `<div style="margin-top:6px;font-style:italic">${esc(p.parsed.transcript)}</div>` : ''}`
-      : esc(p.text);
+      : esc(p.text).replace(/^(@(?:shift|s)\b)/i, '<span class="trig">$1</span>');
     const canDel = mine || me.admin;
     return `${dayHdr}<div class="post ${mine ? 'me' : ''}${p.kind === 'photo' || p.kind === 'video' ? ' media' : ''}" data-id="${esc(p.id)}" ${canDel ? `oncontextmenu="event.preventDefault();askDelete('${esc(p.id)}')" ontouchstart="pressStart(event,'${esc(p.id)}')" ontouchend="pressEnd()" ontouchmove="pressEnd()"` : ''}>${body}${lineTag(p)}<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
   }).join('');
+  if ([...asking.values()].some(t => t > Date.now())) el('feed').insertAdjacentHTML('beforeend', '<div class="post agent typing">Shift is thinking…</div>');
   pinFor(3000);
 }
 // Open at the END of the conversation and stay there while the pictures arrive (Mario, 2026-09-24: "still opens in
@@ -482,7 +547,8 @@ async function sendText() {
   try {
     const p = await Admin.api('POST', `/api/site/${cur}/posts`, { kind: 'text', text: t });
     posts.push(p); draw();
-    await digestOne(cur, p.id);
+    if (me.admin && isAskText(t)) { const th = cur; await digestOne(th, p.id); askOne(th, p.id); }   // digest marks it a question (no ledger line), then Shift answers
+    else await digestOne(cur, p.id);
   } catch (e) { alert('Could not send: ' + e.message); el('text').value = t; micSend(); }
 }
 function pick(accept, kind, capture) { const f = el('file'); f.accept = accept; if (capture === false) f.removeAttribute('capture'); else f.capture = 'environment'; f.onchange = () => { const file = f.files[0]; if (!file) return; sendFile(file, kind === 'any' ? (/^video\//.test(file.type) ? 'video' : 'photo') : kind); f.value = ''; }; f.click(); }
@@ -631,6 +697,15 @@ Admin.require('site', async m => {
   el('who').innerHTML = el('whofoot').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
   document.body.classList.add('has-composer');
   await loadThreads();
+  if (new URLSearchParams(location.search).get('demo') === 'agent' && me.admin && threads.some(t => t.id === 'shift')) {   // local-only fixture for hub-verify screenshots
+    await open_('shift');   // its loadPosts has landed, so the fixture posts are not overwritten
+    const d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Beirut' }), at = new Date().toISOString();
+    posts.push({ id: 'demo-q', thread: 'shift', by: me.email, byAdmin: true, at, date: d, kind: 'text', text: 'pay Khoder 150 from my cash', agentAsk: true, answeredAt: at, digestedAt: at });
+    posts.push({ id: 'demo-a', thread: 'shift', by: 'shift', at, date: d, kind: 'text', text: 'One unpaid bill for Khoder (BILL/2026/09/0012, $150). I will pay it from Mario cash.' });
+    posts.push({ id: 'demo-c', thread: 'shift', by: 'shift', at, date: d, kind: 'action', text: 'Pay Khoder $150 from Mario cash (87) — S LB', status: 'pending', action: { summary: 'Pay Khoder $150 from Mario cash (87) — S LB', detail: '', writes: [{ id: 'demo', name: 'odoo_register_payment', input: { move_id: 1, journal_id: 87, summary: 'demo' } }] } });
+    posts.push({ id: 'demo-d', thread: 'shift', by: 'shift', at, date: d, kind: 'action', text: 'To-do for Christa: send D3 drawings', status: 'done', receipt: 'to-do "send D3 drawings" https://hub.shift-group.co/todo', action: { summary: 'To-do for Christa: send D3 drawings', detail: '', writes: [] } });
+    draw(); return;
+  }
   const [h, want] = decodeURIComponent(location.hash.slice(1)).split('/');
   if (h && threads.some(t => t.id === h)) open_(h, want);
   else if (innerWidth > 800 && threads[0]) open_(threads[0].id);
