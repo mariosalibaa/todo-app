@@ -112,6 +112,7 @@
   #pwgate input{background:var(--base);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:11px 12px;font-size:1rem;width:100%;}
   #pwgate button{background:var(--amber);color:#1e1e2e;border:0;border-radius:10px;padding:11px;font-weight:700;font-size:.95rem;cursor:pointer;}
   #pwmsg{color:var(--red);font-size:.8rem;min-height:1em;}
+  tr.dayrow td{font-size:.82em;opacity:.85;background:rgba(255,255,255,.02);} tr.dayrow td:first-child{padding-left:22px;}
 </style>
 </head>
 <body>
@@ -271,8 +272,8 @@ const battUsd = m => { const d = dv(m, 'discharge'); return d ? d / BATT_KWH / (
 const CMP = {
   school: { name: 'M1 School', keys: ['school'] }, church: { name: 'M2 Church', keys: ['church'] }, liqaa: { name: 'M3 Liqaa', keys: ['liqaa'] },
   hotel: { name: 'M4 Hotel', keys: ['hotel'] }, genChurch: { name: 'M5 Gen church', keys: ['genChurch'] }, genSmall: { name: 'M6 Gen small', keys: ['genSmall'] },
-  genBig: { name: 'M7 Gen big', keys: ['genBig'] }, edl: { name: 'M8 EDL', keys: ['edl'], deye: m => dv(m, 'gridIn') },
-  gens: { name: 'Generators M5–M7', keys: ['genChurch', 'genBig', 'genSmall'], deye: m => dsplit(m, 'gen').v },
+  genBig: { name: 'M7 Gen big', keys: ['genBig'], deye: m => dsplit(m, 'gen').v },   // Mario 2026-10-01: Deye's generator input = the big generator only edl: { name: 'M8 EDL', keys: ['edl'], deye: m => dv(m, 'gridIn') },
+  gens: { name: 'Generators M5–M7', keys: ['genChurch', 'genBig', 'genSmall'] },
 };
 const dayMonth = () => { const v = store.get('cpr.dayMonth'); return v && M && M.list.includes(v) ? v : (M ? M.list[M.list.length - 1] : ''); };
 const cmpKey = () => store.get('cpr.cmp') || '';
@@ -283,7 +284,10 @@ const cmpKey = () => store.get('cpr.cmp') || '';
 // a month they read less (installed late, offline, the EDL meter miswired until Apr 2026), Deye alone counts.
 const edlSplit = m => { const d = dv(m, 'gridIn'), me = mv(m, 'edl'); if (d == null) return { deye: null, direct: null, total: me.v, est: me.est, meter: me.v };
   const direct = me.v != null ? Math.max(0, me.v - d) : 0; return { deye: d, direct, total: d + direct, meter: me.v }; };
-const genSplit = m => { const ds = dsplit(m, 'gen'), g = sumv(m, ['genChurch', 'genBig', 'genSmall']); if (ds.v == null) return { deye: null, direct: null, total: g.v, est: g.est, meter: g.v };
+// Mario 2026-10-01: Deye's generator input is the big generator only — the church generator feeds the church directly (and the church
+// fills it), so it is never compared with Deye; the small generator (no meter since May 2026) stays with the big one
+const GEN_OURS = ['genBig', 'genSmall'];
+const genSplit = m => { const ds = dsplit(m, 'gen'), g = sumv(m, GEN_OURS); if (ds.v == null) return { deye: null, direct: null, total: g.v, est: g.est, meter: g.v };
   const direct = g.v != null ? Math.max(0, g.v - ds.v) : 0; return { deye: ds.v, direct, total: ds.v + direct, est: ds.est, meter: g.v }; };
 const edlOf = m => { const e = edlSplit(m); return { v: e.total, est: e.est, note: e.deye == null ? 'meter' : '' }; };
 const num2 = v => false ? `<span class="fl">${f0(v)}</span><span class="sh">${(v / 1000).toFixed(1)}</span>` : f0(v);
@@ -308,8 +312,8 @@ const VIEWS = {
       const s = VIEWS.sup.row(m), ch = mv(m, 'church'), co = churchOurs(m);
       const church = co == null ? { v: null } : { v: co, est: ch.est };
       const bld = sumv(m, ['school', 'liqaa', 'hotel']); if (bld.v != null && co != null) bld.v += co;
-      const gs = genSplit(m), gc = mv(m, 'genChurch').v;
-      const gen = gs.total == null ? { v: null } : { v: Math.max(0, gs.total - (gc || 0)), est: gs.est };
+      const gs = genSplit(m);
+      const gen = gs.total == null ? { v: null } : { v: gs.total, est: gs.est };
       const sup = { v: (s[0].v || 0) + (s[1].v || 0) + (gen.v || 0) || null, est: s[0].est || s[1].est || gen.est };
       return [mv(m, 'school'), church, sumv(m, ['liqaa', 'hotel']), [bld, 'sum'], [{ v: dv(m, 'use') }, 'wide admc'], [s[0], 'gs'], s[1], gen, [sup, 'sum'], { v: dv(m, 'gridOut') }, s[s.length - 2], [s[s.length - 1], 'wide']];
     },
@@ -323,18 +327,18 @@ const VIEWS = {
     det: m => { const t = sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, p = k => t ? ' (' + (mv(m, k).v / t * 100).toFixed(0) + ' %)' : ''; return `Church <b>${f0(mv(m, 'church').v)}</b> − its generator <b>${f0(mv(m, 'genChurch').v)}</b> = <b>${f0(churchOurs(m))}</b> kWh from us · Liqaa <b>${f0(mv(m, 'liqaa').v)}</b>${p('liqaa')} · Hotel <b>${f0(mv(m, 'hotel').v)}</b>${p('hotel')} kWh — together Kamal's <b>${f0(sumv(m, ['liqaa', 'hotel']).v)}</b>`; },
   },
   sup: {
-    head: ['Solar', 'EDL', ['EDL', 'direct'], ['Gen', ''], ['Gen', 'direct'], ['Total', '', 'sum'], ['Sold', 'to EDL'], ['Battery', 'cycles'], ['Battery', 'cost $']],
+    head: ['Solar', 'EDL', ['EDL', 'direct'], ['Gen big', 'Deye'], ['Gen big', 'direct'], ['Gen', 'church'], ['Total', '', 'sum'], ['Sold', 'to EDL'], ['Battery', 'cycles'], ['Battery', 'cost $']],
     row: m => {
       const e = edlSplit(m), g = genSplit(m), pv = dsplit(m, 'pv');
       const edl = { v: e.total, est: e.est, note: e.deye == null && e.total != null ? 'meter' : '' }, gen = { v: g.total, est: g.est, note: g.deye == null && g.total != null ? 'meters' : '' };
-      const tot = (pv.v || 0) + (edl.v || 0) + (gen.v || 0);
-      return [pv, edl, { v: e.direct }, gen, { v: g.direct }, [{ v: tot || null, est: edl.est || gen.est || pv.est }, 'sum'], { v: dv(m, 'gridOut') }, { html: dv(m, 'discharge') ? (dv(m, 'discharge') / BATT_KWH).toFixed(1) : '<span class="none">—</span>', sum: dv(m, 'discharge') / BATT_KWH }, { v: battUsd(m) }];
+      const gc = mv(m, 'genChurch'), tot = (pv.v || 0) + (edl.v || 0) + (gen.v || 0) + (gc.v || 0);
+      return [pv, edl, { v: e.direct }, gen, { v: g.direct }, gc, [{ v: tot || null, est: edl.est || gen.est || pv.est || gc.est }, 'sum'], { v: dv(m, 'gridOut') }, { html: dv(m, 'discharge') ? (dv(m, 'discharge') / BATT_KWH).toFixed(1) : '<span class="none">—</span>', sum: dv(m, 'discharge') / BATT_KWH }, { v: battUsd(m) }];
     },
-    det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL: Deye <b>${f0(edlSplit(m).deye)}</b>, meter <b>${f0(edlSplit(m).meter)}</b> → direct through the transfer switch <b>${f0(edlSplit(m).direct)}</b> · Generators: Deye <b>${f0(genSplit(m).deye)}</b>, meters <b>${f0(genSplit(m).meter)}</b> → direct <b>${f0(genSplit(m).direct)}</b> · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
+    det: m => `Solar <b>${f0(dsplit(m, 'pv').v)}</b> + Deye generator input <b>${f0(dsplit(m, 'gen').v)}</b> = <b>${f0((dsplit(m, 'pv').v || 0) + (dsplit(m, 'gen').v || 0))}</b> against Deye's own production <b>${f0(dv(m, 'prod'))}</b> · EDL: Deye <b>${f0(edlSplit(m).deye)}</b>, meter <b>${f0(edlSplit(m).meter)}</b> → direct through the transfer switch <b>${f0(edlSplit(m).direct)}</b> · Big generator: Deye <b>${f0(genSplit(m).deye)}</b>, meter <b>${f0(genSplit(m).meter)}</b> → direct <b>${f0(genSplit(m).direct)}</b> · Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> · sold to EDL (net metering) <b>${f0(dv(m, 'gridOut'))}</b> kWh`,
   },
   cmp: {
     // Mario 2026-09-26: each meter M1–M8, SD card against openHAB; Deye next to EDL and the generators
-    head: () => { const c = CMP[cmpKey()]; if (!c) return [['EDL', 'SD · openHAB · Deye'], ['Generator', 'SD · openHAB · Deye'], ['Buildings', 'SD · openHAB · Deye load']];
+    head: () => { const c = CMP[cmpKey()]; if (!c) return [['EDL', 'SD · openHAB · Deye'], ['Generator big', 'SD · openHAB · Deye'], ['Buildings', 'SD · openHAB · Deye load']];
       return ['SD card', 'openHAB', ...(c.deye ? ['Deye'] : []), ['oH vs SD', '%']]; },
     row: m => {
       const c = CMP[cmpKey()];
@@ -352,19 +356,19 @@ const VIEWS = {
         const line = (lab, x, part) => `<span class="tri"><i>${lab}</i>${x == null ? '—' : f0(x)}${part ? '<i> part</i>' : ''}</span>`;
         return { html: `<span class="${spread > 0.15 ? 'far' : ''}">${line('SD', sd.v, sd.part)}${line('oH', oh.v, oh.part)}${deyeV === undefined ? '' : line(deyeApart ? 'Deye load' : 'Deye', deyeV)}${deyeApart ? bypassLine() : ''}</span>` };
       };
-      return [tri(['edl'], dv(m, 'gridIn')), tri(['genChurch', 'genBig', 'genSmall'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], dv(m, 'use'), true) /* Deye load beside them (Mario 2026-10-01) — shown, not in the amber test: the buildings also take EDL / generator directly (Mario 2026-09-26) */];
+      return [tri(['edl'], dv(m, 'gridIn')), tri(['genBig'], dsplit(m, 'gen').v), tri(['school', 'church', 'liqaa', 'hotel'], dv(m, 'use'), true) /* Deye load beside them (Mario 2026-10-01) — shown, not in the amber test: the buildings also take EDL / generator directly (Mario 2026-09-26) */];
     },
     rowOld: m => {
       const pair = (a, b) => ({ html: a == null && b == null ? '<span class="none">—</span>' : `<span class="pair">${a == null ? '—' : f0(a)} · ${b == null ? '—' : f0(b)}</span>${pct(a, b) != null ? `<span class="d ${Math.abs(pct(a, b)) > 15 ? 'big' : ''}">${pct(a, b) > 0 ? '+' : ''}${pct(a, b)} %</span>` : ''}` });
       return [pair(mv(m, 'edl').v, dv(m, 'gridIn')), pair(sumv(m, ['genChurch', 'genBig', 'genSmall']).v, dsplit(m, 'gen').v), pair(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v, dv(m, 'use'))];
     },
-    det: m => (CMP[cmpKey()] ? `${CMP[cmpKey()].name}: ` : '') + `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Generators: meters <b>${f0(sumv(m, ['genChurch', 'genBig', 'genSmall']).v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh — what the buildings take above Deye's load = EDL / generator feeding Kamal (Liqaa + Hotel) through the bypass, outside Deye. % = Deye against the meter.`,
+    det: m => (CMP[cmpKey()] ? `${CMP[cmpKey()].name}: ` : '') + `SD = the meters' own SD cards (collected up to 24 Jun 2026) · oH = openHAB (the same meters read live by the Pi; its offline stretches are spread over the days they missed) · Deye = the inverters. Amber = the three differ by more than 15 %. <br>EDL: meter <b>${f0(mv(m, 'edl').v)}</b>, Deye grid input <b>${f0(dv(m, 'gridIn'))}</b> · Big generator: meter <b>${f0(mv(m, 'genBig').v)}</b>, Deye generator input <b>${f0(dv(m, 'gen'))}</b> · Buildings <b>${f0(sumv(m, ['school', 'church', 'liqaa', 'hotel']).v)}</b>, Deye UPS load <b>${f0(dv(m, 'use'))}</b> kWh — what the buildings take above Deye's load = EDL / generator feeding Kamal (Liqaa + Hotel) through the bypass, outside Deye. % = Deye against the meter.`,
   },
   dsl: {
-    head: [['Generator', 'kWh (meters)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈'], ['Bought', 'litres', 'gs'], ['Bought', '$']],
-    row: m => { const g = sumv(m, ['genChurch', 'genBig', 'genSmall']); const lpk = +store.get('cpr.lpk') || 0.3, usd = (+store.get('cpr.usd') || fuelPrice()); const l = g.v == null ? null : g.v * lpk; const fu = FUEL[m.slice(0, 7)];
+    head: [['Gen big', 'kWh (Deye + direct)'], ['Diesel', 'litres ≈'], ['Cost', '$ ≈'], ['Bought', 'litres', 'gs'], ['Bought', '$']],
+    row: m => { const gs = genSplit(m), g = { v: gs.total, est: gs.est }; const lpk = +store.get('cpr.lpk') || 0.3, usd = (+store.get('cpr.usd') || fuelPrice()); const l = g.v == null ? null : g.v * lpk; const fu = FUEL[m.slice(0, 7)];
       return [g, { v: l, est: g.est }, { v: l != null && usd ? l * usd : null, est: g.est }, [{ v: fu ? fu.l : null, note: fu ? fu.n + ' fill' + (fu.n > 1 ? 's' : '') : '' }, 'gs'], { v: fu ? fu.usd : null }]; },
-    det: m => `Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> kWh — Deye sees <b>${f0(dv(m, 'gen'))}</b> kWh at the inverters' generator input`,
+    det: m => `Generator church <b>${f0(mv(m, 'genChurch').v)}</b> · Generator big <b>${f0(mv(m, 'genBig').v)}</b> · Generator small <b>${f0(mv(m, 'genSmall').v)}</b> kWh — Deye sees <b>${f0(dv(m, 'gen'))}</b> kWh at the inverters' generator input (the big generator); the church generator is filled by the church, not counted here`,
   },
 };
 
@@ -409,7 +413,11 @@ function render() {
       if (val && val.v != null) { tot[i].v += val.v; tot[i].any = true; } else if (val && val.sum != null && isFinite(val.sum)) { tot[i].v += val.sum; tot[i].any = true; tot[i].cyc = true; }
       return val && val.html != null ? `<td class="${cls}">${val.html}</td>` : cell(val || { v: null }, cls + (V.head[i] && Array.isArray(V.head[i]) && V.head[i][2] ? ' ' + V.head[i][2] : ''));
     }).join('');
-    return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` : '');
+    // Mario 2026-10-01: "when I click on a month, I should see the daily" — the month's days under its detail line
+    const days = !DAY && open.has(m) && MD ? MD.list.filter(d => d.startsWith(m)).slice().reverse() : [];
+    let dayRows = '';
+    if (days.length) { M = MD; try { dayRows = days.map(d => `<tr class="dayrow">${monthCell(d)}${V.row(d).map((x, i) => { const [val, cls] = Array.isArray(x) ? x : [x, '']; return val && val.html != null ? `<td class="${cls}">${val.html}</td>` : cell(val || { v: null }, cls + (V.head[i] && Array.isArray(V.head[i]) && V.head[i][2] ? ' ' + V.head[i][2] : '')); }).join('')}</tr>`).join(''); } finally { M = MM; } }
+    return `<tr class="row" onclick="toggle('${m}')">${monthCell(m)}${cells}</tr>` + (open.has(m) ? `<tr class="det"><td colspan="${cols}">${V.det(m)}</td></tr>` + dayRows : '');
   }).join('');
   const totRow = tab === 'cmp' ? '' : `<tr class="tot"><td>Total</td>${V.head.map((h, i) => `<td class="${Array.isArray(h) && /wide|gs/.test(h[2] || '') ? h[2] : ''}">${tot[i].any ? (tot[i].cyc ? tot[i].v.toFixed(0) : num2(tot[i].v)) : ''}${tab === 'bld' && i === 1 ? `<small class="ours">${f0(list.reduce((s, m) => s + (churchOurs(m) || 0), 0))} from us</small>` : ''}${V.pct && i < V.head.length - 1 && tot[V.head.length - 1].v ? `<small class="pc">${(tot[i].v / tot[V.head.length - 1].v * 100).toFixed(0)} %</small>` : ''}</td>`).join('')}</tr>`;
   document.getElementById('tbl').innerHTML = `<thead><tr><th>${DAY ? 'Day' : 'Month'}</th>${V.head.map(hd).join('')}</tr></thead><tbody>${body}${totRow}</tbody>`;

@@ -28,7 +28,7 @@
   th{font-size:.58rem;letter-spacing:.06em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px 5px;border-bottom:1px solid var(--surface0);}
   td{padding:8px 5px;border-bottom:1px solid var(--surface0);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
   th:first-child,td:first-child{text-align:left;padding-left:10px;} th:last-child,td:last-child{padding-right:10px;}
-  td.k{color:var(--amber);font-weight:600;} th small{display:block;text-transform:none;letter-spacing:0;font-weight:400;}
+  td.k{color:var(--amber);font-weight:600;} tr.dayrow td{font-size:.8em;opacity:.8;} tr.dayrow small{display:block;font-size:.9em;color:var(--sub);} tr.dayrow td:first-child{padding-left:18px;} tr.dayrow.hasfill td{opacity:1;color:var(--amber);} tr.tot td{font-weight:700;border-top:1px solid #444;font-size:inherit;} th small{display:block;text-transform:none;letter-spacing:0;font-weight:400;}
   .photo{display:flex;gap:10px;align-items:center;}
   .photo button{flex:1;}
   button{cursor:pointer;background:var(--surface0);color:var(--text);border:1px solid var(--surface1);border-radius:10px;padding:12px;font-size:.95rem;font-family:inherit;}
@@ -95,7 +95,8 @@
     <div id="msg"></div>
   </form>
   <h2>By month</h2>
-  <div id="months"></div>
+  <div class="tot"><label>Price per litre (for fills without litres) $ <input type="number" id="ppl" step="0.01" min="0" style="width:80px" onchange="store.set('cpr.ppl', this.value); load()"></label></div>
+  <div id="months" style="overflow-x:auto"></div>
   <h2>Fills</h2>
   <div class="adminbar" id="adminbar"></div>
   <div class="tot" id="tot"></div>
@@ -207,16 +208,42 @@ async function load() {
     document.getElementById('list').innerHTML = rows ? `<table class="fills"><thead><tr><th>Date</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Bill</th>${ADMIN ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table>` : '';
   } catch (e) { if (e.quiet) return; document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
 }
-// Mario 2026-09-26: the quantities and prices by month, against the kWh the generators produced (meters, /api/cpr)
-let GENKWH = null;
+// Mario 2026-09-26: the quantities and prices by month, against the kWh the generators produced (/api/cpr)
+// Mario 2026-10-01: kWh = Deye's generator input; litres estimated at a price per litre for the fills that have none
+// (the M.M.J. statement gives $ only); L/kWh beside $/kWh; the big-generator meter (M7) next to Deye for admins only
+let GENKWH = null, DEYEGEN = null, BIGDAY = {}, DEYEDAY = {}, LIST = [];
+const openM = new Set();
+function toggleM(m) { openM.has(m) ? openM.delete(m) : openM.add(m); monthTable(LIST); }
 async function monthTable(list) {
-  if (!GENKWH) { try { const d = await (await fetch('/api/cpr', { credentials: 'same-origin' })).json(); GENKWH = {}; d.days.forEach((day, i) => { const m = day.slice(0, 7); let s = 0; for (const k of ['genBig']) { const v = d.data[k] && d.data[k][i]; if (v) s += v[0]; } GENKWH[m] = (GENKWH[m] || 0) + s; }); } catch (e) { GENKWH = {}; } }
+  if (!GENKWH) { try { const d = await (await fetch('/api/cpr', { credentials: 'same-origin' })).json(); GENKWH = {}; DEYEGEN = {};
+    d.days.forEach((day, i) => { const m = day.slice(0, 7); const v = d.data.genBig && d.data.genBig[i]; if (v && v[0] != null) { GENKWH[m] = (GENKWH[m] || 0) + v[0]; BIGDAY[day] = v[0]; } });
+    const gi = d.deye && d.deye.fields ? d.deye.fields.indexOf('gen') : -1;
+    if (gi >= 0) d.deye.days.forEach((day, i) => { const v = d.deye.data[i] && d.deye.data[i][gi]; if (v != null) { const m = day.slice(0, 7); DEYEGEN[m] = (DEYEGEN[m] || 0) + v; DEYEDAY[day] = v; } });
+  } catch (e) { GENKWH = {}; DEYEGEN = {}; } }
+  LIST = list;
+  const ppl = +store.get('cpr.ppl') || 1.10;
+  const pi = document.getElementById('ppl'); if (pi && !pi.value) pi.value = ppl.toFixed(2);
   const by = {};
-  for (const x of list) { const m = x.date.slice(0, 7); const o = by[m] || (by[m] = { n: 0, l: 0, usd: 0, lp: 0, up: 0 }); o.n++; o.l += x.litres || 0; o.usd += x.usd || 0; if (x.litres && x.usd) { o.lp += x.litres; o.up += x.usd; } }
+  for (const x of list) { const m = x.date.slice(0, 7); const o = by[m] || (by[m] = { n: 0, l: 0, est: false, usd: 0 }); o.n++; o.usd += x.usd || 0;
+    if (x.litres) o.l += x.litres; else if (x.usd) { o.l += x.usd / ppl; o.est = true; } }
+  const ms = Object.keys(by).sort(); if (!ms.length) { document.getElementById('months').innerHTML = '<div class="tot">No fill yet.</div>'; return; }
+  const all = []; for (let m = ms[0]; m <= ms[ms.length - 1]; ) { all.push(m); const [y, mo] = m.split('-').map(Number); m = mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`; }
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const rows = Object.keys(by).sort().reverse().map(m => { const o = by[m], kwh = GENKWH[m];
-    return `<tr><td>${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}</td><td>${o.n}</td><td>${f2(o.l)}</td><td>${o.usd ? '$' + f2(o.usd) : ''}</td><td>${o.lp ? '$' + (o.up / o.lp).toFixed(2) : ''}</td><td>${kwh != null ? Math.round(kwh).toLocaleString('en-US') : '—'}</td><td class="k">${kwh && o.usd ? '$' + (o.usd / kwh).toFixed(3) : '—'}</td></tr>`; }).join('');
-  document.getElementById('months').innerHTML = rows ? `<table><thead><tr><th>Month</th><th>Fills</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Gen big kWh<small>meter M7</small></th><th>$ / kWh<small>diesel cost</small></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tot">No fill yet.</div>';
+  const n0 = v => v == null ? '—' : Math.round(v).toLocaleString('en-US');
+  const T = { n: 0, l: 0, est: false, usd: 0, kwh: 0, big: 0 };
+  const row = (label, o, kwh, big, cls, m) => `<tr${cls ? ` class="${cls}"` : ''}${m ? ` onclick="toggleM('${m}')" style="cursor:pointer"` : ''}><td>${label}</td><td>${o.n || ''}</td><td>${o.usd ? '$' + f2(Math.round(o.usd)) : '—'}</td><td>${o.l ? (o.est ? '≈ ' : '') + n0(o.l) : '—'}</td><td>${n0(kwh)}</td>${ADMIN ? `<td>${n0(big)}</td>` : ''}<td class="k">${kwh && o.usd ? '$' + (o.usd / kwh).toFixed(2) : '—'}</td><td class="k">${kwh && o.l ? (o.est ? '≈ ' : '') + (o.l / kwh).toFixed(2) : '—'}</td></tr>`;
+  const rows = all.map(m => { const o = by[m] || { n: 0, l: 0, usd: 0 }, kwh = DEYEGEN[m], big = GENKWH[m];
+    T.n += o.n; T.usd += o.usd; T.l += o.l; T.est = T.est || o.est; T.kwh += kwh || 0; T.big += big || 0;
+    // Mario 2026-10-01: a month opens day by day — each fill on its day (invoice, $, litres) beside that day's kWh
+    let days = '';
+    if (openM.has(m)) { const [y, mo] = m.split('-').map(Number), nd = new Date(Date.UTC(y, mo, 0)).getUTCDate(), DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      for (let d = nd; d >= 1; d--) { const day = `${m}-${String(d).padStart(2, '0')}`, fs = list.filter(x => x.date === day);
+        if (DEYEDAY[day] == null && BIGDAY[day] == null && !fs.length) continue;
+        const usd = fs.reduce((a, x) => a + (x.usd || 0), 0), l = fs.reduce((a, x) => a + (x.litres || (x.usd ? x.usd / ppl : 0)), 0), est = fs.some(x => !x.litres && x.usd);
+        const refs = fs.map(x => esc((x.note || '').replace(/ \(statement.*$/, ''))).filter(Boolean).join('<br>');
+        days += `<tr class="dayrow${fs.length ? ' hasfill' : ''}"><td>${DOW[new Date(day + 'T12:00:00Z').getUTCDay()]} ${d}${refs ? `<small>${refs}</small>` : ''}</td><td>${fs.length || ''}</td><td>${usd ? '$' + f2(Math.round(usd)) : ''}</td><td>${l ? (est ? '≈ ' : '') + n0(l) : ''}</td><td>${n0(DEYEDAY[day])}</td>${ADMIN ? `<td>${n0(BIGDAY[day])}</td>` : ''}<td></td><td></td></tr>`; } }
+    return row(`${openM.has(m) ? '▾' : '▸'} ${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}`, o, kwh, big, 'mrow', m) + days; }).reverse().join('');
+  document.getElementById('months').innerHTML = `<table><thead><tr><th>Month</th><th>Fills</th><th>Diesel $</th><th>Litres<small>≈ at $${ppl.toFixed(2)}/L</small></th><th>Gen big kWh<small>Deye</small></th>${ADMIN ? '<th>Gen big kWh<small>meter M7 (oH)</small></th>' : ''}<th>$ / kWh</th><th>L / kWh</th></tr></thead><tbody>${rows}${row('<b>Total</b>', T, T.kwh, T.big, 'tot')}</tbody></table>`;
 }
 async function del(id) {
   if (!confirm('Delete this fill and its photo?')) return;
