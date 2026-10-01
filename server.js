@@ -962,6 +962,15 @@ const handler = async (req, res) => {
     return;
   }
   // the Charts tab's one-day chart: each meter's average kW per hour from openHAB (?day=YYYY-MM-DD, Beirut)
+  // admin: one meter's openHAB items phase by phase over a day (/api/cpr/phases?meter=7&day=2026-09-24)
+  if (url.startsWith('/api/cpr/phases') && req.method === 'GET') {
+    if (!(await cprAccess()).isAdmin) { res.writeHead(403); res.end('admin'); return; }
+    const q = new URL(req.url, 'http://x').searchParams, meter = q.get('meter') || '', day = q.get('day') || '';
+    if (!/^[1-8]$/.test(meter) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) { res.writeHead(400); res.end('meter / day'); return; }
+    try { const v = await energy.meterPhases(meter, day); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
+    catch (e) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    return;
+  }
   if (url === '/api/cpr/meters' && req.method === 'GET') {
     if (!(await cprAccess()).ok) return cprDenied();
     const day = new URL(req.url, 'http://x').searchParams.get('day') || '';

@@ -113,6 +113,7 @@
   #pwgate button{background:var(--amber);color:#1e1e2e;border:0;border-radius:10px;padding:11px;font-weight:700;font-size:.95rem;cursor:pointer;}
   #pwmsg{color:var(--red);font-size:.8rem;min-height:1em;}
   tr.dayrow td{font-size:.82em;opacity:.85;background:rgba(255,255,255,.02);} tr.dayrow td:first-child{padding-left:22px;}
+  .ph{margin:8px 0 4px;font-size:.85rem;} .ph button{margin-left:6px;} table.phases{font-size:.72rem;margin-top:8px;white-space:nowrap;} table.phases td,table.phases th{padding:3px 6px;text-align:right;} table.phases td:first-child,table.phases th:first-child{text-align:left;} table.phases small{display:block;opacity:.6;}
 </style>
 </head>
 <body>
@@ -381,7 +382,7 @@ function render() {
     : tab === 'rd'
     ? `<label>Month <select onchange="store.set('cpr.rdMonth', this.value); render()">${M.list.filter(m => m >= '2025-02').reverse().map(m => `<option value="${m}" ${m === rdMonth() ? 'selected' : ''}>${MON[+m.slice(5) - 1]} ${m.slice(0, 4)}</option>`).join('')}</select></label>`
     : tab === 'cmp'
-    ? `<div class="chips">${[['', 'Summary'], ...Object.entries(CMP).map(([k, c]) => [k, c.name])].map(([k, n]) => `<button class="${k === cmpKey() ? 'on' : ''}" onclick="store.set('cpr.cmp', '${k}'); render()">${n}</button>`).join('')}</div>`
+    ? `<div class="chips">${[['', 'Summary'], ...Object.entries(CMP).map(([k, c]) => [k, c.name])].map(([k, n]) => `<button class="${k === cmpKey() ? 'on' : ''}" onclick="store.set('cpr.cmp', '${k}'); render()">${n}</button>`).join('')}</div>${/^M\d/.test((CMP[cmpKey()] || {}).name || '') ? `<div class="ph"><label>Phases of ${CMP[cmpKey()].name.split(' ')[0]} on <input type="date" id="phday" value="${store.get('cpr.phDay') || today()}" onchange="store.set('cpr.phDay', this.value)"></label> <button onclick="phases()">⚡ Show phase by phase</button><div id="phout" style="overflow-x:auto"></div></div>` : ''}`
     : tab === 'dsl'
     ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="${fuelPrice() ? fuelPrice().toFixed(2) + ' (fills)' : 'price'}" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
     : '';
@@ -666,6 +667,18 @@ function renderReadings() {
   dash.innerHTML = `<div class="tt"><table><thead><tr><th>Meter</th><th>Reading ${day(d.from)} 00:00</th><th>${endHead}</th><th class="sum">kWh used</th><th class="wide">Month table<small>kWh</small></th></tr></thead><tbody>${rows}
     ${any ? `<tr class="tot"><td>Buildings</td><td></td><td></td><td>${f0(tot)}</td><td class="wide"></td></tr>` : ''}</tbody></table></div>
     <div class="st muted small">The counters as the meters show them (kWh), read by openHAB at midnight Beirut time. A small time under a reading = openHAB had no reading at midnight (the Pi was offline) and this is the nearest one. "Month table" = the month's kWh in the other tabs, which also use the meters' SD cards. Readings from Feb 2025.</div>`;
+}
+// Mario 2026-10-01: "did you check phase by phase?" — every openHAB item of the chosen meter over one day (admin)
+async function phases() {
+  const n = (CMP[cmpKey()].name.match(/^M(\d)/) || [])[1], day = document.getElementById('phday').value, out = document.getElementById('phout');
+  out.innerHTML = '<div class="muted">Reading openHAB…</div>';
+  try {
+    const d = await (await fetch(`/api/cpr/phases?meter=${n}&day=${day}`, { credentials: 'same-origin' })).json();
+    if (d.error) { out.innerHTML = `<div class="muted">openHAB: ${esc(d.error)}</div>`; return; }
+    const f = v => v == null ? '' : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2);
+    const hrs = (d.items.find(i => i.hours) || {}).hours || [];
+    out.innerHTML = `<table class="phases"><thead><tr><th>Item</th><th>Now</th><th>Day avg</th><th>Min</th><th>Max</th>${hrs.map((_, h) => `<th>${h}h</th>`).join('')}</tr></thead><tbody>${d.items.map(i => `<tr><td>${esc(i.label || i.name)}<small>${esc(i.name)}</small></td><td>${esc(String(i.state).slice(0, 12))}</td><td>${f(i.avg)}</td><td${i.min < 0 ? ' style="color:var(--amber)"' : ''}>${f(i.min)}</td><td>${f(i.max)}</td>${hrs.map((_, h) => `<td${i.hours && i.hours[h] < 0 ? ' style="color:var(--amber)"' : ''}>${i.hours ? f(i.hours[h]) : ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  } catch (e) { out.innerHTML = `<div class="muted">${esc(e.message)}</div>`; }
 }
 function setTab(k) { tab = k; store.set('cpr.tab', k); open.clear(); render(); }
 function toggle(m) { open.has(m) ? open.delete(m) : open.add(m); render(); }

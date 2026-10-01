@@ -83,6 +83,29 @@ async function build(ctx) {
 // per hour of one Beirut day = the rise of its kWh counter over that hour. openHAB only, the same cleaning as the
 // days (stale repeats while the Pi was offline dropped); an hour the counter has no reading on both sides = null.
 const dayCache = new Map();
+// Mario 2026-10-01: "did you check phase by phase?" — every openHAB item of one meter (Meter7_…): its state now and,
+// over one day, the average / min / max and each hour's average, so a reversed or missing phase shows at a glance
+async function meterPhases(meter, day) {
+  if (!process.env.OPENHAB_USER || !process.env.OPENHAB_PASS) throw new Error('OPENHAB_USER / OPENHAB_PASS not set');
+  const auth = 'Basic ' + Buffer.from(`${process.env.OPENHAB_USER}:${process.env.OPENHAB_PASS}`).toString('base64');
+  const r = await fetch(`${OH_URL}/rest/items?fields=name,label,state,type`, { headers: { Authorization: auth, Accept: 'application/json' } });
+  if (!r.ok) throw new Error('openHAB ' + r.status);
+  const items = (await r.json()).filter(i => new RegExp(`^Meter${meter}_`).test(i.name)).sort((a, b) => a.name < b.name ? -1 : 1);
+  const t0 = C.dayStart(day), t1 = Math.min(C.dayStart(C.nextDay(day)), Date.now());
+  const out = [];
+  for (const it of items) {
+    const o = { name: it.name, label: it.label || '', state: it.state };
+    if (/^Number/.test(it.type || 'Number') && !/EPImp|EPExp|EQ/.test(it.name)) {
+      try { const pts = (await ohSeries(it.name, t0, t1)).filter(p => p[0] >= t0 && p[0] < t1);
+        if (pts.length) { const v = pts.map(p => p[1]); o.avg = v.reduce((a, b) => a + b, 0) / v.length; o.min = Math.min(...v); o.max = Math.max(...v);
+          o.hours = []; for (let t = t0; t < t1; t += 3600e3) { const h = pts.filter(p => p[0] >= t && p[0] < t + 3600e3).map(p => p[1]); o.hours.push(h.length ? h.reduce((a, b) => a + b, 0) / h.length : null); } }
+      } catch (e) { o.err = String(e.message || e); }
+    }
+    out.push(o);
+  }
+  return { meter, day, items: out };
+}
+
 async function meterDay(day) {
   if (!process.env.OPENHAB_USER || !process.env.OPENHAB_PASS) throw new Error('OPENHAB_USER / OPENHAB_PASS not set');
   const today = C.dayOf(Date.now()), hit = dayCache.get(day);
@@ -154,4 +177,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, meterDay, readings };
+module.exports = { handle, meterDay, readings, meterPhases };
