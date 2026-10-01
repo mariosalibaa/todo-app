@@ -1041,6 +1041,46 @@ const handler = async (req, res) => {
   }
 
 
+  // One To-Do task from a machine (Mario, 2026-10-01: the 07:30 mail digest puts each action item on the board).
+  // Same key as the Whish watcher. Adds ONE doc - the board's own POST replaces the whole list, so a task
+  // written here carries origin:'api' and that POST never hard-deletes it (see the tasks route).
+  if (url.split('?')[0] === '/api/tasks/add' && req.method === 'POST') {
+    const key = process.env.ACCOUNTING_API_KEY;
+    const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!key || given.length < 32 || given !== key) { res.writeHead(401); res.end('unauthorized'); return; }
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const t = JSON.parse(body || '{}');
+        if (!t.title || typeof t.title !== 'string') { res.writeHead(400); res.end('title required'); return; }
+        const col = db.collection('workspaces').doc(TEAM_ID).collection('tasks');
+        // a stable id lets a re-run of the same digest update its task instead of adding a twin
+        const id = (t.id && /^[a-z0-9-]{6,80}$/i.test(t.id)) ? t.id : 'api-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const ref = col.doc(id);
+        const cur = (await ref.get()).data();
+        const now = new Date().toISOString();
+        const by = String(t.createdBy || 'Mail digest').slice(0, 60);
+        const task = cur ? { ...cur, title: t.title.slice(0, 300), notes: String(t.notes || cur.notes || '').slice(0, 4000), updatedAt: now, updatedBy: by } : {
+          id, title: t.title.slice(0, 300), done: false, doneAt: null, createdAt: now,
+          project: String(t.project || ''), taskStatus: '', department: null,
+          priority: ['high', 'medium', 'low', 'urgent'].includes(t.priority) ? t.priority : '',
+          due: /^\d{4}-\d{2}-\d{2}$/.test(t.due || '') ? t.due : '', partner: '',
+          notes: String(t.notes || '').slice(0, 4000), taskType: 'task', clientName: '', clientId: null,
+          subtasks: [], assignees: [], createdBy: by, updatedBy: by, updatedAt: now,
+          workspaceId: TEAM_ID, origin: 'api',
+        };
+        await ref.set(task);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, id, updated: !!cur }));
+      } catch (e) {
+        console.error('tasks/add:', e);
+        res.writeHead(400); res.end('bad request');
+      }
+    });
+    return;
+  }
+
   // Machine access for the Whish folder watcher (D:scodewhish-watcher):
   // "Authorization: Bearer $ACCOUNTING_API_KEY" opens the accounting API only.
   // No key configured = nothing opens.
@@ -1443,9 +1483,11 @@ Answer with ONLY a JSON array: [{"text":"...","kind":"idea|work","taskId":"id or
 
         // The client sends the full task list — remove docs that are no longer in it
         const keep = new Set(tasks.map(t => t.id));
-        const existing = await col.listDocuments();
-        for (const docRef of existing) {
-          if (!keep.has(docRef.id)) batch.delete(docRef);
+        // a task added by /api/tasks/add may be newer than this tab's list — never hard-delete those
+        // (deleting one from the board sets deleted:true and arrives in the list, so it isn't lost)
+        const existing = await col.get();
+        for (const doc of existing.docs) {
+          if (!keep.has(doc.id) && doc.data().origin !== 'api') batch.delete(doc.ref);
         }
 
         await batch.commit();
