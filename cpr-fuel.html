@@ -243,7 +243,7 @@ async function monthTable(list) {
         const refs = fs.map(x => esc((x.note || '').replace(/ \(statement.*$/, ''))).filter(Boolean).join('<br>');
         days += `<tr class="dayrow${fs.length ? ' hasfill' : ''}"><td>${DOW[new Date(day + 'T12:00:00Z').getUTCDay()]} ${d}${refs ? `<small>${refs}</small>` : ''}</td><td>${fs.length || ''}</td><td>${usd ? '$' + f2(Math.round(usd)) : ''}</td><td>${l ? (est ? '≈ ' : '') + n0(l) : ''}</td><td>${n0(DEYEDAY[day])}</td>${ADMIN ? `<td>${n0(BIGDAY[day])}</td>` : ''}<td></td><td></td></tr>`; } }
     return row(`${openM.has(m) ? '▾' : '▸'} ${MON[+m.slice(5) - 1]} ${m.slice(2, 4)}`, o, kwh, big, 'mrow', m) + days; }).reverse().join('');
-  document.getElementById('months').innerHTML = `<table><thead><tr><th>Month</th><th>Fills</th><th>Diesel $</th><th>Litres<small>≈ at $${ppl.toFixed(2)}/L</small></th><th>Gen big kWh<small>Deye</small></th>${ADMIN ? '<th>Gen big kWh<small>meter M7 (oH)</small></th>' : ''}<th>$ / kWh</th><th>L / kWh</th></tr></thead><tbody>${rows}${row('<b>Total</b>', T, T.kwh, T.big, 'tot')}</tbody></table>`;
+  document.getElementById('months').innerHTML = `<table><thead><tr><th>Month</th><th>Fills</th><th>Diesel $</th><th>Litres<small>≈ at $${ppl.toFixed(2)}/L</small></th><th>Gen big kWh<small>Deye</small></th>${ADMIN ? '<th>Gen big kWh<small>meter M7 (oH) · admin</small></th>' : ''}<th>$ / kWh</th><th>L / kWh</th></tr></thead><tbody>${rows}${row('<b>Total</b>', T, T.kwh, T.big, 'tot')}</tbody></table>`;
 }
 async function del(id) {
   if (!confirm('Delete this fill and its photo?')) return;
