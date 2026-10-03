@@ -139,7 +139,7 @@
     let h = `<tr><th>Plant</th><th class="hide-sm">kWp</th><th>Status</th><th>Now<small class="hide-sm">kW</small></th><th>Today<small class="hide-sm">kWh</small></th><th class="hide-sm">Month</th><th class="hide-sm">Year</th><th class="hide-sm">Last data</th></tr>`;
     for (const p of ps) {
       const k = p.src + ':' + p.id;
-      h += `<tr class="row" data-k="${k}"><td class="name">${esc(p.name)}${p.src === 'solarman' ? '<span class="tag">Solarman</span>' : ''}<small>${p.status === 'online' ? '' : 'last data ' + ago(p.last) + ' · '}${f1(p.kwp)} kWp</small></td>` +
+      h += `<tr class="row" data-k="${k}"><td class="name">${esc(p.name)}${p.src === 'solarman' ? '<span class="tag">Solarman</span>' : p.alsoSolarman ? '<span class="tag">+ Solarman</span>' : ''}<small>${p.status === 'online' ? '' : 'last data ' + ago(p.last) + ' · '}${f1(p.kwp)} kWp</small></td>` +
         `<td class="hide-sm">${f1(p.kwp)}</td><td><span class="st ${p.status}"><i></i><b>${LABEL[p.status] || esc(p.status)}</b></span></td>` +
         `<td>${live(p) ? f1(p.nowKw) : '—'}</td><td>${live(p) ? f1(p.today) : '—'}</td><td class="hide-sm">${f0(p.month)}</td><td class="hide-sm">${f0(p.year)}</td><td class="hide-sm">${ago(p.last)}</td></tr>`;
       if (open[k]) h += `<tr class="det"><td colspan="8">${devHtml(p)}</td></tr>`;

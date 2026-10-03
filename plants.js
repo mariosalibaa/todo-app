@@ -70,16 +70,34 @@ async function smToken(fresh) {
     if (!j.access_token) throw new Error('Solarman sign-in refused: ' + (j.msg || r.status));
     return (smTok = j.access_token);
   }
-  const r = await fetch(`${SM_WEB}/oauth-s/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'password', identity_type: '2', username: process.env.SOLARMAN_USER, client_id: 'test', system: 'SOLARMAN', lang: 'en', password: sha(process.env.SOLARMAN_PASS) }) });
-  const j = await r.json().catch(() => ({}));
-  if (!j.access_token) throw new Error('Solarman sign-in refused: ' + (j.error_description || j.error || r.status));
+  // the website's sign-in. A SOLARMAN Business account lands in org 0 (sees no plant) — sign in again straight into
+  // the business org (org_id on the password grant; switch_org answers sorry_for_server_exception here). The org is
+  // SOLARMAN_ORG, else the first one /user-s/acc/org/my lists (SHIFT = 62647, found 2026-10-03).
+  const grant = org => fetch(`${SM_WEB}/oauth-s/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'password', identity_type: '2', username: process.env.SOLARMAN_USER, client_id: 'test', system: 'SOLARMAN', lang: 'en', password: sha(process.env.SOLARMAN_PASS), ...(org ? { org_id: String(org) } : {}) }) })
+    .then(r => r.json().catch(() => ({ error: r.status })));
+  let org = process.env.SOLARMAN_ORG;
+  if (!org) {
+    const j = await grant();
+    if (!j.access_token) throw new Error('Solarman sign-in refused: ' + (j.error_description || j.error));
+    const l = await (await fetch(`${SM_WEB}/user-s/acc/org/my`, { headers: { Authorization: 'bearer ' + j.access_token } })).json().catch(() => []);
+    org = Array.isArray(l) && l[0] && l[0].org ? l[0].org.id : null;
+    if (!org) return (smTok = j.access_token);
+  }
+  const j = await grant(org);
+  if (!j.access_token) throw new Error('Solarman sign-in refused: ' + (j.error_description || j.error));
   return (smTok = j.access_token);
 }
 async function smPost(path, body, retried) {
   const base = smMode() === 'api' ? SM_API : SM_WEB;
   const r = await fetch(base + path, { method: 'POST', headers: { Authorization: 'bearer ' + await smToken(retried), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body || {}) });
   if (r.status === 401 && !retried) return smPost(path, body, true);
+  if (!r.ok) throw new Error('Solarman ' + r.status);
+  return r.json();
+}
+async function smGet(path, retried) {
+  const r = await fetch(SM_WEB + path, { headers: { Authorization: 'bearer ' + await smToken(retried), Accept: 'application/json' } });
+  if (r.status === 401 && !retried) return smGet(path, true);
   if (!r.ok) throw new Error('Solarman ' + r.status);
   return r.json();
 }
@@ -107,9 +125,10 @@ async function smDevices(id) {
     return (j.deviceListItems || []).map(d => ({ type: String(d.deviceType || '').toLowerCase(), sn: d.deviceSn, id: d.deviceId, online: d.connectStatus === 1, status: d.connectStatus, last: d.collectionTime ? new Date(d.collectionTime * 1000).toISOString() : null }));
   }
   const out = [];
-  for (const type of ['INVERTER', 'COLLECTOR']) {
-    let j; try { j = await smPost(`/maintain-s/power/device/${id}/device-list?deviceType=${type}`); } catch (e) { continue; }
-    for (const d of j.data || []) out.push({ type: type.toLowerCase(), sn: d.deviceSn, id: d.deviceId, online: d.deviceStatus === 1, status: d.deviceStatus, last: d.collectionTime ? new Date(d.collectionTime * 1000).toISOString() : null });
+  for (const type of ['inverter', 'collector', 'battery']) {   // the website: /maintain-s/operating/station/<id>/<type> (netState 1 = online)
+    let j; try { j = await smGet(`/maintain-s/operating/station/${id}/${type}?page=1&size=1000`); } catch (e) { continue; }
+    for (const d of j.data || []) out.push({ type, sn: d.deviceSn, id: d.id, online: d.netState === 1, status: d.netState, role: d.name || null,
+      last: d.collectionTime ? new Date(d.collectionTime * 1000).toISOString() : null, logger: d.parentDeviceType === 'COLLECTOR' ? d.parentDeviceSn : null });
   }
   return out;
 }
@@ -126,6 +145,16 @@ async function list(ctx, fresh) {
     try { const p = await smList(); v.plants.push(...p); v.sources.solarman = { ok: true, n: p.length, mode: smMode() }; }
     catch (e) { v.sources.solarman = { ok: false, connected: true, mode: smMode(), error: String(e.message || e) }; }
   }
+  // most loggers report to both platforms: a Solarman plant named like a DeyeCloud one is that plant — kept on the
+  // DeyeCloud line (tag "also on Solarman"), not listed twice and not alerted twice
+  // (same name and kWp within 10 % — Solarman's 40 kWp "Mckinsey" is not DeyeCloud's 120 kWp one; or same kWp and one name inside the other / a shared word of 4+ letters: "CPR" = "CPR Complexe…",
+  // "Raashin" = "Georges Youssef Matar (Therese Raashin)", "feytroun" = "Faytroun" by Antoine Menassa)
+  const norm = n => n.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const words = n => new Set(n.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && w !== 'villa' && w !== 'residence'));
+  const deyes = v.plants.filter(p => p.src === 'deye');
+  const twin = p => deyes.find(d => !d.alsoSolarman && norm(d.name) === norm(p.name) && Math.abs((d.kwp || 0) - (p.kwp || 0)) <= 0.1 * Math.max(d.kwp || 0, p.kwp || 0)) || deyes.find(d => !d.alsoSolarman && Math.abs((d.kwp || 0) - (p.kwp || 0)) < 0.011 &&
+    (norm(d.name).includes(norm(p.name)) || norm(p.name).includes(norm(d.name)) || [...words(p.name)].some(w => words(d.name).has(w))));
+  v.plants = v.plants.filter(p => { if (p.src !== 'solarman') return true; const d = twin(p); if (!d) return true; d.alsoSolarman = p.id; return false; });
   cache = { at: Date.now(), v };
   return v;
 }
