@@ -50,6 +50,7 @@
   .set input{width:80px;}
   /* year summary (Mario 2026-09-26: "give me the year summary, one dashboard") */
   #dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;}
+  .ytab{overflow-x:auto;} .ytab table{width:100%;} .ytab td small,.ytab th small{display:block;} .ytab tr.dy td{color:var(--sub);}
   .yc{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;}
   .yc.all{border-color:var(--amber);} .yc.all h2{color:var(--text);}
   .yc h2{margin:0;font-size:1.3rem;color:var(--amber);} .yc .cov{font-size:.72rem;color:var(--overlay0);margin:2px 0 8px;}
@@ -442,11 +443,34 @@ function deyeYearCard(y, ms) {
     <h3>Inverters <b></b></h3>${line('Produced (solar + generator)', prod)}${line('— Solar', sum('pv'))}${line('— Generator (inverter generator input)', sum('gen'))}<div class="cov adm" style="display:none;margin:-2px 0 4px">≈ Deye kept only the total before Apr 2025; split from its 5-minute production (night output and generator runs = generator; checked on Apr 2025 – Sep 2026 against the real split: within about 3 % of the generator a month). Nothing at night in 2023–24: the generator was not on the inverters' generator input then — it came in through the grid input, so "Grid input" in 2023–24 is EDL and the generator together (Mario, 2026-09-27).</div>${line('Used — UPS load', use)}${line('Grid input — EDL + generator', buy)}${line('Sold to EDL', sold)}
     <div class="yk"><div><b>${Math.round(dis / BATT_KWH)}</b><span>battery cycles</span></div><div><b>${f0(dis)}</b><span>kWh from the battery</span></div></div></div>`;
 }
+// Mario 2026-10-03: "put it in tabular form, one line per year" — the cards' figures as one table above them
+function yearTable(yrs, val) {
+  const metered = m => D.buildings.some(b => M.by[m].m[b.key] && M.by[m].m[b.key].n), td = today();
+  const rows = ['all', ...yrs].map(y => {
+    const ms = y === 'all' ? M.list.filter(metered) : M.list.filter(m => m.startsWith(y));
+    if (!ms.length) return '';
+    const S = f => ms.reduce((a, m) => a + (f(m) || 0), 0), dsum = k => S(m => M.by[m].d[k]);
+    const cyc = Math.round(dsum('discharge') / BATT_KWH), first = ms[0], last = ms[ms.length - 1];
+    const per = (y === 'all' ? MON[+first.slice(5) - 1] + ' ' + first.slice(2, 4) + ' → ' : MON[+first.slice(5) - 1] + ' → ') + (last === td.slice(0, 7) ? +td.slice(8) + ' ' : '') + MON[+last.slice(5) - 1] + (y === 'all' ? ' ' + last.slice(2, 4) : '');
+    const n = v => v == null ? '<span class="none">—</span>' : f0(v);
+    const lab = `<td><b>${y === 'all' ? 'All years' : y}</b><small>${per} · ${ms.length} mo</small></td>`;
+    if (y !== 'all' && !ms.some(metered)) {   // before the building meters (Feb 2025): Deye only
+      const pv = dsum('pv'), gen = dsum('gen'), gin = dsum('gridIn');
+      return `<tr class="dy">${lab}<td>—</td><td>—</td><td>—</td><td class="sum">—</td><td>${n(pv)}</td><td>${n(gin)}<small>EDL + gen</small></td><td>${n(gen)}</td><td class="sum">${n(pv + gin + gen)}</td><td>${pv + gin + gen ? Math.round(pv / (pv + gin + gen) * 100) + ' %' : '—'}</td><td>—</td><td>—</td><td>${n(dsum('gridOut'))}</td><td>${cyc}</td></tr>`;
+    }
+    const s = Array(10).fill(0); for (const m of ms) VIEWS.all.row(m).forEach((x, i) => { s[i] += val(x); });
+    const [school, church, kamal, bld, , solar, edl, gen, sup, sold] = s;
+    const eD = S(m => edlSplit(m).direct), gD = S(m => genSplit(m).direct);
+    return `<tr${y === 'all' ? ' class="tot"' : ''}>${lab}<td>${n(school)}</td><td>${n(church)}</td><td>${n(kamal)}</td><td class="sum">${n(bld)}</td><td>${n(solar)}</td><td>${n(edl)}</td><td>${n(gen)}</td><td class="sum">${n(sup)}</td><td>${sup ? Math.round(solar / sup * 100) + ' %' : '—'}</td><td>${n(eD)}</td><td>${n(gD)}</td><td>${n(sold)}</td><td>${cyc}</td></tr>`;
+  }).join('');
+  return `<div class="tt ytab" style="grid-column:1/-1"><table><thead><tr><th>Year</th><th>School</th><th>Church<small>from us</small></th><th>Kamal<small>Liqaa + Hotel</small></th><th class="sum">Buildings</th><th>Solar</th><th>EDL</th><th>Generators</th><th class="sum">Supply</th><th>Solar share</th><th>EDL direct<small>outside Deye</small></th><th>Gen direct<small>outside Deye</small></th><th>Sold to EDL</th><th>Battery cycles</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="st muted small">kWh. One line per year; "All years" = since the building meters (Feb 2025). 2023–2024: the Deye inverters only — no building meters yet, and their grid input then carried EDL and the generator together. The cards below give the detail.</div></div>`;
+}
 function renderYears() {
   const yrs = [...new Set(M.list.map(m => m.slice(0, 4)))].reverse();
   const val = x => { const v = Array.isArray(x) ? x[0] : x; return v && v.v != null ? v.v : 0; };
   const lpk = +store.get('cpr.lpk') || 0.3, usd = (+store.get('cpr.usd') || fuelPrice());
-  document.getElementById('dash').innerHTML = ['all', ...yrs].map(y => {
+  document.getElementById('dash').innerHTML = yearTable(yrs, val) + ['all', ...yrs].map(y => {
     const metered = m => D.buildings.some(b => M.by[m].m[b.key] && M.by[m].m[b.key].n);
     const ms = y === 'all' ? M.list.filter(metered) : M.list.filter(m => m.startsWith(y));
     if (y !== 'all' && !ms.some(metered)) return deyeYearCard(y, ms);
