@@ -21,6 +21,7 @@
   .chip{font-size:.74rem;padding:5px 10px;border-radius:999px;border:1px solid var(--surface0);background:var(--mantle);color:var(--sub);}
   .chip.ok{border-color:rgba(166,227,161,.4);color:var(--green);} .chip.no{border-color:rgba(243,139,168,.4);color:var(--red);}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
+  .kpi[data-kf]{cursor:pointer;} .kpi[data-kf]:hover{border-color:var(--surface1);}
   .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:11px 13px;}
   .kpi b{display:block;font-size:1.3rem;font-variant-numeric:tabular-nums;} .kpi span{font-size:.66rem;color:var(--overlay0);text-transform:uppercase;letter-spacing:.06em;}
   .kpi small{display:block;color:var(--sub);font-size:.68rem;margin-top:2px;}
@@ -84,7 +85,7 @@
   <div class="err" id="err"></div>
   <div class="kpis" id="kpis"></div>
   <div class="bar" id="bar" hidden>
-    <button data-f="all" class="on">All</button><button data-f="bad">Problems</button><button data-f="online">Online</button><button data-f="nodevice">No device</button>
+    <button data-f="all" class="on">All</button><button data-f="bad">Problems</button><button data-f="offline">Offline</button><button data-f="partial">Partly offline</button><button data-f="online">Online</button><button data-f="nodevice">No device</button>
     <input id="q" type="search" placeholder="Search a plant…"><span class="sp"></span><button id="refresh">↻ Refresh</button>
   </div>
   <div class="card"><table id="tbl"></table></div>
@@ -130,10 +131,10 @@
     const ps = D.plants, by = s => ps.filter(p => p.status === s).length;
     const sum = k => ps.reduce((a, p) => a + (p.status !== 'nodevice' && p[k] != null && (k === 'kwp' || k === 'month' || k === 'year' || live(p)) ? +p[k] : 0), 0);
     $('kpis').innerHTML =
-      `<div class="kpi"><span>Plants</span><b>${ps.length}</b><small>${f1(sum('kwp'))} kWp</small></div>` +
-      `<div class="kpi g"><span>Online</span><b>${by('online')}</b></div>` +
-      `<div class="kpi p"><span>Partly offline</span><b>${by('partial')}</b></div>` +
-      `<div class="kpi r"><span>Offline</span><b>${by('offline') + by('alarm')}</b><small>${by('nodevice')} without a device</small></div>` +
+      `<div class="kpi" data-kf="all"><span>Plants</span><b>${ps.length}</b><small>${f1(sum('kwp'))} kWp</small></div>` +
+      `<div class="kpi g" data-kf="online"><span>Online</span><b>${by('online')}</b></div>` +
+      `<div class="kpi p" data-kf="partial"><span>Partly offline</span><b>${by('partial')}</b></div>` +
+      `<div class="kpi r" data-kf="offline"><span>Offline</span><b>${by('offline') + by('alarm')}</b><small>${by('nodevice')} without a device</small></div>` +
       `<div class="kpi a"><span>Power now</span><b>${f0(sum('nowKw'))} kW</b></div>` +
       `<div class="kpi"><span>Today</span><b>${f0(sum('today'))} kWh</b><small>month ${f0(sum('month'))} · year ${f0(sum('year'))}</small></div>`;
     render();
@@ -145,7 +146,7 @@
   function render() {
     const q = $('q').value.trim().toLowerCase();
     let ps = D.plants.filter(p => (!q || p.name.toLowerCase().includes(q) || p.id.includes(q)) &&
-      (filter === 'all' ? true : filter === 'bad' ? RANK[p.status] <= 1 : p.status === filter));
+      (filter === 'all' ? true : filter === 'bad' ? RANK[p.status] <= 1 : filter === 'offline' ? (p.status === 'offline' || p.status === 'alarm') : p.status === filter));
     ps = ps.slice().sort((a, b) => (RANK[a.status] ?? 4) - (RANK[b.status] ?? 4) || (b.kwp || 0) - (a.kwp || 0));
     let h = `<tr><th>Plant</th><th class="hide-sm">kWp</th><th>Status</th><th>Now<small class="hide-sm">kW</small></th><th>Today<small class="hide-sm">kWh</small></th><th class="hide-sm">Month</th><th class="hide-sm">Year</th><th class="hide-sm">Last data</th></tr>`;
     for (const p of ps) {
@@ -248,10 +249,10 @@
     draw(); devices(p, draw);
   }
 
-  $('bar').addEventListener('click', e => {
-    const b = e.target.closest('button[data-f]'); if (!b) return;
-    filter = b.dataset.f; [...$('bar').querySelectorAll('button[data-f]')].forEach(x => x.classList.toggle('on', x === b)); render();
-  });
+  const setFilter = f => { filter = f; [...$('bar').querySelectorAll('button[data-f]')].forEach(x => x.classList.toggle('on', x.dataset.f === f)); render(); };
+  $('bar').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if (b) setFilter(b.dataset.f); });
+  // the status cards are filters too
+  $('kpis').addEventListener('click', e => { const k = e.target.closest('[data-kf]'); if (k && !SHARE) setFilter(k.dataset.kf); });
   $('q').addEventListener('input', () => render());
   $('refresh').addEventListener('click', () => { DEV = {}; DET = {}; load(true); });
   $('tbl').addEventListener('change', async e => {
