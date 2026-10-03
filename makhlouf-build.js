@@ -19,7 +19,7 @@ const ix = {}; head.forEach((k, i) => { if (!(k in ix)) ix[k] = i; });
 
 const INSTALL = '2026-10-02 06:30';   // Mario: moved on 2 Oct between 06:00 and 07:00
 const HOUSE = { at: '2026-08-23 16:58', epa: 8352000, epb: 4151812, epc: 4975910, aPerDay: 37 };   // last house row (Wh)
-const COLS = ['UA', 'UB', 'UC', 'IA', 'IB', 'IC', 'IN', 'PA', 'PB', 'PC', 'PSum', 'PFAvg', 'FAvg', 'UTHAvg', 'ITHAvg', 'EPSum'];
+const COLS = ['UA', 'UB', 'UC', 'IA', 'IB', 'IC', 'IN', 'PA', 'PB', 'PC', 'PSum', 'PFAvg', 'FAvg', 'UTHAvg', 'ITHAvg', 'EPSum', 'PFA', 'PFB', 'PFC', 'UTHA', 'UTHB', 'UTHC', 'ITHA', 'ITHB', 'ITHC', 'QSum', 'SSum'];
 
 const rows = [];
 let last = null;

@@ -40,7 +40,7 @@
     h1{font-size:1.05rem;} .lead{font-size:.76rem;}
     .kpis{grid-template-columns:1fr 1fr;gap:8px;} .kpi{padding:10px 12px;} .kpi b{font-size:1.1rem;} .kpi small{font-size:.64rem;}
     table{font-size:.74rem;} th{padding:7px 4px;font-size:.54rem;} td{padding:7px 4px;} th small{display:none;}
-    td:first-child,th:first-child{padding-left:10px;} .hide-sm{display:none;} .chart{height:240px;padding:8px;}
+    td:first-child,th:first-child{padding-left:10px;} .hide-sm{display:none;} #phases td,#phases th{padding:7px 3px;font-size:.68rem;} #phases th{white-space:normal;} #phases td small{font-size:.56rem;} #phases td:last-child small{display:none;} .chart{height:240px;padding:8px;}
   }
 </style>
 </head>
@@ -101,15 +101,18 @@
       `<div class="kpi"><span>Energy since install</span><b>≈ ${f0(eTot)} kWh</b><small>${f1(hrs)} h from ${when(D.install)} · avg ${f0(eTot / hrs)} kW</small></div>` +
       `<div class="kpi ${recShare < 0.9 ? 'r' : 'g'}"><span>Card recording</span><b>${Math.round(recShare * 100)} %</b><small>${R.length.toLocaleString('en-US')} of ${f0(sinceInstall)} minutes since install${gaps ? ' · ' + gaps + ' gap' + (gaps > 1 ? 's' : '') : ''}</small></div>`;
 
-    // per phase now + the energy split
+    // per phase now (Mario 2026-10-03: "show also the phase reading") + each phase's own kWh counter and its share
     if (L) {
       const imb = Math.max(L[C.IA], L[C.IB], L[C.IC]) / ((L[C.IA] + L[C.IB] + L[C.IC]) / 3) - 1;
-      const ph = (n, u, i, p, e, note) => `<tr><td>${n}</td><td>${f1(u)}</td><td>${f0(i)}</td><td>${f1(p / 1000)}</td><td>${f0(e)}<small>${note}</small></td></tr>`;
-      $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>kWh since install<small>meter counter</small></th></tr>` +
-        ph('A', L[C.UA], L[C.IA], L[C.PA], eA, `less the house ≈ ${f0(H.aPerDay * houseDays)}`) +
-        ph('B', L[C.UB], L[C.IB], L[C.PB], eB, 'exact') + ph('C', L[C.UC], L[C.IC], L[C.PC], eC, 'exact') +
-        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td></tr>` +
-        `<tr class="tot"><td>Total</td><td>${f1((L[C.UA] + L[C.UB] + L[C.UC]) / 3)}<small>average</small></td><td class="${imb > 0.2 ? 'warn' : ''}">${Math.round(imb * 100)} %<small>imbalance</small></td><td>${f1(L[C.PSum] / 1000)}</td><td>≈ ${f0(eTot)}</td></tr>`;
+      const pf = v => v == null || isNaN(v) ? '—' : v.toFixed(2);
+      const ph = (n, x, cnt, e, note) => `<tr><td>${n}</td><td>${f1(L[C['U' + x]])}</td><td>${f0(L[C['I' + x]])}</td><td>${f1(L[C['P' + x]] / 1000)}</td><td>${pf(L[C['PF' + x]])}</td>` +
+        `<td class="hide-sm">${f1(L[C['UTH' + x]])} %</td><td class="hide-sm">${f1(L[C['ITH' + x]])} %</td><td>${f1(cnt / 1000)}<small class="hide-sm">kWh on the meter</small></td><td>${f0(e)}<small>${note}</small></td></tr>`;
+      $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>PF</th><th class="hide-sm">Voltage THD</th><th class="hide-sm">Current THD</th><th>Counter<small>at ${when(K.at)}</small></th><th>kWh since install</th></tr>` +
+        ph('A', 'A', K.epa, eA, `less the house ≈ ${f0(H.aPerDay * houseDays)}`) +
+        ph('B', 'B', K.epb, eB, 'exact') + ph('C', 'C', K.epc, eC, 'exact') +
+        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td><td class="hide-sm"></td><td class="hide-sm"></td><td></td><td></td></tr>` +
+        `<tr class="tot"><td>Total</td><td>${f1((L[C.UA] + L[C.UB] + L[C.UC]) / 3)}<small>average</small></td><td class="${imb > 0.2 ? 'warn' : ''}">${Math.round(imb * 100)} %<small>imbalance</small></td><td>${f1(L[C.PSum] / 1000)}<small>${C.SSum != null ? f1(L[C.SSum] / 1000) + ' kVA' : ''}</small></td><td>${pf(L[C.PFAvg])}</td>` +
+        `<td class="hide-sm">${f1(L[C.UTHAvg])} %</td><td class="hide-sm">${f1(L[C.ITHAvg])} %</td><td>${f1(K.epsum / 1000)}</td><td>≈ ${f0(eTot)}</td></tr>`;
     }
 
     // chart: total + each phase, kW per minute; a gap > 3 min breaks the line
@@ -132,13 +135,13 @@
     // hour by hour from the recorded minutes (kWh = Σ kW × 1 min; only what the card holds)
     const hr = {};
     for (const r of R) {
-      const k = r[0].slice(0, 13), h = hr[k] = hr[k] || { n: 0, kwh: 0, max: 0, amax: 0, vmin: 1e9, vmax: 0, thd: 0 };
+      const k = r[0].slice(0, 13), h = hr[k] = hr[k] || { n: 0, kwh: 0, max: 0, amax: 0, vmin: 1e9, vmax: 0, thd: 0, ia: 0, ib: 0, ic: 0, pa: 0, pb: 0, pc: 0 };
       const kw = r[C.PSum] / 1000; h.n++; h.kwh += kw / 60; h.max = Math.max(h.max, kw);
-      h.amax = Math.max(h.amax, r[C.IA], r[C.IB], r[C.IC]); h.vmin = Math.min(h.vmin, r[C.UA], r[C.UB], r[C.UC]); h.vmax = Math.max(h.vmax, r[C.UA], r[C.UB], r[C.UC]); h.thd += r[C.ITHAvg];
+      h.amax = Math.max(h.amax, r[C.IA], r[C.IB], r[C.IC]); h.vmin = Math.min(h.vmin, r[C.UA], r[C.UB], r[C.UC]); h.vmax = Math.max(h.vmax, r[C.UA], r[C.UB], r[C.UC]); h.thd += r[C.ITHAvg]; h.ia += r[C.IA]; h.ib += r[C.IB]; h.ic += r[C.IC]; h.pa += r[C.PA] / 1000; h.pb += r[C.PB] / 1000; h.pc += r[C.PC] / 1000;
     }
     const keys = Object.keys(hr).sort();
-    $('hours').innerHTML = `<tr><th>Hour</th><th>Minutes<small>recorded</small></th><th>kWh<small>recorded</small></th><th>Avg kW</th><th>Max kW</th><th class="hide-sm">Max A<small>one phase</small></th><th class="hide-sm">Volts<small>min–max</small></th><th class="hide-sm">Current THD</th></tr>` +
-      (keys.length ? keys.map(k => { const h = hr[k]; return `<tr><td>${when(k + ':00')}</td><td class="${h.n < 55 ? 'warn' : ''}">${h.n}</td><td>${f1(h.kwh)}</td><td>${f1(h.kwh * 60 / h.n)}</td><td>${f1(h.max)}</td><td class="hide-sm">${f0(h.amax)}</td><td class="hide-sm">${f0(h.vmin)}–${f0(h.vmax)}</td><td class="hide-sm">${f1(h.thd / h.n)} %</td></tr>`; }).join('') : '<tr><td colspan="8">No minutes recorded since the install yet.</td></tr>');
+    $('hours').innerHTML = `<tr><th>Hour</th><th>Minutes<small>recorded</small></th><th>kWh<small>recorded</small></th><th>Avg kW</th><th>Max kW</th><th>A<small>kW · amps</small></th><th>B<small>kW · amps</small></th><th>C<small>kW · amps</small></th><th class="hide-sm">Max A<small>one phase</small></th><th class="hide-sm">Volts<small>min–max</small></th><th class="hide-sm">Current THD</th></tr>` +
+      (keys.length ? keys.map(k => { const h = hr[k]; return `<tr><td>${when(k + ':00')}</td><td class="${h.n < 55 ? 'warn' : ''}">${h.n}</td><td>${f1(h.kwh)}</td><td>${f1(h.kwh * 60 / h.n)}</td><td>${f1(h.max)}</td>${[['pa', 'ia'], ['pb', 'ib'], ['pc', 'ic']].map(([p, i]) => `<td>${f1(h[p] / h.n)}<small>${f0(h[i] / h.n)} A</small></td>`).join('')}<td class="hide-sm">${f0(h.amax)}</td><td class="hide-sm">${f0(h.vmin)}–${f0(h.vmax)}</td><td class="hide-sm">${f1(h.thd / h.n)} %</td></tr>`; }).join('') : '<tr><td colspan="11">No minutes recorded since the install yet.</td></tr>');
 
     $('lead').innerHTML = `Maison M Naccache generator (300–600 kVA MTS) · logger ${D.serial} · SD card read up to <b>${when(K.at)}</b> (${D.file}).`;
     $('note').innerHTML =
