@@ -49,6 +49,16 @@
   .tag{font-size:.6rem;padding:1px 6px;border-radius:999px;border:1px solid var(--surface1);color:var(--sub);margin-left:4px;vertical-align:middle;}
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
   .note b{color:var(--text);font-weight:600;}
+  .flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px;}
+  .flow div{background:var(--mantle);border:1px solid var(--surface0);border-radius:10px;padding:8px 10px;}
+  .flow span{display:block;font-size:.6rem;color:var(--overlay0);text-transform:uppercase;letter-spacing:.06em;}
+  .flow b{font-size:1.05rem;font-variant-numeric:tabular-nums;} .flow small{display:block;color:var(--sub);font-size:.66rem;margin-top:2px;}
+  .flow .bad b{color:var(--red);}
+  .sect{font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--overlay0);margin:12px 0 6px;font-weight:600;}
+  .ep{border-left:3px solid var(--red);background:rgba(243,139,168,.08);border-radius:0 8px 8px 0;padding:7px 10px;font-size:.76rem;margin-bottom:6px;line-height:1.45;}
+  .ep.done{border-left-color:var(--peach);background:rgba(250,179,135,.06);}
+  tr.rec td:first-child{color:var(--peach);font-weight:600;}
+  .watch{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;color:var(--sub);cursor:pointer;}
   .err{color:var(--red);font-size:.85rem;margin:14px 0;}
   .muted{color:var(--overlay0);}
   @media (max-width:640px){
@@ -58,6 +68,7 @@
     table{font-size:.74rem;} th{padding:7px 4px;font-size:.54rem;} td{padding:8px 4px;} td.name{min-width:0;}
     td:first-child,th:first-child{padding-left:10px;} td:last-child,th:last-child{padding-right:10px;}
     .hide-sm{display:none;} .st b{display:none;}
+    .flow{grid-template-columns:1fr 1fr;max-width:calc(100vw - 50px);} .flow b{font-size:.95rem;} .ep,.watch{max-width:calc(100vw - 50px);}
   }
 </style>
 </head>
@@ -99,7 +110,7 @@
     return Math.round(m / 1440) + ' days ago';
   };
   const when = iso => iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
-  let D = null, filter = 'all', open = {}, DEV = {};
+  let D = null, filter = 'all', open = {}, DEV = {}, DET = {};
   // a plant silent for over 2 h keeps its last power and its last day's kWh on DeyeCloud — not shown as now / today
   const live = p => !!p.last && Date.now() - new Date(p.last) < 2 * 3600e3;
 
@@ -148,13 +159,49 @@
     $('tbl').innerHTML = h;
   }
 
+  const hm = iso => iso ? new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }) : '—';
+  // power flow + source health + alarms of an opened plant (GET /api/plants/detail)
+  function flowHtml(p, share) {
+    const x = DET[p.src + ':' + p.id];
+    if (!x) return '<div class="muted" style="margin-bottom:8px">Reading the power flow…</div>';
+    if (x.error) return `<div class="err">${esc(x.error)}</div>`;
+    let h = '';
+    const f = x.flow, t = x.today || {}, s = x.source;
+    if (f) {
+      const b = f.battKw, bTxt = b == null ? '' : b > 0.05 ? `discharging ${f1(b)} kW` : b < -0.05 ? `charging ${f1(-b)} kW` : 'idle';
+      const g = f.gridKw;
+      h += `<div class="flow">` +
+        `<div><span>☀ Solar</span><b>${f1(f.solarKw)} kW</b><small>today ${f1(t.solar)} kWh</small></div>` +
+        `<div><span>🏠 Load</span><b>${f1(f.loadKw)} kW</b><small>today ${f1(t.load)} kWh</small></div>` +
+        `<div><span>🔋 Battery</span><b>${f.soc == null ? '—' : f.soc + ' %'}</b><small>${bTxt}${t.charge != null ? ` · in ${f1(t.charge)} / out ${f1(t.discharge)} kWh` : ''}</small></div>` +
+        `<div><span>⚡ Grid / gen in</span><b>${g == null ? '—' : f1(g) + ' kW'}</b><small>today ${f1(t.gridIn)} kWh${f.genKw ? ` · gen port ${f1(f.genKw)} kW` : ''}${t.gen ? ` · gen ${f1(t.gen)} kWh` : ''}</small></div>`;
+      if (s) h += `<div class="${s.hzBad ? 'bad' : ''}"><span>Source on the grid port</span><b>${s.v > 150 ? f0(s.v) + ' V · ' + (s.hz == null ? '—' : s.hz.toFixed(2)) + ' Hz' : 'none'}</b><small>${s.hzBad ? 'frequency outside 49–51 Hz · ' : ''}present ${f1(s.presentH)} h today</small></div>`;
+      h += `</div><div class="muted" style="font-size:.68rem;margin:-4px 0 6px">reading of ${hm(f.at)}${s ? '' : ' · no grid voltage on this platform for this plant'}</div>`;
+    }
+    if (s && s.episodes.length) {
+      h += `<div class="sect">Source there but not accepted</div>` + s.episodes.map(e =>
+        `<div class="ep ${e.active ? '' : 'done'}">${e.active ? '<b>Now</b> · ' : ''}${hm(e.from)}–${e.active ? 'now' : hm(e.to)} · ${f0(e.v)} V · ${e.hzMin == null ? '' : e.hzMin.toFixed(1) + '–' + e.hzMax.toFixed(1) + ' Hz'} · import ≈ 0 · SOC ${e.socFrom} % → ${e.socTo} %</div>`).join('');
+    }
+    if (!share && x.alarms) {
+      if (x.alarms.error) h += `<div class="sect">Alarms</div><div class="err">${esc(x.alarms.error)}</div>`;
+      else {
+        h += `<div class="sect">Alarms · last 7 days${x.alarms.length ? ` (${x.alarms.length})` : ''}</div>`;
+        h += !x.alarms.length ? '<div class="muted" style="font-size:.76rem">None.</div>' :
+          `<table class="dev"><tr><th>Alarm</th><th>Device</th><th>Start</th><th>End</th></tr>` + x.alarms.map(a =>
+            `<tr class="${a.count > 1 ? 'rec' : ''}"><td>${esc(a.name)}${a.count > 1 ? ` <small>×${a.count} this week</small>` : ''}</td><td>${esc(a.device)}</td><td>${when(a.from)}</td><td>${a.to ? when(a.to) : '<b style="color:var(--red)">open</b>'}</td></tr>`).join('') + `</table>`;
+      }
+    }
+    if (!share && x.watch != null) h += `<div style="margin-top:8px"><label class="watch"><input type="checkbox" data-watch="${p.src}:${p.id}" ${x.watch ? 'checked' : ''}> Telegram me when a grid / generator source is there but refused while the battery drains</label></div>`;
+    return h + '<div class="sect">Devices</div>';
+  }
+
   function devHtml(p, share) {
     const k = p.src + ':' + p.id, d = DEV[k];
-    let h = '';
-    if (!d) h = '<span class="muted">Reading the devices…</span>';
-    else if (d.error) h = `<span class="err">${esc(d.error)}</span>`;
-    else if (!d.length) h = '<span class="muted">No devices on this plant.</span>';
-    else h = `<table class="dev"><tr><th>Device</th><th>Serial</th><th>Status</th><th>Now kW</th><th class="hide-sm">Today kWh</th><th>Last data</th></tr>` +
+    let h = flowHtml(p, share);
+    if (!d) h += '<span class="muted">Reading the devices…</span>';
+    else if (d.error) h += `<span class="err">${esc(d.error)}</span>`;
+    else if (!d.length) h += '<span class="muted">No devices on this plant.</span>';
+    else h += `<table class="dev"><tr><th>Device</th><th>Serial</th><th>Status</th><th>Now kW</th><th class="hide-sm">Today kWh</th><th>Last data</th></tr>` +
       d.map(x => `<tr><td>${esc(x.type)}${x.role ? ' · ' + esc(x.role) : ''}${x.ratedKw ? ' <small>' + f0(x.ratedKw) + ' kW</small>' : ''}</td><td>${esc(x.sn)}${x.logger ? '<small>logger ' + esc(x.logger) + '</small>' : ''}</td>` +
         `<td><span class="st ${x.online ? 'online' : 'offline'}"><i></i>${x.online ? 'online' : 'offline'}</span></td><td>${x.kw != null ? f1(x.kw) : ''}</td><td class="hide-sm">${x.today != null ? f1(x.today) : ''}</td>` +
         `<td>${when(x.last)}${!x.online && x.last ? '<small>' + ago(x.last) + '</small>' : ''}</td></tr>`).join('') + `</table>`;
@@ -165,13 +212,21 @@
     return h;
   }
 
+  // the devices first (fast), then the detail (power flow, source, alarms — a few seconds), which also fills the
+  // device rows' now kW / today kWh that Solarman leaves empty
   async function devices(p, rerender) {
     const k = p.src + ':' + p.id;
+    const qs = `?src=${p.src}&id=${p.id}` + (SHARE ? `&k=${encodeURIComponent(SHARE.k)}` : '');
     try {
-      const qs = `?src=${p.src}&id=${p.id}` + (SHARE ? `&k=${encodeURIComponent(SHARE.k)}` : '');
       const r = await fetch('/api/plants/devices' + qs, { credentials: 'same-origin' }); const j = await r.json();
       DEV[k] = j.error ? { error: j.error } : j.devices;
     } catch (e) { DEV[k] = { error: String(e.message || e) }; }
+    rerender();
+    try {
+      const r = await fetch('/api/plants/detail' + qs, { credentials: 'same-origin' }); const j = await r.json();
+      DET[k] = j.error ? { error: j.error } : j;
+      if (!j.error && j.devices) DEV[k] = j.devices;
+    } catch (e) { DET[k] = { error: String(e.message || e) }; }
     rerender();
   }
 
@@ -198,8 +253,16 @@
     filter = b.dataset.f; [...$('bar').querySelectorAll('button[data-f]')].forEach(x => x.classList.toggle('on', x === b)); render();
   });
   $('q').addEventListener('input', () => render());
-  $('refresh').addEventListener('click', () => { DEV = {}; load(true); });
+  $('refresh').addEventListener('click', () => { DEV = {}; DET = {}; load(true); });
+  $('tbl').addEventListener('change', async e => {
+    const c = e.target.closest('input[data-watch]'); if (!c) return;
+    const [src, id] = c.dataset.watch.split(':');
+    const r = await fetch(`/api/plants/watch?src=${src}&id=${id}&on=${c.checked ? 1 : 0}`, { method: 'POST', credentials: 'same-origin' });
+    if (!r.ok) { c.checked = !c.checked; alert('Could not save the watch.'); return; }
+    if (DET[c.dataset.watch]) DET[c.dataset.watch].watch = c.checked;
+  });
   $('tbl').addEventListener('click', e => {
+    if (e.target.closest('label.watch')) return;
     const c = e.target.closest('button[data-copy]');
     if (c) { navigator.clipboard.writeText(c.dataset.copy).then(() => { c.textContent = 'Copied ✓'; setTimeout(() => { c.textContent = 'Copy client link'; }, 1500); }); return; }
     const tr = e.target.closest('tr.row'); if (!tr || SHARE) return;

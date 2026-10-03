@@ -1033,7 +1033,9 @@ const handler = async (req, res) => {
     const json = (code, v) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); };
     const src = q.get('src') === 'solarman' ? 'solarman' : 'deye', id = String(q.get('id') || '').replace(/\D/g, '');
     const shared = !!id && !!q.get('k') && q.get('k') === P.shareKey(src, id);
-    const acc = shared ? { isAdmin: false } : await cprAccess();
+    const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const machine = bearer.length >= 16 && bearer === process.env.ACCOUNTING_API_KEY;   // the laptop's key: fixtures / tests
+    const acc = shared ? { isAdmin: false } : machine ? { isAdmin: true } : await cprAccess();
     if (!acc.isAdmin && !shared) return json(401, { error: 'admin' });
     try {
       if (url.split('?')[0] === '/api/plants') {
@@ -1041,7 +1043,17 @@ const handler = async (req, res) => {
         if (shared) return json(200, { at: v.at, plants: v.plants.filter(p => p.src === src && p.id === id), sources: {} });
         return json(200, { ...v, plants: v.plants.map(p => ({ ...p, share: P.shareKey(p.src, p.id) })) });
       }
-      if (url.split('?')[0] === '/api/plants/devices' && id) return json(200, { devices: await P.devices({ db, TEAM_ID }, src, id) });
+      if (url.split('?')[0] === '/api/plants/devices' && id) return json(200, { devices: (await P.devices({ db, TEAM_ID }, src, id)).map(({ fd, ...d }) => d) });
+      // one plant opened: power flow, grid/gen source health, alarms (alarms + the watch flag for admins only)
+      if (url.split('?')[0] === '/api/plants/detail' && id) {
+        const ctx = { db, TEAM_ID };
+        const d = await P.detail(ctx, src, id, { alarms: acc.isAdmin, rows: acc.isAdmin && q.get('rows') === '1' });
+        if (acc.isAdmin) d.watch = !!(await P.watching(ctx))[`${src}:${id}`];
+        return json(200, d);
+      }
+      if (url.split('?')[0] === '/api/plants/watch' && req.method === 'POST' && acc.isAdmin && id) {
+        return json(200, { source: await P.setWatch({ db, TEAM_ID }, src, id, q.get('on') === '1') });
+      }
       return json(404, { error: 'not found' });
     } catch (e) { console.error('plants error:', e); return json(500, { error: e.message }); }
   }
