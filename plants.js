@@ -147,12 +147,14 @@ async function list(ctx, fresh) {
   }
   // most loggers report to both platforms: a Solarman plant named like a DeyeCloud one is that plant — kept on the
   // DeyeCloud line (tag "also on Solarman"), not listed twice and not alerted twice
-  // (same name and kWp within 10 % — Solarman's 40 kWp "Mckinsey" is not DeyeCloud's 120 kWp one; or same kWp and one name inside the other / a shared word of 4+ letters: "CPR" = "CPR Complexe…",
+  // Mario 2026-10-03: "where there is conflict or duplication, Deye is the updated platform — we moved many plants
+  // to Deye". So the same name = the DeyeCloud plant wins, whatever Solarman says (its 40 kWp "Mckinsey" = the earlier
+  // record of DeyeCloud's 120 kWp one). Also (same kWp and one name inside the other / a shared word of 4+ letters: "CPR" = "CPR Complexe…",
   // "Raashin" = "Georges Youssef Matar (Therese Raashin)", "feytroun" = "Faytroun" by Antoine Menassa)
   const norm = n => n.toLowerCase().replace(/[^a-z0-9]/g, '');
   const words = n => new Set(n.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && w !== 'villa' && w !== 'residence'));
   const deyes = v.plants.filter(p => p.src === 'deye');
-  const twin = p => deyes.find(d => !d.alsoSolarman && norm(d.name) === norm(p.name) && Math.abs((d.kwp || 0) - (p.kwp || 0)) <= 0.1 * Math.max(d.kwp || 0, p.kwp || 0)) || deyes.find(d => !d.alsoSolarman && Math.abs((d.kwp || 0) - (p.kwp || 0)) < 0.011 &&
+  const twin = p => deyes.find(d => !d.alsoSolarman && norm(d.name) === norm(p.name)) || deyes.find(d => !d.alsoSolarman && Math.abs((d.kwp || 0) - (p.kwp || 0)) < 0.011 &&
     (norm(d.name).includes(norm(p.name)) || norm(p.name).includes(norm(d.name)) || [...words(p.name)].some(w => words(d.name).has(w))));
   v.plants = v.plants.filter(p => { if (p.src !== 'solarman') return true; const d = twin(p); if (!d) return true; d.alsoSolarman = p.id; return false; });
   cache = { at: Date.now(), v };
