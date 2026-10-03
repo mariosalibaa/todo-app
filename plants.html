@@ -30,7 +30,7 @@
   .bar button,.bar input{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:999px;padding:6px 12px;font-size:.78rem;font-family:inherit;cursor:pointer;}
   .bar input{border-radius:8px;cursor:text;flex:1;min-width:140px;max-width:260px;}
   .bar button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
-  .bar .sp{flex:1;}
+  .bar .sp{flex:1;} .bar .sep{width:1px;align-self:stretch;background:var(--surface0);margin:0 4px;}
   .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;overflow-x:auto;}
   table{width:100%;border-collapse:collapse;font-size:.8rem;}
   th{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
@@ -86,6 +86,7 @@
   <div class="kpis" id="kpis"></div>
   <div class="bar" id="bar" hidden>
     <button data-f="all" class="on">All</button><button data-f="bad">Problems</button><button data-f="offline">Offline</button><button data-f="partial">Partly offline</button><button data-f="online">Online</button><button data-f="nodevice">No device</button>
+    <span class="sep"></span><button data-p="all" class="on">Both platforms</button><button data-p="deye">DeyeCloud</button><button data-p="solarman">Solarman</button>
     <input id="q" type="search" placeholder="Search a plant…"><span class="sp"></span><button id="refresh">↻ Refresh</button>
   </div>
   <div class="card"><table id="tbl"></table></div>
@@ -111,7 +112,7 @@
     return Math.round(m / 1440) + ' days ago';
   };
   const when = iso => iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
-  let D = null, filter = 'all', open = {}, DEV = {}, DET = {};
+  let D = null, filter = 'all', platform = 'all', open = {}, DEV = {}, DET = {};
   // a plant silent for over 2 h keeps its last power and its last day's kWh on DeyeCloud — not shown as now / today
   const live = p => !!p.last && Date.now() - new Date(p.last) < 2 * 3600e3;
 
@@ -146,6 +147,7 @@
   function render() {
     const q = $('q').value.trim().toLowerCase();
     let ps = D.plants.filter(p => (!q || p.name.toLowerCase().includes(q) || p.id.includes(q)) &&
+      (platform === 'all' || (platform === 'deye' ? p.src === 'deye' : p.src === 'solarman' || !!p.alsoSolarman)) &&
       (filter === 'all' ? true : filter === 'bad' ? RANK[p.status] <= 1 : filter === 'offline' ? (p.status === 'offline' || p.status === 'alarm') : p.status === filter));
     ps = ps.slice().sort((a, b) => (RANK[a.status] ?? 4) - (RANK[b.status] ?? 4) || (b.kwp || 0) - (a.kwp || 0));
     let h = `<tr><th>Plant</th><th class="hide-sm">kWp</th><th>Status</th><th>Now<small class="hide-sm">kW</small></th><th>Today<small class="hide-sm">kWh</small></th><th class="hide-sm">Month</th><th class="hide-sm">Year</th><th class="hide-sm">Last data</th></tr>`;
@@ -250,7 +252,12 @@
   }
 
   const setFilter = f => { filter = f; [...$('bar').querySelectorAll('button[data-f]')].forEach(x => x.classList.toggle('on', x.dataset.f === f)); render(); };
-  $('bar').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if (b) setFilter(b.dataset.f); });
+  $('bar').addEventListener('click', e => {
+    const b = e.target.closest('button[data-f]'); if (b) return setFilter(b.dataset.f);
+    // platform: DeyeCloud = every plant read from DeyeCloud; Solarman = Solarman-only plants + Deye plants also on Solarman
+    const q = e.target.closest('button[data-p]'); if (!q) return;
+    platform = q.dataset.p; [...$('bar').querySelectorAll('button[data-p]')].forEach(x => x.classList.toggle('on', x === q)); render();
+  });
   // the status cards are filters too
   $('kpis').addEventListener('click', e => { const k = e.target.closest('[data-kf]'); if (k && !SHARE) setFilter(k.dataset.kf); });
   $('q').addEventListener('input', () => render());
