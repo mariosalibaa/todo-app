@@ -203,9 +203,9 @@ async function load() {
     const rows = d.list.map(x => {
       const src = `/api/cpr/fuel/${x.id}/file?k=${encodeURIComponent(KEY)}`;
       const img = x.file ? (/pdf$/.test(x.file.mime) ? `<a class="thumb pdf" href="${src}" target="_blank">📄</a>` : `<a class="thumb" href="${src}" target="_blank"><img loading="lazy" src="${src}" alt=""></a>`) : '<span class="none">—</span>';
-      return `<tr><td>${+x.date.slice(8)} ${MON[+x.date.slice(5, 7) - 1]} ${x.date.slice(2, 4)}${x.note ? `<small>${esc(x.note)}</small>` : ''}</td><td>${x.litres ? f2(x.litres) : ''}</td><td>${x.usd ? '$' + f2(x.usd) : ''}</td><td>${x.litres && x.usd ? '$' + (x.usd / x.litres).toFixed(2) : ''}</td><td>${img}</td>${ADMIN ? `<td><button class="del" onclick="del('${x.id}')" title="Delete this fill">🗑</button></td>` : ''}</tr>`;
+      return `<tr><td>${+x.date.slice(8)} ${MON[+x.date.slice(5, 7) - 1]} ${x.date.slice(2, 4)}${x.note ? `<small>${esc(x.note)}</small>` : ''}</td><td>${x.litres ? f2(x.litres) : ''}</td><td>${x.usd ? '$' + f2(x.usd) : ''}</td><td>${x.litres && x.usd ? '$' + (x.usd / x.litres).toFixed(2) : ''}</td><td>${x.litres && x.usd ? '$' + Math.round(x.usd / x.litres * 1000).toLocaleString('en-US') : ''}</td><td>${img}</td>${ADMIN ? `<td><button class="del" onclick="del('${x.id}')" title="Delete this fill">🗑</button></td>` : ''}</tr>`;
     }).join('');
-    document.getElementById('list').innerHTML = rows ? `<table class="fills"><thead><tr><th>Date</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>Bill</th>${ADMIN ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table>` : '';
+    document.getElementById('list').innerHTML = rows ? `<table class="fills"><thead><tr><th>Date</th><th>Litres</th><th>Paid</th><th>$ / L</th><th>$ / 1000 L</th><th>Bill</th>${ADMIN ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table>` : '';
   } catch (e) { if (e.quiet) return; document.getElementById('msg').className = 'err'; document.getElementById('msg').textContent = e.message; }
 }
 // Mario 2026-09-26: the quantities and prices by month, against the kWh the generators produced (/api/cpr)

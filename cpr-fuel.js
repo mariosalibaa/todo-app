@@ -10,6 +10,7 @@
 // (CPR_FUEL_KEY, ?k= or x-cpr-key) only counts again with CPR_FUEL_REQUIRE_CODE=1; a wrong code then waits 2 s.
 
 const files = require('./hub-files');
+const BIG_GEN_FROM = '2026-07-13';   // the big generator was installed 13 Jul 2026 (Mario) — its controller counts from 0 there
 const GENS = { big: 'Generator big', church: 'Generator church', small: 'Generator small', other: 'Other' };
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -77,6 +78,63 @@ async function handle(req, res, url, ctx) {
     let f = {}; try { f = mm ? JSON.parse(mm[0]) : {}; } catch (e) {}
     return json(res, 200, { litres: +f.litres > 0 ? +f.litres : null, usd: +f.usd > 0 ? +f.usd : null,
       date: /^\d{4}-\d{2}-\d{2}$/.test(f.date || '') ? f.date : null, gen: GENS[f.gen] ? f.gen : null, note: String(f.note || '').slice(0, 200) });
+  }
+  // The big generator's own controller (Mario 2026-10-03: "add the controller as a fixed reference") — a photo of its
+  // GEN ENERGY / ENG RUN TIME screens now and then; /cpr compares its kWh since the install with Deye's generator input.
+  //   GET /api/cpr/fuel/genlog  list · POST { date, kwh, kvah?, kvarh?, hours?, starts?, trips?, dataBase64? } admin
+  //   POST /api/cpr/fuel/genlog/read { dataBase64, mime } admin → the figures read off the photo · DELETE …/genlog/<id> admin
+  const glog = db.collection('workspaces').doc(TEAM_ID).collection('cprGenLog');
+  if (p === '/api/cpr/fuel/genlog' && req.method === 'GET') {
+    const snap = await glog.orderBy('date', 'desc').limit(200).get();
+    return json(res, 200, { since: BIG_GEN_FROM, admin: !!isAdmin, list: snap.docs.map(d => { const x = d.data(); return { ...x, file: x.file ? { name: x.file.name, mime: x.file.mime } : null }; }) });
+  }
+  if (p === '/api/cpr/fuel/genlog' && req.method === 'POST') {
+    if (!isAdmin) return json(res, 403, { error: 'admin only' });
+    const b = await readBody(req);
+    const date = String(b.date || '').slice(0, 10), num = k => +b[k] >= 0 && b[k] !== '' && b[k] != null ? +b[k] : null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json(res, 400, { error: 'date' });
+    if (!(+b.kwh > 0)) return json(res, 400, { error: 'kWh needed' });
+    const id = newId();
+    const doc = { id, date, kwh: +b.kwh, kvah: num('kvah'), kvarh: num('kvarh'), hours: num('hours'), starts: num('starts'), trips: num('trips'), who: 'admin', at: new Date().toISOString() };
+    if (b.dataBase64) {
+      const buf = Buffer.from(String(b.dataBase64).replace(/^data:[^,]*,/, ''), 'base64');
+      if (buf.length > 4e6) return json(res, 400, { error: 'photo over 4 MB' });
+      doc.file = await files.saveFile(ctx, { buf, mime: 'image/jpeg', name: `big gen controller ${date}.jpg`, key: `cpr-genlog/${id}.jpg`, who: 'admin', meta: { cprGenLog: id } });
+    }
+    await glog.doc(id).set(doc);
+    return json(res, 200, { ...doc, file: doc.file ? { name: doc.file.name } : null });
+  }
+  if (p === '/api/cpr/fuel/genlog/read' && req.method === 'POST') {
+    if (!isAdmin) return json(res, 403, { error: 'admin only' });
+    const b = await readBody(req), apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return json(res, 501, { error: 'no_api_key' });
+    const data = String(b.dataBase64 || '').replace(/^data:[^,]*,/, ''), mime = /^image\/(jpeg|png|webp|gif)$/.test(b.mime || '') ? b.mime : 'image/jpeg';
+    if (!data) return json(res, 400, { error: 'no image' });
+    const system = 'You read a photo of a generator controller screen (GEN ENERGY: kWh, kVAh, kVArh; or ENG RUN TIME: hours + minutes, STARTS, TRIPS). ' +
+      'Answer ONLY with JSON: {"kwh": number|null, "kvah": number|null, "kvarh": number|null, "hours": number|null, "starts": number|null, "trips": number|null}. hours = hours + minutes/60. Unknown → null.';
+    const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, system,
+        messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data } }, { type: 'text', text: 'Read this screen.' }] }] }) });
+    const out = await r.json();
+    if (!r.ok) return json(res, 502, { error: 'Claude: ' + (out.error && out.error.message || r.status) });
+    const mm = (out.content || []).map(c => c.text || '').join('').match(/\{[\s\S]*\}/);
+    let f = {}; try { f = mm ? JSON.parse(mm[0]) : {}; } catch (e) {}
+    const o = {}; for (const k of ['kwh', 'kvah', 'kvarh', 'hours', 'starts', 'trips']) o[k] = +f[k] >= 0 && f[k] != null ? +f[k] : null;
+    return json(res, 200, o);
+  }
+  if ((m = /^\/api\/cpr\/fuel\/genlog\/([\w-]+)\/file$/.exec(p)) && req.method === 'GET') {
+    const d = await glog.doc(m[1]).get();
+    if (!d.exists || !d.data().file) { res.writeHead(404); res.end('not found'); return true; }
+    await files.streamFile(ctx, d.data().file, res, req);
+    return true;
+  }
+  if ((m = /^\/api\/cpr\/fuel\/genlog\/([\w-]+)$/.exec(p)) && req.method === 'DELETE') {
+    if (!isAdmin) return json(res, 403, { error: 'admin only' });
+    const d = await glog.doc(m[1]).get();
+    if (d.exists && d.data().file) { try { await files.deleteFile(ctx, d.data().file); } catch (e) {} }
+    await glog.doc(m[1]).delete();
+    return json(res, 200, { ok: true });
   }
   if ((m = /^\/api\/cpr\/fuel\/([\w-]+)\/file$/.exec(p)) && req.method === 'GET') {
     const d = await col.doc(m[1]).get();

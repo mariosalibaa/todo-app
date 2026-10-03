@@ -180,7 +180,8 @@ fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : nul
 let FUEL = {};
 // $ per litre: what Kamal's fills cost on average (Mario 2026-09-27), unless the admin typed a price
 const fuelPrice = () => { let l = 0, u = 0; for (const o of Object.values(FUEL)) { if (o.l && o.usd) { l += o.l; u += o.usd; } } return l ? u / l : 0; };
-function loadFuel() { fetch('/api/cpr/fuel', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(d => { FUEL = {}; for (const x of (d && d.list) || []) { const k = x.date.slice(0, 7); const o = FUEL[k] || (FUEL[k] = { l: 0, usd: 0, n: 0 }); o.l += x.litres || 0; o.usd += x.usd || 0; o.n++; } if (M) render(); }).catch(() => {}); }
+let FUEL_LIST = null;
+function loadFuel() { fetch('/api/cpr/fuel', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(d => { FUEL = {}; FUEL_LIST = (d && d.list) || []; for (const x of (d && d.list) || []) { const k = x.date.slice(0, 7); const o = FUEL[k] || (FUEL[k] = { l: 0, usd: 0, n: 0 }); o.l += x.litres || 0; o.usd += x.usd || 0; o.n++; } if (M) render(); }).catch(() => {}); }
 let D = null, M = null, MD = null, tab = store.get('cpr.tab') || 'live', open = new Set();
 
 async function load(fresh) {
@@ -651,8 +652,8 @@ function renderReadings() {
   const m = rdMonth(), d = RD[m];
   if (!d) { loadReadings(m); }
   const dash = document.getElementById('dash');
-  if (!d || d.loading) { dash.innerHTML = '<div class="tt">Reading the meters in openHAB…</div>'; return; }
-  if (d.error) { dash.innerHTML = `<div class="tt"><span style="color:var(--amber)">openHAB not reachable (${esc(d.error)})</span> <button onclick="delete RD['${m}']; render()">Try again</button></div>`; return; }
+  if (!d || d.loading) { dash.innerHTML = genCard() + '<div class="tt">Reading the meters in openHAB…</div>'; return; }
+  if (d.error) { dash.innerHTML = genCard() + `<div class="tt"><span style="color:var(--amber)">openHAB not reachable (${esc(d.error)})</span> <button onclick="delete RD['${m}']; render()">Try again</button></div>`; return; }
   const day = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short' });
   const rd = x => x == null ? '<span class="none">—</span>' : `${x.kwh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${x.exact && !x.latest ? '' : `<small>${x.latest ? 'latest · ' : 'read '}${esc(when(x.at))}</small>`}`;
   const endHead = d.running ? 'Latest reading' : `Reading ${day(d.to)} 00:00`;
@@ -664,9 +665,65 @@ function renderReadings() {
     if (diff != null && !off && x.group !== 'source' && ['school', 'church', 'liqaa', 'hotel'].includes(x.key)) { tot += diff; any = true; }
     return `<tr><td>${RD_NAME[x.key] || esc(x.name)}</td><td>${rd(x.start)}</td><td>${rd(x.end)}</td><td class="sum">${diff == null ? '<span class="none">—</span>' : f0(diff)}${off ? '<small style="color:var(--amber)">meter changed or offline — see the month table</small>' : ''}</td><td class="wide">${page == null ? '<span class="none">—</span>' : f0(page)}</td></tr>`;
   }).join('');
-  dash.innerHTML = `<div class="tt"><table><thead><tr><th>Meter</th><th>Reading ${day(d.from)} 00:00</th><th>${endHead}</th><th class="sum">kWh used</th><th class="wide">Month table<small>kWh</small></th></tr></thead><tbody>${rows}
+  dash.innerHTML = genCard() + `<div class="tt"><table><thead><tr><th>Meter</th><th>Reading ${day(d.from)} 00:00</th><th>${endHead}</th><th class="sum">kWh used</th><th class="wide">Month table<small>kWh</small></th></tr></thead><tbody>${rows}
     ${any ? `<tr class="tot"><td>Buildings</td><td></td><td></td><td>${f0(tot)}</td><td class="wide"></td></tr>` : ''}</tbody></table></div>
     <div class="st muted small">The counters as the meters show them (kWh), read by openHAB at midnight Beirut time. A small time under a reading = openHAB had no reading at midnight (the Pi was offline) and this is the nearest one. "Month table" = the month's kWh in the other tabs, which also use the meters' SD cards. Readings from Feb 2025.</div>`;
+}
+// The big generator's own controller (Mario 2026-10-03) — its kWh counter since the install (13 Jul 2026) against
+// Deye's generator input over the same days: what the controller counted above Deye went straight to Kamal through
+// the bypass, outside the inverters. Readings = photos of the controller screen (admin adds them, the photo is read).
+let GL = null;
+function loadGenLog() {
+  GL = GL || { loading: true };
+  fetch('/api/cpr/fuel/genlog', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : { error: 'HTTP ' + r.status }).then(d => { GL = d; if (tab === 'rd') render(); }).catch(e => { GL = { error: String(e.message || e) }; });
+}
+const deyeGen = (from, to) => { if (!D.deye || !D.deye.days) return null; const gi = D.deye.fields.indexOf('gen'); let s = 0; D.deye.days.forEach((d, i) => { if (d >= from && d <= to && D.deye.data[i]) s += D.deye.data[i][gi] || 0; }); return s; };
+function genCard() {
+  if (!GL) loadGenLog();
+  if (!GL || GL.loading) return '';
+  if (GL.error) return `<div class="tt muted small">Big generator counter: ${esc(GL.error)}</div>`;
+  const since = GL.since, n1 = v => v == null ? '<span class="none">—</span>' : v.toLocaleString('en-US', { maximumFractionDigits: 1 });
+  const dname = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const rows = GL.list.map(x => {
+    const dg = deyeGen(since, x.date), by = dg == null ? null : x.kwh - dg;
+    const litres = ADMIN && FUEL_LIST ? FUEL_LIST.filter(f => f.date >= since && f.date <= x.date).reduce((s, f) => s + (f.litres || 0), 0) : 0;
+    return `<tr><td>${dname(x.date)}${x.file ? ` <a href="/api/cpr/fuel/genlog/${esc(x.id)}/file" target="_blank">photo</a>` : ''}</td><td class="sum">${n1(x.kwh)}</td><td>${n1(dg == null ? null : Math.round(dg))}</td>
+      <td class="sum">${by == null ? '<span class="none">—</span>' : f0(by)}${by != null && x.kwh ? `<small>${(by / x.kwh * 100).toFixed(0)} %</small>` : ''}</td>
+      <td class="wide">${x.hours == null ? '<span class="none">—</span>' : `${Math.floor(x.hours)} h ${Math.round(x.hours % 1 * 60)} min<small>${(x.kwh / x.hours).toFixed(0)} kW average</small>`}</td>
+      <td class="wide">${x.starts == null ? '—' : x.starts} / ${x.trips == null ? '—' : x.trips}</td>
+      <td class="wide">${x.kvah ? (x.kwh / x.kvah).toFixed(2) : '—'}</td>
+      ${ADMIN ? `<td class="wide">${litres ? `${f0(litres)} L<small>${(x.kwh / litres).toFixed(2)} kWh/L</small>` : '—'}</td><td class="wide"><button onclick="genDel(this, '${esc(x.id)}')">✕</button></td>` : ''}</tr>`;
+  }).join('');
+  const t = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+  const form = ADMIN ? `<div class="batset" id="glform">Add a reading: photo <input type="file" accept="image/*" id="glph" onchange="genRead(this)"> date <input type="date" id="gldate" value="${t}"> kWh <input type="number" step="0.1" id="glkwh"> kVAh <input type="number" step="0.1" id="glkvah"> kVArh <input type="number" step="0.1" id="glkvarh"> hours <input type="number" step="0.01" id="glhours"> starts <input type="number" id="glstarts"> trips <input type="number" id="gltrips"> <button onclick="genSave()">Save</button> <span id="glmsg" class="muted"></span> <span class="muted">· admin</span></div>` : '';
+  return `<div class="tt"><div class="st"><b>Big generator — its own counter</b> <span class="muted">· installed ${dname(since)}, counts from 0 there</span></div>
+    ${GL.list.length ? `<table><thead><tr><th>Reading</th><th class="sum">Controller<small>kWh</small></th><th>Deye generator input<small>kWh, same days</small></th><th class="sum">Direct to Kamal<small>bypass, kWh</small></th><th class="wide">Run time</th><th class="wide">Starts / trips</th><th class="wide">Power factor</th>${ADMIN ? '<th class="wide">Diesel since install<small>admin</small></th><th class="wide"></th>' : ''}</tr></thead><tbody>${rows}</tbody></table>` : '<div class="muted">No reading yet.</div>'}
+    <div class="st muted small">The controller counts everything the generator makes; Deye only what passes through the inverters. The difference went straight to Kamal (Liqaa + Hotel) through the bypass. The M7 meter is not used here — its configuration is to be checked on site.</div>${form}</div>`;
+}
+function genImg(file) { return new Promise((ok, no) => { const im = new Image(); im.onload = () => { const k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = im.width * k; c.height = im.height * k; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', 0.85)); }; im.onerror = no; im.src = URL.createObjectURL(file); }); }
+let GL_PHOTO = null;
+async function genRead(inp) {
+  const f = inp.files[0], m = document.getElementById('glmsg'); if (!f) return;
+  m.textContent = 'Reading the photo…';
+  try {
+    GL_PHOTO = await genImg(f);
+    const r = await (await fetch('/api/cpr/fuel/genlog/read', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataBase64: GL_PHOTO, mime: 'image/jpeg' }) })).json();
+    if (r.error) { m.textContent = r.error; return; }
+    for (const k of ['kwh', 'kvah', 'kvarh', 'hours', 'starts', 'trips']) { const el = document.getElementById('gl' + k); if (r[k] != null && !el.value) el.value = k === 'hours' ? r[k].toFixed(2) : r[k]; }
+    m.textContent = 'Read — check the boxes, then Save (a photo of the second screen fills the empty boxes).';
+  } catch (e) { m.textContent = String(e.message || e); }
+}
+async function genSave() {
+  const v = k => document.getElementById('gl' + k).value, m = document.getElementById('glmsg');
+  const body = { date: v('date'), kwh: v('kwh'), kvah: v('kvah'), kvarh: v('kvarh'), hours: v('hours'), starts: v('starts'), trips: v('trips'), dataBase64: GL_PHOTO };
+  m.textContent = 'Saving…';
+  const r = await (await fetch('/api/cpr/fuel/genlog', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+  if (r.error) { m.textContent = r.error; return; }
+  GL_PHOTO = null; GL = null; loadGenLog();
+}
+async function genDel(b, id) {
+  if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Delete?'; return; }
+  await fetch('/api/cpr/fuel/genlog/' + id, { method: 'DELETE', credentials: 'same-origin' }); GL = null; loadGenLog();
 }
 // Mario 2026-10-01: "did you check phase by phase?" — every openHAB item of the chosen meter over one day (admin)
 async function phases() {
