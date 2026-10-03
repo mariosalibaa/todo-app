@@ -206,25 +206,31 @@ function sourceHealth(rows, now = Date.now()) {
     if (rows[i].v > 150) out.presentH += dt / 3600;
   }
   out.presentH = Math.round(out.presentH * 10) / 10;
+  // A battery-first inverter also leaves a healthy source unused while the SOC is high (Bookstop 3 Oct, 15:17–17:05:
+  // SOC 99 → 69 %, 49–50 Hz) — normal. So a run only counts when the battery goes below SOC_FLOOR while the source is
+  // there (it should have taken over by then), or when the frequency sits outside 49–51 Hz for most of the run.
+  // Each stretch (a one-sample blip of ≤ 5 min does not end it) is judged on its own; qualifying stretches less than
+  // 15 min apart are then one episode, which must last ≥ 20 min with the SOC falling.
+  const SOC_FLOOR = 30;
   const bad = r => r.v > 150 && r.grid != null && Math.abs(r.grid) < 100 && r.batt > 0;
-  let run = null;
-  const close = (endIdx) => {
-    if (!run) return;
-    const a = rows[run.i], b = rows[endIdx];
-    if (b.t - a.t >= 20 * 60 && a.soc != null && b.soc != null && b.soc < a.soc) {
-      const seg = rows.slice(run.i, endIdx + 1), hz = seg.map(r => r.hz).filter(x => x != null);
-      out.episodes.push({ from: new Date(a.t * 1000).toISOString(), to: new Date(b.t * 1000).toISOString(), socFrom: a.soc, socTo: b.soc,
-        hzMin: hz.length ? Math.min(...hz) : null, hzMax: hz.length ? Math.max(...hz) : null, v: Math.round(seg.reduce((s, r) => s + r.v, 0) / seg.length),
-        active: endIdx === rows.length - 1 && now / 1000 - b.t < 20 * 60 });
-    }
-    run = null;
-  };
+  const pieces = [];
   for (let i = 0; i < rows.length; i++) {
-    if (run && rows[i].t - rows[i - 1].t > 15 * 60) close(i - 1);   // a hole in the data ends the run
-    if (bad(rows[i])) { if (!run) run = { i }; }
-    else close(i - 1);
+    if (!bad(rows[i])) continue;
+    const p = pieces[pieces.length - 1];
+    if (p && rows[i].t - rows[p.j].t <= 6 * 60) p.j = i; else pieces.push({ i, j: i });
   }
-  close(rows.length - 1);
+  const stats = (i, j) => { const seg = rows.slice(i, j + 1).filter(bad), hz = seg.map(r => r.hz).filter(x => x != null);
+    return { seg, hz, offHz: hz.filter(x => x < 49 || x > 51).length, minSoc: Math.min(...seg.map(r => r.soc).filter(x => x != null)) }; };
+  const ok = pieces.filter(p => { const s = stats(p.i, p.j); return s.minSoc < SOC_FLOOR || s.offHz > s.hz.length / 2; });
+  const merged = [];
+  for (const p of ok) { const m = merged[merged.length - 1]; if (m && rows[p.i].t - rows[m.j].t <= 15 * 60) m.j = p.j; else merged.push({ ...p }); }
+  for (const m of merged) {
+    const a = rows[m.i], b = rows[m.j], s = stats(m.i, m.j);
+    if (b.t - a.t < 20 * 60 || a.soc == null || b.soc == null || !(b.soc < a.soc)) continue;
+    out.episodes.push({ from: new Date(a.t * 1000).toISOString(), to: new Date(b.t * 1000).toISOString(), socFrom: a.soc, socTo: b.soc,
+      hzMin: s.hz.length ? Math.min(...s.hz) : null, hzMax: s.hz.length ? Math.max(...s.hz) : null, v: Math.round(s.seg.reduce((x, r) => x + r.v, 0) / s.seg.length),
+      why: s.offHz > s.hz.length / 2 ? 'hz' : 'soc', active: m.j >= rows.length - 3 && now / 1000 - b.t < 20 * 60 });
+  }
   return out;
 }
 

@@ -40,9 +40,15 @@ const fx = path.join(__dirname, 'fixtures', 'bookstop-2026-10-03.json');
 if (fs.existsSync(fx)) {
   const rows = JSON.parse(fs.readFileSync(fx, 'utf8'));
   const h = sourceHealth(rows, Date.parse('2026-10-04T00:00:00+03:00'));
-  const ev = h.episodes.find(e => iso2t(e.from) <= Date.parse('2026-10-03T17:30:00+03:00') / 1000 && iso2t(e.to) >= Date.parse('2026-10-03T18:45:00+03:00') / 1000);
-  assert.ok(ev, 'Bookstop 3 Oct: the 17:00–19:15 episode is found — got ' + JSON.stringify(h.episodes.map(e => [hm(iso2t(e.from)), hm(iso2t(e.to)), e.socFrom, e.socTo])));
+  const ev = h.episodes.find(e => iso2t(e.from) <= Date.parse('2026-10-03T18:30:00+03:00') / 1000 && iso2t(e.to) >= Date.parse('2026-10-03T18:45:00+03:00') / 1000);
+  assert.ok(ev, 'Bookstop 3 Oct: the refusal is caught before the 19:04 F56 trip — got ' + JSON.stringify(h.episodes.map(e => [hm(iso2t(e.from)), hm(iso2t(e.to)), e.socFrom, e.socTo])));
   assert.ok(ev.socFrom - ev.socTo >= 30, 'the battery fell by 30+ points');
   console.log(`✓ Bookstop 3 Oct: ${hm(iso2t(ev.from))}–${hm(iso2t(ev.to))}, SOC ${ev.socFrom} → ${ev.socTo} %, ${ev.hzMin}–${ev.hzMax} Hz; all episodes:`,
     h.episodes.map(e => `${hm(iso2t(e.from))}–${hm(iso2t(e.to))}`).join(', '));
 } else console.log('· no Bookstop fixture yet (fixtures/bookstop-2026-10-03.json)');
+// the battery-first afternoon (healthy source unused while the SOC is high) must not be an episode
+if (fs.existsSync(fx)) {
+  const h = sourceHealth(JSON.parse(fs.readFileSync(fx, 'utf8')), Date.parse('2026-10-04T00:00:00+03:00'));
+  assert.ok(!h.episodes.some(e => iso2t(e.from) < Date.parse('2026-10-03T17:30:00+03:00') / 1000), 'no episode in the battery-first afternoon');
+  console.log('✓ battery-first afternoon ignored');
+}
