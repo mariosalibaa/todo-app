@@ -159,6 +159,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
   fs.readFileSync(path.join(__dirname, 'cpr.html'));
   fs.readFileSync(path.join(__dirname, 'cpr-fuel.html'));
+  fs.readFileSync(path.join(__dirname, 'cpr-dynamic.html'));
   fs.readFileSync(path.join(__dirname, 'mahab.html'));
   fs.readFileSync(path.join(__dirname, 'scan-editor.js'));
 }
@@ -730,6 +731,7 @@ const handler = async (req, res) => {
     'procurement.html': path.join(__dirname, 'procurement.html'),
     'cpr.html': path.join(__dirname, 'cpr.html'),
     'cpr-fuel.html': path.join(__dirname, 'cpr-fuel.html'),
+    'cpr-dynamic.html': path.join(__dirname, 'cpr-dynamic.html'),
     'mahab.html': path.join(__dirname, 'mahab.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/members': 'hub.html', '/ask': 'hub.html',   // members & access, the decisions desk (admin views of the hub page)
@@ -747,6 +749,7 @@ const handler = async (req, res) => {
     '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
     '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
+    '/cpr/dynamic': 'cpr-dynamic.html',   // big generator fuel vs Cummins datasheet — PUBLIC snapshot for the supplier, no prices (Mario 2026-10-03)
     '/cpr/diesel': 'cpr-fuel.html' };   // Kamal's diesel fills (private link: /cpr/diesel?k=CPR_FUEL_KEY)   // CPR energy — kWh per building / source per month; PUBLIC, no sign-in, no hub bar (Mario, 2026-09-26: "open for everyone")
   // /whatsapp — the WhatsApp Archive (whatsapp-local on Mario's laptop, 2013 → today, refreshed from
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from

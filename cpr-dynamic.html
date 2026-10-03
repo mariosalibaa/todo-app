@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CPR big generator — fuel vs datasheet</title>
+<!-- hub.shift-group.co/cpr/dynamic — a snapshot for Dynamic, the big generator's supplier (Mario 2026-10-03: "one link to share
+     with the supplier … all data of this gen"). PUBLIC, no password, no prices, no site names beyond CPR. Static figures —
+     to refresh: new controller reading + Deye 5-min run hours per fill period (scratchpad genhours.cjs recipe in memory). -->
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --ink: #15181C; --mut: #6b7076; --line: #e3e1dc; --amber: #F2A93B; --red: #c0392b; --green: #2e7d4f; --head: #15181C; --headInk: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111315; --card: #1a1d21; --ink: #e9e7e2; --mut: #9aa0a6; --line: #2c3035; --head: #0b0c0e; --headInk: #fff; --red: #ff7a6b; --green: #6fcf97; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--head); color: var(--headInk); padding: 22px 16px 20px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header .wrap { padding: 0; max-width: 1040px; }
+  .mark { font-family: "Century Gothic", "Futura", "Avenir", sans-serif; letter-spacing: .32em; font-weight: 700; color: var(--amber); font-size: 13px; }
+  h1 { margin: 6px 0 4px; font-size: 24px; line-height: 1.25; }
+  header p { margin: 0; color: #b9bdc2; font-size: 14px; }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 16px 0; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .kpi b { display: block; font-size: 22px; line-height: 1.2; }
+  .kpi span { color: var(--mut); font-size: 13px; }
+  .kpi.bad b { color: var(--red); }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 9px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 12px; color: var(--mut); font-weight: 600; vertical-align: bottom; white-space: normal; }
+  tr.tot td { font-weight: 700; border-top: 2px solid var(--ink); }
+  td.hi { color: var(--red); font-weight: 600; }
+  td.ok { color: var(--green); }
+  small { color: var(--mut); }
+  .note { color: var(--mut); font-size: 13px; margin: 10px 0 0; }
+  ol, ul { margin: 6px 0 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  .big { font-size: 20px; font-weight: 700; color: var(--red); }
+  footer { color: var(--mut); font-size: 12px; text-align: center; padding: 8px 16px 28px; }
+  .pbtn { float: right; background: var(--amber); color: #15181C; border: 0; border-radius: 6px; padding: 7px 12px; font-weight: 600; cursor: pointer; }
+  /* phone: the fill table becomes one card per fill */
+  @media (max-width: 640px) {
+    h1 { font-size: 20px; }
+    table.cards thead { display: none; }
+    table.cards, table.cards tbody, table.cards tr, table.cards td { display: block; width: 100%; }
+    table.cards tr { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 10px; padding: 6px 10px; }
+    table.cards td { display: flex; justify-content: space-between; gap: 12px; border: 0; padding: 3px 0; text-align: right; white-space: normal; }
+    table.cards td::before { content: attr(data-l); color: var(--mut); text-align: left; font-size: 13px; }
+    table.cards td:first-child { font-weight: 700; font-size: 16px; border-bottom: 1px solid var(--line); padding-bottom: 5px; margin-bottom: 3px; }
+    table.cards td:first-child::before { content: ''; }
+    table.cards tr.tot { border: 2px solid var(--ink); }
+    table.cards tr.tot td { border-top: 0; }
+    .pbtn { display: none; }
+  }
+  @media print { body { background: #fff; color: #000; } section { break-inside: avoid; border-color: #ccc; } .pbtn { display: none; } header { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="mark">SHIFT GROUP</div>
+  <h1>CPR big generator — diesel used vs the Cummins datasheet</h1>
+  <p>Cummins 6LTAA9.5-G1 · 256 kWe / 320 kVA prime · installed 13 Jul 2026 · data to 3 Oct 2026</p>
+</div></header>
+
+<div class="wrap">
+<section>
+  <button class="pbtn" onclick="window.print()">Save as PDF</button>
+  <h2>In short</h2>
+  <div class="kpis">
+    <div class="kpi"><b>116 kWe</b><span>average load (45 % of prime)</span></div>
+    <div class="kpi"><b>34 L/h</b><span>datasheet at that load</span></div>
+    <div class="kpi bad"><b>46 L/h</b><span>actual, average</span></div>
+    <div class="kpi"><b>0.29 L/kWh</b><span>datasheet at that load</span></div>
+    <div class="kpi bad"><b>0.39 L/kWh</b><span>actual (complete periods)</span></div>
+    <div class="kpi bad"><b>+34 %</b><span>more diesel than the datasheet (+893 L)</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Generator controller — reading on 3 Oct 2026</h2>
+  <div class="kpis">
+    <div class="kpi"><b>10,219.2</b><span>kWh since installation</span></div>
+    <div class="kpi"><b>10,274.8</b><span>kVAh</span></div>
+    <div class="kpi"><b>967.6</b><span>kVArh</span></div>
+    <div class="kpi"><b>0.99</b><span>power factor (kWh ÷ kVAh)</span></div>
+    <div class="kpi"><b>87 h 47 min</b><span>engine run time</span></div>
+    <div class="kpi"><b>115 / 5</b><span>starts / trips</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Fill by fill</h2>
+  <div class="scroll">
+  <table class="cards">
+    <thead><tr><th>Fill</th><th>Litres delivered</th><th>kWh until next fill</th><th>Run hours</th><th>Average load kWe</th><th>Datasheet L/h at that load</th><th>Actual L/h</th><th>Datasheet litres for the period</th><th>Actual L/kWh</th><th>Datasheet L/kWh</th></tr></thead>
+    <tbody>
+      <tr><td>13 Jul (install)</td><td data-l="Litres delivered">fuel already in tank</td><td data-l="kWh until next fill">511</td><td data-l="Run hours">4.8</td><td data-l="Average load kWe">106</td><td data-l="Datasheet L/h">31.5</td><td data-l="Actual L/h">—</td><td data-l="Datasheet litres">152</td><td data-l="Actual L/kWh">—</td><td data-l="Datasheet L/kWh">0.30</td></tr>
+      <tr><td>20 Jul</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">1,241</td><td data-l="Run hours">11.3</td><td data-l="Average load kWe">110</td><td data-l="Datasheet L/h">32.4</td><td data-l="Actual L/h" class="hi">44.2</td><td data-l="Datasheet litres">367</td><td data-l="Actual L/kWh" class="hi">0.40</td><td data-l="Datasheet L/kWh">0.30</td></tr>
+      <tr><td>31 Jul</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">1,520</td><td data-l="Run hours">11.0</td><td data-l="Average load kWe">138</td><td data-l="Datasheet L/h">39.7</td><td data-l="Actual L/h" class="hi">45.5</td><td data-l="Datasheet litres">437</td><td data-l="Actual L/kWh" class="hi">0.33</td><td data-l="Datasheet L/kWh">0.29</td></tr>
+      <tr><td>7 Aug</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">966</td><td data-l="Run hours">9.1</td><td data-l="Average load kWe">106</td><td data-l="Datasheet L/h">31.5</td><td data-l="Actual L/h" class="hi">54.9</td><td data-l="Datasheet litres">287</td><td data-l="Actual L/kWh" class="hi">0.52</td><td data-l="Datasheet L/kWh">0.30</td></tr>
+      <tr><td>18 Aug</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">1,444</td><td data-l="Run hours">11.8</td><td data-l="Average load kWe">122</td><td data-l="Datasheet L/h">35.6</td><td data-l="Actual L/h" class="hi">42.2</td><td data-l="Datasheet litres">421</td><td data-l="Actual L/kWh" class="hi">0.35</td><td data-l="Datasheet L/kWh">0.29</td></tr>
+      <tr><td>25 Aug</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">989</td><td data-l="Run hours">8.9</td><td data-l="Average load kWe">111</td><td data-l="Datasheet L/h">32.8</td><td data-l="Actual L/h" class="hi">56.1</td><td data-l="Datasheet litres">292</td><td data-l="Actual L/kWh" class="hi">0.51</td><td data-l="Datasheet L/kWh">0.30</td></tr>
+      <tr><td>8 Sep</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">1,085</td><td data-l="Run hours">9.7</td><td data-l="Average load kWe">111</td><td data-l="Datasheet L/h">32.9</td><td data-l="Actual L/h" class="hi">51.3</td><td data-l="Datasheet litres">320</td><td data-l="Actual L/kWh" class="hi">0.46</td><td data-l="Datasheet L/kWh">0.30</td></tr>
+      <tr><td>23 Sep</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">1,658</td><td data-l="Run hours">13.3</td><td data-l="Average load kWe">125</td><td data-l="Datasheet L/h">36.3</td><td data-l="Actual L/h">37.6</td><td data-l="Datasheet litres">483</td><td data-l="Actual L/kWh">0.30</td><td data-l="Datasheet L/kWh">0.29</td></tr>
+      <tr><td>28 Sep</td><td data-l="Litres delivered">500</td><td data-l="kWh until next fill">806 <small>to 3 Oct</small></td><td data-l="Run hours">7.7</td><td data-l="Average load kWe">105</td><td data-l="Datasheet L/h">31.3</td><td data-l="Actual L/h"><small>in progress</small></td><td data-l="Datasheet litres">240</td><td data-l="Actual L/kWh"><small>in progress</small></td><td data-l="Datasheet L/kWh">0.30</td></tr>
+      <tr class="tot"><td>Total</td><td data-l="Litres delivered">4,000 L</td><td data-l="kWh">10,219</td><td data-l="Run hours">87.8</td><td data-l="Average load kWe">116</td><td data-l="Datasheet L/h">34.2</td><td data-l="Actual L/h" class="hi">45.6</td><td data-l="Datasheet litres">≈ 3,000 L</td><td data-l="Actual L/kWh" class="hi">0.39</td><td data-l="Datasheet L/kWh">0.29</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Each period's litres assume that fill was used up before the next one. Tank levels were not measured, so a single period can swing; the total of the complete periods below is the reliable figure.</p>
+</section>
+
+<section>
+  <h2>The seven complete periods (20 Jul → 28 Sep)</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th></th><th>Litres</th><th>kWh</th><th>Run hours</th><th>L/kWh</th><th>L per hour</th></tr></thead>
+    <tbody>
+      <tr><td>Delivered</td><td class="hi">3,500</td><td>8,903</td><td>75.2</td><td class="hi">0.39</td><td class="hi">46.5</td></tr>
+      <tr><td>Datasheet at the same load and hours</td><td>2,607</td><td>8,903</td><td>75.2</td><td>0.29</td><td>34.7</td></tr>
+      <tr class="tot"><td>Difference</td><td class="hi">+893 L (+34 %)</td><td></td><td></td><td class="hi">+0.10</td><td class="hi">+11.8</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Cummins 6LTAA9.5-G1 datasheet — 1500 rpm, 50 Hz, prime power</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Load</th><th>Gross engine kWm</th><th>Electrical kWe</th><th>L/h</th><th>g/kWh</th><th>L per kWh electrical</th></tr></thead>
+    <tbody>
+      <tr><td>100 %</td><td>290</td><td>256</td><td>70</td><td>199</td><td>0.27</td></tr>
+      <tr><td>75 %</td><td>218</td><td>189</td><td>52</td><td>196</td><td>0.28</td></tr>
+      <tr><td>50 %</td><td>145</td><td>120</td><td>35</td><td>197</td><td>0.29</td></tr>
+      <tr><td>25 %</td><td>73</td><td>53</td><td>18</td><td>210</td><td>0.34</td></tr>
+      <tr class="tot"><td>Our average</td><td>≈ 140</td><td>116</td><td>≈ 34</td><td></td><td>0.29</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">kWe from the datasheet's own ratio at prime (290 kWm gross → 273 kWm net after the 13 kWm fan → 256 kWe). Between the points: L/h ≈ 4.5 + 0.255 × kWe. Source: Cummins specification sheet 6LTAA9.5-G1 (07/18), S-6385.</p>
+</section>
+
+<section>
+  <h2>How the figures were measured</h2>
+  <ul>
+    <li><b>Energy</b> — the generator feeds the site's three 50 kW inverters, which log the generator input every 5 minutes. Their total for 13 Jul → 3 Oct is 4.95 % below the controller (9,737 kWh), so each period is scaled up by 4.95 % to match the controller's 10,219 kWh.</li>
+    <li><b>Run hours</b> — from the same 5-minute data (minutes with the generator delivering), scaled to the controller's 87 h 47 min.</li>
+    <li><b>Diesel</b> — every delivery is 500 L (supplier statement), 8 deliveries since installation.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>What we ask Dynamic to check</h2>
+  <p>At 106–138 kWe the engine has burned <b>42–56 L/h</b>, where the datasheet gives <b>31–40 L/h</b>.</p>
+  <ol>
+    <li>Fuel system: injectors, injection pump timing, return line, any leak.</li>
+    <li>Air filter and intake / exhaust restriction.</li>
+    <li>Governor and speed setting (1500 rpm, 50 Hz).</li>
+    <li>Controller kWh and run-hour counters (CT ratio set correctly).</li>
+  </ol>
+  <p class="note">Next on our side: a sealed tank test — tank level, controller kWh and hours read before and after a week with no delivery.</p>
+</section>
+</div>
+<footer>Shift Group · Make the Shift · shift-group.co · figures as of 3 Oct 2026</footer>
+</body>
+</html>
