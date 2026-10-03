@@ -155,7 +155,9 @@ async function list(ctx, fresh) {
   const norm = n => n.toLowerCase().replace(/[^a-z0-9]/g, '');
   const words = n => new Set(n.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && w !== 'villa' && w !== 'residence'));
   const deyes = v.plants.filter(p => p.src === 'deye');
-  const twin = p => deyes.find(d => !d.alsoSolarman && norm(d.name) === norm(p.name)) || deyes.find(d => !d.alsoSolarman && Math.abs((d.kwp || 0) - (p.kwp || 0)) < 0.011 &&
+  // the same plant under another name on each platform — confirmed by Mario (2026-10-03: Solarman "Rabih Naccache" = Deye "Rabih Felfley")
+  const SAME = { 'solarman:1780179': 'deye:62329900' };
+  const twin = p => deyes.find(d => SAME[`${p.src}:${p.id}`] === `deye:${d.id}`) || deyes.find(d => !d.alsoSolarman && norm(d.name) === norm(p.name)) || deyes.find(d => !d.alsoSolarman && Math.abs((d.kwp || 0) - (p.kwp || 0)) < 0.011 &&
     (norm(d.name).includes(norm(p.name)) || norm(p.name).includes(norm(d.name)) || [...words(p.name)].some(w => words(d.name).has(w))));
   v.plants = v.plants.filter(p => { if (p.src !== 'solarman') return true; const d = twin(p); if (!d) return true; d.alsoSolarman = p.id; return false; });
   cache = { at: Date.now(), v };
