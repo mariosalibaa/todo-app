@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Makhlouf Generator · Shift Group</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--blue:#89b4fa;--red:#f38ba8;}
+  *{box-sizing:border-box;}
+  html,body{background:var(--base);}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  main{max-width:1100px;margin:0 auto;padding:20px 16px 60px;}
+  h1{font-size:1.25rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.82rem;margin:0 0 14px;line-height:1.5;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;}
+  .kpi b{display:block;font-size:1.35rem;font-variant-numeric:tabular-nums;} .kpi span{font-size:.68rem;color:var(--overlay0);text-transform:uppercase;letter-spacing:.06em;}
+  .kpi small{display:block;color:var(--sub);font-size:.7rem;margin-top:2px;}
+  .kpi.a b{color:var(--amber);} .kpi.r b{color:var(--red);} .kpi.g b{color:var(--green);}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;overflow-x:auto;padding:4px 0;}
+  .chart{padding:12px;height:300px;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  th small{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:.62rem;}
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:7px 8px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  td small{display:block;color:var(--overlay0);font-size:.64rem;}
+  td.warn{color:var(--red);} tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);}
+  .mh{font-size:.95rem;margin:22px 0 8px;font-weight:600;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
+  .note b{color:var(--text);font-weight:600;}
+  .err{color:var(--red);font-size:.85rem;margin:20px 0;}
+  @media (max-width:640px){
+    header{padding:12px 16px;} main{padding:14px 12px 40px;}
+    h1{font-size:1.05rem;} .lead{font-size:.76rem;}
+    .kpis{grid-template-columns:1fr 1fr;gap:8px;} .kpi{padding:10px 12px;} .kpi b{font-size:1.1rem;} .kpi small{font-size:.64rem;}
+    table{font-size:.74rem;} th{padding:7px 4px;font-size:.54rem;} td{padding:7px 4px;} th small{display:none;}
+    td:first-child,th:first-child{padding-left:10px;} .hide-sm{display:none;} .chart{height:240px;padding:8px;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>MAKHLOUF · GENERATOR</small></div>
+  <a class="hback" href="/">Hub</a>
+</header>
+<main>
+  <h1>Makhlouf generator — power logger</h1>
+  <p class="lead" id="lead">Maison M Naccache generator (300–600 kVA MTS) · logger 3322205001 · read from its SD card.</p>
+  <div class="err" id="err"></div>
+  <div id="app" hidden>
+    <div class="kpis" id="kpis"></div>
+    <h2 class="mh">By phase · last reading</h2>
+    <div class="card"><table id="phases"></table></div>
+    <h2 class="mh" id="chartH">Load, minute by minute</h2>
+    <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
+    <h2 class="mh">Hour by hour</h2>
+    <div class="card"><table id="hours"></table></div>
+    <div class="note" id="note"></div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const f0 = v => v == null || isNaN(v) ? '—' : Math.round(v).toLocaleString('en-US');
+  const f1 = v => v == null || isNaN(v) ? '—' : (Math.round(v * 10) / 10).toLocaleString('en-US');
+  const when = s => { const [d, t] = s.split(' '); return `${+d.slice(8)} ${MON[+d.slice(5, 7) - 1]} ${t.slice(0, 5)}`; };
+  const sec = s => new Date(s.replace(' ', 'T').slice(0, 16) + ':00+03:00').getTime() / 1000;   // Beirut clock
+
+  async function load() {
+    const r = await fetch('/api/makhlouf', { credentials: 'same-origin' });
+    if (r.status === 401) { $('err').textContent = 'Sign in to the Shift Hub first (admins only).'; return; }
+    const D = await r.json();
+    if (D.error) { $('err').textContent = D.error; return; }
+    $('app').hidden = false;
+    const C = D.cols.reduce((o, k, i) => (o[k] = i, o), {});
+    const R = D.rows, L = R[R.length - 1];
+
+    // energy since the install from the meter's counters (they count even when the card does not record)
+    const H = D.house, K = D.counters;
+    const houseDays = (sec(D.install) - sec(H.at)) / 86400;
+    const eB = (K.epb - H.epb) / 1000, eC = (K.epc - H.epc) / 1000, eA = (K.epa - H.epa) / 1000 - H.aPerDay * houseDays;
+    const eTot = eA + eB + eC, hrs = (sec(K.at) - sec(D.install)) / 3600;
+
+    // what the card recorded: minutes, gaps over 3 min
+    let gaps = 0, gapMin = 0;
+    for (let i = 1; i < R.length; i++) { const g = (sec(R[i][0]) - sec(R[i - 1][0])) / 60; if (g > 3) { gaps++; gapMin += g; } }
+    const span = R.length ? (sec(L[0]) - sec(R[0][0])) / 60 + 1 : 0, cover = span ? R.length / span : 0;
+    const sinceInstall = (sec(K.at) - sec(D.install)) / 60, recShare = R.length / sinceInstall;
+
+    $('kpis').innerHTML =
+      `<div class="kpi a"><span>Load now</span><b>${L ? f1(L[C.PSum] / 1000) + ' kW' : '—'}</b><small>${L ? when(L[0]) + ' · PF ' + L[C.PFAvg].toFixed(2) : 'no reading'}</small></div>` +
+      `<div class="kpi r"><span>Peak demand</span><b>${f1(D.peak.kw)} kW</b><small>${D.peak.at ? when(D.peak.at) : ''} · ${f0(D.peak.amps)} A avg (meter register)</small></div>` +
+      `<div class="kpi"><span>Energy since install</span><b>≈ ${f0(eTot)} kWh</b><small>${f1(hrs)} h from ${when(D.install)} · avg ${f0(eTot / hrs)} kW</small></div>` +
+      `<div class="kpi ${recShare < 0.9 ? 'r' : 'g'}"><span>Card recording</span><b>${Math.round(recShare * 100)} %</b><small>${R.length.toLocaleString('en-US')} of ${f0(sinceInstall)} minutes since install${gaps ? ' · ' + gaps + ' gap' + (gaps > 1 ? 's' : '') : ''}</small></div>`;
+
+    // per phase now + the energy split
+    if (L) {
+      const imb = Math.max(L[C.IA], L[C.IB], L[C.IC]) / ((L[C.IA] + L[C.IB] + L[C.IC]) / 3) - 1;
+      const ph = (n, u, i, p, e, note) => `<tr><td>${n}</td><td>${f1(u)}</td><td>${f0(i)}</td><td>${f1(p / 1000)}</td><td>${f0(e)}<small>${note}</small></td></tr>`;
+      $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>kWh since install<small>meter counter</small></th></tr>` +
+        ph('A', L[C.UA], L[C.IA], L[C.PA], eA, `less the house ≈ ${f0(H.aPerDay * houseDays)}`) +
+        ph('B', L[C.UB], L[C.IB], L[C.PB], eB, 'exact') + ph('C', L[C.UC], L[C.IC], L[C.PC], eC, 'exact') +
+        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td></tr>` +
+        `<tr class="tot"><td>Total</td><td>${f1((L[C.UA] + L[C.UB] + L[C.UC]) / 3)}<small>average</small></td><td class="${imb > 0.2 ? 'warn' : ''}">${Math.round(imb * 100)} %<small>imbalance</small></td><td>${f1(L[C.PSum] / 1000)}</td><td>≈ ${f0(eTot)}</td></tr>`;
+    }
+
+    // chart: total + each phase, kW per minute; a gap > 3 min breaks the line
+    const pts = [], pa = [], pb = [], pc = [];
+    R.forEach((r, i) => {
+      if (i && sec(r[0]) - sec(R[i - 1][0]) > 180) { const x = (sec(R[i - 1][0]) + 60) * 1000; [pts, pa, pb, pc].forEach(s => s.push({ x, y: null })); }
+      const x = sec(r[0]) * 1000;
+      pts.push({ x, y: r[C.PSum] / 1000 }); pa.push({ x, y: r[C.PA] / 1000 }); pb.push({ x, y: r[C.PB] / 1000 }); pc.push({ x, y: r[C.PC] / 1000 });
+    });
+    if (window.Chart && R.length > 1) {
+      const tick = v => new Date(v).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      new Chart($('cv'), { type: 'line', data: { datasets: [
+        { label: 'Total', data: pts, borderColor: '#F2A93B', borderWidth: 2 },
+        { label: 'A', data: pa, borderColor: '#f38ba8', borderWidth: 1 }, { label: 'B', data: pb, borderColor: '#a6e3a1', borderWidth: 1 }, { label: 'C', data: pc, borderColor: '#89b4fa', borderWidth: 1 }] },
+        options: { maintainAspectRatio: false, animation: false, spanGaps: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
+          scales: { x: { type: 'linear', ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } }, y: { beginAtZero: true, title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
+          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
+    } else { $('chartH').hidden = $('chartCard').hidden = true; }
+
+    // hour by hour from the recorded minutes (kWh = Σ kW × 1 min; only what the card holds)
+    const hr = {};
+    for (const r of R) {
+      const k = r[0].slice(0, 13), h = hr[k] = hr[k] || { n: 0, kwh: 0, max: 0, amax: 0, vmin: 1e9, vmax: 0, thd: 0 };
+      const kw = r[C.PSum] / 1000; h.n++; h.kwh += kw / 60; h.max = Math.max(h.max, kw);
+      h.amax = Math.max(h.amax, r[C.IA], r[C.IB], r[C.IC]); h.vmin = Math.min(h.vmin, r[C.UA], r[C.UB], r[C.UC]); h.vmax = Math.max(h.vmax, r[C.UA], r[C.UB], r[C.UC]); h.thd += r[C.ITHAvg];
+    }
+    const keys = Object.keys(hr).sort();
+    $('hours').innerHTML = `<tr><th>Hour</th><th>Minutes<small>recorded</small></th><th>kWh<small>recorded</small></th><th>Avg kW</th><th>Max kW</th><th class="hide-sm">Max A<small>one phase</small></th><th class="hide-sm">Volts<small>min–max</small></th><th class="hide-sm">Current THD</th></tr>` +
+      (keys.length ? keys.map(k => { const h = hr[k]; return `<tr><td>${when(k + ':00')}</td><td class="${h.n < 55 ? 'warn' : ''}">${h.n}</td><td>${f1(h.kwh)}</td><td>${f1(h.kwh * 60 / h.n)}</td><td>${f1(h.max)}</td><td class="hide-sm">${f0(h.amax)}</td><td class="hide-sm">${f0(h.vmin)}–${f0(h.vmax)}</td><td class="hide-sm">${f1(h.thd / h.n)} %</td></tr>`; }).join('') : '<tr><td colspan="8">No minutes recorded since the install yet.</td></tr>');
+
+    $('lead').innerHTML = `Maison M Naccache generator (300–600 kVA MTS) · logger ${D.serial} · SD card read up to <b>${when(K.at)}</b> (${D.file}).`;
+    $('note').innerHTML =
+      `<b>Energy since install.</b> The meter's own counters run whatever the SD card does. Phases B and C count only Makhlouf (at Mario's house the logger was on phase A alone), so they are exact. ` +
+      `Phase A still holds the house's use from ${when(H.at)} until the move (≈ ${H.aPerDay} kWh a day, taken off), so the total is an estimate until a second card reading gives a clean start.<br>` +
+      `<b>Peak demand</b> is the meter's own register (highest demand since it was reset), not computed from the card.<br>` +
+      `<b>Card recording.</b> Since 29 Jun the logger wrote a few rows after each power-up and then stopped. Restarted 3 Oct 18:40; this percentage shows whether it now keeps recording.<br>` +
+      `<b>Update.</b> Copy the SD card's CSVs to a folder, then <code>node makhlouf-build.js "&lt;folder&gt;"</code> in the hub repo and deploy.`;
+  }
+  load().catch(e => { $('err').textContent = String(e.message || e); });
+})();
+</script>
+<script src="/phone-preview.js"></script>
+</body>
+</html>

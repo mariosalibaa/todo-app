@@ -161,6 +161,8 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'cpr-fuel.html'));
   fs.readFileSync(path.join(__dirname, 'cpr-dynamic.html'));
   fs.readFileSync(path.join(__dirname, 'mahab.html'));
+  fs.readFileSync(path.join(__dirname, 'makhlouf.html'));
+  fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'));
   fs.readFileSync(path.join(__dirname, 'scan-editor.js'));
 }
 
@@ -733,6 +735,7 @@ const handler = async (req, res) => {
     'cpr-fuel.html': path.join(__dirname, 'cpr-fuel.html'),
     'cpr-dynamic.html': path.join(__dirname, 'cpr-dynamic.html'),
     'mahab.html': path.join(__dirname, 'mahab.html'),
+    'makhlouf.html': path.join(__dirname, 'makhlouf.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/members': 'hub.html', '/ask': 'hub.html',   // members & access, the decisions desk (admin views of the hub page)
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
@@ -746,6 +749,7 @@ const handler = async (req, res) => {
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
+    '/makhlouf': 'makhlouf.html',   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
     '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
     '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
@@ -1019,6 +1023,12 @@ const handler = async (req, res) => {
     const tk = crypto.createHmac('sha256', process.env.MAHAB_PASSWORD).update('mahab-ok').digest('hex').slice(0, 32);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `mahab_ok=${tk}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax` });
     res.end(JSON.stringify({ ok: true })); return;
+  }
+  // /api/makhlouf — the generator logger's SD card, rebuilt by makhlouf-build.js into makhlouf-data.json. Hub admins only.
+  if (url.split('?')[0] === '/api/makhlouf' && req.method === 'GET') {
+    const acc = await cprAccess();
+    if (!acc.isAdmin) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'admin' })); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'))); return;
   }
   if (url.split('?')[0] === '/api/mahab' && req.method === 'GET') {
     const acc = await cprAccess();   // its isAdmin = the hub session check; the CPR password plays no part here
