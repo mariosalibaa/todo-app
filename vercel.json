@@ -22,10 +22,6 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/digest",
-      "schedule": "0 5 * * *"
-    },
-    {
       "path": "/api/cron/site-days",
       "schedule": "55 20 * * *"
     },
