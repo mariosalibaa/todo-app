@@ -50,7 +50,9 @@
   .set input{width:80px;}
   /* year summary (Mario 2026-09-26: "give me the year summary, one dashboard") */
   #dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;}
-  .ytab{overflow-x:auto;} .ytab table{width:100%;} .ytab td small,.ytab th small{display:block;} .ytab tr.dy td{color:var(--sub);}
+  .ytab{overflow-x:auto;padding:10px 8px;} .ytab table{width:100%;font-size:.76rem;}
+  /* Mario 2026-10-03: "show me full table without hor scroll" — headings wrap, cells tight, so 14 columns fit 1100 px */
+  @media (min-width:900px){ .ytab th{white-space:normal;vertical-align:bottom;padding:6px 4px;line-height:1.2;} .ytab td{padding:7px 4px;} .ytab td:first-child,.ytab th:first-child{padding-left:6px;} } .ytab td small,.ytab th small{display:block;} .ytab tr.dy td{color:var(--sub);}
   .yc{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;}
   .yc.all{border-color:var(--amber);} .yc.all h2{color:var(--text);}
   .yc h2{margin:0;font-size:1.3rem;color:var(--amber);} .yc .cov{font-size:.72rem;color:var(--overlay0);margin:2px 0 8px;}

@@ -66,6 +66,10 @@ async function days(ctx) {
     out.error = String(e.message || e);
     console.error('mahab:', out.error);
   }
+  // site meter readings (Mario 2026-10-03: "record the meters reading … gen1, gen2, EDL, sum of all 3") — Firestore
+  // mahabMeters/<yyyy-mm-dd_hhmm>, Beirut time, photos in Dropbox "00. PARTNER\mahab machmouche\meter readings"
+  try { out.meters = (await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('mahabMeters').get()).docs.map(d => d.data()).sort((a, b) => a.at < b.at ? -1 : 1); }
+  catch (e) { out.meters = []; console.error('mahab meters:', e.message); }
   return out;
 }
 

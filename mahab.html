@@ -42,6 +42,7 @@
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
   .note b{color:var(--text);font-weight:600;}
   .err{color:var(--red);font-size:.8rem;margin:8px 0;}
+  .mh{font-size:.95rem;margin:22px 0 8px;font-weight:600;}
   #login{max-width:320px;margin:60px auto;text-align:center;} #login input{width:100%;margin:10px 0;padding:10px;} #login button{width:100%;padding:10px;}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   .ph{display:none;}
@@ -79,6 +80,8 @@
     <div class="tabs" id="years"></div>
     <div class="kpis" id="kpis"></div>
     <div class="card"><table id="tbl"></table></div>
+    <h2 class="mh" id="metersH" hidden>Meter readings on site</h2>
+    <div class="card" id="metersCard" hidden><table id="meters"></table></div>
     <div class="err" id="err"></div>
     <div class="note" id="note"></div>
   </div>
@@ -158,6 +161,7 @@
     }
     rows += line('tot', 'Total ' + year, T);
     $('tbl').innerHTML = head + rows;
+    renderMeters();
     $('note').innerHTML =
       `<b>How it is wired.</b> Until 1 July 2026 EDL came into the inverter on its grid port and there was no generator. ` +
       `Since 2 July EDL and the two generators go through ATSs into <b>one</b> input, the inverter's generator port (site sketch "20260704 mahab gen control"). ` +
@@ -165,6 +169,24 @@
       `Splitting it needs a meter on the generator side of the ATS, or the ATS position logged.<br>` +
       `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
       `Checked against DeyeCloud's own Excel export. Tap a month for its days.`;
+  }
+
+  // the site's own meters (Gen 1, Gen 2, EDL) as read by hand, with their sum; from the second reading on, what the
+  // three meters advanced next to what DeyeCloud's generator port took in over the same days (whole days, so ≈)
+  function renderMeters() {
+    const M = D.meters || [];
+    $('metersH').hidden = $('metersCard').hidden = !M.length;
+    if (!M.length) return;
+    const fi = D.fields.indexOf('gen');
+    const deyeGen = (a, b) => D.days.reduce((s, d, i) => s + (d > a && d <= b && D.data[i] ? D.data[i][fi] || 0 : 0), 0);
+    let rows = `<tr><th>Read on</th><th>Gen 1</th><th>Gen 2</th><th>EDL</th><th>Sum<small>kWh</small></th><th>Meters since last<small>kWh</small></th><th>Deye gen port<small>same days ≈</small></th></tr>`;
+    M.forEach((m, i) => {
+      const p = M[i - 1], [d, t] = m.at.split(' ');
+      const dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
+      rows += `<tr title="${(m.note || '').replace(/"/g, '&quot;')}"><td>${dd} <small>${t || ''}</small></td><td>${fmt1(m.gen1)}</td><td>${fmt1(m.gen2)}</td><td>${fmt1(m.edl)}</td>` +
+        `<td><b>${fmt1(m.sum)}</b></td><td>${p ? fmt1(m.sum - p.sum) : '<small>first reading</small>'}</td><td class="mix">${p ? fmt(deyeGen(p.at.slice(0, 10), d)) : ''}</td></tr>`;
+    });
+    $('meters').innerHTML = rows;
   }
 
   $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; load(); });
