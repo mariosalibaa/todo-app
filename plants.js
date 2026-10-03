@@ -175,7 +175,7 @@ async function check(ctx, send) {
     const k = `${p.src}:${p.id}`, s = seen[k] || {};
     const bad = BAD.has(p.status);
     if (bad) {
-      const since = s.badSince || (first ? null : now);   // first run: already bad = unknown start, never announced
+      const since = s.badSince || (first || !seen[k] ? null : now);   // first sight (first run, or a plant new to the list): already bad = unknown start, never announced
       let note = s.note || null;
       if (since && !s.told && now - since >= 60 * 60000) {
         let what = '';
