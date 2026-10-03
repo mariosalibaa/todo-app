@@ -27,8 +27,11 @@
 //
 // Odoo holds the villa dimension (analytic 69 = common works, 59-61 = U1-U3, 62-64 = D1-D3) across
 // S DEV (co 10), SARL (co 2) and S LB (co 7). The WORK SECTION (excavation, stone walls, prefab,
-// scaffolding…) is not in Odoo yet — Mario, 2026-09-12: keep it on the hub until the scheme is final —
-// so it lives in Firestore ajaltounMeta/sections as supplier rules + per-line overrides.
+// scaffolding…) is in Odoo since 2026-10-04 (Mario: "link hub division with odoo"): analytic plan 18
+// "Ajaltoun division", one account per section (code = section id), carried next to the villa tag —
+// {"69,174": 100} = Common + Prefab. Odoo is the record; choosing a division here writes it onto the bill.
+// Firestore ajaltounMeta/sections keeps the supplier rules + overrides as the fallback for lines Odoo
+// cannot carry (unbooked payments) or that are not tagged yet.
 // Prefab and scaffolding are EQUIPMENT: bought once, reusable on the next project, so they are shown
 // apart and left out of the cost the partners share (Mario, 2026-09-12).
 
@@ -39,6 +42,7 @@ const CTX = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
 const SDEV = 10;
 const PAY_ID_BASE = 1e9;   // hub line id of an unbooked payment = 1e9 + account.payment id (analytic line ids stay far below)
 const VILLAS = { 69: 'Common', 59: 'U1', 60: 'U2', 61: 'U3', 62: 'D1', 63: 'D2', 64: 'D3' };
+const DIV_PLAN = 18, DIV_FIELD = 'x_plan18_id';   // Odoo analytic plan "Ajaltoun division" and its column on analytic lines
 // sections = the BOQ trades (so budget / spent / remaining line up) + the project-level ones
 const SECTIONS = [
   { id: 'excavation', name: 'Excavation' },
@@ -152,8 +156,12 @@ async function pull(odooCall) {
 
 async function pullCosts(odooCall) {
   // 1. every analytic line on the seven Ajaltoun accounts
-  const raw = await odooCall('account.analytic.line', 'search_read', [[['account_id', 'in', Object.keys(VILLAS).map(Number)]]],
-    { fields: ['date', 'name', 'amount', 'partner_id', 'general_account_id', 'company_id', 'account_id', 'move_line_id'], context: CTX, limit: 5000, order: 'date, id' });
+  const [raw, divs] = await Promise.all([
+    odooCall('account.analytic.line', 'search_read', [[['account_id', 'in', Object.keys(VILLAS).map(Number)]]],
+      { fields: ['date', 'name', 'amount', 'partner_id', 'general_account_id', 'company_id', 'account_id', 'move_line_id', DIV_FIELD], context: CTX, limit: 5000, order: 'date, id' }),
+    divAccounts(odooCall),
+  ]);
+  const divCode = new Map(divs.map(d => [d.id, d.code]));
   // 2. the journal item behind each → its move (bill) → its attachments
   const mlIds = [...new Set(raw.map(l => l.move_line_id && l.move_line_id[0]).filter(Boolean))];
   const mls = mlIds.length ? await odooCall('account.move.line', 'read', [mlIds, ['move_id', 'account_id']], { context: CTX }) : [];
@@ -184,6 +192,7 @@ async function pullCosts(odooCall) {
     lines.push({ id: l.id, date: l.date, name: l.name, amount: -l.amount, partner: l.partner_id ? l.partner_id[1] : '', partnerId: l.partner_id ? l.partner_id[0] : null,
       account: gacc, company: l.company_id ? l.company_id[1] : '', companyId: l.company_id ? l.company_id[0] : null,
       villa: VILLAS[l.account_id[0]] || l.account_id[1], moveId: move ? move.id : null, moveName: move ? move.name : '', moveRef: move ? move.ref : '',
+      mlId: l.move_line_id ? l.move_line_id[0] : null, odooSection: l[DIV_FIELD] ? divCode.get(l[DIV_FIELD][0]) || '' : '',
       paid: move ? move.payment_state : '', paidBy: move ? (paidByOf[move.id] || []).join(' + ') : '', files: move ? (attsOf[move.id] || []) : [] });
   }
   // 3. payments tagged with an Ajaltoun project (payment field "Project", x_studio_project) that are not yet
@@ -292,12 +301,72 @@ async function meta(db, TEAM_ID) {
 // the fixed list + the ones Mario added from a line's sheet (2026-09-24: "allow to add new section")
 const allSections = mt => [...SECTIONS, ...((mt && mt.sections) || []).filter(x => x && x.id && !SECTIONS.some(s => s.id === x.id))];
 const saveMeta = (db, TEAM_ID, mt, email) => metaRef(db, TEAM_ID).set({ rules: mt.rules, overrides: mt.overrides, qty: mt.qty, sections: mt.sections || [], updatedAt: now(), updatedBy: email || '' });
-// section of a line: a hub line's own `section` (set on the accounts grid / site chat), else an explicit override
-// (by line id, or by Odoo move name 'move:BILL-2026-09-0021' — slashes as dashes, written through POST /section when
-// a hub line is booked), else the first supplier rule that matches, else general
+// ── the division on the Odoo bill (plan 18) ──
+// the plan's accounts: { id, code } with code = the hub section id
+async function divAccounts(odooCall) {
+  return odooCall('account.analytic.account', 'search_read', [[['plan_id', '=', DIV_PLAN]]], { fields: ['code', 'name'], context: { active_test: false }, limit: 500 });
+}
+// the account of a section, made on the spot for a section Mario added on the hub
+async function divAccountId(odooCall, section, name) {
+  const [a] = await odooCall('account.analytic.account', 'search_read', [[['plan_id', '=', DIV_PLAN], ['code', '=', section]]], { fields: ['id'], context: { active_test: false }, limit: 1 });
+  if (a) return a.id;
+  return odooCall('account.analytic.account', 'create', [{ name: name || section, code: section, plan_id: DIV_PLAN, company_id: false }]);
+}
+// {"69": 100} → {"69,<div>": 100}: every key that names a villa account gets the division, an old division is
+// replaced, keys of other projects are left alone. null when the line carries no Ajaltoun tag.
+function withDivision(dist, divId, divIds) {
+  if (!dist) return null;
+  const out = {}; let hit = false;
+  for (const [k, v] of Object.entries(dist)) {
+    const ids = k.split(',').map(Number);
+    if (!ids.some(i => VILLAS[i])) { out[k] = v; continue; }
+    hit = true;
+    const key = [...ids.filter(i => !divIds.has(i)), divId].join(',');
+    out[key] = (out[key] || 0) + v;
+  }
+  return hit ? out : null;
+}
+// write a division onto Odoo journal items: the given lines, or every Ajaltoun-tagged line of the given bills
+// (product and tax lines alike, so the analytic report adds up). Returns how many lines changed.
+async function writeOdooSection(odooCall, { moveIds, mlIds }, section, name) {
+  const divId = await divAccountId(odooCall, section, name);
+  const divIds = new Set((await divAccounts(odooCall)).map(d => d.id));
+  const domain = mlIds && mlIds.length ? [['id', 'in', mlIds]] : [['move_id', 'in', moveIds || []], ['analytic_distribution', '!=', false]];
+  const mls = await odooCall('account.move.line', 'search_read', [domain], { fields: ['analytic_distribution', 'company_id', 'move_id'], context: CTX, limit: 3000 });
+  let n = 0;
+  for (const ml of mls) {
+    const d = withDivision(ml.analytic_distribution, divId, divIds);
+    if (!d || JSON.stringify(d) === JSON.stringify(ml.analytic_distribution)) continue;
+    const co = ml.company_id[0];
+    await odooCall('account.move.line', 'write', [[ml.id], { analytic_distribution: d }], { context: { allowed_company_ids: [co], company_id: co, check_move_validity: false } });
+    n++;
+  }
+  return n;
+}
+// a bill named in an override key ('move:BILL-2026-09-0021') → its Odoo id. A name is per journal, so the same
+// name lives in several companies (BILL/2026/09/0013 is a BMA bill in SARL and Khoder's month bill in S LB):
+// of the bills with an Ajaltoun tag, the newest is the one just booked — the only caller is the booking flow.
+async function movesNamed(odooCall, key) {
+  const name = String(key).replace(/^move:/, '').replace(/-/g, '/');
+  const mls = await odooCall('account.move.line', 'search_read', [[['move_id.name', '=', name], ['analytic_distribution', '!=', false]]], { fields: ['move_id', 'analytic_distribution'], context: CTX, limit: 200 });
+  const ids = mls.filter(l => Object.keys(l.analytic_distribution || {}).some(k => k.split(',').some(i => VILLAS[+i]))).map(l => l.move_id[0]);
+  return ids.length ? [Math.max(...ids)] : [];
+}
+// after a write: the lines in memory + the stored snapshot show the new division at once (no wait for the next pull)
+async function markSection(db, TEAM_ID, moveIds, section) {
+  if (!cache.data) return;
+  const set = new Set(moveIds);
+  for (const l of cache.data.lines) if (l.moveId && set.has(l.moveId)) l.odooSection = section;
+  await saveSnapshot(db, TEAM_ID, cache.data, cache.at).catch(e => console.warn('ajaltoun: snapshot save failed:', e.message));
+}
+
+// section of a line: a hub line's own `section` (set on the accounts grid / site chat), else the division on the Odoo
+// bill (plan 18), else an explicit override (by line id, or by Odoo move name 'move:BILL-2026-09-0021' — slashes as
+// dashes — for what Odoo cannot carry), else the first supplier rule that matches, else general
 const moveKey = name => 'move:' + String(name || '').replace(/\//g, '-');
 function sectionOf(l, m) {
   if (l.hub && l.txSection && allSections(m).some(s => s.id === l.txSection)) return l.txSection;
+  if (l.odooSection && allSections(m).some(s => s.id === l.odooSection)) return l.odooSection;
   if (m.overrides[l.id]) return m.overrides[l.id];
   if (l.moveName && m.overrides[moveKey(l.moveName)]) return m.overrides[moveKey(l.moveName)];
   const p = (l.partner || '').toLowerCase(), n = (l.name || '').toLowerCase();
@@ -347,6 +416,7 @@ async function handle(req, res, url, user, ctx) {
     const section = { id, name, custom: true };
     mt.sections = [...(mt.sections || []), section];
     await saveMeta(db, TEAM_ID, mt, user.email);
+    await divAccountId(odooCall, id, name).catch(e => console.warn('ajaltoun: division account not made in Odoo:', e.message));   // made again on first use if this fails
     return json(res, 200, { section });
   }
 
@@ -363,25 +433,53 @@ async function handle(req, res, url, user, ctx) {
     if (!access.admin) return json(res, 403, { error: 'admin only' });
     const b = await readBody(req);
     const mt = await meta(db, TEAM_ID);
-    if (!allSections(mt).some(s => s.id === b.section)) return json(res, 400, { error: 'unknown section' });
+    const sec = allSections(mt).find(s => s.id === b.section);
+    if (!sec) return json(res, 400, { error: 'unknown section' });
+    if (!cache.data) { const snap = await loadSnapshot(db, TEAM_ID); if (snap) cache = snap; }   // a cold instance still knows the bills
+    const odooLines = cache.data ? cache.data.lines : [];
+    const odoo = { lines: 0, error: null };
+    // the bills go to Odoo first; an override is kept only where Odoo could not take it
+    const toOdoo = async (target, moveIds) => {
+      try { odoo.lines += await writeOdooSection(odooCall, target, sec.id, sec.name); if (moveIds.length) await markSection(db, TEAM_ID, moveIds, sec.id); return true; }
+      catch (e) { odoo.error = String(e.message || e).slice(0, 200); console.warn('ajaltoun: division not written to Odoo:', odoo.error); return false; }
+    };
     if (b.forPartner) {
-      // the whole supplier: a rule at the front (first match wins), and the supplier's overrides cleared
+      // the whole supplier: a rule at the front (first match wins), its bills re-tagged in Odoo, its overrides cleared
       const p = String(b.forPartner).toLowerCase();
       mt.rules = [{ partner: p, section: b.section }, ...mt.rules.filter(r => r.partner !== p)];
-      const hit = [...(cache.data ? cache.data.lines : []), ...lastHub].filter(l => (l.partner || '').toLowerCase() === p);
+      const hit = [...odooLines, ...lastHub].filter(l => (l.partner || '').toLowerCase() === p);
       for (const l of hit) delete mt.overrides[l.id];
+      const moveIds = [...new Set(hit.filter(l => l.moveId).map(l => l.moveId))];
+      if (moveIds.length) await toOdoo({ moveIds }, moveIds);
       // the supplier's hub lines carry their own division — move them too, or they would keep the old one
       for (const l of hit.filter(l => l.hub)) { await writeHubSection(db, TEAM_ID, l.accId, l.txId, b.section).catch(() => {}); l.txSection = b.section; }
     } else if (b.lineId) {
-      const hub = String(b.lineId).match(/^hub:([^:]+):(.+)$/);
+      const id = String(b.lineId).slice(0, 200);
+      const hub = id.match(/^hub:([^:]+):(.+)$/);
       if (hub) {
         if (!await writeHubSection(db, TEAM_ID, hub[1], hub[2], b.section)) return json(res, 404, { error: 'that ledger line is gone' });
-        delete mt.overrides[String(b.lineId)];
+        delete mt.overrides[id];
         const l = lastHub.find(x => x.id === b.lineId); if (l) l.txSection = b.section;
-      } else mt.overrides[String(b.lineId).slice(0, 200)] = b.section;   // a number (Odoo analytic line) or 'move:<bill>'
+      } else if (id.startsWith('move:')) {
+        // a bill just booked from the grid / the site chat / the line sheet: tag it in Odoo; the override waits
+        // in case the bill is not found (a payment, or Odoo slow to answer)
+        const moveIds = await movesNamed(odooCall, id).catch(() => []);
+        if (moveIds.length && await toOdoo({ moveIds }, moveIds)) delete mt.overrides[id]; else mt.overrides[id] = b.section;
+      } else {
+        // one Odoo line: a bill whose Ajaltoun lines all share one division moves as a whole (its tax lines too),
+        // a bill split across divisions moves only this line
+        const l = odooLines.find(x => String(x.id) === id);
+        if (l && l.moveId) {
+          const same = odooLines.filter(x => x.moveId === l.moveId);
+          const uniform = same.every(x => sectionOf(x, mt) === sectionOf(l, mt));
+          const ok = await toOdoo(uniform ? { moveIds: [l.moveId] } : { mlIds: [l.mlId] }, uniform ? [l.moveId] : []);
+          if (ok && !uniform) { l.odooSection = sec.id; await saveSnapshot(db, TEAM_ID, cache.data, cache.at).catch(() => {}); }
+          if (ok) delete mt.overrides[id]; else mt.overrides[id] = b.section;
+        } else mt.overrides[id] = b.section;   // an unbooked payment: Odoo has no line to tag
+      }
     } else return json(res, 400, { error: 'lineId or forPartner required' });
     await saveMeta(db, TEAM_ID, mt, user.email);
-    return json(res, 200, { ok: true });
+    return json(res, 200, { ok: true, odoo });
   }
 
   // quantity executed so far in a section (m³ excavated, m² of wall…) — typed by Mario, gives the $/unit next to the BOQ rate
@@ -475,4 +573,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, refresh, SECTIONS, hubLines, _pullCosts: pullCosts };
+module.exports = { handle, refresh, SECTIONS, hubLines, _pullCosts: pullCosts, _withDivision: withDivision };
