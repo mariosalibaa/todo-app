@@ -68,9 +68,34 @@ async function days(ctx) {
   }
   // site meter readings (Mario 2026-10-03: "record the meters reading … gen1, gen2, EDL, sum of all 3") — Firestore
   // mahabMeters/<yyyy-mm-dd_hhmm>, Beirut time, photos in Dropbox "00. PARTNER\mahab machmouche\meter readings"
-  try { out.meters = (await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('mahabMeters').get()).docs.map(d => d.data()).sort((a, b) => a.at < b.at ? -1 : 1); }
+  try { out.meters = await meters(ctx); }
   catch (e) { out.meters = []; console.error('mahab meters:', e.message); }
   return out;
+}
+
+// Mario's check (2026-10-03): what the three site meters (Gen 1 + Gen 2 + EDL) advance between two readings must
+// equal DeyeCloud's grid import + export over exactly that time (2 Oct 09:31 → 14:15: meters 41, Deye 41.7).
+// Each reading after the first gets that window integrated from the 5-min series and kept on its doc (`deye`), so
+// it is read from DeyeCloud once. Windows over 31 days are skipped (too many day reads for one page load).
+const toSec = at => new Date(at.replace(' ', 'T') + ':00+03:00').getTime() / 1000;
+async function meters(ctx) {
+  const ref = ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('mahabMeters');
+  const docs = (await ref.get()).docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.at < b.at ? -1 : 1);
+  for (let i = 1; i < docs.length; i++) {
+    const p = docs[i - 1], m = docs[i];
+    if (m.deye && m.deye.from === p.at) continue;
+    const a = toSec(p.at), b = toSec(m.at);
+    if (b > Date.now() / 1000 - 600 || b - a > 31 * 86400) continue;   // Deye uploads late: wait 10 min after the reading
+    const recs = [];
+    for (let d = p.at.slice(0, 10); d <= m.at.slice(0, 10); d = addDays(d, 1)) {
+      recs.push(...await D.dayRecords(await deye.token(ctx), d, STATION));
+      await sleep(1100);
+    }
+    const v = D.integrate(recs.filter(r => r.dateTime >= a && r.dateTime < b));
+    m.deye = { from: p.at, gridIn: v.gridIn, gridOut: v.gridOut, gen: v.gen, genOut: v.genOut, n: v.n };
+    await ref.doc(m.id).set({ deye: m.deye }, { merge: true });
+  }
+  return docs;
 }
 
 module.exports = { days, fill, STATION };

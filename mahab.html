@@ -171,20 +171,22 @@
       `Checked against DeyeCloud's own Excel export. Tap a month for its days.`;
   }
 
-  // the site's own meters (Gen 1, Gen 2, EDL) as read by hand, with their sum; from the second reading on, what the
-  // three meters advanced next to what DeyeCloud's generator port took in over the same days (whole days, so ≈)
+  // the site's own meters (Gen 1, Gen 2, EDL) as read by hand, with their sum. Mario's check (2026-10-03): what the
+  // three advance between two readings = DeyeCloud's grid import + export over exactly that time (server: mahab.js)
   function renderMeters() {
     const M = D.meters || [];
     $('metersH').hidden = $('metersCard').hidden = !M.length;
     if (!M.length) return;
-    const fi = D.fields.indexOf('gen');
-    const deyeGen = (a, b) => D.days.reduce((s, d, i) => s + (d > a && d <= b && D.data[i] ? D.data[i][fi] || 0 : 0), 0);
-    let rows = `<tr><th>Read on</th><th>Gen 1</th><th>Gen 2</th><th>EDL</th><th>Sum<small>kWh</small></th><th>Meters since last<small>kWh</small></th><th>Deye gen port<small>same days ≈</small></th></tr>`;
+    let rows = `<tr><th>Read on</th><th>Gen 1</th><th>Gen 2</th><th>EDL</th><th>Sum</th><th>Meters since last<small>kWh</small></th><th>Deye import + export<small>same time, kWh</small></th><th>Gap<small>meters − Deye</small></th></tr>`;
     M.forEach((m, i) => {
       const p = M[i - 1], [d, t] = m.at.split(' ');
       const dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
-      rows += `<tr title="${(m.note || '').replace(/"/g, '&quot;')}"><td>${dd} <small>${t || ''}</small></td><td>${fmt1(m.gen1)}</td><td>${fmt1(m.gen2)}</td><td>${fmt1(m.edl)}</td>` +
-        `<td><b>${fmt1(m.sum)}</b></td><td>${p ? fmt1(m.sum - p.sum) : '<small>first reading</small>'}</td><td class="mix">${p ? fmt(deyeGen(p.at.slice(0, 10), d)) : ''}</td></tr>`;
+      const dm = p ? m.sum - p.sum : null, z = m.deye ? m.deye.gridIn + m.deye.gridOut : null;
+      const gap = dm != null && z != null ? dm - z : null, bad = gap != null && Math.abs(gap) > Math.max(2, z * 0.1);
+      rows += `<tr title="${(m.note || '').replace(/"/g, '&quot;')}"><td>${dd} <small>${t || ''}</small></td><td>${m.gen1}</td><td>${m.gen2}</td><td>${m.edl}</td>` +
+        `<td><b>${m.sum}</b></td><td>${p ? dm : '<small>first reading</small>'}</td>` +
+        `<td class="mix">${z != null ? fmt1(z) + `<small>import ${fmt1(m.deye.gridIn)} · export ${fmt1(m.deye.gridOut)}</small>` : (p ? '<small>reading DeyeCloud…</small>' : '')}</td>` +
+        `<td${bad ? ' style="color:var(--red)"' : ''}>${gap != null ? (gap > 0 ? '+' : '') + (Math.round(gap * 10) / 10) : ''}</td></tr>`;
     });
     $('meters').innerHTML = rows;
   }
