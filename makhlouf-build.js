@@ -24,7 +24,7 @@ const INSTALL = '2026-10-02 06:30';   // Mario: moved on 2 Oct between 06:00 and
 const START = '2026-10-03 18:40';     // first clean Makhlouf row after the card reinstall
 const COLS = ['UA', 'UB', 'UC', 'IA', 'IB', 'IC', 'IN', 'PA', 'PB', 'PC', 'PSum', 'PFAvg', 'FAvg', 'UTHAvg', 'ITHAvg', 'EPSum', 'PFA', 'PFB', 'PFC', 'UTHA', 'UTHB', 'UTHC', 'ITHA', 'ITHB', 'ITHC', 'QSum', 'SSum'];
 
-const rows = [];
+const rows = [], ups = [];   // ups = power-up rows (the logger lost power just before)
 let last = null, first = null;
 for (const l of lines.slice(3)) {
   const r = l.split(',');
@@ -32,7 +32,7 @@ for (const l of lines.slice(3)) {
   const at = r[0] + ' ' + r[1].slice(0, 5);
   last = r;
   if (at < START) continue;
-  if (+r[ix.UA] === 0 && +r[ix.UB] === 0 && +r[ix.UC] === 0) continue;   // the power-up row (all zeros)
+  if (+r[ix.UA] === 0 && +r[ix.UB] === 0 && +r[ix.UC] === 0) { if (rows.length) ups.push({ at: r[0] + ' ' + r[1], i: rows.length }); continue; }   // the power-up row (all zeros)
   if (!first) first = r;
   rows.push([r[0] + ' ' + r[1], ...COLS.map(k => +r[ix[k]])]);
 }
@@ -59,14 +59,29 @@ for (let i = 1; i < rows.length; i++) {
   const est = Array.from({ length: n }, (_, k) => +Math.max(0, kw0 + (kw1 - kw0) * (k + 1) / (n + 1) + (res.length ? res[k % res.length] : 0)).toFixed(1));
   OFF.push({ from: rows[i - 1][0], to: rows[i][0], min: n, kw0: +kw0.toFixed(1), kw1: +kw1.toFixed(1), kwh: +(est.reduce((x, y) => x + y, 0) / 60).toFixed(1), est });
 }
+// Every logger power cut since START, classified (Mario 2026-10-04): a cut of a few minutes is the manual MTS swapping
+// generators; an hour or more is the ATS on EDL. The generator is told apart by its voltage: G1 (350 kVA) runs at
+// ≈ 231–238 V, G2 (600 kVA) at ≈ 222–229 V — so a swap shows as a voltage step across the cut.
+const G_SPLIT = 229.5, vAvg = r => (r[1 + COLS.indexOf('UA')] + r[1 + COLS.indexOf('UB')] + r[1 + COLS.indexOf('UC')]) / 3;
+const genOf = r => vAvg(r) >= G_SPLIT ? 'G1' : 'G2';
+const avgV = (from, to) => { const v = rows.slice(Math.max(from, 0), Math.min(to, rows.length)).map(vAvg); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const CUTS = ups.map(u => {
+  const before = rows[u.i - 1], after = rows[u.i], min = (sec(after[0]) - sec(before[0])) / 60 - 1;
+  const vb = avgV(u.i - 5, u.i), va = avgV(u.i, u.i + 5), gb = vb >= G_SPLIT ? 'G1' : 'G2', ga = va >= G_SPLIT ? 'G1' : 'G2';
+  return { from: before[0], to: after[0], min: +Math.max(min, 0).toFixed(1), vBefore: +vb.toFixed(1), vAfter: +va.toFixed(1), genBefore: gb, genAfter: ga,
+    kind: min >= 30 ? 'edl' : gb !== ga ? 'swap' : 'blip' };
+});
+OFF.forEach(o => { const c = CUTS.find(c => c.from === o.from); o.kind = c ? c.kind : (o.min >= 30 ? 'edl' : 'blip');
+  if (o.kind !== 'edl') { o.est = []; o.kwh = 0; } });   // a swap or blip: the site had no supply for those minutes — nothing to estimate
 const out = {
   built: new Date().toISOString(), file, serial: (lines[0].split(':')[1] || '').trim(), install: INSTALL,
   cols: ['at', ...COLS], rows,
   start: cnt(first), counters: cnt(last),
   peak: { sum: top('PSum'), a: top('PA'), b: top('PB'), c: top('PC') },
   peakA: { a: top('IA', 1, 'amps'), b: top('IB', 1, 'amps'), c: top('IC', 1, 'amps'), n: top('IN', 1, 'amps') },   // highest one-minute amps per phase
-  off: OFF,
+  off: OFF, cuts: CUTS, gSplit: G_SPLIT,
 };
 fs.writeFileSync(path.join(__dirname, 'makhlouf-data.json'), JSON.stringify(out));
+CUTS.forEach(c => console.log(`cut ${c.from} → ${c.to} (${c.min} min) ${c.genBefore} ${c.vBefore} V → ${c.genAfter} ${c.vAfter} V = ${c.kind}`));
 OFF.forEach(o => console.log(`logger off ${o.from} → ${o.to}: ${o.min} min, ≈ ${o.kw0}→${o.kw1} kW, ≈ ${o.kwh} kWh`));
 console.log(`${rows.length} rows since install, ${rows[0] ? rows[0][0] : '-'} → ${rows.length ? rows[rows.length - 1][0] : '-'}; counter ${out.counters.epsum} Wh at ${out.counters.at}`);
