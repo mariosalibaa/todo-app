@@ -41,7 +41,10 @@
   .setupQ{font-size:.78rem;color:#fab387;margin-top:8px}
   details.hrs>summary{cursor:pointer;list-style:none;} details.hrs>summary::before{content:'\25B8  ';color:var(--amber);} details.hrs[open]>summary::before{content:'\25BE  ';} details.hrs>summary small{font-weight:400;color:var(--sub);font-size:.7rem;margin-left:6px;}
   .batin{width:100%;justify-content:flex-end;} .batin label.tick{color:var(--amber);font-weight:600;cursor:pointer;} .batin label.tick select{margin-left:6px;} .batin.off label:not(.tick){opacity:.45;}
-  .sunin{width:100%;justify-content:flex-end;} .sunin input[type=date]{width:auto;} .sunin label.tick input{width:auto;margin:0 4px 0 0;accent-color:var(--amber);} .suninfo{font-size:.72rem;color:var(--sub);align-self:center;}
+  .sunin{width:100%;justify-content:flex-end;} .sunin input[type=date]{width:auto;} .sunin label.tick input{width:auto;margin:0 4px 0 0;accent-color:var(--amber);} .suninfo{display:block;width:100%;min-height:1.2em;text-align:right;font-size:.72rem;color:var(--sub);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .prodT{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums} .prodT th,.prodT td{padding:6px 8px;border-bottom:1px solid var(--surface0);text-align:right} .prodT th:first-child,.prodT td:first-child{text-align:left} .prodT th{color:var(--overlay0);font-weight:400;font-size:.68rem;text-transform:uppercase} .prodT tr.m{cursor:pointer} .prodT tr.m:hover td{background:var(--mantle)} .prodT tr.m.open td{color:var(--amber)} .prodT tr.d td{font-size:.76rem;color:var(--sub)} .prodT tr.d{cursor:pointer} .prodT tr.d.sel td{color:var(--text)} .prodT small{color:var(--overlay0)}
+  .solin label.tick input[type=checkbox]{width:auto;margin:0 4px 0 0;accent-color:var(--amber);}
+  #prodH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   #batH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   #solH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   .solin{display:inline-flex;gap:12px;font-size:.75rem;color:var(--sub);font-weight:400;}
@@ -179,12 +182,17 @@
     </div>
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
-    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin sunin"><label>Sun <select id="sunM"><option value="day">one day</option><option value="last7">average, 7 days to</option><option value="last30">average, 30 days to</option><option value="month">average of the month</option><option value="monthMin">worst day of the month</option><option value="monthMax">best day of the month</option><option value="ref">4 Oct curve (first estimate)</option></select></label><label>Date <input id="sunD" type="date" value="2026-10-04"></label><label class="tick"><input id="sunPv" type="checkbox"> scale to PVGIS</label><span id="sunInfo" class="suninfo"></span></span>
+    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin sunin"><label>Sun <select id="sunM"><option value="day">one day</option><option value="last7">average, 7 days to</option><option value="last30">average, 30 days to</option><option value="month">average of the month</option><option value="monthMin">worst day of the month</option><option value="monthMax">best day of the month</option><option value="ref">4 Oct curve (first estimate)</option></select></label><label>Date <input id="sunD" type="date" value="2026-10-04"></label><label class="tick"><input id="sunPv" type="checkbox"> scale to PVGIS</label></span><span id="sunInfo" class="suninfo"></span>
       <span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Generator <select id="solG"><option value="log">as logged (G1 / G2)</option><option value="G1">G1 · 350 kVA only</option><option value="G2">G2 · 600 kVA only</option></select></label><label>Floor % <input id="solF" type="number" min="0" max="100" step="1" value="20"></label><label>Ceiling % <input id="solX" type="number" min="0" max="100" step="1" value="80"></label></span>
       <span class="solin batin"><label class="tick">System <select id="batOn"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>kWh <input id="batC" type="number" min="0" step="10" value="750"></label><label>Min % <input id="batM" type="number" min="0" max="90" step="1" value="10"></label><label>Max % <input id="batX" type="number" min="10" max="100" step="1" value="100"></label><label>System kW <input id="batP" type="number" min="0" step="5" value="375"></label><label>Gen start % <input id="batS" type="number" min="0" max="100" step="1" value="25"></label><label>Gen stop % <input id="batT" type="number" min="0" max="100" step="1" value="40"></label></span></h2>
     <div class="kpis" id="solK"></div>
     <div class="card chart" id="solCard"><canvas id="cvs"></canvas></div>
     <div class="note" id="solNote"></div>
+    <h2 class="mh" id="prodH"><span>Solar production · reference year</span><span class="solin"><label>Panels <input id="prodN" type="number" min="1" step="1" value="1"></label><label>Panel W <input id="prodW" type="number" min="100" step="5" value="645"></label><label class="tick"><input id="prodPv" type="checkbox"> scale to PVGIS</label></span></h2>
+    <div class="kpis" id="prodK"></div>
+    <div class="card chart" id="prodCard"><canvas id="cvp"></canvas></div>
+    <div class="card" style="margin-top:10px"><table id="prodT" class="prodT"></table></div>
+    <div class="note" id="prodNote"></div>
     <h2 class="mh" id="batH">Battery · state of charge</h2>
     <div class="kpis" id="batK"></div>
     <div class="note" id="batNote"></div>
@@ -322,6 +330,57 @@
     const GK = { G1: { kva: 350, name: 'G1 · 350 kVA' }, G2: { kva: 600, name: 'G2 · 600 kVA' } };   // kW = kVA × 0.8
     const hourOf = ms => { const d = new Date(ms + 3 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60; };
     let solChart = null;
+
+    // ── Solar production only (Mario 2026-10-04): the reference year for any panel count and wattage. Month table
+    // (average / best / worst day, kWh) — click a month for its days, click a day for its 5-minute curve.
+    let prodChart = null, prodOpen = null, prodDay = null;
+    const prodRender = () => {
+      const fk = v => v == null || isNaN(v) ? '—' : Math.abs(v) < 10 ? v.toFixed(2) : f1(v);   // 2 decimals for one panel
+      if (!SUNDATA) return;
+      const N = Math.max(1, +$('prodN').value || 1), W = Math.max(1, +$('prodW').value || 540), f = N * W / 540, pv = $('prodPv').checked;
+      const all = Object.keys(SUNDATA.days).sort(), MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const fct = m => { const r = SUNDATA.months[m], g = SUNDATA.pvgis[+m.slice(5) - 1] * 0.54; return pv && r && g ? g / r.kwh : 1; };
+      const kwhOf = d => SUNDATA.days[d].kwh * f * fct(d.slice(0, 7));
+      const months = [...new Set(all.map(d => d.slice(0, 7)))];
+      const rows = months.map(m => { const ds = all.filter(d => d.startsWith(m)), v = ds.map(kwhOf);
+        return { m, ds, n: ds.length, avg: v.reduce((a, b) => a + b, 0) / v.length, max: Math.max(...v), min: Math.min(...v), maxD: ds[v.indexOf(Math.max(...v))], minD: ds[v.indexOf(Math.min(...v))], pg: SUNDATA.pvgis[+m.slice(5) - 1] * N * W / 1000 }; });
+      const yearAvg = rows.reduce((a, r) => a + r.avg, 0) / rows.length, best = Math.max(...all.map(kwhOf));
+      $('prodK').innerHTML =
+        `<div class="kpi a"><span>Array</span><b>${fk(N * W / 1000)} kWp</b><small>${N} × ${W} W</small></div>` +
+        `<div class="kpi g"><span>Average day</span><b>${fk(yearAvg)} kWh</b><small>mean of the ${rows.length} months · ${fk(yearAvg / (N * W / 1000))} kWh/kWp</small></div>` +
+        `<div class="kpi"><span>Per year</span><b>≈ ${f0(yearAvg * 365)} kWh</b><small>average day × 365${pv ? ' · PVGIS-scaled' : ' · as measured'}</small></div>` +
+        `<div class="kpi"><span>Best day</span><b>${fk(best)} kWh</b><small>${when(all[all.map(kwhOf).indexOf(best)] + ' 00:00').replace(' 00:00', '')}</small></div>`;
+      let h = `<tr><th>Month</th><th>Days</th><th>Average kWh/day</th><th>Max kWh</th><th>Min kWh</th><th>Month kWh<small> ≈ avg × days</small></th><th class="hide-sm">PVGIS avg</th></tr>`;
+      for (const r of rows) {
+        const [y, mm] = r.m.split('-'), dim = new Date(Date.UTC(+y, +mm, 0)).getUTCDate();
+        h += `<tr class="m${prodOpen === r.m ? ' open' : ''}" data-m="${r.m}"><td>${prodOpen === r.m ? '▾' : '▸'} ${MN[+mm - 1]} ${y}</td><td>${r.n}</td><td><b>${fk(r.avg)}</b></td><td>${fk(r.max)}<small> ${+r.maxD.slice(8)}</small></td><td>${fk(r.min)}<small> ${+r.minD.slice(8)}</small></td><td>${f0(r.avg * dim)}</td><td class="hide-sm">${fk(r.pg)}</td></tr>`;
+        if (prodOpen === r.m) for (const d of r.ds) { const x = SUNDATA.days[d];
+          h += `<tr class="d${prodDay === d ? ' sel' : ''}" data-d="${d}"><td>&nbsp;&nbsp;&nbsp;${when(d + ' 00:00').replace(' 00:00', '')}</td><td></td><td>${fk(kwhOf(d))}</td><td colspan="2">${x.fill > 0.01 ? `<small>${fk(x.fill * f * fct(r.m))} topped up</small>` : ''}</td><td></td><td class="hide-sm"></td></tr>`; }
+      }
+      $('prodT').innerHTML = h;
+      $('prodT').querySelectorAll('tr.m').forEach(tr => tr.onclick = () => { prodOpen = prodOpen === tr.dataset.m ? null : tr.dataset.m; prodDay = null; prodRender(); });
+      $('prodT').querySelectorAll('tr.d').forEach(tr => tr.onclick = () => { prodDay = tr.dataset.d; prodRender(); });
+      // chart: daily kWh bars (the year, or the open month); with a day picked, that day's 5-min kW curve
+      const tickD = d => when(d + ' 00:00').replace(' 00:00', '');
+      let cfg;
+      if (prodDay) {
+        const p = SUNDATA.days[prodDay].p, k = f * fct(prodDay.slice(0, 7)) / 1000;
+        const lab = Array.from({ length: 288 }, (_, b) => `${String(Math.floor(b / 12)).padStart(2, '0')}:${String(b % 12 * 5).padStart(2, '0')}`);
+        cfg = { type: 'line', data: { labels: lab, datasets: [{ label: `${tickD(prodDay)} · ${fk(kwhOf(prodDay))} kWh · ${N} × ${W} W`, data: p.map(v => v * k), borderColor: '#a6e3a1', backgroundColor: 'rgba(166,227,161,.18)', fill: 'origin', borderWidth: 1.8 }] },
+          options: { maintainAspectRatio: false, animation: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
+            scales: { x: { ticks: { color: '#a6adc8', maxTicksLimit: 12 }, grid: { color: '#313244' } }, y: { min: 0, title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
+            plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${fk(c.parsed.y)} kW` } } } } };
+      } else {
+        const ds = prodOpen ? all.filter(d => d.startsWith(prodOpen)) : all;
+        cfg = { type: 'bar', data: { labels: ds.map(tickD), datasets: [{ label: `kWh per day · ${N} × ${W} W${prodOpen ? '' : ' · tap a month below for its days'}`, data: ds.map(kwhOf), backgroundColor: ds.map(d => SUNDATA.days[d].fill > 0.01 ? 'rgba(242,169,59,.75)' : 'rgba(166,227,161,.75)') }] },
+          options: { maintainAspectRatio: false, animation: false, scales: { x: { ticks: { color: '#a6adc8', maxTicksLimit: 14 }, grid: { display: false } }, y: { min: 0, title: { display: true, text: 'kWh / day', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
+            plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${fk(c.parsed.y)} kWh` } } } } };
+      }
+      if (prodChart) prodChart.destroy();
+      prodChart = new Chart($('cvp'), cfg);
+      $('prodNote').innerHTML = `<b>Solar production.</b> The reference plant's year scaled to the array typed in (by watts). Amber bars = days where the reference was throttled and topped up from the clear-sky model; green = measured as it was. ` +
+        `Month kWh = average day × days in the month. PVGIS avg = Naccache's long-term average day for this array (unshaded, optimal tilt, 14 % losses). Tick “scale to PVGIS” to lift each month to it — the reference loses low winter sun to shading.`;
+    };
     // ── Battery (Mario 2026-10-04): 3 × 125 kW PCS × 2 h = 750 kWh. Charged from solar only, never from a generator or EDL.
     // Above the minimum it carries the load with the generator stopped; at the minimum it locks and the generator runs
     // until the next day's solar has charged it again. On EDL solar charges it and it does not discharge.
@@ -440,8 +499,9 @@
           plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12, filter: i => i.text } }, tooltip: { filter: i => !!i.dataset.label && !(i.dataset.yAxisID === 'ys' && i.dataset.label !== 'Battery SOC %'), callbacks: { title: it => tick(it[0].parsed.x), label: c => c.dataset.yAxisID === 'ys' ? `Battery SOC ${f1(c.parsed.y)} %` : /^Battery kW/.test(c.dataset.label) ? `Battery ${c.parsed.y >= 0 ? 'to load' : 'charging'} ${f1(Math.abs(c.parsed.y))} kW` : `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
     };
     if (window.Chart && loadMin.length > 1) {
+      $('prodN').oninput = $('prodW').oninput = $('prodPv').onchange = prodRender;
       $('sunM').onchange = $('sunD').onchange = $('sunPv').onchange = () => { pickSun(); solar(); };
-      fetch('/api/makhlouf-sun', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.days) { SUNDATA = j; const ks = Object.keys(j.days).sort(); $('sunD').min = ks[0]; $('sunD').max = ks[ks.length - 1]; } pickSun(); solar(); }).catch(() => { pickSun(); solar(); });
+      fetch('/api/makhlouf-sun', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.days) { SUNDATA = j; const ks = Object.keys(j.days).sort(); $('sunD').min = ks[0]; $('sunD').max = ks[ks.length - 1]; } pickSun(); solar(); prodRender(); $('prodH').hidden = $('prodCard').hidden = !SUNDATA; }).catch(() => { pickSun(); solar(); });
       $('solN').oninput = $('solW').oninput = $('solF').oninput = $('solX').oninput = $('solG').onchange = $('batOn').onchange = $('batC').oninput = $('batM').oninput = $('batX').oninput = $('batP').oninput = $('batS').oninput = $('batT').oninput = solar; solar();
       $('solNote').innerHTML = `<b>Solar vs load.</b> Sun from a reference Deye plant in Naccache (8 × 540 W, 8 kW inverter, so never clipped): a year of real days at 5-minute steps, per panel. Pick one day, an average over the 7 or 30 days to a date, a month's average, or its worst or best day. When the reference battery was full (often filled from EDL overnight) its inverter throttled the panels to the house load; those 5-minute steps are topped up from a clear-sky model of the array (42° south, fitted to its clean clear days), scaled to how clear that day was. In winter the reference also loses the low morning and afternoon sun to shading, so its months run under the PVGIS average for Naccache — tick “scale to PVGIS” to lift the chosen sun to that month's PVGIS average (unshaded, optimal tilt). Other panel sizes scale by watts (645 W = × 1.19). The load is always the logged Makhlouf day. Dashed green = solar made, filled green = solar used. Red = solar lost: solar − generator floor − load, shown only where it is above zero (the solar the load cannot take once the running generator keeps its floor). Its area is the kWh in the legend and the “thrown away” tile. ` +
         `“Thrown away” also counts the solar cut so the running generator never drops under its floor: floor % × kVA × 0.8 (20 % of G1 350 kVA = 56 kW, of G2 600 kVA = 96 kW). The ceiling line is the running generator's upper limit, ceiling % × kVA × 0.8 (80 %: G1 224 kW, G2 384 kW). “As logged” follows the generator that actually ran each minute (told apart by voltage) and drops the floor while on EDL. Load in the generator-off gaps is the estimate.`;
