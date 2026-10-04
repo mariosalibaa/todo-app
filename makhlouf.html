@@ -189,7 +189,7 @@
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
     <div class="tipbox" id="cvTip">Point at the chart to read the values here.</div>
-    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin sunin"><label>Sun <select id="sunM"><option value="day">one day</option><option value="last7">average, 7 days to</option><option value="last30">average, 30 days to</option><option value="month">average of the month</option><option value="monthMin">worst day of the month</option><option value="monthMax">best day of the month</option><option value="year">year average</option><option value="ref">4 Oct curve (first estimate)</option></select></label><label>Date <input id="sunD" type="date" value="2026-10-04"></label><label class="tick"><input id="sunPv" type="checkbox"> scale to PVGIS</label></span><span id="sunInfo" class="suninfo"></span>
+    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin sunin"><label>Sun <select id="sunM"><option value="day">one day</option><option value="last7">average, 7 days to</option><option value="last30">average, 30 days to</option><option value="month">average of the month</option><option value="monthMin">worst day of the month</option><option value="monthMax">best day of the month</option><option value="year">year average</option><option value="ref">4 Oct curve (first estimate)</option></select></label><label>Date <input id="sunD" type="date" value="2026-10-04"></label><label class="tick"><input id="sunPv" type="checkbox"> scale to PVGIS</label><label>Show <select id="solP"><option value="day">per day</option><option value="month">per month</option><option value="year">per year</option></select></label></span><span id="sunInfo" class="suninfo"></span>
       <span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Generator <select id="solG"><option value="log">as logged (G1 / G2)</option><option value="G1">G1 · 350 kVA only</option><option value="G2">G2 · 600 kVA only</option></select></label><label>Floor % <input id="solF" type="number" min="0" max="100" step="1" value="20"></label><label>Ceiling % <input id="solX" type="number" min="0" max="100" step="1" value="80"></label><label>Logger gaps <select id="solGap"><option value="edl">EDL</option><option value="gen">generator</option></select></label></span>
       <span class="solin batin"><label class="tick">System <select id="batOn"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>kWh <input id="batC" type="number" min="0" step="10" value="750"></label><label>Min % <input id="batM" type="number" min="0" max="90" step="1" value="10"></label><label>Max % <input id="batX" type="number" min="10" max="100" step="1" value="100"></label><label>System kW <input id="batP" type="number" min="0" step="5" value="375"></label><label>Gen start % <input id="batS" type="number" min="0" max="100" step="1" value="25"></label><label>Gen stop % <input id="batT" type="number" min="0" max="100" step="1" value="40"></label></span></h2>
     <div class="kpis" id="solK"></div>
@@ -202,7 +202,7 @@
     <div class="tipbox" id="prodTip">Point at the chart to read the values here.</div>
     <div class="card" style="margin-top:10px"><table id="prodT" class="prodT"></table></div>
     <div class="note" id="prodNote"></div>
-    <h2 class="mh" id="yrH"><span>Year on Makhlouf's load</span><span class="solin"><label>Panels <input id="yrN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="yrW" type="number" min="100" step="5" value="645"></label><label>System <select id="yrS"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>Battery kWh <input id="yrC" type="number" min="0" step="10" value="750"></label><label class="tick"><input id="yrPv" type="checkbox"> scale to PVGIS</label></span></h2>
+    <h2 class="mh" id="yrH"><span>Year on Makhlouf's load</span><span class="solin"><label>Panels <input id="yrN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="yrW" type="number" min="100" step="5" value="645"></label><label>System <select id="yrS"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>Battery kWh <input id="yrC" type="number" min="0" step="10" value="750"></label><label>Load kWh/month <input id="yrL" type="number" min="0" step="1000" value="75000" style="width:84px"></label><label class="tick"><input id="yrPv" type="checkbox"> scale to PVGIS</label></span></h2>
     <div class="kpis" id="yrK"></div>
     <div class="card"><table id="yrT" class="prodT"></table></div>
     <div class="note" id="yrNote"></div>
@@ -361,7 +361,7 @@
         if (kw != null) loadMin.push([t * 1000, kw, false, genMin.get(m) || 'G2']); } }
     const GK = { G1: { kva: 350, name: 'G1 · 350 kVA' }, G2: { kva: 600, name: 'G2 · 600 kVA' } };   // kW = kVA × 0.8
     const hourOf = ms => { const d = new Date(ms + 3 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60; };
-    let solChart = null, LM = loadMin;
+    let solChart = null, LM = loadMin, PM = 1, PU = 'day';   // PM: tiles per day / month / year (Mario 2026-10-05)
     // ── Year on Makhlouf's load (Mario 2026-10-04): every reference day run against the logged Makhlouf day, on-grid or hybrid.
     // Month rows = the month's total (average day × days in the month); click for the days; last row = the year (12 month slots).
     // Generator, floor %, ceiling, logger gaps, min/max SOC, system kW and gen start/stop come from the Solar vs load controls.
@@ -371,7 +371,7 @@
       let soc = lo, genOn = true, r;
       for (let pass = 0; pass < (hyb ? 2 : 1); pass++) {
         r = { made: 0, used: 0, lost: 0, bat: 0, gen: 0, edl: 0, fuel: 0, genH: 0 };
-        for (const [x, kw, , src] of LM) {
+        for (const [x, kw, , src] of (set.lm || LM)) {
           const p = N * pk[Math.min(287, Math.floor(hourOf(x) * 12))] * W / 540, onEdl = src === 'EDL', net = kw - p;
           r.made += p / 60;
           if (!hyb) {
@@ -406,7 +406,10 @@
       const pct = Math.min(100, Math.max(0, +$('solF').value || 0)), gm = $('solG').value;
       const minP = Math.min(90, Math.max(0, +$('batM').value || 0)) / 100, maxP = Math.min(100, Math.max(minP * 100 + 1, +$('batX').value || 100)) / 100;
       const sP = Math.min(100, Math.max(minP * 100, +$('batS').value || 25)) / 100;
-      const set = { floorOf: src => GK[gm === 'log' ? src : gm].kva * 0.8 * pct / 100, minP, maxP, P: Math.max(0, +$('batP').value || 0), sP, tP: Math.min(100, Math.max(sP * 100 + 1, +$('batT').value || 40)) / 100 };
+      // Mario 2026-10-04: scale the logged day to the client's monthly figure (75,000 kWh/month = 900 MWh/year, meeting 1 Oct)
+      const dayLog = LM.reduce((a, q) => a + q[1] / 60, 0), tgt = Math.max(0, +$('yrL').value || 0), lf = tgt ? tgt * 12 / 365 / dayLog : 1;
+      const lm = lf === 1 ? LM : LM.map(q => [q[0], q[1] * lf, q[2], q[3], q[4]]);
+      const set = { lm, floorOf: src => GK[gm === 'log' ? src : gm].kva * 0.8 * pct / 100, minP, maxP, P: Math.max(0, +$('batP').value || 0), sP, tP: Math.min(100, Math.max(sP * 100 + 1, +$('batT').value || 40)) / 100 };
       const all = Object.keys(SUNDATA.days).sort(), MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const fct = m => { const r = SUNDATA.months[m], g = SUNDATA.pvgis[+m.slice(5) - 1] * 0.54; return pv && r && g ? g / r.kwh : 1; };
       const res = {}; for (const d of all) { const f = fct(d.slice(0, 7)); res[d] = simDay(SUNDATA.days[d].p.map(v => v * f / 1000), N, W, hyb, cap, set); }
@@ -426,14 +429,14 @@
       h += `<tr class="tot"><td><b>Year</b><small> ${Object.keys(slot).length} months</small></td><td>${all.length}</td>${cells(yr, 1)}</tr>`;
       $('yrT').innerHTML = h;
       $('yrT').querySelectorAll('tr.m').forEach(tr => tr.onclick = () => { yrOpen = yrOpen === tr.dataset.m ? null : tr.dataset.m; yrRender(); });
-      const load = LM.reduce((a, q) => a + q[1] / 60, 0) * 365;
+      const load = dayLog * lf * 365;
       const none = simDay(new Array(288).fill(0), 0, W, false, 0, set).fuel * 365;   // the same year with no solar
       $('yrK').innerHTML =
         `<div class="kpi a"><span>Solar made</span><b>${f0(yr.made)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · a year</small></div>` +
-        `<div class="kpi g"><span>Solar used</span><b>${f0(yr.used)} kWh</b><small>${Math.round(yr.used / load * 100)} % of ≈ ${f0(load)} kWh load</small></div>` +
+        `<div class="kpi g"><span>Solar used</span><b>${f0(yr.used)} kWh</b><small>${Math.round(yr.used / load * 100)} % of ≈ ${f0(load)} kWh load${lf !== 1 ? ` (logged day × ${lf.toFixed(2)})` : ''}</small></div>` +
         `<div class="kpi ${yr.lost > 1 ? 'r' : ''}"><span>Solar thrown</span><b>${f0(yr.lost)} kWh</b><small>${yr.made ? Math.round(yr.lost / yr.made * 100) : 0} % of what was made</small></div>` +
         `<div class="kpi g"><span>Diesel</span><b>≈ ${f0(yr.fuel)} L</b><small>generator on ${f0(yr.genH)} h a year (${f1(yr.genH / 365)} h/day) · saves ≈ ${f0(none - yr.fuel)} L (${Math.round((none - yr.fuel) / none * 100)} %) vs no solar · generator ${f0(yr.gen)} kWh${hyb ? ` · battery ${f0(yr.bat)} kWh to the load` : ''}</small></div>`;
-      $('yrNote').innerHTML = `<b>Year on Makhlouf's load.</b> Each reference day (sun as in Solar production, × panels and watts) is run against the logged Makhlouf day, so the load is the same every day — it changes only the sun. ` +
+      $('yrNote').innerHTML = `<b>Year on Makhlouf's load.</b> Each reference day (sun as in Solar production, × panels and watts) is run against the logged Makhlouf day, so the load is the same every day — it changes only the sun. “Load kWh/month” scales that day to a monthly figure (75,000 kWh = what Makhlouf quoted at the 1 Oct meeting, ≈ 900 MWh a year; the logged day alone is ≈ 79,000 kWh/month); empty = the logged day as it is. ` +
         `A month row is that month's total: the average simulated day × the days in the month; tap it for the days. The year is the sum of the 12 months (October appears twice in the data, its two years are averaged). ` +
         `Generator, floor %, logger gaps, min/max SOC, system kW and gen start/stop are taken from the Solar vs load controls above. Diesel follows the generator's load: an idle part plus a part per kW, set so G1 burns 42.5 L/h at 92 kW and G2 60 L/h at 137 kW (your figures at the logged average load).`;
     };
@@ -543,15 +546,16 @@
       }
       const o = out, base = LM.reduce((a, [, kw, , src]) => a + (src === 'EDL' ? 0 : fuelLh(src, kw) / 60), 0);
       $('batK').innerHTML =
-        `<div class="kpi g"><span>Charged from solar</span><b>${f0(o.chg)} kWh</b><small>${f0(cap)} kWh bank · SOC ${f0(o.minSoc)}–${f0(o.maxSoc)} % (limits ${f0(minP * 100)}–${f0(maxP * 100)} %)</small></div>` +
+        `<div class="kpi g"><span>Charged from solar</span><b>${f0(o.chg * PM)} kWh</b><small>${f0(cap)} kWh bank · SOC ${f0(o.minSoc)}–${f0(o.maxSoc)} % (limits ${f0(minP * 100)}–${f0(maxP * 100)} %)</small></div>` +
         `<div class="kpi"><span>Cloud reserve</span><b>${f0(startAt - lo)} kWh</b><small>${f0(minP * 100)}–${f0(sP * 100)} % kept back · ≈ ${f0((startAt - lo) / Math.max(o.peakLoad, 1) * 60)} min at the ${f0(o.peakLoad)} kW peak</small></div>` +
-        `<div class="kpi a"><span>Battery to the load</span><b>${f0(o.dis)} kWh</b><small>generator stopped ${f1(o.offMin / 60)} of ${f1((o.offMin + o.onMin) / 60)} h</small></div>` +
-        `<div class="kpi"><span>Generator running</span><b>${f1(o.onMin / 60)} h</b><small>≈ ${f0(o.litres)} L (logged day ≈ ${f0(base)} L)</small></div>` +
-        `<div class="kpi g"><span>Diesel saved</span><b>≈ ${f0(base - o.litres)} L</b><small>${base ? Math.round((base - o.litres) / base * 100) : 0} % of the day · load-dependent, 42.5 / 60 L/h at the logged load</small></div>`;
+        `<div class="kpi a"><span>Battery to the load</span><b>${f0(o.dis * PM)} kWh</b><small>generator stopped ${f1(o.offMin / 60 * PM)} of ${f1((o.offMin + o.onMin) / 60 * PM)} h</small></div>` +
+        `<div class="kpi"><span>Generator running</span><b>${f1(o.onMin / 60 * PM)} h</b><small>≈ ${f0(o.litres * PM)} L (no solar ≈ ${f0(base * PM)} L)</small></div>` +
+        `<div class="kpi g"><span>Diesel saved</span><b>≈ ${f0((base - o.litres) * PM)} L</b><small>${base ? Math.round((base - o.litres) / base * 100) : 0} % · load-dependent, 42.5 / 60 L/h at the logged load</small></div>`;
       o.lines = { minP, sP, tP, maxP };
       return o;
     };
     const solar = () => {
+      PU = $('solP').value; PM = PU === 'month' ? 365 / 12 : PU === 'year' ? 365 : 1;
       clearTimeout(window.yrT); window.yrT = setTimeout(() => yrRender(), 300);   // the year table follows the Solar vs load settings
       const N = Math.max(0, +$('solN').value || 0), W = Math.max(0, +$('solW').value || 540), pct = Math.min(100, Math.max(0, +$('solF').value || 0)), gm = $('solG').value;
       const floorOf = src => src === 'EDL' && gm === 'log' ? 0 : GK[gm === 'log' ? src : gm].kva * 0.8 * pct / 100;   // on EDL the PV runs grid-tied, no floor
@@ -587,10 +591,10 @@
       const runTxt = runs.filter(r => r[1] - r[0] >= 4).map(r => `${hm(r[0])}–${hm(r[1])}`).join(', ');
       const eLoad = loadMin.reduce((a, [, kw]) => a + kw / 60, 0);
       $('solK').innerHTML =
-        `<div class="kpi a"><span>Solar made</span><b>${f0(ePV)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · peak ${f0(maxPV)} kW</small></div>` +
-        `<div class="kpi g"><span>Solar used</span><b>${f0(eUsed)} kWh</b><small>${Math.round(eUsed / eLoad * 100)} % of the load (${f0(eLoad)} kWh)</small></div>` +
-        `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur)} kWh</b><small>${B ? `battery on, no generator floor · battery full or ${f0(+$('batP').value || 0)} kW reached` : `generator kept ≥ ${pct} % (${gm === 'log' ? `G1 ${f0(F.G1)} / G2 ${f0(F.G2)} kW` : f0(F[gm]) + ' kW'})`} · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
-        `<div class="kpi ${overMin ? 'r' : ''}"><span>Generator</span><b>${f0(eGen)} kWh</b><small><strong style="color:var(--text)">on ${f1(genH)} h</strong>${runTxt ? ` (${runTxt})` : ''} · ${eForced > 0.5 ? `${f0(eForced)} kWh only because of the floor (${f0(eForcedOver)} while solar ≥ load) · ` : ''}${overMin ? `over ${cpct} % ceiling ${overMin} min (worst +${f0(overMax)} kW) · ` : `never above ${cpct} % ceiling · `}${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (after the floor)</small></div>`;
+        `<div class="kpi a"><span>Solar made${PM !== 1 ? ' · per ' + PU : ''}</span><b>${f0(ePV * PM)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · peak ${f0(maxPV)} kW</small></div>` +
+        `<div class="kpi g"><span>Solar used</span><b>${f0(eUsed * PM)} kWh</b><small>${Math.round(eUsed / eLoad * 100)} % of the load (${f0(eLoad * PM)} kWh)</small></div>` +
+        `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur * PM)} kWh</b><small>${B ? `battery on, no generator floor · battery full or ${f0(+$('batP').value || 0)} kW reached` : `generator kept ≥ ${pct} % (${gm === 'log' ? `G1 ${f0(F.G1)} / G2 ${f0(F.G2)} kW` : f0(F[gm]) + ' kW'})`} · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
+        `<div class="kpi ${overMin ? 'r' : ''}"><span>Generator</span><b>${f0(eGen * PM)} kWh</b><small><strong style="color:var(--text)">on ${f1(genH * PM)} h</strong>${runTxt && PM === 1 ? ` (${runTxt})` : ''} · ${eForced > 0.5 ? `${f0(eForced * PM)} kWh only because of the floor (${f0(eForcedOver * PM)} while solar ≥ load) · ` : ''}${overMin ? `over ${cpct} % ceiling ${overMin} min (worst +${f0(overMax)} kW) · ` : `never above ${cpct} % ceiling · `}${eEdl ? `+ EDL ${f0(eEdl * PM)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (after the floor)</small></div>`;
       const ds = [
         { label: 'Load', data: ld, borderColor: '#F2A93B', borderWidth: 1.5, spanGaps: false },
         { label: `Load · gap estimated (${$('solGap').value === 'gen' ? 'on the generator' : 'on EDL'})`, data: le, borderColor: '#9399b2', borderWidth: 1.2, spanGaps: false },
@@ -623,11 +627,12 @@
     };
     if (window.Chart && loadMin.length > 1) {
       $('prodN').oninput = $('prodW').oninput = $('prodPv').onchange = prodRender;
-      ['yrN', 'yrW', 'yrC'].forEach(i => $(i).oninput = yrRender); $('yrS').onchange = $('yrPv').onchange = yrRender;
+      ['yrN', 'yrW', 'yrC', 'yrL'].forEach(i => $(i).oninput = yrRender); $('yrS').onchange = $('yrPv').onchange = yrRender;
+      $('solP').onchange = solar;
       $('sunM').onchange = $('sunD').onchange = $('sunPv').onchange = () => { pickSun(); solar(); };
       fetch('/api/makhlouf-sun', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.days) { SUNDATA = j; const ks = Object.keys(j.days).sort(); $('sunD').min = ks[0]; $('sunD').max = ks[ks.length - 1]; } pickSun(); solar(); prodRender(); yrRender(); $('prodH').hidden = $('prodCard').hidden = !SUNDATA; }).catch(() => { pickSun(); solar(); });
       $('solN').oninput = $('solW').oninput = $('solF').oninput = $('solX').oninput = $('solGap').onchange = $('solG').onchange = $('batOn').onchange = $('batC').oninput = $('batM').oninput = $('batX').oninput = $('batP').oninput = $('batS').oninput = $('batT').oninput = solar; solar();
-      $('solNote').innerHTML = `<b>Solar vs load.</b> Sun from a reference Deye plant in Naccache (8 × 540 W, 8 kW inverter, so never clipped): a year of real days at 5-minute steps, per panel. Pick one day, an average over the 7 or 30 days to a date, a month's average, or its worst or best day. When the reference battery was full (often filled from EDL overnight) its inverter throttled the panels to the house load; those 5-minute steps are topped up from a clear-sky model of the array (42° south, fitted to its clean clear days), scaled to how clear that day was. In winter the reference also loses the low morning and afternoon sun to shading, so its months run under the PVGIS average for Naccache — tick “scale to PVGIS” to lift the chosen sun to that month's PVGIS average (unshaded, optimal tilt). Other panel sizes scale by watts (645 W = × 1.19). The load is always the logged Makhlouf day. Dashed green = solar made, filled green = solar used. Red = solar lost: solar − generator floor − load, shown only where it is above zero (the solar the load cannot take once the running generator keeps its floor). Its area is the kWh in the legend and the “thrown away” tile. ` +
+      $('solNote').innerHTML = `<b>Solar vs load.</b> “Show per month / per year” multiplies the tiles by 30.4 or 365 days of the chosen sun — pick “average of the month” or “year average” for a fair month or year. Sun from a reference Deye plant in Naccache (8 × 540 W, 8 kW inverter, so never clipped): a year of real days at 5-minute steps, per panel. Pick one day, an average over the 7 or 30 days to a date, a month's average, or its worst or best day. When the reference battery was full (often filled from EDL overnight) its inverter throttled the panels to the house load; those 5-minute steps are topped up from a clear-sky model of the array (42° south, fitted to its clean clear days), scaled to how clear that day was. In winter the reference also loses the low morning and afternoon sun to shading, so its months run under the PVGIS average for Naccache — tick “scale to PVGIS” to lift the chosen sun to that month's PVGIS average (unshaded, optimal tilt). Other panel sizes scale by watts (645 W = × 1.19). The load is always the logged Makhlouf day. Dashed green = solar made, filled green = solar used. Red = solar lost: solar − generator floor − load, shown only where it is above zero (the solar the load cannot take once the running generator keeps its floor). Its area is the kWh in the legend and the “thrown away” tile. ` +
         `“Thrown away” also counts the solar cut so the running generator never drops under its floor: floor % × kVA × 0.8 (20 % of G1 350 kVA = 56 kW, of G2 600 kVA = 96 kW). The ceiling line is the running generator's upper limit, ceiling % × kVA × 0.8 (80 %: G1 224 kW, G2 384 kW). “As logged” follows the generator that actually ran each minute (told apart by voltage) and drops the floor while on EDL. “Logger gaps” decides who carried the estimated load while the logger was dark: EDL (no floor, no fuel, the battery waits) or the generator that came back after the gap (floor, fuel, the battery may discharge). Load in the generator-off gaps is the estimate.`;
       $('batNote').innerHTML = `<b>Battery</b> (tick above). Charged from solar only; no generator floor while it is on, so solar goes to the load first and the rest into the battery — only what a full battery or the system kW limit cannot take is lost. ` +
         `Above the min SOC it carries the load and the generator stays off (up to the system kW). The generator auto-starts when the SOC falls to the gen start % and runs, at least at its floor, until solar has charged the battery to the gen stop %; solar beyond (load − floor) charges it meanwhile. The band between the min SOC and the gen start % is the reserve that catches a cloud or a failed start — the battery never runs the site alone below it. Never charged from a generator or EDL; on EDL it is kept for the generator hours. ` +
