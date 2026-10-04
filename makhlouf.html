@@ -309,9 +309,9 @@
       let soc = lo, locked = true, out;
       for (let pass = 0; pass < 2; pass++) {
         const socS = [], pw = [], gen = [];
-        let chg = 0, dis = 0, sur = 0, genKwh = 0, offMin = 0, onMin = 0, litres = 0, minSoc = 100, maxSoc = 0;
+        let chg = 0, dis = 0, sur = 0, genKwh = 0, offMin = 0, onMin = 0, litres = 0, minSoc = 100, maxSoc = 0, made = 0;
         for (const [x, kw, , src] of loadMin) {
-          const p = N * perPanel(hourOf(x), W), onEdl = src === 'EDL', net = kw - p;
+          const p = N * perPanel(hourOf(x), W), onEdl = src === 'EDL', net = kw - p; made += p / 60;
           let b = 0, gOn = false, g = 0;   // b > 0 discharge, b < 0 charge (kW)
           if (net <= 0) {   // solar covers the whole load: the rest charges the battery, the generator can stop
             b = -Math.min(-net, P, room()); sur += (-net + b) / 60;
@@ -332,10 +332,11 @@
           const pct = cap ? soc / cap * 100 : 0; minSoc = Math.min(minSoc, pct); maxSoc = Math.max(maxSoc, pct);
           socS.push({ x, y: pct }); pw.push({ x, y: b }); gen.push({ x, y: gOn ? 2 : null });
         }
-        out = { socS, pw, gen, chg, dis, sur, genKwh, offMin, onMin, litres, minSoc, maxSoc };
+        out = { socS, pw, gen, chg, dis, sur, genKwh, offMin, onMin, litres, minSoc, maxSoc, made };
       }
       const o = out, base = loadMin.reduce((a, [, , , src]) => a + (src === 'EDL' ? 0 : FUEL[src] / 60), 0);
       $('batK').innerHTML =
+        `<div class="kpi g"><span>Solar used</span><b>${f0(o.made - o.sur)} kWh</b><small>${o.made ? Math.round((o.made - o.sur) / o.made * 100) : 0} % of ${f0(o.made)} kWh made · no floor loss, the battery takes it</small></div>` +
         `<div class="kpi g"><span>Charged from solar</span><b>${f0(o.chg)} kWh</b><small>${f0(cap)} kWh bank · SOC ${f0(o.minSoc)}–${f0(o.maxSoc)} %</small></div>` +
         `<div class="kpi a"><span>Delivered to the load</span><b>${f0(o.dis)} kWh</b><small>generator stopped ${f1(o.offMin / 60)} of ${f1((o.offMin + o.onMin) / 60)} h</small></div>` +
         `<div class="kpi"><span>Generator</span><b>${f0(o.genKwh)} kWh</b><small>${f1(o.onMin / 60)} h running · ≈ ${f0(o.litres)} L (logged day ≈ ${f0(base)} L)</small></div>` +
@@ -360,24 +361,25 @@
       const N = Math.max(0, +$('solN').value || 0), W = Math.max(0, +$('solW').value || 540), pct = Math.min(100, Math.max(0, +$('solF').value || 0)), gm = $('solG').value;
       const floorOf = src => src === 'EDL' && gm === 'log' ? 0 : GK[gm === 'log' ? src : gm].kva * 0.8 * pct / 100;   // on EDL the PV runs grid-tied, no floor
       const F = Object.fromEntries(['G1', 'G2'].map(g => [g, GK[g].kva * 0.8 * pct / 100]));
-      const ld = [], le = [], pv = [], df = [], fl = [];
+      const ld = [], le = [], pv = [], pu = [], df = [], fl = [];
       let ePV = 0, eUsed = 0, eSur = 0, eGen = 0, eEdl = 0, maxSur = 0, maxPV = 0, minNet = Infinity;
       for (const [x, kw, isEst, src] of loadMin) {
         const fk = floorOf(src), p = N * perPanel(hourOf(x), W), net = kw - p, room = Math.max(kw - Math.min(fk, kw), 0), used = Math.min(p, room);
-        ld.push({ x, y: isEst ? null : kw }); le.push({ x, y: isEst ? kw : null }); pv.push({ x, y: p }); df.push({ x, y: -net }); fl.push({ x, y: fk });
-        ePV += p / 60; eUsed += used / 60; eSur += (p - used) / 60; if (src === 'EDL' && gm === 'log') eEdl += (kw - used) / 60; else eGen += (kw - used) / 60; maxPV = Math.max(maxPV, p); maxSur = Math.max(maxSur, p - room); if (p > 0) minNet = Math.min(minNet, net);
+        ld.push({ x, y: isEst ? null : kw }); le.push({ x, y: isEst ? kw : null }); pv.push({ x, y: p }); pu.push({ x, y: used }); df.push({ x, y: p - room });   // above zero = solar the load cannot take once the running generator keeps its floor fl.push({ x, y: fk });
+        ePV += p / 60; eUsed += used / 60; eSur += (p - used) / 60; if (src === 'EDL' && gm === 'log') eEdl += (kw - used) / 60; else eGen += (kw - used) / 60; maxPV = Math.max(maxPV, p); maxSur = Math.max(maxSur, p - room); if (p > 0) minNet = Math.min(minNet, room - p);
       }
       const eLoad = loadMin.reduce((a, [, kw]) => a + kw / 60, 0);
       $('solK').innerHTML =
         `<div class="kpi a"><span>Solar made</span><b>${f0(ePV)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · peak ${f0(maxPV)} kW</small></div>` +
         `<div class="kpi g"><span>Solar used</span><b>${f0(eUsed)} kWh</b><small>${Math.round(eUsed / eLoad * 100)} % of the load (${f0(eLoad)} kWh)</small></div>` +
         `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur)} kWh</b><small>generator kept ≥ ${pct} % (${gm === 'log' ? `G1 ${f0(F.G1)} / G2 ${f0(F.G2)} kW` : f0(F[gm]) + ' kW'}) · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
-        `<div class="kpi"><span>Generator</span><b>${f0(eGen)} kWh</b><small>${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (solar − load)</small></div>`;
+        `<div class="kpi"><span>Generator</span><b>${f0(eGen)} kWh</b><small>${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (after the floor)</small></div>`;
       const ds = [
         { label: 'Load', data: ld, borderColor: '#F2A93B', borderWidth: 1.5, spanGaps: false },
         { label: 'Load · EDL estimated', data: le, borderColor: '#9399b2', borderWidth: 1.2, spanGaps: false },
-        { label: `Solar · ${N} × ${W} W`, data: pv, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.12)', fill: 'origin' },
-        { label: 'Solar − load (remaining kW)', data: df, borderColor: '#89b4fa', borderWidth: 1.5, fill: { target: 'origin', above: 'rgba(166,227,161,.35)', below: 'rgba(137,180,250,.08)' } },
+        { label: `Solar made · ${N} × ${W} W`, data: pv, borderColor: '#a6e3a1', borderWidth: 1.5, borderDash: [5, 3] },
+        { label: 'Solar used', data: pu, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.18)', fill: 'origin' },
+        { label: 'Solar − (load − gen floor) · above 0 = lost', data: df, borderColor: '#89b4fa', borderWidth: 1.5, fill: { target: 'origin', above: 'rgba(166,227,161,.35)', below: 'rgba(137,180,250,.08)' } },
         { label: 'Generator floor', data: fl, borderColor: '#f38ba8', borderWidth: 1, borderDash: [4, 4] }];
       battery(N, W, floorOf);
       if (solChart) { solChart.data.datasets = ds; solChart.update(); return; }
@@ -391,7 +393,7 @@
     if (window.Chart && loadMin.length > 1) {
       $('solN').oninput = $('solW').oninput = $('solF').oninput = $('solG').onchange = $('batC').oninput = $('batM').oninput = $('batP').oninput = solar; solar();
       $('solNote').innerHTML = `<b>Solar vs load.</b> Sun shape from Walid Hibri Naccache's Deye plant on 4 Oct (8 × 540 W made 16.5 kWh with the battery never full, so nothing was cut): ` +
-        `<b>2.06 kWh and 299 W peak per 540 W panel</b> (3.82 kWh per kWp) — a modest day. Other panel sizes scale by watts: a 645 W panel ≈ 2.46 kWh and 357 W peak. Blue = solar − load, the kW remaining: the green area above zero is solar left over after the whole load is covered; below zero the generator (or EDL) supplies the difference. ` +
+        `<b>2.06 kWh and 299 W peak per 540 W panel</b> (3.82 kWh per kWp) — a modest day. Other panel sizes scale by watts: a 645 W panel ≈ 2.46 kWh and 357 W peak. Dashed green = solar made, filled green = solar used. Blue = solar − (load − 20 % of the running generator): above zero (green area) is solar lost because the load minus the generator floor cannot take it; below zero the generator (or EDL) supplies the difference. ` +
         `“Thrown away” also counts the solar cut so the running generator never drops under its floor: floor % × kVA × 0.8 (20 % of G1 350 kVA = 56 kW, of G2 600 kVA = 96 kW). “As logged” follows the generator that actually ran each minute (told apart by voltage) and drops the floor while on EDL. Load in the generator-off gaps is the estimate.`;
       $('batNote').innerHTML = `<b>Battery.</b> Uses the panels, panel W, generator and floor set above. Charged from solar only: the solar that the load and the generator floor cannot take. ` +
         `With charge above the minimum it carries the load and the generator stays off (up to the PCS limit). At the minimum it locks and the generator runs until the next day's solar has charged it. ` +
