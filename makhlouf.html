@@ -363,7 +363,8 @@
       const batOn = $('batOn').value === '1';
       document.querySelector('.batin').classList.toggle('off', !batOn); $('batH').hidden = $('batK').hidden = $('batNote').hidden = !batOn;
       const B = batOn ? battery(N, W, floorOf) : null;
-      const ld = [], le = [], pv = [], pu = [], df = [], fl = [], cl = [], gk = [];
+      const ld = [], le = [], pv = [], pu = [], df = [], fl = [], cl = [], gk = [], gf = [];
+      let eForced = 0, eForcedOver = 0;
       let mi = -1;
       let overMin = 0, overMax = 0;
       let ePV = 0, eUsed = 0, eSur = 0, eGen = 0, eEdl = 0, maxSur = 0, maxPV = 0, minNet = Infinity;
@@ -372,7 +373,9 @@
         const p = N * perPanel(hourOf(x), W), net = kw - p, fk = B ? 0 : floorOf(src);
         const room = B ? p - B.lost[mi] : Math.max(kw - Math.min(fk, kw), 0), used = Math.min(p, room);   // with the battery: no floor, only what the full battery / system kW cannot take is lost
         ld.push({ x, y: isEst ? null : kw }); le.push({ x, y: isEst ? kw : null }); pv.push({ x, y: p }); pu.push({ x, y: used }); df.push({ x, y: Math.max(p - room, 0) });
-        fl.push({ x, y: B ? null : fk }); const onGrid = src === 'EDL' && gm === 'log'; gk.push({ x, y: onGrid ? null : B ? B.genK[mi] : kw - used });   // generator output (EDL hours: none)
+        fl.push({ x, y: B ? null : fk }); const onGrid = src === 'EDL' && gm === 'log'; gk.push({ x, y: onGrid ? null : B ? B.genK[mi] : kw - used });
+        { const gOut = onGrid ? 0 : B ? B.genK[mi] : kw - used, forced = Math.max(0, gOut - Math.max(net, 0));   // generator kW only there because of its floor (solar could have covered it)
+          gf.push({ x, y: forced > 0.05 ? forced : null }); eForced += forced / 60; if (p >= kw) eForcedOver += forced / 60; }   // generator output (EDL hours: none)
         const ck = ceilOf(src); cl.push({ x, y: ck }); if (ck != null && kw - used > ck) { overMin++; overMax = Math.max(overMax, kw - used - ck); }   // df above zero = solar the load cannot take once the running generator keeps its floor
         ePV += p / 60; eUsed += used / 60; eSur += (p - used) / 60; if (B) { /* totals from the battery run */ } else if (src === 'EDL' && gm === 'log') eEdl += (kw - used) / 60; else eGen += (kw - used) / 60; maxPV = Math.max(maxPV, p); maxSur = Math.max(maxSur, p - room); if (p > 0) minNet = Math.min(minNet, room - p);
       }
@@ -383,13 +386,14 @@
         `<div class="kpi a"><span>Solar made</span><b>${f0(ePV)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · peak ${f0(maxPV)} kW</small></div>` +
         `<div class="kpi g"><span>Solar used</span><b>${f0(eUsed)} kWh</b><small>${Math.round(eUsed / eLoad * 100)} % of the load (${f0(eLoad)} kWh)</small></div>` +
         `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur)} kWh</b><small>${B ? `battery on, no generator floor · battery full or ${f0(+$('batP').value || 0)} kW reached` : `generator kept ≥ ${pct} % (${gm === 'log' ? `G1 ${f0(F.G1)} / G2 ${f0(F.G2)} kW` : f0(F[gm]) + ' kW'})`} · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
-        `<div class="kpi ${overMin ? 'r' : ''}"><span>Generator</span><b>${f0(eGen)} kWh</b><small>${overMin ? `over ${cpct} % ceiling ${overMin} min (worst +${f0(overMax)} kW) · ` : `never above ${cpct} % ceiling · `}${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (after the floor)</small></div>`;
+        `<div class="kpi ${overMin ? 'r' : ''}"><span>Generator</span><b>${f0(eGen)} kWh</b><small>${eForced > 0.5 ? `${f0(eForced)} kWh only because of the floor (${f0(eForcedOver)} while solar ≥ load) · ` : ''}${overMin ? `over ${cpct} % ceiling ${overMin} min (worst +${f0(overMax)} kW) · ` : `never above ${cpct} % ceiling · `}${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (after the floor)</small></div>`;
       const ds = [
         { label: 'Load', data: ld, borderColor: '#F2A93B', borderWidth: 1.5, spanGaps: false },
         { label: 'Load · EDL estimated', data: le, borderColor: '#9399b2', borderWidth: 1.2, spanGaps: false },
         { label: `Solar made · ${N} × ${W} W`, data: pv, borderColor: '#a6e3a1', borderWidth: 1.5, borderDash: [5, 3] },
         { label: B ? 'Solar used (load + battery)' : 'Solar used', data: pu, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.18)', fill: 'origin' },
         { label: B ? `Solar lost (battery full) · ${f0(eSur)} kWh` : `Solar lost = solar − gen floor − load · ${f0(eSur)} kWh`, data: df, borderColor: '#f38ba8', borderWidth: 1.5, backgroundColor: 'rgba(243,139,168,.30)', fill: 'origin' },
+        { label: `Generator forced by floor · ${f0(eForced)} kWh`, data: gf, borderColor: '#89b4fa', borderWidth: 0, backgroundColor: 'rgba(137,180,250,.35)', fill: 'origin', spanGaps: false },
         { label: `Generator output · ${f0(eGen)} kWh`, data: gk, borderColor: '#89b4fa', borderWidth: 1.8, spanGaps: false, order: -1 },
         { label: 'Generator floor', data: fl, borderColor: '#f38ba8', borderWidth: 1, borderDash: [4, 4] },
         { label: `Generator ceiling ${cpct} %`, data: cl, borderColor: '#fab387', borderWidth: 1.2, borderDash: [8, 4], spanGaps: false }];
