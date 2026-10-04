@@ -171,7 +171,7 @@
       </g>
     </svg></div><div class="legend"><span><i class="e"></i>EDL</span><span><i></i>Generator / load cable</span><span><i class="a"></i>Measured point</span><span><i class="d"></i>Assumed — to confirm on site</span></div>
       <table class="setupT"><tr><th>Array</th><th>Panels</th><th>Panel</th><th>kWp</th><th>Peak (4 Oct sun)</th><th>kWh / day</th></tr>
-        <tr><td>Walid Hibri, Naccache (reference)</td><td>8</td><td>540 W</td><td>4.32</td><td>2.4 kW</td><td>16.5 measured</td></tr>
+        <tr><td>Reference plant, Naccache (Deye, 4 Oct)</td><td>8</td><td>540 W</td><td>4.32</td><td>2.4 kW</td><td>16.5 measured</td></tr>
         <tr><td>Makhlouf, small option</td><td>300</td><td>645 W</td><td>193.5</td><td>≈ 107 kW</td><td>≈ 739</td></tr>
         <tr><td>Makhlouf, large option</td><td>600</td><td>645 W</td><td>387</td><td>≈ 215 kW</td><td>≈ 1,478</td></tr></table>
       <div class="setupQ"><b>Switching:</b> MTS (manual) picks G1 or G2; the ATS (automatic, InteliLite AMF25) swaps between EDL and the generator. The logger sits between the two, so it goes dark whenever the ATS is on EDL. On 4 Oct: EDL 00:32–03:15 (went off on G2, came back on G1), EDL 10:02–12:09, MTS swap G1 → G2 at 14:28 (under a minute). <b>To confirm:</b> EDL hours on a typical day. · AMF25 photo (30 Sept) showed L3 highest, the logger shows A — phase names may not match.</div>
@@ -284,13 +284,13 @@
       });
     } else { $('chartH').hidden = $('chartCard').hidden = true; }
 
-    // ── Solar vs load (Mario 2026-10-04): panels typed in; sun shape = Walid Hibri Naccache, 4 Oct 2026 —
+    // ── Solar vs load (Mario 2026-10-04): panels typed in; sun shape = reference Deye plant in Naccache, 4 Oct 2026 —
     // 8 × 540 W, 16.5 kWh, battery never full so nothing curtailed → 2.06 kWh and 299 W peak per panel. Read off his
     // Deye production curve (kW per half hour), scaled to 16.5 kWh / 8 panels. Load = card minutes + the generator-off estimate.
     const SUN = [[6.5, 0], [7, .3], [7.5, .8], [8, 1.3], [8.5, 1.8], [9, 2.2], [9.5, 2.5], [10, 2.7], [10.5, 2.8], [11, 2.8], [11.5, 2.8], [12, 2.7], [12.5, 2.5], [13, 2.3], [13.5, 2.1], [14, 1.9], [14.5, 1.6], [15, 1.4], [15.5, 1.2], [16, 1.0], [16.5, .8], [17, .6], [17.5, .4], [18, .1], [18.25, 0]];
     const sunAt = h => { for (let k = 1; k < SUN.length; k++) if (h >= SUN[k - 1][0] && h < SUN[k][0]) return SUN[k - 1][1] + (SUN[k][1] - SUN[k - 1][1]) * (h - SUN[k - 1][0]) / (SUN[k][0] - SUN[k - 1][0]); return 0; };
     let raw = 0; for (let m = 0; m < 1440; m++) raw += sunAt(m / 60) / 60;
-    const perPanel = (h, w) => sunAt(h) * 16.5 / raw / 8 * w / 540;   // kW per panel, scaled from Walid's 540 W to the panel typed in
+    const perPanel = (h, w) => sunAt(h) * 16.5 / raw / 8 * w / 540;   // kW per panel, scaled from the reference 540 W panels to the panel typed in
     const loadMin = [];   // [x ms, kW] every minute from the first to the last reading
     { const t0 = sec(R[0][0]), t1 = sec(L[0]), byMin = new Map(R.map(r => [Math.round(sec(r[0]) / 60), r[C.PSum] / 1000])), genMin = new Map(R.map(r => [Math.round(sec(r[0]) / 60), genOf(r)]));
       const ramp = new Map(EDL.map(o => [Math.round(sec(o.from) / 60), o.kw0]));   // the last reading before a shutdown is the load already dropped — use the estimate there
@@ -415,7 +415,7 @@
     };
     if (window.Chart && loadMin.length > 1) {
       $('solN').oninput = $('solW').oninput = $('solF').oninput = $('solX').oninput = $('solG').onchange = $('batOn').onchange = $('batC').oninput = $('batM').oninput = $('batX').oninput = $('batP').oninput = solar; solar();
-      $('solNote').innerHTML = `<b>Solar vs load.</b> Sun shape from Walid Hibri Naccache's Deye plant on 4 Oct (8 × 540 W made 16.5 kWh with the battery never full, so nothing was cut): ` +
+      $('solNote').innerHTML = `<b>Solar vs load.</b> Sun shape from a reference Deye plant in Naccache on 4 Oct (8 × 540 W made 16.5 kWh with the battery never full, so nothing was cut): ` +
         `<b>2.06 kWh and 299 W peak per 540 W panel</b> (3.82 kWh per kWp) — a modest day. Other panel sizes scale by watts: a 645 W panel ≈ 2.46 kWh and 357 W peak. Dashed green = solar made, filled green = solar used. Red = solar lost: solar − generator floor − load, shown only where it is above zero (the solar the load cannot take once the running generator keeps its floor). Its area is the kWh in the legend and the “thrown away” tile. ` +
         `“Thrown away” also counts the solar cut so the running generator never drops under its floor: floor % × kVA × 0.8 (20 % of G1 350 kVA = 56 kW, of G2 600 kVA = 96 kW). The ceiling line is the running generator's upper limit, ceiling % × kVA × 0.8 (80 %: G1 224 kW, G2 384 kW). “As logged” follows the generator that actually ran each minute (told apart by voltage) and drops the floor while on EDL. Load in the generator-off gaps is the estimate.`;
       $('batNote').innerHTML = `<b>Battery</b> (tick above). Charged from solar only; no generator floor while it is on, so solar goes to the load first and the rest into the battery — only what a full battery or the system kW limit cannot take is lost. ` +
