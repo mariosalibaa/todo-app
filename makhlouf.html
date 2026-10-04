@@ -179,14 +179,12 @@
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
     <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Generator <select id="solG"><option value="log">as logged (G1 / G2)</option><option value="G1">G1 · 350 kVA only</option><option value="G2">G2 · 600 kVA only</option></select></label><label>Floor % <input id="solF" type="number" min="0" max="100" step="1" value="20"></label><label>Ceiling % <input id="solX" type="number" min="0" max="100" step="1" value="80"></label></span>
-      <span class="solin batin"><label class="tick">System <select id="batOn"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>kWh <input id="batC" type="number" min="0" step="10" value="750"></label><label>Min SOC % <input id="batM" type="number" min="0" max="90" step="1" value="10"></label><label>Max SOC % <input id="batX" type="number" min="10" max="100" step="1" value="100"></label><label>System kW <input id="batP" type="number" min="0" step="5" value="375"></label></span></h2>
+      <span class="solin batin"><label class="tick">System <select id="batOn"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>kWh <input id="batC" type="number" min="0" step="10" value="750"></label><label>Min % <input id="batM" type="number" min="0" max="90" step="1" value="10"></label><label>Max % <input id="batX" type="number" min="10" max="100" step="1" value="100"></label><label>System kW <input id="batP" type="number" min="0" step="5" value="375"></label><label>Gen start % <input id="batS" type="number" min="0" max="100" step="1" value="25"></label><label>Gen stop % <input id="batT" type="number" min="0" max="100" step="1" value="40"></label></span></h2>
     <div class="kpis" id="solK"></div>
     <div class="card chart" id="solCard"><canvas id="cvs"></canvas></div>
     <div class="note" id="solNote"></div>
     <h2 class="mh" id="batH">Battery · state of charge</h2>
     <div class="kpis" id="batK"></div>
-    <div class="card chart" id="batCard"><canvas id="cvb"></canvas></div>
-    <div class="card chart" id="batKCard" style="margin-top:10px"><canvas id="cvk"></canvas></div>
     <div class="note" id="batNote"></div>
     <details class="hrs"><summary class="mh">Hour by hour <small>tap to open</small></summary>
     <div class="card"><table id="hours"></table></div></details>
@@ -305,15 +303,20 @@
     // until the next day's solar has charged it again. On EDL solar charges it and it does not discharge.
     // The logged day is run twice (it repeats), so the SOC starts where the day ends. 95 % each way.
     const FUEL = { G1: 42.5, G2: 60 };   // L/h, Mario's summer figures
-    let batChart = null, batKChart = null;
-    const battery = (N, W) => {
+    const battery = (N, W, floorOf) => {
       // Mario 2026-10-04: one tick turns the battery on — 750 kWh, SOC 10–100 %, system 375 kW; no generator floor then.
       // Charged from solar only. Above the min SOC it carries the load with the generator stopped; at the min it locks and the
       // generator runs (no floor: solar goes to the load first, the rest into the battery) until the sun has charged it and no
       // longer covers the load. On EDL solar charges it and it does not discharge. Day run twice; 95 % each way.
       const cap = Math.max(0, +$('batC').value || 0), minP = Math.min(90, Math.max(0, +$('batM').value || 0)) / 100, maxP = Math.min(100, Math.max(minP * 100 + 1, +$('batX').value || 100)) / 100;
       const P = Math.max(0, +$('batP').value || 0), eff = 0.95, lo = cap * minP, hi = cap * maxP;
-      let soc = lo, out;
+      // Reserve (Mario 2026-10-04: "batt at 10 % cannot supply the load or stabilise the system if a cloud appears"):
+      // the generator auto-starts at the start SOC and only stops again at the stop SOC. While it runs it keeps its floor
+      // and solar beyond (load − floor) charges the battery. The band between the min and the start SOC is never used in
+      // normal running — it is the cloud / generator-start reserve.
+      const sP = Math.min(100, Math.max(minP * 100, +$('batS').value || 25)) / 100, tP = Math.min(100, Math.max(sP * 100 + 1, +$('batT').value || 40)) / 100;
+      const startAt = cap * sP, stopAt = cap * tP;
+      let soc = lo, out, genOn = true;
       for (let pass = 0; pass < 2; pass++) {
         const socS = [], pw = [], gen = [], lost = [], genK = [];
         let chg = 0, dis = 0, sur = 0, genKwh = 0, edlKwh = 0, offMin = 0, onMin = 0, litres = 0, minSoc = 100, maxSoc = 0, made = 0;
@@ -321,10 +324,17 @@
         for (const [x, kw, , src] of loadMin) {
           const p = N * perPanel(hourOf(x), W), onEdl = src === 'EDL', net = kw - p; made += p / 60;
           let b = 0, gOn = false, g = 0, ls = 0;   // b > 0 battery to the load, b < 0 charging (kW)
-          if (net <= 0) { b = -Math.min(-net, P, room()); ls = -net + b; }   // solar covers the load; the rest charges the battery
-          else if (onEdl) { edlKwh += net / 60; }   // EDL covers the gap, the battery is kept for the generator hours
-          else {   // solar < load: the battery supports until the min SOC, the generator covers the rest (Mario 2026-10-04)
-            b = Math.min(net, P, Math.max((soc - lo) * eff * 60, 0)); g = net - b; gOn = g > 0.05;
+          if (onEdl) {   // EDL covers the load; solar beyond it charges the battery, which is kept for the generator hours
+            if (net <= 0) { b = -Math.min(-net, P, room()); ls = -net + b; } else edlKwh += net / 60;
+          } else {
+            if (genOn && soc >= stopAt) genOn = false;   // charged enough to stand alone, cloud reserve included
+            if (!genOn && soc <= startAt) genOn = true;  // auto-start before the reserve is touched
+            if (!genOn && net > P) genOn = true;          // more than the system kW can carry
+            if (genOn) {   // generator at max(load − solar, its floor); solar beyond (load − floor) charges the battery
+              const fk = Math.min(floorOf(src), kw); g = Math.max(net, fk); gOn = true;
+              const spare = p - (kw - g); if (spare > 0) { b = -Math.min(spare, P, room()); ls = spare + b; }
+            } else if (net <= 0) { b = -Math.min(-net, P, room()); ls = -net + b; }   // solar covers the load; the rest charges the battery
+            else { b = Math.min(net, P, Math.max((soc - lo) * eff * 60, 0)); g = net - b; gOn = g > 0.05; }   // battery carries; the hard min is the last stop
           }
           if (b > 0) { soc -= b / eff / 60; dis += b / 60; } else if (b < 0) { soc += -b * eff / 60; chg += -b / 60; }
           soc = Math.min(hi, Math.max(lo, soc)); sur += ls / 60;
@@ -332,38 +342,16 @@
           const pct = cap ? soc / cap * 100 : 0; minSoc = Math.min(minSoc, pct); maxSoc = Math.max(maxSoc, pct);
           socS.push({ x, y: pct }); pw.push({ x, y: b }); gen.push({ x, y: gOn ? 2 : null }); lost.push(ls); genK.push(g);
         }
-        out = { socS, pw, gen, lost, genK, chg, dis, sur, genKwh, edlKwh, offMin, onMin, litres, minSoc, maxSoc, made };
+        out = { socS, pw, gen, lost, genK, chg, dis, sur, genKwh, edlKwh, offMin, onMin, litres, minSoc, maxSoc, made, peakLoad: Math.max(...loadMin.map(q => q[1])) };
       }
       const o = out, base = loadMin.reduce((a, [, , , src]) => a + (src === 'EDL' ? 0 : FUEL[src] / 60), 0);
       $('batK').innerHTML =
         `<div class="kpi g"><span>Charged from solar</span><b>${f0(o.chg)} kWh</b><small>${f0(cap)} kWh bank · SOC ${f0(o.minSoc)}–${f0(o.maxSoc)} % (limits ${f0(minP * 100)}–${f0(maxP * 100)} %)</small></div>` +
+        `<div class="kpi"><span>Cloud reserve</span><b>${f0(startAt - lo)} kWh</b><small>${f0(minP * 100)}–${f0(sP * 100)} % kept back · ≈ ${f0((startAt - lo) / Math.max(o.peakLoad, 1) * 60)} min at the ${f0(o.peakLoad)} kW peak</small></div>` +
         `<div class="kpi a"><span>Battery to the load</span><b>${f0(o.dis)} kWh</b><small>generator stopped ${f1(o.offMin / 60)} of ${f1((o.offMin + o.onMin) / 60)} h</small></div>` +
         `<div class="kpi"><span>Generator running</span><b>${f1(o.onMin / 60)} h</b><small>≈ ${f0(o.litres)} L (logged day ≈ ${f0(base)} L)</small></div>` +
         `<div class="kpi g"><span>Diesel saved</span><b>≈ ${f0(base - o.litres)} L</b><small>${base ? Math.round((base - o.litres) / base * 100) : 0} % of the day · G1 42.5 / G2 60 L/h</small></div>`;
-      const tick = v => new Date(v).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-      const xs = { type: 'linear', min: loadMin[0][0], max: loadMin[loadMin.length - 1][0], ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } };
-      // graph 1: state of charge
-      const ds = [
-        { label: 'State of charge %', data: o.socS, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.12)', fill: 'origin' },
-        { label: `Max SOC ${f0(maxP * 100)} %`, data: o.socS.map(q => ({ x: q.x, y: maxP * 100 })), borderColor: '#a6adc8', borderWidth: 1, borderDash: [4, 4] },
-        { label: `Min SOC ${f0(minP * 100)} %`, data: o.socS.map(q => ({ x: q.x, y: minP * 100 })), borderColor: '#fab387', borderWidth: 1, borderDash: [4, 4] },
-        { label: 'Generator running', data: o.gen, borderColor: '#f38ba8', borderWidth: 6, spanGaps: false }];
-      // graph 2: battery power — above zero to the load (discharging), below zero charging from solar
-      const dk = [
-        { label: `Discharging to the load · ${f0(o.dis)} kWh`, data: o.pw.map(q => ({ x: q.x, y: q.y > 0 ? q.y : 0 })), borderColor: '#F2A93B', borderWidth: 1.2, backgroundColor: 'rgba(242,169,59,.30)', fill: 'origin' },
-        { label: `Charging from solar · ${f0(o.chg)} kWh`, data: o.pw.map(q => ({ x: q.x, y: q.y < 0 ? q.y : 0 })), borderColor: '#a6e3a1', borderWidth: 1.2, backgroundColor: 'rgba(166,227,161,.30)', fill: 'origin' },
-        { label: `System limit ±${f0(P)} kW`, data: o.pw.map(q => ({ x: q.x, y: P })), borderColor: '#6c7086', borderWidth: 1, borderDash: [4, 4] },
-        { label: '', data: o.pw.map(q => ({ x: q.x, y: -P })), borderColor: '#6c7086', borderWidth: 1, borderDash: [4, 4] }];
-      if (batChart) { batChart.data.datasets = ds; batChart.update(); batKChart.data.datasets = dk; batKChart.update(); return o; }
-      batChart = new Chart($('cvb'), { type: 'line', data: { datasets: ds },
-        options: { maintainAspectRatio: false, animation: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
-          scales: { x: xs, y: { min: 0, max: 100, title: { display: true, text: 'SOC %', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
-          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x),
-            label: c => c.dataset.label === 'Generator running' ? 'Generator running' : `${c.dataset.label.replace(/ \d+ %$/, '').replace(/ %$/, '')} ${f1(c.parsed.y)} %` } } } } });
-      batKChart = new Chart($('cvk'), { type: 'line', data: { datasets: dk },
-        options: { maintainAspectRatio: false, animation: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
-          scales: { x: xs, y: { title: { display: true, text: 'battery kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: c => c.tick.value === 0 ? '#6c7086' : '#313244' } } },
-          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12, filter: i => i.text } }, tooltip: { filter: i => i.dataset.label && !/limit/.test(i.dataset.label) && i.parsed.y !== 0, callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label.split(' · ')[0]} ${f1(Math.abs(c.parsed.y))} kW` } } } } });
+      o.lines = { minP, sP, tP, maxP };
       return o;
     };
     const solar = () => {
@@ -373,8 +361,8 @@
       const ceilOf = src => src === 'EDL' && gm === 'log' ? null : GK[gm === 'log' ? src : gm].kva * 0.8 * cpct / 100;   // the running generator's ceiling (kVA × 0.8 × %)
       const F = Object.fromEntries(['G1', 'G2'].map(g => [g, GK[g].kva * 0.8 * pct / 100]));
       const batOn = $('batOn').value === '1';
-      document.querySelector('.batin').classList.toggle('off', !batOn); $('batH').hidden = $('batK').hidden = $('batCard').hidden = $('batKCard').hidden = $('batNote').hidden = !batOn;
-      const B = batOn ? battery(N, W) : null;
+      document.querySelector('.batin').classList.toggle('off', !batOn); $('batH').hidden = $('batK').hidden = $('batNote').hidden = !batOn;
+      const B = batOn ? battery(N, W, floorOf) : null;
       const ld = [], le = [], pv = [], pu = [], df = [], fl = [], cl = [], gk = [];
       let mi = -1;
       let overMin = 0, overMax = 0;
@@ -405,7 +393,14 @@
         { label: `Generator output · ${f0(eGen)} kWh`, data: gk, borderColor: '#89b4fa', borderWidth: 1.8, spanGaps: false, order: -1 },
         { label: 'Generator floor', data: fl, borderColor: '#f38ba8', borderWidth: 1, borderDash: [4, 4] },
         { label: `Generator ceiling ${cpct} %`, data: cl, borderColor: '#fab387', borderWidth: 1.2, borderDash: [8, 4], spanGaps: false }];
-      if (B) ds.push({ label: 'Battery SOC %', data: B.socS, borderColor: '#cba6f7', borderWidth: 2.2, yAxisID: 'ys' });
+      if (B) {
+        const flat = v => B.socS.map(q => ({ x: q.x, y: v * 100 }));
+        ds.push({ label: `Battery kW · ${f0(B.chg)} kWh in / ${f0(B.dis)} out`, data: B.pw.map(q => ({ x: q.x, y: q.y })), borderColor: '#94e2d5', borderWidth: 1.2, backgroundColor: 'rgba(148,226,213,.15)', fill: 'origin' },
+          { label: 'Battery SOC %', data: B.socS, borderColor: '#cba6f7', borderWidth: 2.2, yAxisID: 'ys' },
+          { label: `Gen start ${f0(B.lines.sP * 100)} % / stop ${f0(B.lines.tP * 100)} %`, data: flat(B.lines.sP), borderColor: '#cba6f7', borderWidth: 1, borderDash: [2, 3], yAxisID: 'ys' },
+          { label: '', data: flat(B.lines.tP), borderColor: '#cba6f7', borderWidth: 1, borderDash: [2, 3], yAxisID: 'ys' },
+          { label: `Min SOC ${f0(B.lines.minP * 100)} %`, data: flat(B.lines.minP), borderColor: '#fab387', borderWidth: 1, borderDash: [4, 4], yAxisID: 'ys' });
+      }
       const ysOn = !!B;
       if (solChart) { solChart.data.datasets = ds; solChart.options.scales.ys.display = ysOn; solChart.update(); return; }
       const tick = v => new Date(v).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -414,17 +409,17 @@
           scales: { x: { type: 'linear', min: loadMin[0][0], max: loadMin[loadMin.length - 1][0], ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } },
             y: { title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: c => c.tick.value === 0 ? '#6c7086' : '#313244' } },
             ys: { display: ysOn, position: 'right', min: 0, max: 100, title: { display: true, text: 'battery SOC %', color: '#cba6f7' }, ticks: { color: '#cba6f7' }, grid: { drawOnChartArea: false } } },
-          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x), label: c => c.dataset.yAxisID === 'ys' ? `Battery SOC ${f1(c.parsed.y)} %` : `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
+          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12, filter: i => i.text } }, tooltip: { filter: i => !!i.dataset.label && !(i.dataset.yAxisID === 'ys' && i.dataset.label !== 'Battery SOC %'), callbacks: { title: it => tick(it[0].parsed.x), label: c => c.dataset.yAxisID === 'ys' ? `Battery SOC ${f1(c.parsed.y)} %` : /^Battery kW/.test(c.dataset.label) ? `Battery ${c.parsed.y >= 0 ? 'to load' : 'charging'} ${f1(Math.abs(c.parsed.y))} kW` : `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
     };
     if (window.Chart && loadMin.length > 1) {
-      $('solN').oninput = $('solW').oninput = $('solF').oninput = $('solX').oninput = $('solG').onchange = $('batOn').onchange = $('batC').oninput = $('batM').oninput = $('batX').oninput = $('batP').oninput = solar; solar();
+      $('solN').oninput = $('solW').oninput = $('solF').oninput = $('solX').oninput = $('solG').onchange = $('batOn').onchange = $('batC').oninput = $('batM').oninput = $('batX').oninput = $('batP').oninput = $('batS').oninput = $('batT').oninput = solar; solar();
       $('solNote').innerHTML = `<b>Solar vs load.</b> Sun shape from a reference Deye plant in Naccache on 4 Oct (8 × 540 W made 16.5 kWh with the battery never full, so nothing was cut): ` +
         `<b>2.06 kWh and 299 W peak per 540 W panel</b> (3.82 kWh per kWp) — a modest day. Other panel sizes scale by watts: a 645 W panel ≈ 2.46 kWh and 357 W peak. Dashed green = solar made, filled green = solar used. Red = solar lost: solar − generator floor − load, shown only where it is above zero (the solar the load cannot take once the running generator keeps its floor). Its area is the kWh in the legend and the “thrown away” tile. ` +
         `“Thrown away” also counts the solar cut so the running generator never drops under its floor: floor % × kVA × 0.8 (20 % of G1 350 kVA = 56 kW, of G2 600 kVA = 96 kW). The ceiling line is the running generator's upper limit, ceiling % × kVA × 0.8 (80 %: G1 224 kW, G2 384 kW). “As logged” follows the generator that actually ran each minute (told apart by voltage) and drops the floor while on EDL. Load in the generator-off gaps is the estimate.`;
       $('batNote').innerHTML = `<b>Battery</b> (tick above). Charged from solar only; no generator floor while it is on, so solar goes to the load first and the rest into the battery — only what a full battery or the system kW limit cannot take is lost. ` +
-        `Above the min SOC it carries the load and the generator stays off (up to the system kW). It stays at the min SOC until solar beats the load again (the next day); the excess then charges it up to the max SOC. When solar falls below the load it supports until the min SOC, the generator covering the rest. Never charged from a generator or EDL; on EDL it is kept for the generator hours. ` +
+        `Above the min SOC it carries the load and the generator stays off (up to the system kW). The generator auto-starts when the SOC falls to the gen start % and runs, at least at its floor, until solar has charged the battery to the gen stop %; solar beyond (load − floor) charges it meanwhile. The band between the min SOC and the gen start % is the reserve that catches a cloud or a failed start — the battery never runs the site alone below it. Never charged from a generator or EDL; on EDL it is kept for the generator hours. ` +
         `On EDL the solar charges it and it does not discharge. 95 % efficiency each way; the logged day is run twice so the morning starts from the evening's SOC. Fuel from G1 42.5 and G2 60 L/h.`;
-    } else { $('solH').hidden = $('solCard').hidden = $('batH').hidden = $('batCard').hidden = true; }
+    } else { $('solH').hidden = $('solCard').hidden = $('batH').hidden = true; }
 
     // hour by hour from the recorded minutes (kWh = Σ kW × 1 min; only what the card holds)
     const hr = {};
