@@ -3084,12 +3084,70 @@ Admin.api('GET', '/api/ajaltoun/sections').then(l => { ajSections = Array.isArra
 function divisionCell(t) {
   if (!AJ_IDS.has(+t.analyticId) || t.src === 'odoo') return '';
   const list = ajSections || [], cur = list.find(x => x.id === t.section);
-  return `<input class="division" list="aj-divisions" value="${esc(cur ? cur.name : (t.section || ''))}" placeholder="division…" title="Which work section of Ajaltoun this line belongs to — type to search, or type a new name to create it" style="margin-top:3px;max-width:100%;font-size:11px;box-sizing:border-box;width:100%" onchange="saveSection('${t.id}', this.value, this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">`;
+  // a dropdown that filters as you type (Mario, 2026-10-04: "add dropdown autocomplete for divisions"),
+  // the same picker the project uses: arrows + Enter, click, or "＋ Create" for a new division
+  const id = 'dv-' + t.id;
+  return `<div class="pick" style="margin-top:3px"><input type="text" class="division" id="${id}-txt" autocomplete="off" value="${esc(cur ? cur.name : (t.section || ''))}" placeholder="division…" title="Which work section of Ajaltoun this line belongs to — type to search, or type a new name to create it" style="max-width:100%;font-size:11px;box-sizing:border-box;width:100%"
+    data-row="${t.id}" onfocus="dvFilter('${id}')" oninput="dvFilter('${id}')" onkeydown="dvKey(event,'${id}')" onblur="dvBlur('${id}')"><div class="pick-list" id="${id}-list"></div></div>`;
 }
 // the one datalist behind every division input (drawn once, refreshed when a section is created)
 function drawDivisionList() {
   let dl = document.getElementById('aj-divisions'); if (!dl) { dl = document.createElement('datalist'); dl.id = 'aj-divisions'; document.body.appendChild(dl); }
   dl.innerHTML = (ajSections || []).map(x => `<option value="${esc(x.name)}">`).join('');
+}
+function dvFilter(id) {
+  const txt = document.getElementById(id + '-txt'), box = document.getElementById(id + '-list'); if (!txt || !box) return;
+  const raw = txt.value.trim(), q = norm(raw), all = ajSections || [];
+  // on focus the whole list shows; typing narrows it (a match anywhere in the name)
+  const cur = all.find(x => norm(x.name) === q);
+  const list = (q && !cur ? all.filter(x => norm(x.name).includes(q)) : all).slice(0, 60);
+  P[id] = { list, hi: Math.max(0, list.indexOf(cur)) };
+  let html = list.map((x, i) => `<div class="${i === P[id].hi ? 'hi' : ''}" onmousedown="event.preventDefault();dvChoose('${id}',${i})"><span>${esc(x.name)}</span></div>`).join('');
+  if (raw && !cur) html += `<div class="new" onmousedown="event.preventDefault();dvChoose('${id}',-1)"><span>＋ Create division "${esc(raw)}"</span></div>`;
+  if (!html) html = '<div class="none">no division yet — type a name to create one</div>';
+  box.innerHTML = html; box.className = 'pick-list on';
+  const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+}
+function dvKey(e, id) {
+  const box = document.getElementById(id + '-list');
+  if (e.key === 'Escape') { if (box.className.includes('on')) e.stopPropagation(); box.className = 'pick-list'; return; }
+  if (e.key === 'ArrowDown' && !box.className.includes('on')) { e.preventDefault(); dvFilter(id); return; }
+  const st = P[id]; if (!st) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!st.list.length) return;
+    e.preventDefault();
+    st.hi = Math.min(st.list.length - 1, Math.max(0, st.hi + (e.key === 'ArrowDown' ? 1 : -1)));
+    [...box.children].forEach((c, i) => c.className = i === st.hi ? 'hi' : (c.className.includes('new') ? 'new' : ''));
+    const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    // the highlighted division; nothing in the list = create what is typed
+    dvChoose(id, st.list.length ? st.hi : -1);
+  }
+}
+// i >= 0: a division from the list; -1: create what is typed
+function dvChoose(id, i) {
+  const txt = document.getElementById(id + '-txt'), st = P[id]; if (!txt) return;
+  const name = i >= 0 && st && st.list[i] ? st.list[i].name : txt.value.trim();
+  txt.value = name; P[id] = null;
+  document.getElementById(id + '-list').className = 'pick-list';
+  txt.dataset.done = '1';
+  saveSection(txt.dataset.row, name, txt);
+  txt.blur();
+}
+function dvBlur(id) {
+  setTimeout(() => {
+    const txt = document.getElementById(id + '-txt'); if (!txt) return;
+    document.getElementById(id + '-list').className = 'pick-list';
+    if (txt.dataset.done) { delete txt.dataset.done; return; }
+    const row = tx.find(x => x.id === txt.dataset.row); if (!row) return;
+    const cur = (ajSections || []).find(x => x.id === row.section);
+    const v = txt.value.trim();
+    if (!v) { if (row.section) saveSection(row.id, '', txt); return; }
+    const exact = (ajSections || []).find(x => norm(x.name) === norm(v));
+    if (exact) { if (exact.id !== row.section) saveSection(row.id, exact.name, txt); return; }
+    txt.value = cur ? cur.name : '';   // typed but not picked: snap back (creating is the ＋ line or Enter)
+  }, 160);
 }
 async function saveSection(id, value, el) {
   const t = tx.find(x => x.id === id); if (!t) return;
