@@ -32,6 +32,10 @@
   td small{display:block;color:var(--overlay0);font-size:.64rem;}
   td.warn{color:var(--red);} tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);}
   .mh{font-size:.95rem;margin:22px 0 8px;font-weight:600;}
+  #chartH{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .sw{display:inline-flex;border:1px solid var(--surface0);border-radius:8px;overflow:hidden;}
+  .sw button{background:transparent;color:var(--sub);border:0;padding:4px 12px;font:inherit;font-size:.75rem;cursor:pointer;}
+  .sw button.on{background:var(--amber);color:#15181C;font-weight:600;}
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
   .note b{color:var(--text);font-weight:600;}
   .err{color:var(--red);font-size:.85rem;margin:20px 0;}
@@ -57,7 +61,7 @@
     <div class="kpis" id="kpis"></div>
     <h2 class="mh">By phase · last reading</h2>
     <div class="card"><table id="phases"></table></div>
-    <h2 class="mh" id="chartH">Load, minute by minute</h2>
+    <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
     <h2 class="mh">Hour by hour</h2>
     <div class="card"><table id="hours"></table></div>
@@ -116,22 +120,32 @@
     }
 
     // chart: total + each phase, kW per minute; a gap > 3 min breaks the line
-    const pts = [], pa = [], pb = [], pc = [];
-    R.forEach((r, i) => {
-      if (i && sec(r[0]) - sec(R[i - 1][0]) > 180) { const x = (sec(R[i - 1][0]) + 60) * 1000; [pts, pa, pb, pc].forEach(s => s.push({ x, y: null })); }
-      const x = sec(r[0]) * 1000;
-      pts.push({ x, y: r[C.PSum] / 1000 }); pa.push({ x, y: r[C.PA] / 1000 }); pb.push({ x, y: r[C.PB] / 1000 }); pc.push({ x, y: r[C.PC] / 1000 });
-    });
-    const est = []; OFF.forEach(o => { est.push({ x: (sec(o.from) + 60) * 1000, y: o.kw0 }, { x: (sec(o.to) - 60) * 1000, y: o.kw1 }, { x: sec(o.to) * 1000, y: null }); });
+    // chart: kW or amps (Mario 2026-10-04: "also show it in amper"); a gap > 3 min breaks the line
+    const MODES = {
+      kW: { unit: 'kW', sets: [['Total', 'PSum', '#F2A93B', 2, 1000], ['A', 'PA', '#f38ba8', 1, 1000], ['B', 'PB', '#a6e3a1', 1, 1000], ['C', 'PC', '#89b4fa', 1, 1000]], est: kw => kw },
+      A: { unit: 'A', sets: [['A', 'IA', '#f38ba8', 1.5, 1], ['B', 'IB', '#a6e3a1', 1.5, 1], ['C', 'IC', '#89b4fa', 1.5, 1], ['Neutral', 'IN', '#cba6f7', 1, 1]], est: kw => kw * 1000 / (3 * 225 * 0.94) },   // est. = average amps per phase at 225 V, PF 0.94
+    };
+    const series = m => MODES[m].sets.map(([label, col, color, w, div]) => {
+      const data = [];
+      R.forEach((r, i) => {
+        if (i && sec(r[0]) - sec(R[i - 1][0]) > 180) data.push({ x: (sec(R[i - 1][0]) + 60) * 1000, y: null });
+        data.push({ x: sec(r[0]) * 1000, y: r[C[col]] / div });
+      });
+      return { label, data, borderColor: color, borderWidth: w };
+    }).concat([{ label: m === 'A' ? 'Generator off (EDL?) · est. avg per phase' : 'Generator off (EDL?) · estimated', borderColor: '#9399b2', borderWidth: 2, borderDash: [6, 4],
+      data: OFF.flatMap(o => [{ x: (sec(o.from) + 60) * 1000, y: MODES[m].est(o.kw0) }, { x: (sec(o.to) - 60) * 1000, y: MODES[m].est(o.kw1) }, { x: sec(o.to) * 1000, y: null }]) }]);
     if (window.Chart && R.length > 1) {
       const tick = v => new Date(v).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-      new Chart($('cv'), { type: 'line', data: { datasets: [
-        { label: 'Total', data: pts, borderColor: '#F2A93B', borderWidth: 2 },
-        { label: 'A', data: pa, borderColor: '#f38ba8', borderWidth: 1 }, { label: 'B', data: pb, borderColor: '#a6e3a1', borderWidth: 1 }, { label: 'C', data: pc, borderColor: '#89b4fa', borderWidth: 1 },
-        { label: 'Generator off (EDL?) · estimated', data: est, borderColor: '#9399b2', borderWidth: 2, borderDash: [6, 4] }] },
+      let mode = 'kW';
+      const chart = new Chart($('cv'), { type: 'line', data: { datasets: series(mode) },
         options: { maintainAspectRatio: false, animation: false, spanGaps: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
-          scales: { x: { type: 'linear', ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } }, y: { beginAtZero: true, title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
-          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
+          scales: { x: { type: 'linear', min: sec(R[0][0]) * 1000, max: sec(L[0]) * 1000, ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } }, y: { min: 0, title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
+          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label} ${mode === 'A' ? f0(c.parsed.y) : f1(c.parsed.y)} ${MODES[mode].unit}` } } } } });
+      document.querySelectorAll('#unitSw button').forEach(b => b.onclick = () => {
+        mode = b.dataset.u; document.querySelectorAll('#unitSw button').forEach(x => x.classList.toggle('on', x === b));
+        $('chartT').textContent = mode === 'A' ? 'Current, minute by minute' : 'Load, minute by minute';
+        chart.data.datasets = series(mode); chart.options.scales.y.title.text = MODES[mode].unit; chart.update();
+      });
     } else { $('chartH').hidden = $('chartCard').hidden = true; }
 
     // hour by hour from the recorded minutes (kWh = Σ kW × 1 min; only what the card holds)
