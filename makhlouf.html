@@ -41,7 +41,7 @@
   .setupQ{font-size:.78rem;color:#fab387;margin-top:8px}
   #solH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   .solin{display:inline-flex;gap:12px;font-size:.75rem;color:var(--sub);font-weight:400;}
-  .solin{flex-wrap:wrap;} .solin input{width:64px;margin-left:6px;background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:6px;padding:4px 6px;font:inherit;}
+  .solin{flex-wrap:wrap;} .solin select{margin-left:6px;background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:6px;padding:4px 6px;font:inherit;} .solin input{width:64px;margin-left:6px;background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:6px;padding:4px 6px;font:inherit;}
   #chartH{display:flex;align-items:center;justify-content:space-between;gap:10px;}
   .sw{display:inline-flex;border:1px solid var(--surface0);border-radius:8px;overflow:hidden;}
   .sw button{background:transparent;color:var(--sub);border:0;padding:4px 12px;font:inherit;font-size:.75rem;cursor:pointer;}
@@ -175,7 +175,7 @@
     </div>
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
-    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Gen floor kW <input id="solF" type="number" min="0" step="1" value="56"></label></span></h2>
+    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Generator <select id="solG"><option value="log">as logged (G1 / G2)</option><option value="G1">G1 · 350 kVA only</option><option value="G2">G2 · 600 kVA only</option></select></label><label>Floor % <input id="solF" type="number" min="0" max="100" step="1" value="20"></label></span></h2>
     <div class="kpis" id="solK"></div>
     <div class="card chart" id="solCard"><canvas id="cvs"></canvas></div>
     <div class="note" id="solNote"></div>
@@ -284,31 +284,34 @@
     let raw = 0; for (let m = 0; m < 1440; m++) raw += sunAt(m / 60) / 60;
     const perPanel = (h, w) => sunAt(h) * 16.5 / raw / 8 * w / 540;   // kW per panel, scaled from Walid's 540 W to the panel typed in
     const loadMin = [];   // [x ms, kW] every minute from the first to the last reading
-    { const t0 = sec(R[0][0]), t1 = sec(L[0]), byMin = new Map(R.map(r => [Math.round(sec(r[0]) / 60), r[C.PSum] / 1000]));
+    { const t0 = sec(R[0][0]), t1 = sec(L[0]), byMin = new Map(R.map(r => [Math.round(sec(r[0]) / 60), r[C.PSum] / 1000])), genMin = new Map(R.map(r => [Math.round(sec(r[0]) / 60), genOf(r)]));
       const ramp = new Map(EDL.map(o => [Math.round(sec(o.from) / 60), o.kw0]));   // the last reading before a shutdown is the load already dropped — use the estimate there
       for (let t = t0; t <= t1; t += 60) { const m = Math.round(t / 60); let kw = ramp.has(m) ? ramp.get(m) : byMin.get(m);
-        if (kw == null) { const o = EDL.find(o => t > sec(o.from) && t < sec(o.to)); if (o) { kw = estAt(o, t); if (kw != null) { loadMin.push([t * 1000, kw, true]); continue; } } }
-        if (kw != null) loadMin.push([t * 1000, kw, false]); } }
+        if (kw == null) { const o = EDL.find(o => t > sec(o.from) && t < sec(o.to)); if (o) { kw = estAt(o, t); if (kw != null) { loadMin.push([t * 1000, kw, true, 'EDL']); continue; } } }
+        if (kw != null) loadMin.push([t * 1000, kw, false, genMin.get(m) || 'G2']); } }
+    const GK = { G1: { kva: 350, name: 'G1 · 350 kVA' }, G2: { kva: 600, name: 'G2 · 600 kVA' } };   // kW = kVA × 0.8
     const hourOf = ms => { const d = new Date(ms + 3 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60; };
     let solChart = null;
     const solar = () => {
-      const N = Math.max(0, +$('solN').value || 0), W = Math.max(0, +$('solW').value || 540), F = Math.max(0, +$('solF').value || 0);
+      const N = Math.max(0, +$('solN').value || 0), W = Math.max(0, +$('solW').value || 540), pct = Math.min(100, Math.max(0, +$('solF').value || 0)), gm = $('solG').value;
+      const floorOf = src => src === 'EDL' && gm === 'log' ? 0 : GK[gm === 'log' ? src : gm].kva * 0.8 * pct / 100;   // on EDL the PV runs grid-tied, no floor
+      const F = Object.fromEntries(['G1', 'G2'].map(g => [g, GK[g].kva * 0.8 * pct / 100]));
       const ld = [], le = [], pv = [], df = [], fl = [];
-      let ePV = 0, eUsed = 0, eSur = 0, eGen = 0, maxSur = 0, maxPV = 0, minNet = Infinity;
-      for (const [x, kw, isEst] of loadMin) {
-        const p = N * perPanel(hourOf(x), W), net = kw - p, room = Math.max(kw - Math.min(F, kw), 0), used = Math.min(p, room);
-        ld.push({ x, y: isEst ? null : kw }); le.push({ x, y: isEst ? kw : null }); pv.push({ x, y: p }); df.push({ x, y: -net }); fl.push({ x, y: F });
-        ePV += p / 60; eUsed += used / 60; eSur += (p - used) / 60; eGen += (kw - used) / 60; maxPV = Math.max(maxPV, p); maxSur = Math.max(maxSur, p - room); if (p > 0) minNet = Math.min(minNet, net);
+      let ePV = 0, eUsed = 0, eSur = 0, eGen = 0, eEdl = 0, maxSur = 0, maxPV = 0, minNet = Infinity;
+      for (const [x, kw, isEst, src] of loadMin) {
+        const fk = floorOf(src), p = N * perPanel(hourOf(x), W), net = kw - p, room = Math.max(kw - Math.min(fk, kw), 0), used = Math.min(p, room);
+        ld.push({ x, y: isEst ? null : kw }); le.push({ x, y: isEst ? kw : null }); pv.push({ x, y: p }); df.push({ x, y: -net }); fl.push({ x, y: fk });
+        ePV += p / 60; eUsed += used / 60; eSur += (p - used) / 60; if (src === 'EDL' && gm === 'log') eEdl += (kw - used) / 60; else eGen += (kw - used) / 60; maxPV = Math.max(maxPV, p); maxSur = Math.max(maxSur, p - room); if (p > 0) minNet = Math.min(minNet, net);
       }
       const eLoad = loadMin.reduce((a, [, kw]) => a + kw / 60, 0);
       $('solK').innerHTML =
         `<div class="kpi a"><span>Solar made</span><b>${f0(ePV)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · peak ${f0(maxPV)} kW</small></div>` +
         `<div class="kpi g"><span>Solar used</span><b>${f0(eUsed)} kWh</b><small>${Math.round(eUsed / eLoad * 100)} % of the load (${f0(eLoad)} kWh)</small></div>` +
-        `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur)} kWh</b><small>generator kept ≥ ${f0(F)} kW · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
-        `<div class="kpi"><span>Generator</span><b>${f0(eGen)} kWh</b><small>most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (solar − load)</small></div>`;
+        `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur)} kWh</b><small>generator kept ≥ ${pct} % (${gm === 'log' ? `G1 ${f0(F.G1)} / G2 ${f0(F.G2)} kW` : f0(F[gm]) + ' kW'}) · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
+        `<div class="kpi"><span>Generator</span><b>${f0(eGen)} kWh</b><small>${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (solar − load)</small></div>`;
       const ds = [
         { label: 'Load', data: ld, borderColor: '#F2A93B', borderWidth: 1.5, spanGaps: false },
-        { label: 'Load · estimated (gen off)', data: le, borderColor: '#9399b2', borderWidth: 1.2, spanGaps: false },
+        { label: 'Load · EDL estimated', data: le, borderColor: '#9399b2', borderWidth: 1.2, spanGaps: false },
         { label: `Solar · ${N} × ${W} W`, data: pv, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.12)', fill: 'origin' },
         { label: 'Solar − load (remaining kW)', data: df, borderColor: '#89b4fa', borderWidth: 1.5, fill: { target: 'origin', above: 'rgba(166,227,161,.35)', below: 'rgba(137,180,250,.08)' } },
         { label: 'Generator floor', data: fl, borderColor: '#f38ba8', borderWidth: 1, borderDash: [4, 4] }];
@@ -321,10 +324,10 @@
           plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
     };
     if (window.Chart && loadMin.length > 1) {
-      $('solN').oninput = $('solW').oninput = $('solF').oninput = solar; solar();
+      $('solN').oninput = $('solW').oninput = $('solF').oninput = $('solG').onchange = solar; solar();
       $('solNote').innerHTML = `<b>Solar vs load.</b> Sun shape from Walid Hibri Naccache's Deye plant on 4 Oct (8 × 540 W made 16.5 kWh with the battery never full, so nothing was cut): ` +
         `<b>2.06 kWh and 299 W peak per 540 W panel</b> (3.82 kWh per kWp) — a modest day. Other panel sizes scale by watts: a 645 W panel ≈ 2.46 kWh and 357 W peak. Blue = solar − load, the kW remaining: the green area above zero is solar left over after the whole load is covered; below zero the generator (or EDL) supplies the difference. ` +
-        `“Thrown away” also counts the solar cut so the generator never drops under its floor (20 % of the 350 kVA = 56 kW; 96 kW for the 600 kVA). Load in the generator-off gaps is the estimate.`;
+        `“Thrown away” also counts the solar cut so the running generator never drops under its floor: floor % × kVA × 0.8 (20 % of G1 350 kVA = 56 kW, of G2 600 kVA = 96 kW). “As logged” follows the generator that actually ran each minute (told apart by voltage) and drops the floor while on EDL. Load in the generator-off gaps is the estimate.`;
     } else { $('solH').hidden = $('solCard').hidden = true; }
 
     // hour by hour from the recorded minutes (kWh = Σ kW × 1 min; only what the card holds)
