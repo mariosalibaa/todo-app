@@ -1122,6 +1122,19 @@ const handler = async (req, res) => {
     return;
   }
 
+  // the papers of hub lines onto their Odoo entries (papers.js) — lines changed in the last 3 days.
+  // Hourly from the Render timer (ACCOUNTING_API_KEY) and daily from Vercel cron (CRON_SECRET).
+  if (url.split('?')[0] === '/api/cron/papers') {
+    const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!(given.length >= 16 && (given === process.env.CRON_SECRET || given === process.env.ACCOUNTING_API_KEY))) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return; }
+    try {
+      const ws = db.collection('workspaces').doc(TEAM_ID), A = require('./accounts');
+      const since = new Date(Date.now() - 3 * 864e5).toISOString();
+      const r = await require('./papers').sweep({ odooCall, admin, ws }, { listAccounts: A.listAccounts, resolve: A.resolve, txCol: A.txCol }, { since, deadline: 50e3 });
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ...r, errors: r.errors.slice(0, 20) }));
+    } catch (e) { console.error('papers cron:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
   if (url === '/api/cron/ajaltoun') {
     const q = new URL(req.url, 'http://x').searchParams;
     const secret = process.env.CRON_SECRET;

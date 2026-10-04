@@ -40,6 +40,10 @@
     {
       "path": "/api/cron/ajaltoun",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/papers",
+      "schedule": "0 3 * * *"
     }
   ]
 }

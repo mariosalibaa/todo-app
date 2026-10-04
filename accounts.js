@@ -146,6 +146,16 @@ async function resolve(ws, id) {
   return null;
 }
 const txCol = a => a.ref.collection('tx');
+// a line's papers follow it onto its Odoo entries (papers.js). Never fails the request that triggered it.
+async function syncPapers(ctx, a, txId) {
+  try {
+    const ws = ctx.db.collection('workspaces').doc(ctx.TEAM_ID), ref = txCol(a).doc(txId);
+    const t = (await ref.get()).data(); if (!t) return null;
+    const P = require('./papers');
+    if (!P.hasPapers(t) || !P.targetsOf(t).length) return null;
+    return await P.syncLine({ odooCall: ctx.odooCall, admin: ctx.admin, ws }, { id: txId, ...t }, { ref });
+  } catch (e) { console.error('papers sync', a.id, txId, e.message); return { error: String(e.message || e).slice(0, 160) }; }
+}
 // "09:05", "2026-09-07 09:05" or an ISO instant → ISO instant; a bare time is Beirut time on the line's day
 function waInstant(v, day) {
   v = String(v || '').trim(); let m;
@@ -951,6 +961,7 @@ async function handle(req, res, url, user, ctx) {
       key, store, at: now(), by: who, from: String(b.from || 'upload').slice(0, 20) };   // camera | upload | scan
     const docs = [...(cur.docs || []), doc];
     await ref.set({ docs, updatedAt: now(), updatedBy: who }, { merge: true });
+    await syncPapers(ctx, a, m[2]);   // already in Odoo: the new paper goes onto its entry now
     return json(res, 200, doc);
   }
 
@@ -1180,7 +1191,9 @@ async function handle(req, res, url, user, ctx) {
     const after = Object.fromEntries(Object.entries(data).filter(([k]) => k !== 'updatedAt' && k !== 'updatedBy'));
     if (!body.__silent) await a.ref.collection('log').add({ at: data.updatedAt, who, txId: m[2], line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80), before, after, undo: !!body.__undo });
     // `after` goes back too: it carries what the server added on its own (the review stamp)
-    return json(res, 200, { ok: true, before, after, ...(sheet ? { sheet } : {}), ...(odooAnalytic ? { odooAnalytic } : {}) });
+    // a paper or an Odoo entry changed on the line: the papers follow onto the entry
+    const papers = ['fileIds', 'docs', 'bookedMove', 'odoo'].some(k => k in body) ? await syncPapers(ctx, a, m[2]) : null;
+    return json(res, 200, { ok: true, before, after, ...(sheet ? { sheet } : {}), ...(odooAnalytic ? { odooAnalytic } : {}), ...(papers ? { papers } : {}) });
   }
 
   // the account's change log, newest first (undo/redo read it back after a reload)
@@ -1516,7 +1529,7 @@ async function handle(req, res, url, user, ctx) {
     if (!a) return json(res, 404, { error: 'no such account' });
     const b = await readBody(req);
     if (!b.txId) return json(res, 400, { error: 'txId is required' });
-    try { return json(res, 200, await bills.bookRow(ledgerCtx, a, b.txId, who)); }
+    try { const r = await bills.bookRow(ledgerCtx, a, b.txId, who); r.papers = await syncPapers(ctx, a, b.txId); return json(res, 200, r); }
     catch (e) { console.error('book-row', e); return json(res, 400, { error: String(e.message || e) }); }
   }
   // the received rows as payments to him; the unofficial vendor tickets as bills settled by him
