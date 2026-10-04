@@ -108,10 +108,10 @@
       <path d="M242 396 H258 V356 H270" fill="none" stroke="var(--wire)" stroke-width="2.5"/>
 
       <!-- Generator selector -->
-      <rect x="270" y="296" width="118" height="80" rx="4" fill="var(--paper)" stroke="var(--sub)" stroke-width="1.8" stroke-dasharray="6 4"/>
-      <text x="329" y="324" font-size="13" text-anchor="middle">Gen selector</text>
-      <text x="329" y="342" font-size="11" text-anchor="middle" class="s">one runs at a time</text>
-      <text x="329" y="360" font-size="11" text-anchor="middle" fill="var(--warn)">type? confirm</text>
+      <rect x="270" y="296" width="118" height="80" rx="4" fill="var(--paper)" stroke="var(--wire)" stroke-width="2"/>
+      <text x="329" y="324" font-size="13" text-anchor="middle">MTS · manual</text>
+      <text x="329" y="342" font-size="11" text-anchor="middle" class="s">gen selector</text>
+      <text x="329" y="360" font-size="11" text-anchor="middle" class="s">one gen at a time</text>
       <path d="M388 336 H560 V250" fill="none" stroke="var(--wire)" stroke-width="2.5"/>
 
       <!-- Logger on generator line -->
@@ -127,9 +127,9 @@
 
       <!-- Changeover -->
       <rect x="500" y="170" width="120" height="80" rx="4" fill="var(--paper)" stroke="var(--wire)" stroke-width="2"/>
-      <text x="560" y="198" font-size="13" text-anchor="middle">Changeover</text>
+      <text x="560" y="198" font-size="13" text-anchor="middle">ATS · automatic</text>
       <text x="560" y="216" font-size="11" text-anchor="middle" class="s m">InteliLite AMF25</text>
-      <text x="560" y="233" font-size="11" text-anchor="middle" fill="var(--warn)">auto (AMF) or MTS?</text>
+      <text x="560" y="233" font-size="11" text-anchor="middle" class="s">EDL ⇄ generator</text>
       <text x="572" y="160" font-size="11" class="s">EDL</text>
       <text x="572" y="270" font-size="11" class="s">GEN</text>
 
@@ -163,7 +163,7 @@
         <text x="676" y="384" font-size="12" class="s">Not installed — proposal</text>
         <text x="676" y="402" font-size="11" class="s">PV 300 or 600 × 645 W (194 / 387 kWp)</text>
         <text x="676" y="418" font-size="11" class="s">+ battery, Deye 3 × 125 kW PCS + STS</text>
-        <text x="676" y="434" font-size="11" class="s">ties in at the changeover / MDB</text>
+        <text x="676" y="434" font-size="11" class="s">ties in at the ATS / MDB</text>
         <path d="M721 360 V300" stroke="var(--sub)" stroke-width="1.2" stroke-dasharray="2 4"/>
       </g>
     </svg></div><div class="legend"><span><i class="e"></i>EDL</span><span><i></i>Generator / load cable</span><span><i class="a"></i>Measured point</span><span><i class="d"></i>Assumed — to confirm on site</span></div>
@@ -171,7 +171,7 @@
         <tr><td>Walid Hibri, Naccache (reference)</td><td>8</td><td>540 W</td><td>4.32</td><td>2.4 kW</td><td>16.5 measured</td></tr>
         <tr><td>Makhlouf, small option</td><td>300</td><td>645 W</td><td>193.5</td><td>≈ 107 kW</td><td>≈ 739</td></tr>
         <tr><td>Makhlouf, large option</td><td>600</td><td>645 W</td><td>387</td><td>≈ 215 kW</td><td>≈ 1,478</td></tr></table>
-      <div class="setupQ"><b>To confirm on site:</b> generator selector type · changeover automatic (AMF25) or manual · EDL hours per day · was the 00:32 cut EDL or the G2 → G1 switch-over? · AMF25 photo (30 Sept) showed L3 highest, the logger shows A — phase names may not match.</div>
+      <div class="setupQ"><b>Switching:</b> MTS (manual) picks G1 or G2; the ATS (automatic, InteliLite AMF25) swaps between EDL and the generator. The logger sits between the two, so it goes dark whenever the ATS is on EDL. <b>To confirm:</b> EDL hours per day · was the 00:32 cut EDL or the manual G2 → G1 swap? · AMF25 photo (30 Sept) showed L3 highest, the logger shows A — phase names may not match.</div>
     </div>
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
