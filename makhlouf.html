@@ -178,10 +178,12 @@
         <path d="M721 360 V300" stroke="var(--sub)" stroke-width="1.2" stroke-dasharray="2 4"/>
       </g>
     </svg></div><div class="legend"><span><i class="e"></i>EDL</span><span><i></i>Generator / load cable</span><span><i class="a"></i>Measured point</span><span><i class="d"></i>Assumed — to confirm on site</span></div>
-      <table class="setupT"><tr><th>Array</th><th>Panels</th><th>Panel</th><th>kWp</th><th>Peak (4 Oct sun)</th><th>kWh / day</th></tr>
-        <tr><td>Reference plant, Naccache (Deye, 4 Oct)</td><td>8</td><td>540 W</td><td>4.32</td><td>2.4 kW</td><td>16.5 measured</td></tr>
-        <tr><td>Makhlouf, small option</td><td>300</td><td>645 W</td><td>193.5</td><td>≈ 107 kW</td><td>≈ 739</td></tr>
-        <tr><td>Makhlouf, large option</td><td>600</td><td>645 W</td><td>387</td><td>≈ 215 kW</td><td>≈ 1,478</td></tr></table>
+      <table class="setupT"><tr><th>Array</th><th>Panels</th><th>Panel</th><th>kWp</th><th>Tilt · facing</th><th>Peak (4 Oct sun)</th><th>kWh / day (4 Oct)</th><th>Year avg kWh/kWp/day</th></tr>
+        <tr><td>Reference plant, Naccache (Deye)</td><td>8</td><td>540 W</td><td>4.32</td><td>42° · south (175°)<small> fitted</small></td><td>2.4 kW</td><td>16.5 measured</td><td>3.28 measured<small> · winter shaded</small></td></tr>
+        <tr><td>PVGIS, Naccache (EU JRC, long-term)</td><td>—</td><td>—</td><td>per kWp</td><td>29° · south (176°)<small> optimal</small></td><td>—</td><td>Oct avg 4.12</td><td>4.19<small> · 14 % losses</small></td></tr>
+        <tr><td>Makhlouf, small option</td><td>300</td><td>645 W</td><td>193.5</td><td>to be designed</td><td>≈ 107 kW</td><td>≈ 739</td><td>3.28–4.19</td></tr>
+        <tr><td>Makhlouf, large option</td><td>600</td><td>645 W</td><td>387</td><td>to be designed</td><td>≈ 215 kW</td><td>≈ 1,478</td><td>3.28–4.19</td></tr></table>
+      <div class="setupQ" style="color:var(--sub)"><b>Panel efficiency</b> does not enter the kWh: everything is per watt of panel (kWh/kWp), so a 645 W panel at 21–23 % makes the same kWh per watt as a 540 W one — efficiency only sets the area (≈ 2.8–3.1 m² for a 645 W panel, ≈ 1,700–1,850 m² of panels for 600). What does change kWh per watt: tilt and facing, shading, dust, heat (≈ −0.3 %/°C) and system losses (PVGIS assumes 14 %).</div>
       <div class="setupQ"><b>Switching:</b> MTS (manual) picks G1 or G2; the ATS (automatic, InteliLite AMF25) swaps between EDL and the generator. The logger sits between the two, so it goes dark whenever the ATS is on EDL. On 4 Oct: EDL 00:32–03:15 (went off on G2, came back on G1), EDL 10:02–12:09, MTS swap G1 → G2 at 14:28 (under a minute). <b>To confirm:</b> EDL hours on a typical day. · AMF25 photo (30 Sept) showed L3 highest, the logger shows A — phase names may not match.</div>
     </div>
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
@@ -408,11 +410,11 @@
       const all = Object.keys(SUNDATA.days).sort(), MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const fct = m => { const r = SUNDATA.months[m], g = SUNDATA.pvgis[+m.slice(5) - 1] * 0.54; return pv && r && g ? g / r.kwh : 1; };
       const res = {}; for (const d of all) { const f = fct(d.slice(0, 7)); res[d] = simDay(SUNDATA.days[d].p.map(v => v * f / 1000), N, W, hyb, cap, set); }
-      const K = ['made', 'used', 'lost', 'bat', 'gen', 'fuel'];
+      const K = ['made', 'used', 'lost', 'bat', 'gen', 'genH', 'fuel'];
       const avgOf = ds => Object.fromEntries(K.map(k => [k, ds.reduce((a, d) => a + res[d][k], 0) / ds.length]));
       const months = [...new Set(all.map(d => d.slice(0, 7)))];
       const cells = (o, mult) => K.map(k => `<td>${k === 'bat' && !hyb ? '—' : fk2(o[k] * mult)}</td>`).join('');
-      let h = `<tr><th>Month</th><th>Days</th><th>Solar made kWh</th><th>Solar used kWh</th><th>Solar thrown kWh</th><th>Battery to load kWh</th><th>Generator kWh</th><th>Diesel L</th></tr>`;
+      let h = `<tr><th>Month</th><th>Days</th><th>Solar made kWh</th><th>Solar used kWh</th><th>Solar thrown kWh</th><th>Battery to load kWh</th><th>Generator kWh</th><th>Generator on h</th><th>Diesel L</th></tr>`;
       const slot = {};
       for (const m of months) {
         const ds = all.filter(d => d.startsWith(m)), [y, mm] = m.split('-'), dim = new Date(Date.UTC(+y, +mm, 0)).getUTCDate(), a = avgOf(ds);
@@ -430,7 +432,7 @@
         `<div class="kpi a"><span>Solar made</span><b>${f0(yr.made)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · a year</small></div>` +
         `<div class="kpi g"><span>Solar used</span><b>${f0(yr.used)} kWh</b><small>${Math.round(yr.used / load * 100)} % of ≈ ${f0(load)} kWh load</small></div>` +
         `<div class="kpi ${yr.lost > 1 ? 'r' : ''}"><span>Solar thrown</span><b>${f0(yr.lost)} kWh</b><small>${yr.made ? Math.round(yr.lost / yr.made * 100) : 0} % of what was made</small></div>` +
-        `<div class="kpi g"><span>Diesel</span><b>≈ ${f0(yr.fuel)} L</b><small>saves ≈ ${f0(none - yr.fuel)} L (${Math.round((none - yr.fuel) / none * 100)} %) vs no solar · generator ${f0(yr.gen)} kWh${hyb ? ` · battery ${f0(yr.bat)} kWh to the load` : ''}</small></div>`;
+        `<div class="kpi g"><span>Diesel</span><b>≈ ${f0(yr.fuel)} L</b><small>generator on ${f0(yr.genH)} h a year (${f1(yr.genH / 365)} h/day) · saves ≈ ${f0(none - yr.fuel)} L (${Math.round((none - yr.fuel) / none * 100)} %) vs no solar · generator ${f0(yr.gen)} kWh${hyb ? ` · battery ${f0(yr.bat)} kWh to the load` : ''}</small></div>`;
       $('yrNote').innerHTML = `<b>Year on Makhlouf's load.</b> Each reference day (sun as in Solar production, × panels and watts) is run against the logged Makhlouf day, so the load is the same every day — it changes only the sun. ` +
         `A month row is that month's total: the average simulated day × the days in the month; tap it for the days. The year is the sum of the 12 months (October appears twice in the data, its two years are averaged). ` +
         `Generator, floor %, logger gaps, min/max SOC, system kW and gen start/stop are taken from the Solar vs load controls above. Diesel follows the generator's load: an idle part plus a part per kW, set so G1 burns 42.5 L/h at 92 kW and G2 60 L/h at 137 kW (your figures at the logged average load).`;
@@ -578,12 +580,17 @@
       }
       if (B) { eGen = B.genKwh; eEdl = B.edlKwh; overMin = 0; overMax = 0;
         LM.forEach(([, , , src], i) => { const ck = ceilOf(src); if (ck != null && B.genK[i] > ck) { overMin++; overMax = Math.max(overMax, B.genK[i] - ck); } }); }
+      // generator on: minutes it supplies anything (Mario 2026-10-04: show when and how many hours)
+      const gon = gk.map(q => q.y != null && q.y > 0.05), runs = [];
+      gon.forEach((on, i) => { if (on && (i === 0 || !gon[i - 1])) runs.push([i, i]); else if (on) runs[runs.length - 1][1] = i; });
+      const genH = gon.filter(Boolean).length / 60, hm = i => new Date(gk[i].x + 3 * 3600e3).toISOString().slice(11, 16);
+      const runTxt = runs.filter(r => r[1] - r[0] >= 4).map(r => `${hm(r[0])}–${hm(r[1])}`).join(', ');
       const eLoad = loadMin.reduce((a, [, kw]) => a + kw / 60, 0);
       $('solK').innerHTML =
         `<div class="kpi a"><span>Solar made</span><b>${f0(ePV)} kWh</b><small>${N} × ${W} W = ${f1(N * W / 1000)} kWp · peak ${f0(maxPV)} kW</small></div>` +
         `<div class="kpi g"><span>Solar used</span><b>${f0(eUsed)} kWh</b><small>${Math.round(eUsed / eLoad * 100)} % of the load (${f0(eLoad)} kWh)</small></div>` +
         `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur)} kWh</b><small>${B ? `battery on, no generator floor · battery full or ${f0(+$('batP').value || 0)} kW reached` : `generator kept ≥ ${pct} % (${gm === 'log' ? `G1 ${f0(F.G1)} / G2 ${f0(F.G2)} kW` : f0(F[gm]) + ' kW'})`} · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
-        `<div class="kpi ${overMin ? 'r' : ''}"><span>Generator</span><b>${f0(eGen)} kWh</b><small>${eForced > 0.5 ? `${f0(eForced)} kWh only because of the floor (${f0(eForcedOver)} while solar ≥ load) · ` : ''}${overMin ? `over ${cpct} % ceiling ${overMin} min (worst +${f0(overMax)} kW) · ` : `never above ${cpct} % ceiling · `}${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (after the floor)</small></div>`;
+        `<div class="kpi ${overMin ? 'r' : ''}"><span>Generator</span><b>${f0(eGen)} kWh</b><small><strong style="color:var(--text)">on ${f1(genH)} h</strong>${runTxt ? ` (${runTxt})` : ''} · ${eForced > 0.5 ? `${f0(eForced)} kWh only because of the floor (${f0(eForcedOver)} while solar ≥ load) · ` : ''}${overMin ? `over ${cpct} % ceiling ${overMin} min (worst +${f0(overMax)} kW) · ` : `never above ${cpct} % ceiling · `}${eEdl ? `+ EDL ${f0(eEdl)} kWh · ` : ''}most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (after the floor)</small></div>`;
       const ds = [
         { label: 'Load', data: ld, borderColor: '#F2A93B', borderWidth: 1.5, spanGaps: false },
         { label: `Load · gap estimated (${$('solGap').value === 'gen' ? 'on the generator' : 'on EDL'})`, data: le, borderColor: '#9399b2', borderWidth: 1.2, spanGaps: false },
@@ -591,6 +598,7 @@
         { label: B ? 'Solar used (load + battery)' : 'Solar used', data: pu, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.18)', fill: 'origin' },
         { label: B ? `Solar lost (battery full) · ${f0(eSur)} kWh` : `Solar lost = solar − gen floor − load · ${f0(eSur)} kWh`, data: df, borderColor: '#f38ba8', borderWidth: 1.5, backgroundColor: 'rgba(243,139,168,.30)', fill: 'origin' },
         { label: `Generator forced by floor · ${f0(eForced)} kWh`, data: gf, borderColor: '#89b4fa', borderWidth: 0, backgroundColor: 'rgba(137,180,250,.35)', fill: 'origin', spanGaps: false },
+        { label: `Generator on · ${f1(genH)} h`, data: gk.map((q, i) => ({ x: q.x, y: gon[i] ? 1 : null })), borderColor: '#f38ba8', borderWidth: 7, yAxisID: 'yg', spanGaps: false },
         { label: `Generator output · ${f0(eGen)} kWh`, data: gk, borderColor: '#89b4fa', borderWidth: 1.8, spanGaps: false, order: -1 },
         { label: 'Generator floor', data: fl, borderColor: '#f38ba8', borderWidth: 1, borderDash: [4, 4] },
         { label: `Generator ceiling ${cpct} %`, data: cl, borderColor: '#fab387', borderWidth: 1.2, borderDash: [8, 4], spanGaps: false }];
@@ -609,8 +617,9 @@
         options: { maintainAspectRatio: false, animation: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
           scales: { x: { type: 'linear', min: loadMin[0][0], max: loadMin[loadMin.length - 1][0], ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } },
             y: { title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: c => c.tick.value === 0 ? '#6c7086' : '#313244' } },
+            yg: { display: false, min: 0, max: 30 },
             ys: { display: ysOn, position: 'right', min: 0, max: 100, title: { display: true, text: 'battery SOC %', color: '#cba6f7' }, ticks: { color: '#cba6f7' }, grid: { drawOnChartArea: false } } },
-          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12, filter: i => i.text } }, tooltip: { enabled: false, external: tipBelow('solTip'),  filter: i => !!i.dataset.label && !(i.dataset.yAxisID === 'ys' && i.dataset.label !== 'Battery SOC %'), callbacks: { title: it => tick(it[0].parsed.x), label: c => c.dataset.yAxisID === 'ys' ? `Battery SOC ${f1(c.parsed.y)} %` : /^Battery kW/.test(c.dataset.label) ? `Battery ${c.parsed.y >= 0 ? 'to load' : 'charging'} ${f1(Math.abs(c.parsed.y))} kW` : `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
+          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12, filter: i => i.text } }, tooltip: { enabled: false, external: tipBelow('solTip'),  filter: i => !!i.dataset.label && !(i.dataset.yAxisID === 'ys' && i.dataset.label !== 'Battery SOC %'), callbacks: { title: it => tick(it[0].parsed.x), label: c => c.dataset.yAxisID === 'yg' ? 'Generator on' : c.dataset.yAxisID === 'ys' ? `Battery SOC ${f1(c.parsed.y)} %` : /^Battery kW/.test(c.dataset.label) ? `Battery ${c.parsed.y >= 0 ? 'to load' : 'charging'} ${f1(Math.abs(c.parsed.y))} kW` : `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
     };
     if (window.Chart && loadMin.length > 1) {
       $('prodN').oninput = $('prodW').oninput = $('prodPv').onchange = prodRender;
