@@ -146,6 +146,28 @@ async function resolve(ws, id) {
   return null;
 }
 const txCol = a => a.ref.collection('tx');
+// A payment out of a worker's cash with no clear partner is his own: the partner is the cash account's
+// person (Mario, 2026-10-04: "for payment where partner is not clear, choose same as cash"). Only lines
+// with nothing chosen — no partner, no typed name, no cash/bank journal — and never one set by hand.
+const cashPartnerPatch = (a, t) => {
+  const p = a && a.odooPartner;
+  if (!p || !p.id || !t || t.excluded || !(t.debit > 0) || t.partnerId || t.partnerText || t.cashJournalId || t.cashAccountId || t.partnerKind === 'cash') return null;
+  if (t.partnerSrc === 'manual' || t.src === 'odoo' || t.provider === 'whish') return null;
+  return { partnerId: +p.id, partnerName: String(p.name || ''), partnerSrc: 'auto', partnerKind: 'partner' };
+};
+async function applyCashPartner(a) {
+  if (!a || !a.odooPartner || !a.odooPartner.id) return 0;
+  const snap = await txCol(a).get();
+  let n = 0, batch = null, inBatch = 0;
+  for (const d of snap.docs) {
+    const patch = cashPartnerPatch(a, d.data()); if (!patch) continue;
+    if (!batch) batch = txCol(a).firestore.batch();
+    batch.set(d.ref, { ...patch, partnerAutoAt: now() }, { merge: true });   // updatedAt untouched: not an edit of the line
+    n++; if (++inBatch >= 400) { await batch.commit(); batch = null; inBatch = 0; }
+  }
+  if (batch) await batch.commit();
+  return n;
+}
 // a line's papers follow it onto its Odoo entries (papers.js). Never fails the request that triggered it.
 async function syncPapers(ctx, a, txId) {
   try {
@@ -1091,6 +1113,7 @@ async function handle(req, res, url, user, ctx) {
       description: String(b.description || '').trim(), debit, credit, createdAt: now(), createdBy: who, updatedAt: now(), updatedBy: who };
     for (const k of ANNOT) if (k in b) t[k] = b[k];
     if (t.waAt) t.waAt = waInstant(t.waAt, t.date);
+    Object.assign(t, cashPartnerPatch(a, t) || {});   // a payment with no partner named: the cash account's own person
     if (t.company) { t.companySrc = t.companySrc || 'manual'; t.kind = t.company === 'Personal' ? 'personal' : 'work'; t.kindSrc = 'manual'; }
     if (t.partnerName) t.partnerSrc = t.partnerSrc || 'manual';
     if (t.analyticName) t.analyticSrc = t.analyticSrc || 'manual';
@@ -1347,6 +1370,7 @@ async function handle(req, res, url, user, ctx) {
     if (excelIn(b.excel)) { a.excel = { ...(a.excel || {}), ...excelIn(b.excel) }; await a.ref.set({ excel: a.excel }, { merge: true }); }
     try {
       const r = await ledgers.importExcel(ledgerCtx, a, who);
+      r.cashPartner = await applyCashPartner(a).catch(() => 0);
       // a row naming a supplier Odoo knows is that supplier's own bill, not a line of the month (Mario, 2026-09-06)
       if (!a.cashBox) { try { r.vendorized = await bills.vendorize(ledgerCtx, a, who, {}); } catch (e) { r.vendorized = { error: String(e.message || e).slice(0, 160) }; } }
       // the same workbook holds his timesheet: bring the mirror up to date and put the open
@@ -1418,6 +1442,7 @@ async function handle(req, res, url, user, ctx) {
     if (!Array.isArray(b.messages)) return json(res, 400, { error: 'messages[] required' });
     try {
       const r = await ledgers.importWhatsappLive(ledgerCtx, a, who, b.messages, String(b.since || ''));
+      r.cashPartner = await applyCashPartner(a).catch(() => 0);
       await hubLog(ws, 'whatsapp', { who, txId: 'live', line: `${a.id}: ${r.messages} msgs → ${r.added} new, ${r.updated} updated, ${r.kept} kept`, before: {}, after: r });
       return json(res, 200, r);
     } catch (e) { console.error('whatsapp-live', e); return json(res, 400, { error: String(e.message || e) }); }
@@ -1723,4 +1748,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, resolve, listAccounts, txCol, journalsOf, ANNOT, paidByIn, importOdoo, importBudget };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server
+module.exports = { handle, resolve, listAccounts, txCol, applyCashPartner, cashPartnerPatch, journalsOf, ANNOT, paidByIn, importOdoo, importBudget };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server
