@@ -46,6 +46,8 @@
   .prodT{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums} .prodT th,.prodT td{padding:6px 8px;border-bottom:1px solid var(--surface0);text-align:right} .prodT th:first-child,.prodT td:first-child{text-align:left} .prodT th{color:var(--overlay0);font-weight:400;font-size:.68rem;text-transform:uppercase} .prodT tr.m{cursor:pointer} .prodT tr.m:hover td{background:var(--mantle)} .prodT tr.m.open td{color:var(--amber)} .prodT tr.d td{font-size:.76rem;color:var(--sub)} .prodT tr.tot td{border-top:2px solid var(--amber);color:var(--amber)} .prodT tr.d{cursor:pointer} .prodT tr.d.sel td{color:var(--text)} .prodT small{color:var(--overlay0)}
   .solin label.tick input[type=checkbox]{width:auto;margin:0 4px 0 0;accent-color:var(--amber);}
   #prodH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .tipbox{min-height:2.6em;margin:6px 2px 0;padding:6px 10px;border:1px solid var(--surface0);border-radius:8px;background:var(--mantle);font-size:.76rem;color:var(--sub);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-variant-numeric:tabular-nums}
+  .tipbox b{color:var(--text);margin-right:4px} .tipbox i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
   #batH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   #solH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   .solin{display:inline-flex;gap:12px;font-size:.75rem;color:var(--sub);font-weight:400;}
@@ -183,15 +185,18 @@
     </div>
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
+    <div class="tipbox" id="cvTip">Point at the chart to read the values here.</div>
     <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin sunin"><label>Sun <select id="sunM"><option value="day">one day</option><option value="last7">average, 7 days to</option><option value="last30">average, 30 days to</option><option value="month">average of the month</option><option value="monthMin">worst day of the month</option><option value="monthMax">best day of the month</option><option value="year">year average</option><option value="ref">4 Oct curve (first estimate)</option></select></label><label>Date <input id="sunD" type="date" value="2026-10-04"></label><label class="tick"><input id="sunPv" type="checkbox"> scale to PVGIS</label></span><span id="sunInfo" class="suninfo"></span>
       <span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Generator <select id="solG"><option value="log">as logged (G1 / G2)</option><option value="G1">G1 · 350 kVA only</option><option value="G2">G2 · 600 kVA only</option></select></label><label>Floor % <input id="solF" type="number" min="0" max="100" step="1" value="20"></label><label>Ceiling % <input id="solX" type="number" min="0" max="100" step="1" value="80"></label><label>Logger gaps <select id="solGap"><option value="edl">EDL</option><option value="gen">generator</option></select></label></span>
       <span class="solin batin"><label class="tick">System <select id="batOn"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>kWh <input id="batC" type="number" min="0" step="10" value="750"></label><label>Min % <input id="batM" type="number" min="0" max="90" step="1" value="10"></label><label>Max % <input id="batX" type="number" min="10" max="100" step="1" value="100"></label><label>System kW <input id="batP" type="number" min="0" step="5" value="375"></label><label>Gen start % <input id="batS" type="number" min="0" max="100" step="1" value="25"></label><label>Gen stop % <input id="batT" type="number" min="0" max="100" step="1" value="40"></label></span></h2>
     <div class="kpis" id="solK"></div>
     <div class="card chart" id="solCard"><canvas id="cvs"></canvas></div>
+    <div class="tipbox" id="solTip">Point at the chart to read the values here.</div>
     <div class="note" id="solNote"></div>
     <h2 class="mh" id="prodH"><span>Solar production · reference year</span><span class="solin"><label>Panels <input id="prodN" type="number" min="1" step="1" value="1"></label><label>Panel W <input id="prodW" type="number" min="100" step="5" value="645"></label><label class="tick"><input id="prodPv" type="checkbox"> scale to PVGIS</label></span></h2>
     <div class="kpis" id="prodK"></div>
     <div class="card chart" id="prodCard"><canvas id="cvp"></canvas></div>
+    <div class="tipbox" id="prodTip">Point at the chart to read the values here.</div>
     <div class="card" style="margin-top:10px"><table id="prodT" class="prodT"></table></div>
     <div class="note" id="prodNote"></div>
     <h2 class="mh" id="batH">Battery · state of charge</h2>
@@ -210,6 +215,13 @@
   const f0 = v => v == null || isNaN(v) ? '—' : Math.round(v).toLocaleString('en-US');
   const f1 = v => v == null || isNaN(v) ? '—' : (Math.round(v * 10) / 10).toLocaleString('en-US');
   const when = s => { const [d, t] = s.split(' '); return `${+d.slice(8)} ${MON[+d.slice(5, 7) - 1]} ${t.slice(0, 5)}`; };
+  // chart values in a box under the chart instead of a tooltip over it (Mario 2026-10-04)
+  const tipBelow = id => ({ tooltip: t }) => {
+    if (!t || !t.opacity || !t.body) return;   // keep the last values when the pointer leaves
+    const el = document.getElementById(id); if (!el) return;
+    el.innerHTML = `<b>${(t.title || []).join(' ')}</b>` + t.body.map((bd, i) => { const c = t.labelColors[i] || {};
+      return `<span><i style="background:${c.borderColor || c.backgroundColor}"></i>${bd.lines.join(' ')}</span>`; }).join('');
+  };
   const sec = s => new Date(s.replace(' ', 'T').slice(0, 16) + ':00+03:00').getTime() / 1000;   // Beirut clock
 
   async function load() {
@@ -285,7 +297,7 @@
       const chart = new Chart($('cv'), { type: 'line', data: { datasets: series(mode) },
         options: { maintainAspectRatio: false, animation: false, spanGaps: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
           scales: { x: { type: 'linear', min: sec(R[0][0]) * 1000, max: sec(L[0]) * 1000, ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } }, y: { min: 0, title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
-          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label} ${mode === 'A' ? f0(c.parsed.y) : f1(c.parsed.y)} ${MODES[mode].unit}` } } } } });
+          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { enabled: false, external: tipBelow('cvTip'),  callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label} ${mode === 'A' ? f0(c.parsed.y) : f1(c.parsed.y)} ${MODES[mode].unit}` } } } } });
       document.querySelectorAll('#unitSw button').forEach(b => b.onclick = () => {
         mode = b.dataset.u; document.querySelectorAll('#unitSw button').forEach(x => x.classList.toggle('on', x === b));
         $('chartT').textContent = mode === 'A' ? 'Current, minute by minute' : 'Load, minute by minute';
@@ -385,12 +397,12 @@
         cfg = { type: 'line', data: { labels: lab, datasets: [{ label: `${tickD(prodDay)} · ${fk(kwhOf(prodDay))} kWh · ${N} × ${W} W`, data: p.map(v => v * k), borderColor: '#a6e3a1', backgroundColor: 'rgba(166,227,161,.18)', fill: 'origin', borderWidth: 1.8 }] },
           options: { maintainAspectRatio: false, animation: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
             scales: { x: { ticks: { color: '#a6adc8', maxTicksLimit: 12 }, grid: { color: '#313244' } }, y: { min: 0, title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
-            plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${fk(c.parsed.y)} kW` } } } } };
+            plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { enabled: false, external: tipBelow('prodTip'),  callbacks: { label: c => `${fk(c.parsed.y)} kW` } } } } };
       } else {
         const ds = prodOpen ? all.filter(d => d.startsWith(prodOpen)) : all;
         cfg = { type: 'bar', data: { labels: ds.map(tickD), datasets: [{ label: `kWh per day · ${N} × ${W} W${prodOpen ? '' : ' · tap a month below for its days'}`, data: ds.map(kwhOf), backgroundColor: ds.map(d => SUNDATA.days[d].fill > 0.01 ? 'rgba(242,169,59,.75)' : 'rgba(166,227,161,.75)') }] },
           options: { maintainAspectRatio: false, animation: false, scales: { x: { ticks: { color: '#a6adc8', maxTicksLimit: 14 }, grid: { display: false } }, y: { min: 0, title: { display: true, text: 'kWh / day', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
-            plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${fk(c.parsed.y)} kWh` } } } } };
+            plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { enabled: false, external: tipBelow('prodTip'),  callbacks: { label: c => `${fk(c.parsed.y)} kWh` } } } } };
       }
       if (prodChart) prodChart.destroy();
       prodChart = new Chart($('cvp'), cfg);
@@ -513,7 +525,7 @@
           scales: { x: { type: 'linear', min: loadMin[0][0], max: loadMin[loadMin.length - 1][0], ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } },
             y: { title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: c => c.tick.value === 0 ? '#6c7086' : '#313244' } },
             ys: { display: ysOn, position: 'right', min: 0, max: 100, title: { display: true, text: 'battery SOC %', color: '#cba6f7' }, ticks: { color: '#cba6f7' }, grid: { drawOnChartArea: false } } },
-          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12, filter: i => i.text } }, tooltip: { filter: i => !!i.dataset.label && !(i.dataset.yAxisID === 'ys' && i.dataset.label !== 'Battery SOC %'), callbacks: { title: it => tick(it[0].parsed.x), label: c => c.dataset.yAxisID === 'ys' ? `Battery SOC ${f1(c.parsed.y)} %` : /^Battery kW/.test(c.dataset.label) ? `Battery ${c.parsed.y >= 0 ? 'to load' : 'charging'} ${f1(Math.abs(c.parsed.y))} kW` : `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
+          plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12, filter: i => i.text } }, tooltip: { enabled: false, external: tipBelow('solTip'),  filter: i => !!i.dataset.label && !(i.dataset.yAxisID === 'ys' && i.dataset.label !== 'Battery SOC %'), callbacks: { title: it => tick(it[0].parsed.x), label: c => c.dataset.yAxisID === 'ys' ? `Battery SOC ${f1(c.parsed.y)} %` : /^Battery kW/.test(c.dataset.label) ? `Battery ${c.parsed.y >= 0 ? 'to load' : 'charging'} ${f1(Math.abs(c.parsed.y))} kW` : `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
     };
     if (window.Chart && loadMin.length > 1) {
       $('prodN').oninput = $('prodW').oninput = $('prodPv').onchange = prodRender;
