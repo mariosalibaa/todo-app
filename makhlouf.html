@@ -110,13 +110,14 @@
     if (L) {
       const imb = Math.max(L[C.IA], L[C.IB], L[C.IC]) / ((L[C.IA] + L[C.IB] + L[C.IC]) / 3) - 1;
       const pf = v => v == null || isNaN(v) ? '—' : v.toFixed(2);
-      const ph = (n, x, cnt, e, note, pk) => `<tr><td>${n}</td><td>${f1(L[C['U' + x]])}</td><td>${f0(L[C['I' + x]])}</td><td>${f1(L[C['P' + x]] / 1000)}</td><td>${pf(L[C['PF' + x]])}</td>` +
-        `<td class="hide-sm">${f1(L[C['UTH' + x]])} %</td><td class="hide-sm">${f1(L[C['ITH' + x]])} %</td><td>${f1(cnt / 1000)}<small class="hide-sm">kWh on the meter</small></td><td>${f0(e)}<small>${note}</small></td><td>${f1(pk.kw)}<small>${when(pk.at)}</small></td></tr>`;
-      $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>PF</th><th class="hide-sm">Voltage THD</th><th class="hide-sm">Current THD</th><th>Counter<small>at ${when(K.at)}</small></th><th>kWh<small>since ${when(S.at)}</small></th><th>Max kW<small>highest minute</small></th></tr>` +
-        ph('A', 'A', K.epa, eA, '', D.peak.a) + ph('B', 'B', K.epb, eB, '', D.peak.b) + ph('C', 'C', K.epc, eC, '', D.peak.c) +
-        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td><td class="hide-sm"></td><td class="hide-sm"></td><td></td><td></td><td></td></tr>` +
+      const PA = D.peakA || {}, mx = pk => pk ? `${f0(pk.amps)}<small>${when(pk.at)}</small>` : '—';
+      const ph = (n, x, cnt, e, note, pk, pkA) => `<tr><td>${n}</td><td>${f1(L[C['U' + x]])}</td><td>${f0(L[C['I' + x]])}</td><td>${f1(L[C['P' + x]] / 1000)}</td><td>${pf(L[C['PF' + x]])}</td>` +
+        `<td class="hide-sm">${f1(L[C['UTH' + x]])} %</td><td class="hide-sm">${f1(L[C['ITH' + x]])} %</td><td>${f1(cnt / 1000)}<small class="hide-sm">kWh on the meter</small></td><td>${f0(e)}<small>${note}</small></td><td>${f1(pk.kw)}<small>${when(pk.at)}</small></td><td>${mx(pkA)}</td></tr>`;
+      $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>PF</th><th class="hide-sm">Voltage THD</th><th class="hide-sm">Current THD</th><th>Counter<small>at ${when(K.at)}</small></th><th>kWh<small>since ${when(S.at)}</small></th><th>Max kW<small>highest minute</small></th><th>Max A<small>highest minute</small></th></tr>` +
+        ph('A', 'A', K.epa, eA, '', D.peak.a, PA.a) + ph('B', 'B', K.epb, eB, '', D.peak.b, PA.b) + ph('C', 'C', K.epc, eC, '', D.peak.c, PA.c) +
+        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td><td class="hide-sm"></td><td class="hide-sm"></td><td></td><td></td><td></td><td>${mx(PA.n)}</td></tr>` +
         `<tr class="tot"><td>Total</td><td>${f1((L[C.UA] + L[C.UB] + L[C.UC]) / 3)}<small>average</small></td><td class="${imb > 0.2 ? 'warn' : ''}">${Math.round(imb * 100)} %<small>imbalance</small></td><td>${f1(L[C.PSum] / 1000)}<small>${C.SSum != null ? f1(L[C.SSum] / 1000) + ' kVA' : ''}</small></td><td>${pf(L[C.PFAvg])}</td>` +
-        `<td class="hide-sm">${f1(L[C.UTHAvg])} %</td><td class="hide-sm">${f1(L[C.ITHAvg])} %</td><td>${f1(K.epsum / 1000)}</td><td>${f0(eTot)}</td><td>${f1(D.peak.sum.kw)}<small>${when(D.peak.sum.at)}</small></td></tr>`;
+        `<td class="hide-sm">${f1(L[C.UTHAvg])} %</td><td class="hide-sm">${f1(L[C.ITHAvg])} %</td><td>${f1(K.epsum / 1000)}</td><td>${f0(eTot)}</td><td>${f1(D.peak.sum.kw)}<small>${when(D.peak.sum.at)}</small></td><td></td></tr>`;
     }
 
     // chart: total + each phase, kW per minute; a gap > 3 min breaks the line

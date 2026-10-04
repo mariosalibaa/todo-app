@@ -38,7 +38,7 @@ for (const l of lines.slice(3)) {
 }
 const n = k => +last[ix[k]];
 const cnt = r => ({ at: r[0] + ' ' + r[1], epa: +r[ix.EPA], epb: +r[ix.EPB], epc: +r[ix.EPC], epsum: +r[ix.EPSum] });
-const top = k => { let m = null; for (const r of rows) if (!m || r[1 + COLS.indexOf(k)] > m[1 + COLS.indexOf(k)]) m = r; return m ? { kw: m[1 + COLS.indexOf(k)] / 1000, at: m[0] } : null; };
+const top = (k, div = 1000, key = 'kw') => { let m = null; for (const r of rows) if (!m || r[1 + COLS.indexOf(k)] > m[1 + COLS.indexOf(k)]) m = r; return m ? { [key]: m[1 + COLS.indexOf(k)] / div, at: m[0] } : null; };
 // logger-off periods since START, with an estimated load across each
 const sec = s => Date.parse(s.replace(' ', 'T').slice(0, 19) + '+03:00') / 1000;
 const avg = (a, b) => { const v = rows.filter(r => sec(r[0]) >= a && sec(r[0]) < b).map(r => r[1 + COLS.indexOf('PSum')] / 1000); return v.length ? v.reduce((x, y) => x + y, 0) / v.length : null; };
@@ -55,6 +55,7 @@ const out = {
   cols: ['at', ...COLS], rows,
   start: cnt(first), counters: cnt(last),
   peak: { sum: top('PSum'), a: top('PA'), b: top('PB'), c: top('PC') },
+  peakA: { a: top('IA', 1, 'amps'), b: top('IB', 1, 'amps'), c: top('IC', 1, 'amps'), n: top('IN', 1, 'amps') },   // highest one-minute amps per phase
   off: OFF,
 };
 fs.writeFileSync(path.join(__dirname, 'makhlouf-data.json'), JSON.stringify(out));
