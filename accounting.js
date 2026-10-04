@@ -457,7 +457,11 @@ async function handle(req, res, url, user, ctx) {
       })
     }, { merge: true });
     const addedIds = tx.filter(t => !existing.has(t.id)).map(t => t.id);
-    return json(res, 200, { account: head.account, head, lines: tx.length, added: addedIds.length, updated: tx.length - addedIds.length, addedIds, warnings });
+    // standing orders marked auto book their new lines now (Elie's EAR receipts, Mario 2026-10-04)
+    let autoBooked = [];
+    try { autoBooked = await require('./whish-rules').autoBook(ctx, head.account, addedIds, 'auto (rule) · ' + who); }
+    catch (e) { autoBooked = [{ error: String(e.message || e).slice(0, 300) }]; }
+    return json(res, 200, { account: head.account, head, lines: tx.length, added: addedIds.length, updated: tx.length - addedIds.length, addedIds, autoBooked, warnings });
   }
 
   if (url === '/api/accounting/whish/contacts' && req.method === 'GET') {

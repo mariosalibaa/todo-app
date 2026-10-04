@@ -38,7 +38,7 @@ const money = n => Math.round(Number(n || 0) * 100) / 100;
 // "this number is always Patrick" or as tight as "$60 out, and only $60".
 const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName', 'book', 'accountId',
   'companyId', 'companyName', 'journalId', 'accountId', 'accountCode', 'analyticId', 'analyticName',
-  'paymentJournalId', 'paymentJournalName', 'description', 'active', 'section'];
+  'paymentJournalId', 'paymentJournalName', 'description', 'active', 'section', 'auto'];
 
 // Does this line belong to this rule? The amount is compared to the cent, because
 // "about $60" is how a $600 transfer ends up booked as an internet bill.
@@ -93,6 +93,97 @@ async function adHocPaymentRule(odooCall, account, t) {
     paymentJournalId: journalId, paymentJournalName: j ? j.name : '', analyticId: t.analyticId || null, analyticName: t.analyticName || '' };
 }
 const alreadyInOdoo = t => !!(t.odoo && (t.odoo.matches || []).some(x => x.chosen));
+
+// book:'payment' = no bill at all: the line is money handed to a partner against bills that exist (or will)
+// on their own — Georges' excavation certificates (Mario, 2026-09-13). A payment on the rule's cash journal,
+// memo WHISH-<id> as the idempotency key, the Project field carrying the line's analytic account.
+// With apply, the payment then meets the partner's open documents oldest first (retention bills held back).
+async function bookPayment(odooCall, account, col, t, rule, who, { apply = false } = {}) {
+  const id = t.id;
+  if (!rule.partnerId || !rule.paymentJournalId || !rule.companyId) return { id, error: rule.error || 'the rule is missing the partner, company or cash journal' };
+  const ref = REF(t, account);
+  const pctx = { allowed_company_ids: [rule.companyId], company_id: rule.companyId };
+  const dup = await odooCall('account.payment', 'search_read', [[['memo', 'ilike', ref], ['company_id', '=', rule.companyId]]], { fields: ['id', 'name', 'state', 'move_id'], context: pctx, limit: 1 });
+  let payId = dup.length ? dup[0].id : null;
+  const already = !!payId;
+  const analyticId = t.analyticId || rule.analyticId || null;
+  if (!payId) {
+    // money in from a partner who is mainly a VENDOR is a vendor refund on the payable account, not a customer
+    // receipt on the receivable (Mario, 2026-09-13: Anthony's $636 return landed on 411100 and could meet nothing)
+    const [pr] = await odooCall('res.partner', 'read', [[rule.partnerId], ['supplier_rank', 'customer_rank']], { context: pctx });
+    const vendorish = pr && (pr.supplier_rank || 0) >= (pr.customer_rank || 0) && (pr.supplier_rank || 0) > 0;
+    const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: t.debit ? 'supplier' : (vendorish ? 'supplier' : 'customer'), partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
+      // memo = who / what · WHISH ref, so the Odoo payments list says which payment is Anthony's and which is Dib's diesel (Mario, 2026-09-13)
+      company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: memoFor(rule, t, ref) };
+    if (analyticId) vals.x_studio_project = analyticId;
+    const [method] = await odooCall('account.payment.method.line', 'search_read', [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', vals.payment_type]]], { fields: ['id'], context: pctx, limit: 1 });
+    if (method) vals.payment_method_line_id = method.id;
+    payId = await odooCall('account.payment', 'create', [vals], { context: pctx });
+  }
+  const PF = ['name', 'state', 'move_id', 'amount', 'date', 'x_studio_project', 'payment_type', 'journal_id', 'partner_id'];
+  let [py] = await odooCall('account.payment', 'read', [[payId], PF], { context: pctx });
+  if (py.state === 'draft') { await odooCall('account.payment', 'action_post', [[payId]], { context: pctx }); [py] = await odooCall('account.payment', 'read', [[payId], PF], { context: pctx }); }
+  if (analyticId && !py.x_studio_project) await odooCall('account.payment', 'write', [[payId], { x_studio_project: analyticId }], { context: pctx }).catch(() => {});
+  const payment = { id: payId, name: py.name, date: py.date, amount: py.amount };
+  const booked = { moveId: py.move_id ? py.move_id[0] : null, move: py.name, ref, kind: 'payment', state: py.state, paymentState: 'paid', payment, at: new Date().toISOString(), by: who, ruleId: rule.id };
+  const data = { booked };
+  if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
+  if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
+  if (t.analyticSrc !== 'manual' && rule.analyticId) { data.analyticId = rule.analyticId; data.analyticName = rule.analyticName || ''; data.analyticSrc = 'odoo'; data.analyticFrom = py.name; }
+  if (!t.section && rule.section) data.section = rule.section;
+  const applied = [];
+  if (apply && booked.moveId) {
+    const PAY = ['liability_payable', 'asset_receivable'];
+    const lineOf = async mid => (await odooCall('account.move.line', 'search_read', [[['move_id', '=', mid], ['account_id.account_type', 'in', PAY], ['reconciled', '=', false]]], { fields: ['id', 'amount_residual'], context: pctx, limit: 1 }))[0];
+    const pl = await lineOf(booked.moveId);
+    const types = py.payment_type === 'outbound' ? ['in_invoice', 'in_refund'] : ['out_invoice', 'out_refund'];
+    const docs = pl ? await odooCall('account.move', 'search_read', [[['partner_id', '=', rule.partnerId], ['company_id', '=', rule.companyId], ['move_type', 'in', types], ['state', '=', 'posted'], ['amount_residual', '>', 0]]],
+      { fields: ['name', 'ref', 'amount_residual'], order: 'date, id', context: pctx }) : [];
+    for (const d of docs) {
+      if (/retention/i.test(d.ref || '')) continue;
+      const left = (await odooCall('account.move.line', 'read', [[pl.id], ['amount_residual', 'reconciled']], { context: pctx }))[0];
+      if (left.reconciled || Math.abs(left.amount_residual) < 0.005) break;
+      const dl = await lineOf(d.id); if (!dl) continue;
+      const before = Math.abs(dl.amount_residual);
+      await odooCall('account.move.line', 'reconcile', [[dl.id, pl.id]], { context: pctx });
+      const after = Math.abs((await odooCall('account.move.line', 'read', [[dl.id], ['amount_residual']], { context: pctx }))[0].amount_residual);
+      applied.push({ id: d.id, name: d.name, ref: d.ref || '', applied: money(before - after), stillOpen: money(after) });
+    }
+    // the grid's Odoo column: the payment is this line's match, with the documents it met under it
+    const label = d => d.ref ? `${d.name} (${d.ref})` : d.name;
+    data.odoo = { checkedAt: new Date().toISOString(), matches: [{ moveId: booked.moveId, move: py.move_id ? py.move_id[1] : py.name, date: py.date, amount: py.amount,
+      partner: py.partner_id ? py.partner_id[1] : rule.partnerName, partnerId: rule.partnerId, company: rule.companyName, journal: py.journal_id ? py.journal_id[1] : '', state: py.state,
+      docs: applied.map(label), docIds: Object.fromEntries(applied.map(d => [label(d), d.id])), settled: false, analytics: [], score: 10, why: ['booked by rule ' + (rule.label || rule.id)], chosen: true }] };
+  }
+  await col.doc(String(id)).set(data, { merge: true });
+  return { id, moveId: booked.moveId, move: py.name, amount: py.amount, state: py.state, paymentState: 'paid', payment, already, kind: 'payment', applied };
+}
+
+// Standing orders that book themselves (Mario, 2026-10-04: "next time EAR pays on Whish, auto book on Odoo; only
+// reviewed should remain to me"). A rule with auto:true and book:'payment' books every NEW line it fits the moment the
+// statement is uploaded, and applies it to the partner's oldest open documents. The line is left unreviewed: the
+// ✓ reviewed tick stays Mario's.
+async function autoBook(ctx, accountId, ids, who) {
+  const { db, TEAM_ID, odooCall } = ctx;
+  const ws = db.collection('workspaces').doc(TEAM_ID);
+  const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.auto === true && r.book === 'payment' && r.active !== false);
+  if (!rules.length || !ids.length) return [];
+  const account = await accounts.resolve(ws, accountId);
+  if (!account) return [];
+  const col = accounts.txCol(account);
+  const out = [];
+  for (const id of ids) {
+    const snap = await col.doc(String(id)).get();
+    if (!snap.exists) continue;
+    const t = { id: String(id), ...snap.data() };
+    if (t.booked || alreadyInOdoo(t)) continue;
+    const rule = rules.find(r => (!r.accountId || r.accountId === account.id) && fits(r, t));
+    if (!rule) continue;
+    try { out.push(await bookPayment(odooCall, account, col, t, rule, who, { apply: true })); }
+    catch (e) { out.push({ id, error: String(e.message || e).slice(0, 300) }); }
+  }
+  return out;
+}
 
 async function handle(req, res, url, user, ctx) {
   const { db, TEAM_ID, odooCall } = ctx;
@@ -195,41 +286,8 @@ async function handle(req, res, url, user, ctx) {
       // on their own — Georges' excavation certificates (Mario, 2026-09-13). A vendor payment on the rule's cash
       // journal, memo WHISH-<id> as the idempotency key, the Project field carrying the line's analytic account.
       if (rule.book === 'payment') {
-        if (!rule.partnerId || !rule.paymentJournalId || !rule.companyId) { out.push({ id, error: rule.error || 'the rule is missing the partner, company or cash journal' }); continue; }
-        const ref = REF(t, account);
-        const pctx = { allowed_company_ids: [rule.companyId], company_id: rule.companyId };
-        try {
-          const dup = await odooCall('account.payment', 'search_read', [[['memo', 'ilike', ref], ['company_id', '=', rule.companyId]]], { fields: ['id', 'name', 'state', 'move_id'], context: pctx, limit: 1 });
-          let payId = dup.length ? dup[0].id : null, already = !!payId;
-          const analyticId = t.analyticId || rule.analyticId || null;
-          if (!payId) {
-            // money in from a partner who is mainly a VENDOR is a vendor refund on the payable account, not a customer
-            // receipt on the receivable (Mario, 2026-09-13: Anthony's $636 return landed on 411100 and could meet nothing)
-            const [pr] = await odooCall('res.partner', 'read', [[rule.partnerId], ['supplier_rank', 'customer_rank']], { context: pctx });
-            const vendorish = pr && (pr.supplier_rank || 0) >= (pr.customer_rank || 0) && (pr.supplier_rank || 0) > 0;
-            const vals = { payment_type: t.debit ? 'outbound' : 'inbound', partner_type: t.debit ? 'supplier' : (vendorish ? 'supplier' : 'customer'), partner_id: rule.partnerId, journal_id: rule.paymentJournalId,
-              // memo = who / what · WHISH ref, so the Odoo payments list says which payment is Anthony's and which is Dib's diesel (Mario, 2026-09-13)
-              company_id: rule.companyId, date: t.date, amount: money(t.debit || t.credit), memo: memoFor(rule, t, ref) };
-            if (analyticId) vals.x_studio_project = analyticId;
-            const [method] = await odooCall('account.payment.method.line', 'search_read', [[['journal_id', '=', rule.paymentJournalId], ['payment_type', '=', vals.payment_type]]], { fields: ['id'], context: pctx, limit: 1 });
-            if (method) vals.payment_method_line_id = method.id;
-            payId = await odooCall('account.payment', 'create', [vals], { context: pctx });
-          }
-          let [py] = await odooCall('account.payment', 'read', [[payId], ['name', 'state', 'move_id', 'amount', 'date', 'x_studio_project']], { context: pctx });
-          if (py.state === 'draft') { await odooCall('account.payment', 'action_post', [[payId]], { context: pctx }); [py] = await odooCall('account.payment', 'read', [[payId], ['name', 'state', 'move_id', 'amount', 'date', 'x_studio_project']], { context: pctx }); }
-          if (analyticId && !py.x_studio_project) await odooCall('account.payment', 'write', [[payId], { x_studio_project: analyticId }], { context: pctx }).catch(() => {});
-          const payment = { id: payId, name: py.name, date: py.date, amount: py.amount };
-          const booked = { moveId: py.move_id ? py.move_id[0] : null, move: py.name, ref, kind: 'payment', state: py.state, paymentState: 'paid', payment, at: now(), by: who, ruleId: rule.id };
-          const data = { booked };
-          if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
-          if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
-          if (t.analyticSrc !== 'manual' && rule.analyticId) { data.analyticId = rule.analyticId; data.analyticName = rule.analyticName || ''; data.analyticSrc = 'odoo'; data.analyticFrom = py.name; }
-          if (!t.section && rule.section) data.section = rule.section;
-          await col.doc(id).set(data, { merge: true });
-          out.push({ id, moveId: booked.moveId, move: py.name, amount: py.amount, state: py.state, paymentState: 'paid', payment, already, kind: 'payment' });
-        } catch (e) {
-          out.push({ id, error: String(e.message || e).slice(0, 300) });
-        }
+        try { out.push(await bookPayment(odooCall, account, col, { id, ...t }, rule, who)); }
+        catch (e) { out.push({ id, error: String(e.message || e).slice(0, 300) }); }
         continue;
       }
       if (!rule.partnerId || !rule.journalId || !rule.accountId || !rule.companyId) {
@@ -316,4 +374,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, fits };
+module.exports = { handle, fits, autoBook };
