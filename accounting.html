@@ -2441,7 +2441,12 @@ function cjBlur(id) {
     const row = tx.find(x => x.id === hidden.dataset.row); if (!row) return;
     const cur = cashOf(row);
     if (!txt.value.trim()) { if (cur) cjClear(row.id); return; }
-    const exact = cjList().find(j => norm(j.name) === norm(txt.value));
+    // three journals share the name "Cash Mario USD" (S LB, SARL, S DEV): the name alone picked the first one and
+    // leaving the box flipped the line to S DEV (Mario, 2026-10-05). Same name as now = keep it; else the line's company.
+    if (cur && norm(cur.name) === norm(txt.value)) return;
+    const co = companyOf(row);
+    const same = cjList().filter(j => norm(j.name) === norm(txt.value));
+    const exact = same.find(j => j.company === co) || same[0];
     if (exact) { if (!cur || exact.id !== cur.id) cjChoose(id, exact.id); return; }
     txt.value = cur ? cur.name : '';   // no such journal: snap back
   }, 160);
