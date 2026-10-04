@@ -43,9 +43,9 @@ async function syncLine(deps, t, opts = {}) {
   const { odooCall } = deps;
   const targets = targetsOf(t);
   const out = { id: t.id, targets, moved: 0, copied: 0, uploaded: 0, present: 0, errors: [] };
-  if (!targets.length || !hasPapers(t)) return out;
+  if (!targets.length) return out;
   const ctxAll = { allowed_company_ids: ALL_CO };
-  const moves = await odooCall('account.move', 'read', [targets, ['id', 'name', 'company_id', 'state']], { context: ctxAll });
+  const moves = await odooCall('account.move', 'read', [targets, ['id', 'name', 'ref', 'company_id', 'state']], { context: ctxAll });
   const live = moves.filter(m => m && m.id);
   if (!live.length) { out.errors.push('entries not found in Odoo'); return out; }
   const coOf = Object.fromEntries(live.map(m => [m.id, m.company_id ? m.company_id[0] : 2]));
@@ -103,6 +103,22 @@ async function syncLine(deps, t, opts = {}) {
     }
   }
   if (docsChanged && opts.ref) await opts.ref.set({ docs: t.docs }, { merge: true });
+  // 3. the other way: what Odoo holds on those entries shows on the hub line too (Mario, 2026-10-04:
+  //    "bring photo from Odoo and attach it here") — added to fileIds, never removing anything
+  // Not from a month bill (…-LABOUR / …-EXPENSES): it carries every paper of the month, and one line's
+  // paper is not the others' (Mario, 2026-09-08: never hang a day's photos on every row).
+  const known = new Set(fids);
+  const single = new Set(live.filter(m => !/-(LABOUR|EXPENSES)$/.test(String(m.ref || ''))).map(m => m.id));
+  const fromOdoo = onMoves.filter(x => !known.has(x.id) && single.has(x.res_id));
+  if (fromOdoo.length && !opts.dry) {
+    const meta = await odooCall('ir.attachment', 'read', [fromOdoo.map(x => x.id), ['id', 'name', 'mimetype']], { context: ctxAll });
+    const keep = meta.filter(x => !/^(text\/|application\/(xml|json))/.test(x.mimetype || ''));   // papers, not Odoo's generated XML
+    if (keep.length) {
+      t.fileIds = [...(t.fileIds || []), ...keep.map(x => ({ id: x.id, name: x.name }))];
+      out.pulled = keep.length;
+      if (opts.ref) await opts.ref.set({ fileIds: t.fileIds, files: t.fileIds.map(f => f.name) }, { merge: true });
+    }
+  } else if (fromOdoo.length) out.pulled = fromOdoo.length;
   // 3. one chatter note per entry that received something
   for (const [mid, names] of Object.entries(added)) {
     try {
@@ -124,13 +140,13 @@ async function sweep(deps, { listAccounts, resolve, txCol }, opts = {}) {
     const a = await resolve(deps.ws, x.id); if (!a) continue;
     let q = txCol(a);
     if (opts.since) q = q.where('updatedAt', '>=', opts.since);
-    const docs = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.excluded && hasPapers(t) && targetsOf(t).length);
+    const docs = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.excluded && (t.src !== 'odoo' || (t.docs || []).length) && targetsOf(t).length);
     for (const t of docs) {
       if (opts.deadline && Date.now() - t0 > opts.deadline) { res.stopped = 'time'; return res; }
       res.lines++;
       try {
         const r = await syncLine(deps, t, { ...opts, ref: txCol(a).doc(t.id) });
-        if (r.moved || r.copied || r.uploaded) { res.synced++; if (opts.list) (res.changed = res.changed || []).push({ account: a.id, date: t.date, text: String(t.description || '').slice(0, 60), ...r }); }
+        if (r.moved || r.copied || r.uploaded || r.pulled) { res.synced++; res.pulled = (res.pulled || 0) + (r.pulled || 0); if (opts.list) (res.changed = res.changed || []).push({ account: a.id, date: t.date, text: String(t.description || '').slice(0, 60), ...r }); }
         res.moved += r.moved; res.copied += r.copied; res.uploaded += r.uploaded;
         for (const e of r.errors) res.errors.push(`${a.id} ${t.date} ${t.id}: ${e}`);
       } catch (e) { res.errors.push(`${a.id} ${t.id}: ${String(e.message || e).slice(0, 160)}`); }

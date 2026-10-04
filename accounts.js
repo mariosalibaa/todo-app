@@ -174,7 +174,7 @@ async function syncPapers(ctx, a, txId) {
     const ws = ctx.db.collection('workspaces').doc(ctx.TEAM_ID), ref = txCol(a).doc(txId);
     const t = (await ref.get()).data(); if (!t) return null;
     const P = require('./papers');
-    if (!P.hasPapers(t) || !P.targetsOf(t).length) return null;
+    if (!P.targetsOf(t).length) return null;
     return await P.syncLine({ odooCall: ctx.odooCall, admin: ctx.admin, ws }, { id: txId, ...t }, { ref });
   } catch (e) { console.error('papers sync', a.id, txId, e.message); return { error: String(e.message || e).slice(0, 160) }; }
 }
