@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#15181C">
+<title>Shop · Sin El Fil — Shift</title>
+<meta property="og:title" content="Shop · Sin El Fil">
+<meta property="og:description" content="Plans, photos and a proposed office layout.">
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  /* PUBLIC page for the renter (no sign-in, no hub bar) — Shift Group colours: dark steel + amber */
+  :root{--ink:#15181C;--paper:#f6f5f2;--card:#fff;--line:#e3e0d9;--sub:#6b6a66;--amber:#F2A93B;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  header{background:var(--ink);color:#fff;padding:20px 16px;}
+  .wrap{max-width:980px;margin:0 auto;}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.22em;font-size:1rem;}
+  .wordmark span{color:var(--amber);}
+  main{padding:26px 16px 50px;}
+  h1{font-size:1.6rem;margin:0 0 8px;font-weight:600;}
+  .lead{color:var(--sub);font-size:.95rem;line-height:1.55;margin:0 0 20px;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 18px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;}
+  .kpi .v{font-size:1.3rem;font-weight:600;} .kpi .v::after{content:"";display:block;width:26px;height:3px;background:var(--amber);margin-top:6px;}
+  .kpi .l{font-size:.78rem;color:var(--sub);margin-top:6px;}
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px;}
+  .sec h2{margin:0 0 4px;font-size:1.1rem;font-weight:600;}
+  .sec .sub{color:var(--sub);font-size:.85rem;margin:0 0 12px;}
+  .rows{display:grid;grid-template-columns:120px 1fr;gap:8px 14px;font-size:.9rem;line-height:1.45;margin-bottom:6px;}
+  .rows .k{color:var(--sub);}
+  .figs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:12px;}
+  .fig{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:zoom-in;background:#fafafa;}
+  .fig img{display:block;width:100%;height:190px;object-fit:cover;}
+  .fig.wide{grid-column:1/-1;} .fig.wide img{height:auto;max-height:560px;object-fit:contain;background:#fff;}
+  .fig figcaption{font-size:.78rem;color:var(--sub);padding:7px 10px;}
+  footer{color:var(--sub);font-size:.78rem;text-align:center;padding:10px 16px 30px;}
+  footer a{color:var(--ink);}
+  #lb{position:fixed;inset:0;background:rgba(10,12,14,.96);display:none;flex-direction:column;z-index:10;}
+  #lb.on{display:flex;}
+  #lb .bar{display:flex;align-items:center;gap:10px;padding:10px 12px;color:#fff;font-size:.85rem;}
+  #lb .bar .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #lb button,#lb a{background:none;border:1px solid #444;color:#fff;border-radius:8px;padding:6px 12px;font-size:.9rem;cursor:pointer;text-decoration:none;}
+  #lb .img{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:6px;touch-action:pan-y;}
+  #lb img{max-width:100%;max-height:100%;object-fit:contain;}
+  @media (max-width:560px){.rows{grid-template-columns:1fr;gap:2px;} .rows .k{margin-top:8px;font-size:.75rem;} .fig img{height:150px;} .figs{grid-template-columns:1fr 1fr;} .fig.wide{grid-column:1/-1;}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><div class="wordmark">SHIFT <span>GROUP</span></div></div></header>
+<main class="wrap">
+  <h1 id="title">Shop · Sin El Fil</h1>
+  <p class="lead" id="lead"></p>
+  <div id="body"><p class="lead">Loading…</p></div>
+</main>
+<footer>Mario Saliba · <a href="https://www.shift-group.co">www.shift-group.co</a> · <a href="https://wa.me/9613165168">WhatsApp</a></footer>
+<div id="lb">
+  <div class="bar"><button onclick="lbClose()">✕</button><span class="t" id="lbt"></span><button onclick="lbStep(-1)">‹</button><button onclick="lbStep(1)">›</button><a id="lbdl" href="#" download>↓</a></div>
+  <div class="img" id="lbimg"></div>
+</div>
+<script>
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+let FILES = [], ALL = [], I = 0;
+const url = (f, p) => '/api/bonvin/public/' + encodeURIComponent(f.id) + '?v=' + (f.sha1 || '').slice(0, 8) + (p && f.previewKey ? '&p=1' : '');
+(async () => {
+  let d;
+  try { const r = await fetch('/api/bonvin/public'); if (!r.ok) throw new Error('HTTP ' + r.status); d = await r.json(); }
+  catch (e) { document.getElementById('body').innerHTML = '<p class="lead">Could not load the page — try again in a moment.</p>'; return; }
+  FILES = d.files || []; const S = d.shop || {};
+  if (S.title) { document.getElementById('title').textContent = S.title; document.title = S.title + ' — Shift'; }
+  document.getElementById('lead').textContent = S.lead || '';
+  const byPath = p => FILES.find(f => f.path.toLowerCase() === String(p).toLowerCase());
+  const used = new Set();
+  const figs = list => { const xs = (list || []).map(x => ({ ...x, f: byPath(x.file) })).filter(x => x.f);
+    return xs.length ? `<div class="figs">${xs.map(x => { used.add(x.f.id); ALL.push({ f: x.f, cap: x.caption }); const i = ALL.length - 1;
+      return `<figure class="fig${x.wide ? ' wide' : ''}" onclick="lbOpen(${i})"><img loading="lazy" src="${url(x.f, true)}" alt="${esc(x.caption || '')}"><figcaption>${esc(x.caption || '')}</figcaption></figure>`; }).join('')}</div>` : ''; };
+  let html = S.kpis ? `<div class="kpis">${S.kpis.map(k => `<div class="kpi"><div class="v">${esc(k.v)}</div><div class="l">${esc(k.l)}</div></div>`).join('')}</div>` : '';
+  html += (S.sections || []).map(s => `<section class="sec"><h2>${esc(s.title)}</h2>${s.sub ? `<p class="sub">${esc(s.sub)}</p>` : ''}
+    ${s.rows ? `<div class="rows">${s.rows.map(r => `<div class="k">${esc(r.k)}</div><div>${esc(r.v)}</div>`).join('')}</div>` : ''}${figs(s.figs)}</section>`).join('');
+  // any shared picture the text above does not place still shows, at the end
+  const rest = FILES.filter(f => !used.has(f.id) && /^image\//.test(f.mime));
+  if (rest.length) html += `<section class="sec"><h2>More pictures</h2>${figs(rest.map(f => ({ file: f.path, caption: '' })))}</section>`;
+  document.getElementById('body').innerHTML = html;
+})();
+function lbOpen(i) { I = i; const x = ALL[i]; if (!x) return;
+  document.getElementById('lbt').textContent = x.cap || x.f.name;
+  document.getElementById('lbdl').href = url(x.f) + '&dl=1';
+  const box = document.getElementById('lbimg'); box.innerHTML = `<img src="${url(x.f, true)}" alt="">`;
+  if (x.f.previewKey) { const big = new Image(); big.onload = () => { if (I === i) box.querySelector('img').src = big.src; }; big.src = url(x.f); }
+  document.getElementById('lb').classList.add('on'); document.body.style.overflow = 'hidden'; }
+function lbClose() { document.getElementById('lb').classList.remove('on'); document.body.style.overflow = ''; }
+function lbStep(d) { lbOpen((I + d + ALL.length) % ALL.length); }
+addEventListener('keydown', e => { if (!document.getElementById('lb').classList.contains('on')) return; if (e.key === 'Escape') lbClose(); if (e.key === 'ArrowLeft') lbStep(-1); if (e.key === 'ArrowRight') lbStep(1); });
+let x0 = null; const z = document.getElementById('lbimg');
+z.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+z.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) lbStep(dx < 0 ? 1 : -1); x0 = null; });
+</script>
+</body>
+</html>
