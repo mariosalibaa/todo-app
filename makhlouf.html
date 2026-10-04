@@ -231,7 +231,6 @@
     const sinceInstall = (sec(K.at) - sec(S.at)) / 60 + 1, powered = sinceInstall - offMin, recShare = R.length / powered;
 
     $('kpis').innerHTML =
-      `<div class="kpi a"><span>Load now</span><b>${L ? f1(L[C.PSum] / 1000) + ' kW' : '—'}</b><small>${L ? when(L[0]) + ' · PF ' + L[C.PFAvg].toFixed(2) : 'no reading'}</small></div>` +
       `<div class="kpi r"><span>Peak load</span><b>${f1(D.peak.sum.kw)} kW</b><small>${when(D.peak.sum.at)} · A ${f1(D.peak.a.kw)} · B ${f1(D.peak.b.kw)} · C ${f1(D.peak.c.kw)} kW (highest minute)</small></div>` +
       `<div class="kpi"><span>Energy · site</span><b>≈ ${f0(eTot + offKwh)} kWh</b><small>${f1(hrs)} h from ${when(S.at)} · avg ${f0((eTot + offKwh) / hrs)} kW · generator ${f0(eTot)} (meter)</small></div>` +
       `<div class="kpi"><span>On EDL (ATS)</span><b>${f1(edlMin / 60)} h</b><small>${gaps} time${gaps === 1 ? '' : 's'} · ≈ ${f0(offKwh)} kWh estimated</small></div>` +
