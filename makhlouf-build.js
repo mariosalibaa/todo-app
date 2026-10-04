@@ -48,7 +48,16 @@ for (let i = 1; i < rows.length; i++) {
   if (b - a <= 180) continue;
   const k0 = avg(a - 2400, a - 600), k1 = avg(b + 300, b + 2100);
   const kw0 = k0 ?? k1 ?? 0, kw1 = k1 ?? k0 ?? 0, min = (b - a) / 60 - 1;
-  OFF.push({ from: rows[i - 1][0], to: rows[i][0], min: Math.round(min), kw0: +kw0.toFixed(1), kw1: +kw1.toFixed(1), kwh: +((kw0 + kw1) / 2 * min / 60).toFixed(1) });
+  // minute-by-minute estimate (Mario 2026-10-04 "estimate the missing data"): the straight line, plus the minute-to-minute
+  // swings of the real load just before the shutdown (detrended, so they add no energy) — it reads like the load it replaces
+  const n = Math.max(Math.round(min), 0), src = rows.filter(r => sec(r[0]) >= a - 600 - n * 60 && sec(r[0]) < a - 600).map(r => r[1 + COLS.indexOf('PSum')] / 1000);
+  const aft = rows.filter(r => sec(r[0]) > b + 300 && sec(r[0]) <= b + 300 + n * 60).map(r => r[1 + COLS.indexOf('PSum')] / 1000);
+  const base = src.length >= 30 ? src : aft, m = base.length;
+  let res = [];
+  if (m >= 10) { const xm = (m - 1) / 2, ym = base.reduce((x, y) => x + y, 0) / m; let sxy = 0, sxx = 0; base.forEach((y, k) => { sxy += (k - xm) * (y - ym); sxx += (k - xm) ** 2; });
+    const sl = sxy / sxx; res = base.map((y, k) => y - (ym + sl * (k - xm))); }
+  const est = Array.from({ length: n }, (_, k) => +Math.max(0, kw0 + (kw1 - kw0) * (k + 1) / (n + 1) + (res.length ? res[k % res.length] : 0)).toFixed(1));
+  OFF.push({ from: rows[i - 1][0], to: rows[i][0], min: n, kw0: +kw0.toFixed(1), kw1: +kw1.toFixed(1), kwh: +(est.reduce((x, y) => x + y, 0) / 60).toFixed(1), est });
 }
 const out = {
   built: new Date().toISOString(), file, serial: (lines[0].split(':')[1] || '').trim(), install: INSTALL,

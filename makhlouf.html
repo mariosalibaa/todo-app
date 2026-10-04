@@ -32,6 +32,13 @@
   td small{display:block;color:var(--overlay0);font-size:.64rem;}
   td.warn{color:var(--red);} tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);}
   .mh{font-size:.95rem;margin:22px 0 8px;font-weight:600;}
+  .setup{--paper:var(--mantle);--ink:var(--text);--wire:#cdd6f4;--edl:#89b4fa;--amberInk:var(--amber);--steel:#585b70;--warn:#fab387;--line:var(--surface0);}
+  .setupScroll{overflow-x:auto} .setup svg{display:block;min-width:900px;width:100%;height:auto} .setup svg text{font-family:inherit;fill:var(--ink)} .setup svg .s{fill:var(--sub)} .setup svg .m{font-family:ui-monospace,Consolas,monospace}
+  .setup .legend{display:flex;flex-wrap:wrap;gap:16px;font-size:.75rem;color:var(--sub);margin:6px 0 10px}
+  .setup .legend i{display:inline-block;width:26px;height:0;border-top:2px solid var(--wire);vertical-align:middle;margin-right:6px}
+  .setup .legend i.d{border-top:2px dashed var(--sub)} .setup .legend i.e{border-color:var(--edl)} .setup .legend i.a{border-color:var(--amber);border-top-width:3px}
+  .setupT{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:4px} .setupT th,.setupT td{padding:4px 6px;border-bottom:1px solid var(--surface0);text-align:right} .setupT th:first-child,.setupT td:first-child{text-align:left} .setupT th{color:var(--overlay0);font-weight:400;font-size:.68rem;text-transform:uppercase}
+  .setupQ{font-size:.78rem;color:#fab387;margin-top:8px}
   #solH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   .solin{display:inline-flex;gap:12px;font-size:.75rem;color:var(--sub);font-weight:400;}
   .solin{flex-wrap:wrap;} .solin input{width:64px;margin-left:6px;background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:6px;padding:4px 6px;font:inherit;}
@@ -64,6 +71,108 @@
     <div class="kpis" id="kpis"></div>
     <h2 class="mh">By phase · last reading</h2>
     <div class="card"><table id="phases"></table></div>
+    <h2 class="mh">Site setup <small style="font-weight:400;color:var(--sub);font-size:.72rem">single-line sketch · not to scale · dashed = to confirm on site</small></h2>
+    <div class="card setup"><div class="setupScroll"><svg viewBox="0 0 1120 470" role="img" aria-label="Single-line sketch: EDL and two generators feed a changeover, then the main board and loads">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--wire)"/></marker>
+      </defs>
+
+      <!-- EDL -->
+      <g>
+        <rect x="30" y="40" width="212" height="92" rx="4" fill="var(--paper)" stroke="var(--edl)" stroke-width="2"/>
+        <circle cx="72" cy="86" r="18" fill="none" stroke="var(--edl)" stroke-width="2"/><circle cx="90" cy="86" r="18" fill="none" stroke="var(--edl)" stroke-width="2"/>
+        <text x="120" y="76" font-size="17">EDL</text>
+        <text x="120" y="96" font-size="11" class="s">grid · hours vary</text>
+        <text x="120" y="112" font-size="11" class="s m">400/230 V 50 Hz</text>
+      </g>
+      <path d="M242 86 H560 V170" fill="none" stroke="var(--edl)" stroke-width="2.5"/>
+
+      <!-- Generators -->
+      <g>
+        <rect x="30" y="230" width="212" height="92" rx="4" fill="var(--paper)" stroke="var(--wire)" stroke-width="2"/>
+        <circle cx="70" cy="276" r="22" fill="none" stroke="var(--wire)" stroke-width="2"/><text x="70" y="282" font-size="16" text-anchor="middle">G1</text>
+        <text x="104" y="262" font-size="16">350 kVA</text>
+        <text x="104" y="280" font-size="11" class="s">small · ≈ 280 kW</text>
+        <text x="104" y="298" font-size="11" class="s m">40–45 L/h · 30 winter</text>
+        <text x="104" y="313" font-size="11" class="s">00:30–13:30 · winter –16:00</text>
+      </g>
+      <g>
+        <rect x="30" y="350" width="212" height="92" rx="4" fill="var(--paper)" stroke="var(--wire)" stroke-width="2"/>
+        <circle cx="70" cy="396" r="22" fill="none" stroke="var(--wire)" stroke-width="2"/><text x="70" y="402" font-size="16" text-anchor="middle">G2</text>
+        <text x="104" y="382" font-size="16">600 kVA</text>
+        <text x="104" y="400" font-size="11" class="s">big · ≈ 480 kW</text>
+        <text x="104" y="418" font-size="11" class="s m">60 L/h · 40 winter</text>
+        <text x="104" y="433" font-size="11" class="s">13:30–00:30</text>
+      </g>
+      <path d="M242 276 H258 V316 H270" fill="none" stroke="var(--wire)" stroke-width="2.5"/>
+      <path d="M242 396 H258 V356 H270" fill="none" stroke="var(--wire)" stroke-width="2.5"/>
+
+      <!-- Generator selector -->
+      <rect x="270" y="296" width="118" height="80" rx="4" fill="var(--paper)" stroke="var(--sub)" stroke-width="1.8" stroke-dasharray="6 4"/>
+      <text x="329" y="324" font-size="13" text-anchor="middle">Gen selector</text>
+      <text x="329" y="342" font-size="11" text-anchor="middle" class="s">one runs at a time</text>
+      <text x="329" y="360" font-size="11" text-anchor="middle" fill="var(--warn)">type? confirm</text>
+      <path d="M388 336 H560 V250" fill="none" stroke="var(--wire)" stroke-width="2.5"/>
+
+      <!-- Logger on generator line -->
+      <g>
+        <circle cx="460" cy="336" r="13" fill="var(--paper)" stroke="var(--amber)" stroke-width="3"/>
+        <text x="460" y="341" font-size="11" text-anchor="middle" fill="var(--amberInk)">CT</text>
+        <rect x="400" y="378" width="140" height="62" rx="4" fill="var(--paper)" stroke="var(--amber)" stroke-width="2"/>
+        <path d="M460 349 V378" stroke="var(--amber)" stroke-width="2" stroke-dasharray="3 3"/>
+        <text x="470" y="398" font-size="12" text-anchor="middle">Power logger</text>
+        <text x="470" y="414" font-size="11" text-anchor="middle" class="s m">3322205001 · 3P4W</text>
+        <text x="470" y="430" font-size="11" text-anchor="middle" class="s">generator side only</text>
+      </g>
+
+      <!-- Changeover -->
+      <rect x="500" y="170" width="120" height="80" rx="4" fill="var(--paper)" stroke="var(--wire)" stroke-width="2"/>
+      <text x="560" y="198" font-size="13" text-anchor="middle">Changeover</text>
+      <text x="560" y="216" font-size="11" text-anchor="middle" class="s m">InteliLite AMF25</text>
+      <text x="560" y="233" font-size="11" text-anchor="middle" fill="var(--warn)">auto (AMF) or MTS?</text>
+      <text x="572" y="160" font-size="11" class="s">EDL</text>
+      <text x="572" y="270" font-size="11" class="s">GEN</text>
+
+      <!-- to MDB -->
+      <path d="M620 210 H700" fill="none" stroke="var(--wire)" stroke-width="3" marker-end="url(#ar)"/>
+      <rect x="704" y="120" width="34" height="180" rx="3" fill="var(--steel)"/>
+      <text x="721" y="114" font-size="12" text-anchor="middle">MDB</text>
+      <text x="721" y="318" font-size="11" text-anchor="middle" class="s">main LV board</text>
+
+      <!-- Phases out -->
+      <g font-size="12">
+        <path d="M738 150 H820" stroke="var(--wire)" stroke-width="2.5"/><text x="828" y="146">L1 · A</text><text x="828" y="162" class="s m" font-size="11">max 376 A · 76.7 kW</text>
+        <path d="M738 200 H820" stroke="var(--wire)" stroke-width="2.5"/><text x="828" y="196">L2 · B</text><text x="828" y="212" class="s m" font-size="11">max 275 A · 58.0 kW</text>
+        <path d="M738 250 H820" stroke="var(--wire)" stroke-width="2.5"/><text x="828" y="246">L3 · C</text><text x="828" y="262" class="s m" font-size="11">max 270 A · 57.5 kW</text>
+        <path d="M738 290 H820" stroke="var(--sub)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="828" y="294" class="s">N · max 143 A</text>
+      </g>
+      <rect x="978" y="120" width="132" height="180" rx="4" fill="var(--paper)" stroke="var(--wire)" stroke-width="2"/>
+      <text x="1044" y="160" font-size="14" text-anchor="middle">Loads</text>
+      <text x="1044" y="184" font-size="11" text-anchor="middle" class="s">peak</text>
+      <text x="1044" y="204" font-size="18" text-anchor="middle" fill="var(--amberInk)">192 kW</text>
+      <text x="1044" y="222" font-size="11" text-anchor="middle" class="s m">207 kVA · PF 0.94</text>
+      <text x="1044" y="248" font-size="11" text-anchor="middle" class="s">night 60–90 kW</text>
+      <text x="1044" y="264" font-size="11" text-anchor="middle" class="s">evening 145–155 kW</text>
+      <text x="1044" y="284" font-size="11" text-anchor="middle" class="s">≈ 2,640 kWh/day</text>
+      <path d="M950 150 V250" stroke="var(--line)" stroke-width="1"/>
+      <path d="M950 200 H978" stroke="var(--wire)" stroke-width="2.5" marker-end="url(#ar)"/>
+
+      <!-- Future tie-in marker -->
+      <g opacity=".9">
+        <rect x="660" y="360" width="290" height="80" rx="4" fill="none" stroke="var(--sub)" stroke-width="1.5" stroke-dasharray="2 4"/>
+        <text x="676" y="384" font-size="12" class="s">Not installed — proposal</text>
+        <text x="676" y="402" font-size="11" class="s">PV 300 or 600 × 645 W (194 / 387 kWp)</text>
+        <text x="676" y="418" font-size="11" class="s">+ battery, Deye 3 × 125 kW PCS + STS</text>
+        <text x="676" y="434" font-size="11" class="s">ties in at the changeover / MDB</text>
+        <path d="M721 360 V300" stroke="var(--sub)" stroke-width="1.2" stroke-dasharray="2 4"/>
+      </g>
+    </svg></div><div class="legend"><span><i class="e"></i>EDL</span><span><i></i>Generator / load cable</span><span><i class="a"></i>Measured point</span><span><i class="d"></i>Assumed — to confirm on site</span></div>
+      <table class="setupT"><tr><th>Array</th><th>Panels</th><th>Panel</th><th>kWp</th><th>Peak (4 Oct sun)</th><th>kWh / day</th></tr>
+        <tr><td>Walid Hibri, Naccache (reference)</td><td>8</td><td>540 W</td><td>4.32</td><td>2.4 kW</td><td>16.5 measured</td></tr>
+        <tr><td>Makhlouf, small option</td><td>300</td><td>645 W</td><td>193.5</td><td>≈ 107 kW</td><td>≈ 739</td></tr>
+        <tr><td>Makhlouf, large option</td><td>600</td><td>645 W</td><td>387</td><td>≈ 215 kW</td><td>≈ 1,478</td></tr></table>
+      <div class="setupQ"><b>To confirm on site:</b> generator selector type · changeover automatic (AMF25) or manual · EDL hours per day · was the 00:32 cut EDL or the G2 → G1 switch-over? · AMF25 photo (30 Sept) showed L3 highest, the logger shows A — phase names may not match.</div>
+    </div>
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
     <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Gen floor kW <input id="solF" type="number" min="0" step="1" value="56"></label></span></h2>
@@ -103,6 +212,9 @@
     // logger off = generator off (likely EDL) — estimated by the build (Mario 2026-10-04)
     const OFF = D.off || [], offMin = OFF.reduce((a, o) => a + o.min, 0), offKwh = OFF.reduce((a, o) => a + o.kwh, 0);
     const gaps = OFF.length;
+    // estimated kW at time t (s) inside a generator-off period: the build's minute estimate, else the straight line
+    const estAt = (o, t) => { const a = sec(o.from), b = sec(o.to), k = Math.round((t - a) / 60) - 1;
+      return o.est && o.est[k] != null ? o.est[k] : o.kw0 + (o.kw1 - o.kw0) * (t - a) / (b - a); };
     const span = R.length ? (sec(L[0]) - sec(R[0][0])) / 60 + 1 : 0, cover = span ? R.length / span : 0;
     const sinceInstall = (sec(K.at) - sec(S.at)) / 60 + 1, powered = sinceInstall - offMin, recShare = R.length / powered;
 
@@ -140,8 +252,8 @@
         data.push({ x: sec(r[0]) * 1000, y: r[C[col]] / div });
       });
       return { label, data, borderColor: color, borderWidth: w };
-    }).concat([{ label: m === 'A' ? 'Generator off (EDL?) · est. avg per phase' : 'Generator off (EDL?) · estimated', borderColor: '#9399b2', borderWidth: 2, borderDash: [6, 4],
-      data: OFF.flatMap(o => [{ x: (sec(o.from) + 60) * 1000, y: MODES[m].est(o.kw0) }, { x: (sec(o.to) - 60) * 1000, y: MODES[m].est(o.kw1) }, { x: sec(o.to) * 1000, y: null }]) }]);
+    }).concat([{ label: m === 'A' ? 'Generator off (EDL?) · est. avg per phase' : 'Generator off (EDL?) · estimated', borderColor: '#9399b2', borderWidth: 1.2,
+      data: OFF.flatMap(o => { const pts = []; for (let t = sec(o.from) + 60; t < sec(o.to); t += 60) pts.push({ x: t * 1000, y: MODES[m].est(estAt(o, t)) }); pts.push({ x: sec(o.to) * 1000, y: null }); return pts; }) }]);
     if (window.Chart && R.length > 1) {
       const tick = v => new Date(v).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
       let mode = 'kW';
@@ -167,17 +279,17 @@
     { const t0 = sec(R[0][0]), t1 = sec(L[0]), byMin = new Map(R.map(r => [Math.round(sec(r[0]) / 60), r[C.PSum] / 1000]));
       const ramp = new Map(OFF.map(o => [Math.round(sec(o.from) / 60), o.kw0]));   // the last reading before a shutdown is the load already dropped — use the estimate there
       for (let t = t0; t <= t1; t += 60) { const m = Math.round(t / 60); let kw = ramp.has(m) ? ramp.get(m) : byMin.get(m);
-        if (kw == null) { const o = OFF.find(o => t > sec(o.from) && t < sec(o.to)); if (o) { const a = sec(o.from), b = sec(o.to); kw = o.kw0 + (o.kw1 - o.kw0) * (t - a) / (b - a); } }
-        if (kw != null) loadMin.push([t * 1000, kw]); } }
+        if (kw == null) { const o = OFF.find(o => t > sec(o.from) && t < sec(o.to)); if (o) { kw = estAt(o, t); if (kw != null) { loadMin.push([t * 1000, kw, true]); continue; } } }
+        if (kw != null) loadMin.push([t * 1000, kw, false]); } }
     const hourOf = ms => { const d = new Date(ms + 3 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60; };
     let solChart = null;
     const solar = () => {
       const N = Math.max(0, +$('solN').value || 0), W = Math.max(0, +$('solW').value || 540), F = Math.max(0, +$('solF').value || 0);
-      const ld = [], pv = [], df = [], fl = [];
+      const ld = [], le = [], pv = [], df = [], fl = [];
       let ePV = 0, eUsed = 0, eSur = 0, eGen = 0, maxSur = 0, maxPV = 0, minNet = Infinity;
-      for (const [x, kw] of loadMin) {
+      for (const [x, kw, isEst] of loadMin) {
         const p = N * perPanel(hourOf(x), W), net = kw - p, room = Math.max(kw - Math.min(F, kw), 0), used = Math.min(p, room);
-        ld.push({ x, y: kw }); pv.push({ x, y: p }); df.push({ x, y: -net }); fl.push({ x, y: F });
+        ld.push({ x, y: isEst ? null : kw }); le.push({ x, y: isEst ? kw : null }); pv.push({ x, y: p }); df.push({ x, y: -net }); fl.push({ x, y: F });
         ePV += p / 60; eUsed += used / 60; eSur += (p - used) / 60; eGen += (kw - used) / 60; maxPV = Math.max(maxPV, p); maxSur = Math.max(maxSur, p - room); if (p > 0) minNet = Math.min(minNet, net);
       }
       const eLoad = loadMin.reduce((a, [, kw]) => a + kw / 60, 0);
@@ -187,7 +299,8 @@
         `<div class="kpi ${eSur > 0.5 ? 'r' : ''}"><span>Solar thrown away</span><b>${f0(eSur)} kWh</b><small>generator kept ≥ ${f0(F)} kW · worst ${f0(Math.max(maxSur, 0))} kW over</small></div>` +
         `<div class="kpi"><span>Generator</span><b>${f0(eGen)} kWh</b><small>most solar left over ${isFinite(minNet) ? f0(Math.max(-minNet, 0)) + ' kW' : '—'} (solar − load)</small></div>`;
       const ds = [
-        { label: 'Load', data: ld, borderColor: '#F2A93B', borderWidth: 1.5 },
+        { label: 'Load', data: ld, borderColor: '#F2A93B', borderWidth: 1.5, spanGaps: false },
+        { label: 'Load · estimated (gen off)', data: le, borderColor: '#9399b2', borderWidth: 1.2, spanGaps: false },
         { label: `Solar · ${N} × ${W} W`, data: pv, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.12)', fill: 'origin' },
         { label: 'Solar − load (remaining kW)', data: df, borderColor: '#89b4fa', borderWidth: 1.5, fill: { target: 'origin', above: 'rgba(166,227,161,.35)', below: 'rgba(137,180,250,.08)' } },
         { label: 'Generator floor', data: fl, borderColor: '#f38ba8', borderWidth: 1, borderDash: [4, 4] }];
@@ -214,7 +327,7 @@
       h.amax = Math.max(h.amax, r[C.IA], r[C.IB], r[C.IC]); h.vmin = Math.min(h.vmin, r[C.UA], r[C.UB], r[C.UC]); h.vmax = Math.max(h.vmax, r[C.UA], r[C.UB], r[C.UC]); h.thd += r[C.ITHAvg]; h.ia += r[C.IA]; h.ib += r[C.IB]; h.ic += r[C.IC]; h.pa += r[C.PA] / 1000; h.pb += r[C.PB] / 1000; h.pc += r[C.PC] / 1000;
     }
     const eh = {};   // estimated kWh per hour from the logger-off periods
-    OFF.forEach(o => { const a = sec(o.from) + 60, b = sec(o.to) - 60; for (let t = a; t < b; t += 60) { const kw = o.kw0 + (o.kw1 - o.kw0) * (t - a) / Math.max(b - a, 60);
+    OFF.forEach(o => { const a = sec(o.from) + 60, b = sec(o.to); for (let t = a; t < b; t += 60) { const kw = estAt(o, t);
       const k = new Date((t + 3 * 3600) * 1000).toISOString().slice(0, 13).replace('T', ' '); eh[k] = (eh[k] || 0) + kw / 60;
       if (!hr[k]) hr[k] = { n: 0, kwh: 0, max: 0, amax: 0, vmin: 1e9, vmax: 0, thd: 0, ia: 0, ib: 0, ic: 0, pa: 0, pb: 0, pc: 0 }; } });
     const keys = Object.keys(hr).sort();
@@ -226,7 +339,7 @@
       `<b>Start.</b> Everything counts from ${when(S.at)}, the first clean reading after the card was reinstalled. The house data and the first 36 h at Makhlouf (moved ${when(D.install)}, card not recording) are left out.<br>` +
       `<b>Energy</b> is the meter's own counters since the start — they keep counting through a card gap.<br>` +
       `<b>Peak load</b> is the highest one-minute reading on the card since the start.<br>` +
-      `<b>Generator off.</b> The logger is on the generator only, so when it loses power the generator is off and the site is most likely on EDL. That load is estimated: a straight line from the load just before the shutdown to the load just after the restart (dashed grey on the chart)` +
+      `<b>Generator off.</b> The logger is on the generator only, so when it loses power the generator is off and the site is most likely on EDL. That load is estimated minute by minute: a line from the load just before the shutdown to the load just after the restart, carrying the real minute-to-minute swings of the hours before (grey on the charts)` +
       (OFF.length ? ': ' + OFF.map(o => `${when(o.from)}–${when(o.to).split(' ').pop()} ≈ ${f0(o.kwh)} kWh`).join(' · ') : '') + `.<br>` +
       `<b>Card recording.</b> Minutes on the card out of the minutes the logger had power — red only if the card itself stops writing.<br>` +
       `<b>Update.</b> Copy the SD card's CSVs to a folder, then <code>node makhlouf-build.js "&lt;folder&gt;"</code> in the hub repo and deploy.`;
