@@ -7,6 +7,9 @@
 // power-up, then stopped). Mario 2026-10-04: disregard everything from his house — the page starts at the first clean
 // Makhlouf row (START); energy = the meter's counters minus their value at START (they keep counting through a card
 // gap), peaks = the highest one-minute reading on the card since START.
+// Logger off (no rows > 3 min) = the generator was off — the logger sits on the generator only, so the site was most
+// likely on EDL. Mario 2026-10-04: estimate those periods — a straight line from the load 10–40 min before the
+// shutdown ramp to the load 5–35 min after the restart (OFF[]).
 const fs = require('fs');
 const path = require('path');
 
@@ -36,11 +39,24 @@ for (const l of lines.slice(3)) {
 const n = k => +last[ix[k]];
 const cnt = r => ({ at: r[0] + ' ' + r[1], epa: +r[ix.EPA], epb: +r[ix.EPB], epc: +r[ix.EPC], epsum: +r[ix.EPSum] });
 const top = k => { let m = null; for (const r of rows) if (!m || r[1 + COLS.indexOf(k)] > m[1 + COLS.indexOf(k)]) m = r; return m ? { kw: m[1 + COLS.indexOf(k)] / 1000, at: m[0] } : null; };
+// logger-off periods since START, with an estimated load across each
+const sec = s => Date.parse(s.replace(' ', 'T').slice(0, 19) + '+03:00') / 1000;
+const avg = (a, b) => { const v = rows.filter(r => sec(r[0]) >= a && sec(r[0]) < b).map(r => r[1 + COLS.indexOf('PSum')] / 1000); return v.length ? v.reduce((x, y) => x + y, 0) / v.length : null; };
+const OFF = [];
+for (let i = 1; i < rows.length; i++) {
+  const a = sec(rows[i - 1][0]), b = sec(rows[i][0]);
+  if (b - a <= 180) continue;
+  const k0 = avg(a - 2400, a - 600), k1 = avg(b + 300, b + 2100);
+  const kw0 = k0 ?? k1 ?? 0, kw1 = k1 ?? k0 ?? 0, min = (b - a) / 60 - 1;
+  OFF.push({ from: rows[i - 1][0], to: rows[i][0], min: Math.round(min), kw0: +kw0.toFixed(1), kw1: +kw1.toFixed(1), kwh: +((kw0 + kw1) / 2 * min / 60).toFixed(1) });
+}
 const out = {
   built: new Date().toISOString(), file, serial: (lines[0].split(':')[1] || '').trim(), install: INSTALL,
   cols: ['at', ...COLS], rows,
   start: cnt(first), counters: cnt(last),
   peak: { sum: top('PSum'), a: top('PA'), b: top('PB'), c: top('PC') },
+  off: OFF,
 };
 fs.writeFileSync(path.join(__dirname, 'makhlouf-data.json'), JSON.stringify(out));
+OFF.forEach(o => console.log(`logger off ${o.from} → ${o.to}: ${o.min} min, ≈ ${o.kw0}→${o.kw1} kW, ≈ ${o.kwh} kWh`));
 console.log(`${rows.length} rows since install, ${rows[0] ? rows[0][0] : '-'} → ${rows.length ? rows[rows.length - 1][0] : '-'}; counter ${out.counters.epsum} Wh at ${out.counters.at}`);

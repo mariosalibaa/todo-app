@@ -89,17 +89,18 @@
     const eA = (K.epa - S.epa) / 1000, eB = (K.epb - S.epb) / 1000, eC = (K.epc - S.epc) / 1000;
     const eTot = eA + eB + eC, hrs = (sec(K.at) - sec(S.at)) / 3600;
 
-    // what the card recorded: minutes, gaps over 3 min
-    let gaps = 0, gapMin = 0;
-    for (let i = 1; i < R.length; i++) { const g = (sec(R[i][0]) - sec(R[i - 1][0])) / 60; if (g > 3) { gaps++; gapMin += g; } }
+    // logger off = generator off (likely EDL) — estimated by the build (Mario 2026-10-04)
+    const OFF = D.off || [], offMin = OFF.reduce((a, o) => a + o.min, 0), offKwh = OFF.reduce((a, o) => a + o.kwh, 0);
+    const gaps = OFF.length;
     const span = R.length ? (sec(L[0]) - sec(R[0][0])) / 60 + 1 : 0, cover = span ? R.length / span : 0;
-    const sinceInstall = (sec(K.at) - sec(S.at)) / 60 + 1, recShare = R.length / sinceInstall;
+    const sinceInstall = (sec(K.at) - sec(S.at)) / 60 + 1, powered = sinceInstall - offMin, recShare = R.length / powered;
 
     $('kpis').innerHTML =
       `<div class="kpi a"><span>Load now</span><b>${L ? f1(L[C.PSum] / 1000) + ' kW' : '—'}</b><small>${L ? when(L[0]) + ' · PF ' + L[C.PFAvg].toFixed(2) : 'no reading'}</small></div>` +
       `<div class="kpi r"><span>Peak load</span><b>${f1(D.peak.sum.kw)} kW</b><small>${when(D.peak.sum.at)} · A ${f1(D.peak.a.kw)} · B ${f1(D.peak.b.kw)} · C ${f1(D.peak.c.kw)} kW (highest minute)</small></div>` +
-      `<div class="kpi"><span>Energy</span><b>${f0(eTot)} kWh</b><small>${f1(hrs)} h from ${when(S.at)} · avg ${f0(eTot / hrs)} kW</small></div>` +
-      `<div class="kpi ${recShare < 0.9 ? 'r' : 'g'}"><span>Card recording</span><b>${Math.round(recShare * 100)} %</b><small>${R.length.toLocaleString('en-US')} of ${f0(sinceInstall)} minutes since ${when(S.at)}${gaps ? ' · ' + gaps + ' gap' + (gaps > 1 ? 's' : '') : ''}</small></div>`;
+      `<div class="kpi"><span>Energy · site</span><b>≈ ${f0(eTot + offKwh)} kWh</b><small>${f1(hrs)} h from ${when(S.at)} · avg ${f0((eTot + offKwh) / hrs)} kW · generator ${f0(eTot)} (meter)</small></div>` +
+      `<div class="kpi"><span>Generator off · EDL?</span><b>${f1(offMin / 60)} h</b><small>${gaps} time${gaps === 1 ? '' : 's'} · ≈ ${f0(offKwh)} kWh estimated</small></div>` +
+      `<div class="kpi ${recShare < 0.95 ? 'r' : 'g'}"><span>Card recording</span><b>${Math.min(100, Math.round(recShare * 100))} %</b><small>${R.length.toLocaleString('en-US')} of ${f0(powered)} minutes the logger had power</small></div>`;
 
     // per phase now (Mario 2026-10-03: "show also the phase reading") + each phase's own kWh counter and its share
     if (L) {
@@ -121,11 +122,13 @@
       const x = sec(r[0]) * 1000;
       pts.push({ x, y: r[C.PSum] / 1000 }); pa.push({ x, y: r[C.PA] / 1000 }); pb.push({ x, y: r[C.PB] / 1000 }); pc.push({ x, y: r[C.PC] / 1000 });
     });
+    const est = []; OFF.forEach(o => { est.push({ x: (sec(o.from) + 60) * 1000, y: o.kw0 }, { x: (sec(o.to) - 60) * 1000, y: o.kw1 }, { x: sec(o.to) * 1000, y: null }); });
     if (window.Chart && R.length > 1) {
       const tick = v => new Date(v).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
       new Chart($('cv'), { type: 'line', data: { datasets: [
         { label: 'Total', data: pts, borderColor: '#F2A93B', borderWidth: 2 },
-        { label: 'A', data: pa, borderColor: '#f38ba8', borderWidth: 1 }, { label: 'B', data: pb, borderColor: '#a6e3a1', borderWidth: 1 }, { label: 'C', data: pc, borderColor: '#89b4fa', borderWidth: 1 }] },
+        { label: 'A', data: pa, borderColor: '#f38ba8', borderWidth: 1 }, { label: 'B', data: pb, borderColor: '#a6e3a1', borderWidth: 1 }, { label: 'C', data: pc, borderColor: '#89b4fa', borderWidth: 1 },
+        { label: 'Generator off (EDL?) · estimated', data: est, borderColor: '#9399b2', borderWidth: 2, borderDash: [6, 4] }] },
         options: { maintainAspectRatio: false, animation: false, spanGaps: false, elements: { point: { radius: 0 } }, interaction: { mode: 'index', intersect: false },
           scales: { x: { type: 'linear', ticks: { color: '#a6adc8', callback: tick, maxTicksLimit: 8 }, grid: { color: '#313244' } }, y: { beginAtZero: true, title: { display: true, text: 'kW', color: '#a6adc8' }, ticks: { color: '#a6adc8' }, grid: { color: '#313244' } } },
           plugins: { legend: { labels: { color: '#cdd6f4', boxWidth: 12 } }, tooltip: { callbacks: { title: it => tick(it[0].parsed.x), label: c => `${c.dataset.label} ${f1(c.parsed.y)} kW` } } } } });
@@ -138,16 +141,22 @@
       const kw = r[C.PSum] / 1000; h.n++; h.kwh += kw / 60; h.max = Math.max(h.max, kw);
       h.amax = Math.max(h.amax, r[C.IA], r[C.IB], r[C.IC]); h.vmin = Math.min(h.vmin, r[C.UA], r[C.UB], r[C.UC]); h.vmax = Math.max(h.vmax, r[C.UA], r[C.UB], r[C.UC]); h.thd += r[C.ITHAvg]; h.ia += r[C.IA]; h.ib += r[C.IB]; h.ic += r[C.IC]; h.pa += r[C.PA] / 1000; h.pb += r[C.PB] / 1000; h.pc += r[C.PC] / 1000;
     }
+    const eh = {};   // estimated kWh per hour from the logger-off periods
+    OFF.forEach(o => { const a = sec(o.from) + 60, b = sec(o.to) - 60; for (let t = a; t < b; t += 60) { const kw = o.kw0 + (o.kw1 - o.kw0) * (t - a) / Math.max(b - a, 60);
+      const k = new Date((t + 3 * 3600) * 1000).toISOString().slice(0, 13).replace('T', ' '); eh[k] = (eh[k] || 0) + kw / 60;
+      if (!hr[k]) hr[k] = { n: 0, kwh: 0, max: 0, amax: 0, vmin: 1e9, vmax: 0, thd: 0, ia: 0, ib: 0, ic: 0, pa: 0, pb: 0, pc: 0 }; } });
     const keys = Object.keys(hr).sort();
-    $('hours').innerHTML = `<tr><th>Hour</th><th>Minutes<small>recorded</small></th><th>kWh<small>recorded</small></th><th>Avg kW</th><th>Max kW</th><th>A<small>kW · amps</small></th><th>B<small>kW · amps</small></th><th>C<small>kW · amps</small></th><th class="hide-sm">Max A<small>one phase</small></th><th class="hide-sm">Volts<small>min–max</small></th><th class="hide-sm">Current THD</th></tr>` +
-      (keys.length ? keys.map(k => { const h = hr[k]; return `<tr><td>${when(k + ':00')}</td><td class="${h.n < 55 ? 'warn' : ''}">${h.n}</td><td>${f1(h.kwh)}</td><td>${f1(h.kwh * 60 / h.n)}</td><td>${f1(h.max)}</td>${[['pa', 'ia'], ['pb', 'ib'], ['pc', 'ic']].map(([p, i]) => `<td>${f1(h[p] / h.n)}<small>${f0(h[i] / h.n)} A</small></td>`).join('')}<td class="hide-sm">${f0(h.amax)}</td><td class="hide-sm">${f0(h.vmin)}–${f0(h.vmax)}</td><td class="hide-sm">${f1(h.thd / h.n)} %</td></tr>`; }).join('') : '<tr><td colspan="11">No minutes recorded since the install yet.</td></tr>');
+    $('hours').innerHTML = `<tr><th>Hour</th><th>Minutes<small>recorded</small></th><th>kWh<small>recorded</small></th><th>kWh<small>gen off · est.</small></th><th>Avg kW</th><th>Max kW</th><th>A<small>kW · amps</small></th><th>B<small>kW · amps</small></th><th>C<small>kW · amps</small></th><th class="hide-sm">Max A<small>one phase</small></th><th class="hide-sm">Volts<small>min–max</small></th><th class="hide-sm">Current THD</th></tr>` +
+      (keys.length ? keys.map(k => { const h = hr[k]; if (!h.n) return `<tr><td>${when(k + ':00')}</td><td class="warn">0</td><td>—</td><td>≈ ${f1(eh[k])}</td><td colspan="8" style="color:var(--sub)">generator off all hour — EDL?</td></tr>`; return `<tr><td>${when(k + ':00')}</td><td class="${h.n < 55 ? 'warn' : ''}">${h.n}</td><td>${f1(h.kwh)}</td><td>${eh[k] ? '≈ ' + f1(eh[k]) : ''}</td><td>${h.n ? f1(h.kwh * 60 / h.n) : '—'}</td><td>${f1(h.max)}</td>${[['pa', 'ia'], ['pb', 'ib'], ['pc', 'ic']].map(([p, i]) => `<td>${f1(h[p] / h.n)}<small>${f0(h[i] / h.n)} A</small></td>`).join('')}<td class="hide-sm">${f0(h.amax)}</td><td class="hide-sm">${f0(h.vmin)}–${f0(h.vmax)}</td><td class="hide-sm">${f1(h.thd / h.n)} %</td></tr>`; }).join('') : '<tr><td colspan="12">No minutes recorded since the install yet.</td></tr>');
 
     $('lead').innerHTML = `Maison M Naccache generator (300–600 kVA MTS) · logger ${D.serial} · SD card read up to <b>${when(K.at)}</b> (${D.file}).`;
     $('note').innerHTML =
       `<b>Start.</b> Everything counts from ${when(S.at)}, the first clean reading after the card was reinstalled. The house data and the first 36 h at Makhlouf (moved ${when(D.install)}, card not recording) are left out.<br>` +
       `<b>Energy</b> is the meter's own counters since the start — they keep counting through a card gap.<br>` +
       `<b>Peak load</b> is the highest one-minute reading on the card since the start.<br>` +
-      `<b>Card recording.</b> Minutes on the card out of the minutes since the start; a gap is the logger losing power.<br>` +
+      `<b>Generator off.</b> The logger is on the generator only, so when it loses power the generator is off and the site is most likely on EDL. That load is estimated: a straight line from the load just before the shutdown to the load just after the restart (dashed grey on the chart)` +
+      (OFF.length ? ': ' + OFF.map(o => `${when(o.from)}–${when(o.to).split(' ').pop()} ≈ ${f0(o.kwh)} kWh`).join(' · ') : '') + `.<br>` +
+      `<b>Card recording.</b> Minutes on the card out of the minutes the logger had power — red only if the card itself stops writing.<br>` +
       `<b>Update.</b> Copy the SD card's CSVs to a folder, then <code>node makhlouf-build.js "&lt;folder&gt;"</code> in the hub repo and deploy.`;
   }
   load().catch(e => { $('err').textContent = String(e.message || e); });
