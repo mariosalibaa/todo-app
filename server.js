@@ -1090,6 +1090,12 @@ const handler = async (req, res) => {
     if (!acc.isAdmin) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'admin' })); return; }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'))); return;
   }
+  // /api/makhlouf-sun — a year of 5-min production per 540 W panel from the reference plant (refsun/build.js). Admins only.
+  if (url.split('?')[0] === '/api/makhlouf-sun' && req.method === 'GET') {
+    const acc = await cprAccess();
+    if (!acc.isAdmin) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'admin' })); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=3600' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-sun.json'))); return;
+  }
   if (url.split('?')[0] === '/api/mahab' && req.method === 'GET') {
     const acc = await cprAccess();   // its isAdmin = the hub session check; the CPR password plays no part here
     const tk = process.env.MAHAB_PASSWORD ? crypto.createHmac('sha256', process.env.MAHAB_PASSWORD).update('mahab-ok').digest('hex').slice(0, 32) : null;
