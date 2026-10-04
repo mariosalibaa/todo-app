@@ -551,7 +551,9 @@ async function importExcel(ctx, account, who) {
     if (prev.statementSheetPending && prev.period === 'old') { data.period = 'old'; data.statementSheetPending = true; }
     if (prev.amountSrc === 'manual') { data.debit = prev.debit || 0; data.credit = prev.credit || 0; data.amountSrc = 'manual'; }
     // what the sheet itself says about the row
-    if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerName: partnerName || '', partnerId: null, partnerSrc: partnerName ? 'excel' : '' });
+    // a row booked in Odoo shows Odoo's partner (Mario, 2026-10-05: "same as Odoo: Abed Steel Mario"), not the sheet's word
+    if (prev.bookedMove && prev.partnerId && prev.partnerSrc === 'odoo') Object.assign(data, { partnerName: prev.partnerName, partnerId: prev.partnerId, partnerSrc: 'odoo' });
+    else if (prev.partnerSrc !== 'manual') Object.assign(data, { partnerName: partnerName || '', partnerId: null, partnerSrc: partnerName ? 'excel' : '' });
     if (prev.natureSrc !== 'manual') Object.assign(data, { nature: nature || '', partnerKind: partnerKind || '', cashAccountId: cashAccountId || '' });
     if (prev.analyticSrc !== 'manual') {
       const e = project ? amap[bills.norm(project)] : null;

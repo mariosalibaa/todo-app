@@ -296,7 +296,7 @@ async function bookMonth(ctx, account, month, part, who, opts) {
     bookedMove: { id: moveId, name: moveName, ref, month, part, at, state }, retype: false,
     ref: moveName, service: CO.company,
     company: CO.company, companySrc: 'odoo', kind: l.t.kind || 'work', kindSrc: l.t.kindSrc || 'odoo',
-    partnerId: +partner.id,
+    partnerId: +partner.id, partnerName: partner.name, partnerSrc: 'odoo',
     analyticId: l.a.id, analyticName: l.a.name, analyticSrc: l.t.analyticSrc === 'manual' ? 'manual' : 'excel', analyticFrom: l.a.from,
     odoo: { checkedAt: at, matches: [{ chosen: true, moveId, move: moveName, date: dateOf, amount: total, partner: partner.name, partnerId: +partner.id,
       label: l.line.name, company: CO.company, journal: CO.journal, state, docs: [], analytics: [{ id: l.a.id, name: l.a.name, from: 'bill' }],
@@ -680,7 +680,7 @@ async function postCashBox(ctx, account, who, opts) {
       usedBills.add(bill.id);
       out.spent = money(out.spent + t.debit);
       await col.doc(t.id).set({ bookedMove: { id: fresh.id, name: fresh.name, ref, kind: 'cash-bill', at: now(), state: fresh.state, paymentState: fresh.payment_state }, ref: fresh.name, service: c.companyId === 2 ? 'SARL' : 'S LB',
-        company: c.companyId === 2 ? 'SHIFT GROUP SARL (USD)' : 'S LB', companySrc: 'odoo', partnerId: v.id,
+        company: c.companyId === 2 ? 'SHIFT GROUP SARL (USD)' : 'S LB', companySrc: 'odoo', partnerId: v.id, partnerName: v.name, partnerSrc: 'odoo',
         odoo: { checkedAt: now(), matches: [{ chosen: true, moveId: fresh.id, move: fresh.name, date: t.date, amount: money(t.debit), partner: v.name, partnerId: v.id, label: t.description,
           company: c.companyId === 2 ? 'SHIFT GROUP SARL (USD)' : 'S LB', journal: 'Bills', state: fresh.state, docs: [], analytics: [], score: 10, why: ['paid from his cash box, from this row'] }] } }, { merge: true });
     } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount, error: String(e.message || e).slice(0, 200) }); if (out.skipped.length > 8) break; }
@@ -862,7 +862,7 @@ async function postRefunds(ctx, account, who, opts) {
       }
       out.total = money(out.total + t.credit);
       await col.doc(t.id).set({ bookedMove: { id: note.id, name: note.name, ref, kind: 'vendor-refund', at: now(), state: note.state, paymentState: note.payment_state }, ref: note.name, service: CO.company,
-        company: CO.company, companySrc: 'odoo', partnerId: v[1], analyticId: a.id, analyticName: a.name, analyticSrc: t.analyticSrc === 'manual' ? 'manual' : 'excel',
+        company: CO.company, companySrc: 'odoo', partnerId: v[1], partnerName: v[2], partnerSrc: 'odoo', analyticId: a.id, analyticName: a.name, analyticSrc: t.analyticSrc === 'manual' ? 'manual' : 'excel',
         odoo: { checkedAt: now(), matches: [{ chosen: true, moveId: note.id, move: note.name, date: t.date, amount: money(t.credit), partner: v[2], partnerId: v[1], label: t.description,
           company: CO.company, journal: CO.journal, state: note.state, docs: [], analytics: [{ id: a.id, name: a.name, from: 'refund' }], score: 10, why: ['credit note made from this row, kept by ' + partner.name] }] } }, { merge: true });
     } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount: t.credit, error: String(e.message || e).slice(0, 200) }); if (out.skipped.length > 5) break; }
@@ -946,7 +946,7 @@ async function postVendors(ctx, account, who, opts) {
       }
       out.total = money(out.total + t.debit);
       await col.doc(t.id).set({ bookedMove: { id: bill.id, name: bill.name, ref, kind: 'vendor-bill', at: now(), state: bill.state, paymentState: bill.payment_state }, ref: bill.name, service: CO.company,
-        company: CO.company, companySrc: 'odoo', partnerId: v.id, analyticId: a.id, analyticName: a.name, analyticSrc: t.analyticSrc === 'manual' ? 'manual' : 'excel',
+        company: CO.company, companySrc: 'odoo', partnerId: v.id, partnerName: v.name, partnerSrc: 'odoo', analyticId: a.id, analyticName: a.name, analyticSrc: t.analyticSrc === 'manual' ? 'manual' : 'excel',
         odoo: { checkedAt: now(), matches: [{ chosen: true, moveId: bill.id, move: bill.name, date: t.date, amount: money(t.debit), partner: v.name, partnerId: v.id, label: t.description,
           company: CO.company, journal: CO.journal, state: bill.state, docs: [], analytics: [{ id: a.id, name: a.name, from: 'bill' }], score: 10, why: ['bill made from this row, settled by ' + partner.name] }] } }, { merge: true });
     } catch (e) { out.skipped.push({ id: t.id, date: t.date, amount: t.debit, error: String(e.message || e).slice(0, 200) }); if (out.skipped.length > 5) break; }
