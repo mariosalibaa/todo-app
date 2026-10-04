@@ -83,36 +83,35 @@
     const C = D.cols.reduce((o, k, i) => (o[k] = i, o), {});
     const R = D.rows, L = R[R.length - 1];
 
-    // energy since the install from the meter's counters (they count even when the card does not record)
-    const H = D.house, K = D.counters;
-    const houseDays = (sec(D.install) - sec(H.at)) / 86400;
-    const eB = (K.epb - H.epb) / 1000, eC = (K.epc - H.epc) / 1000, eA = (K.epa - H.epa) / 1000 - H.aPerDay * houseDays;
-    const eTot = eA + eB + eC, hrs = (sec(K.at) - sec(D.install)) / 3600;
+    // energy since the clean start from the meter's counters (they count even when the card does not record).
+    // Mario 2026-10-04: disregard the house data — everything starts at D.start (first clean Makhlouf row).
+    const S = D.start, K = D.counters;
+    const eA = (K.epa - S.epa) / 1000, eB = (K.epb - S.epb) / 1000, eC = (K.epc - S.epc) / 1000;
+    const eTot = eA + eB + eC, hrs = (sec(K.at) - sec(S.at)) / 3600;
 
     // what the card recorded: minutes, gaps over 3 min
     let gaps = 0, gapMin = 0;
     for (let i = 1; i < R.length; i++) { const g = (sec(R[i][0]) - sec(R[i - 1][0])) / 60; if (g > 3) { gaps++; gapMin += g; } }
     const span = R.length ? (sec(L[0]) - sec(R[0][0])) / 60 + 1 : 0, cover = span ? R.length / span : 0;
-    const sinceInstall = (sec(K.at) - sec(D.install)) / 60, recShare = R.length / sinceInstall;
+    const sinceInstall = (sec(K.at) - sec(S.at)) / 60 + 1, recShare = R.length / sinceInstall;
 
     $('kpis').innerHTML =
       `<div class="kpi a"><span>Load now</span><b>${L ? f1(L[C.PSum] / 1000) + ' kW' : '—'}</b><small>${L ? when(L[0]) + ' · PF ' + L[C.PFAvg].toFixed(2) : 'no reading'}</small></div>` +
-      `<div class="kpi r"><span>Peak demand</span><b>${f1(D.peak.kw)} kW</b><small>${D.peak.at ? when(D.peak.at) : ''} · ${f0(D.peak.amps)} A avg (meter register)</small></div>` +
-      `<div class="kpi"><span>Energy since install</span><b>≈ ${f0(eTot)} kWh</b><small>${f1(hrs)} h from ${when(D.install)} · avg ${f0(eTot / hrs)} kW</small></div>` +
-      `<div class="kpi ${recShare < 0.9 ? 'r' : 'g'}"><span>Card recording</span><b>${Math.round(recShare * 100)} %</b><small>${R.length.toLocaleString('en-US')} of ${f0(sinceInstall)} minutes since install${gaps ? ' · ' + gaps + ' gap' + (gaps > 1 ? 's' : '') : ''}</small></div>`;
+      `<div class="kpi r"><span>Peak load</span><b>${f1(D.peak.sum.kw)} kW</b><small>${when(D.peak.sum.at)} · A ${f1(D.peak.a.kw)} · B ${f1(D.peak.b.kw)} · C ${f1(D.peak.c.kw)} kW (highest minute)</small></div>` +
+      `<div class="kpi"><span>Energy</span><b>${f0(eTot)} kWh</b><small>${f1(hrs)} h from ${when(S.at)} · avg ${f0(eTot / hrs)} kW</small></div>` +
+      `<div class="kpi ${recShare < 0.9 ? 'r' : 'g'}"><span>Card recording</span><b>${Math.round(recShare * 100)} %</b><small>${R.length.toLocaleString('en-US')} of ${f0(sinceInstall)} minutes since ${when(S.at)}${gaps ? ' · ' + gaps + ' gap' + (gaps > 1 ? 's' : '') : ''}</small></div>`;
 
     // per phase now (Mario 2026-10-03: "show also the phase reading") + each phase's own kWh counter and its share
     if (L) {
       const imb = Math.max(L[C.IA], L[C.IB], L[C.IC]) / ((L[C.IA] + L[C.IB] + L[C.IC]) / 3) - 1;
       const pf = v => v == null || isNaN(v) ? '—' : v.toFixed(2);
-      const ph = (n, x, cnt, e, note) => `<tr><td>${n}</td><td>${f1(L[C['U' + x]])}</td><td>${f0(L[C['I' + x]])}</td><td>${f1(L[C['P' + x]] / 1000)}</td><td>${pf(L[C['PF' + x]])}</td>` +
-        `<td class="hide-sm">${f1(L[C['UTH' + x]])} %</td><td class="hide-sm">${f1(L[C['ITH' + x]])} %</td><td>${f1(cnt / 1000)}<small class="hide-sm">kWh on the meter</small></td><td>${f0(e)}<small>${note}</small></td></tr>`;
-      $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>PF</th><th class="hide-sm">Voltage THD</th><th class="hide-sm">Current THD</th><th>Counter<small>at ${when(K.at)}</small></th><th>kWh since install</th></tr>` +
-        ph('A', 'A', K.epa, eA, `less the house ≈ ${f0(H.aPerDay * houseDays)}`) +
-        ph('B', 'B', K.epb, eB, 'exact') + ph('C', 'C', K.epc, eC, 'exact') +
-        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td><td class="hide-sm"></td><td class="hide-sm"></td><td></td><td></td></tr>` +
+      const ph = (n, x, cnt, e, note, pk) => `<tr><td>${n}</td><td>${f1(L[C['U' + x]])}</td><td>${f0(L[C['I' + x]])}</td><td>${f1(L[C['P' + x]] / 1000)}</td><td>${pf(L[C['PF' + x]])}</td>` +
+        `<td class="hide-sm">${f1(L[C['UTH' + x]])} %</td><td class="hide-sm">${f1(L[C['ITH' + x]])} %</td><td>${f1(cnt / 1000)}<small class="hide-sm">kWh on the meter</small></td><td>${f0(e)}<small>${note}</small></td><td>${f1(pk.kw)}<small>${when(pk.at)}</small></td></tr>`;
+      $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>PF</th><th class="hide-sm">Voltage THD</th><th class="hide-sm">Current THD</th><th>Counter<small>at ${when(K.at)}</small></th><th>kWh<small>since ${when(S.at)}</small></th><th>Max kW<small>highest minute</small></th></tr>` +
+        ph('A', 'A', K.epa, eA, '', D.peak.a) + ph('B', 'B', K.epb, eB, '', D.peak.b) + ph('C', 'C', K.epc, eC, '', D.peak.c) +
+        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td><td class="hide-sm"></td><td class="hide-sm"></td><td></td><td></td><td></td></tr>` +
         `<tr class="tot"><td>Total</td><td>${f1((L[C.UA] + L[C.UB] + L[C.UC]) / 3)}<small>average</small></td><td class="${imb > 0.2 ? 'warn' : ''}">${Math.round(imb * 100)} %<small>imbalance</small></td><td>${f1(L[C.PSum] / 1000)}<small>${C.SSum != null ? f1(L[C.SSum] / 1000) + ' kVA' : ''}</small></td><td>${pf(L[C.PFAvg])}</td>` +
-        `<td class="hide-sm">${f1(L[C.UTHAvg])} %</td><td class="hide-sm">${f1(L[C.ITHAvg])} %</td><td>${f1(K.epsum / 1000)}</td><td>≈ ${f0(eTot)}</td></tr>`;
+        `<td class="hide-sm">${f1(L[C.UTHAvg])} %</td><td class="hide-sm">${f1(L[C.ITHAvg])} %</td><td>${f1(K.epsum / 1000)}</td><td>${f0(eTot)}</td><td>${f1(D.peak.sum.kw)}<small>${when(D.peak.sum.at)}</small></td></tr>`;
     }
 
     // chart: total + each phase, kW per minute; a gap > 3 min breaks the line
@@ -145,10 +144,10 @@
 
     $('lead').innerHTML = `Maison M Naccache generator (300–600 kVA MTS) · logger ${D.serial} · SD card read up to <b>${when(K.at)}</b> (${D.file}).`;
     $('note').innerHTML =
-      `<b>Energy since install.</b> The meter's own counters run whatever the SD card does. Phases B and C count only Makhlouf (at Mario's house the logger was on phase A alone), so they are exact. ` +
-      `Phase A still holds the house's use from ${when(H.at)} until the move (≈ ${H.aPerDay} kWh a day, taken off), so the total is an estimate until a second card reading gives a clean start.<br>` +
-      `<b>Peak demand</b> is the meter's own register (highest demand since it was reset), not computed from the card.<br>` +
-      `<b>Card recording.</b> Since 29 Jun the logger wrote a few rows after each power-up and then stopped. Restarted 3 Oct 18:40; this percentage shows whether it now keeps recording.<br>` +
+      `<b>Start.</b> Everything counts from ${when(S.at)}, the first clean reading after the card was reinstalled. The house data and the first 36 h at Makhlouf (moved ${when(D.install)}, card not recording) are left out.<br>` +
+      `<b>Energy</b> is the meter's own counters since the start — they keep counting through a card gap.<br>` +
+      `<b>Peak load</b> is the highest one-minute reading on the card since the start.<br>` +
+      `<b>Card recording.</b> Minutes on the card out of the minutes since the start; a gap is the logger losing power.<br>` +
       `<b>Update.</b> Copy the SD card's CSVs to a folder, then <code>node makhlouf-build.js "&lt;folder&gt;"</code> in the hub repo and deploy.`;
   }
   load().catch(e => { $('err').textContent = String(e.message || e); });
