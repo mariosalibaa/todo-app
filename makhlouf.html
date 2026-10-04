@@ -43,7 +43,7 @@
   details.hrs>summary{cursor:pointer;list-style:none;} details.hrs>summary::before{content:'\25B8  ';color:var(--amber);} details.hrs[open]>summary::before{content:'\25BE  ';} details.hrs>summary small{font-weight:400;color:var(--sub);font-size:.7rem;margin-left:6px;}
   .batin{width:100%;justify-content:flex-end;} .batin label.tick{color:var(--amber);font-weight:600;cursor:pointer;} .batin label.tick select{margin-left:6px;} .batin.off label:not(.tick){opacity:.45;}
   .sunin{width:100%;justify-content:flex-end;} .sunin input[type=date]{width:auto;} .sunin label.tick input{width:auto;margin:0 4px 0 0;accent-color:var(--amber);} .suninfo{display:block;width:100%;min-height:1.2em;text-align:right;font-size:.72rem;color:var(--sub);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .prodT{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums} .prodT th,.prodT td{padding:6px 8px;border-bottom:1px solid var(--surface0);text-align:right} .prodT th:first-child,.prodT td:first-child{text-align:left} .prodT th{color:var(--overlay0);font-weight:400;font-size:.68rem;text-transform:uppercase} .prodT tr.m{cursor:pointer} .prodT tr.m:hover td{background:var(--mantle)} .prodT tr.m.open td{color:var(--amber)} .prodT tr.d td{font-size:.76rem;color:var(--sub)} .prodT tr.d{cursor:pointer} .prodT tr.d.sel td{color:var(--text)} .prodT small{color:var(--overlay0)}
+  .prodT{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums} .prodT th,.prodT td{padding:6px 8px;border-bottom:1px solid var(--surface0);text-align:right} .prodT th:first-child,.prodT td:first-child{text-align:left} .prodT th{color:var(--overlay0);font-weight:400;font-size:.68rem;text-transform:uppercase} .prodT tr.m{cursor:pointer} .prodT tr.m:hover td{background:var(--mantle)} .prodT tr.m.open td{color:var(--amber)} .prodT tr.d td{font-size:.76rem;color:var(--sub)} .prodT tr.tot td{border-top:2px solid var(--amber);color:var(--amber)} .prodT tr.d{cursor:pointer} .prodT tr.d.sel td{color:var(--text)} .prodT small{color:var(--overlay0)}
   .solin label.tick input[type=checkbox]{width:auto;margin:0 4px 0 0;accent-color:var(--amber);}
   #prodH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   #batH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
@@ -183,7 +183,7 @@
     </div>
     <h2 class="mh" id="chartH"><span id="chartT">Load, minute by minute</span><span class="sw" id="unitSw"><button data-u="kW" class="on">kW</button><button data-u="A">Amps</button></span></h2>
     <div class="card chart" id="chartCard"><canvas id="cv"></canvas></div>
-    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin sunin"><label>Sun <select id="sunM"><option value="day">one day</option><option value="last7">average, 7 days to</option><option value="last30">average, 30 days to</option><option value="month">average of the month</option><option value="monthMin">worst day of the month</option><option value="monthMax">best day of the month</option><option value="ref">4 Oct curve (first estimate)</option></select></label><label>Date <input id="sunD" type="date" value="2026-10-04"></label><label class="tick"><input id="sunPv" type="checkbox"> scale to PVGIS</label></span><span id="sunInfo" class="suninfo"></span>
+    <h2 class="mh" id="solH"><span>Solar vs load</span><span class="solin sunin"><label>Sun <select id="sunM"><option value="day">one day</option><option value="last7">average, 7 days to</option><option value="last30">average, 30 days to</option><option value="month">average of the month</option><option value="monthMin">worst day of the month</option><option value="monthMax">best day of the month</option><option value="year">year average</option><option value="ref">4 Oct curve (first estimate)</option></select></label><label>Date <input id="sunD" type="date" value="2026-10-04"></label><label class="tick"><input id="sunPv" type="checkbox"> scale to PVGIS</label></span><span id="sunInfo" class="suninfo"></span>
       <span class="solin"><label>Panels <input id="solN" type="number" min="0" step="1" value="600"></label><label>Panel W <input id="solW" type="number" min="100" step="5" value="645"></label><label>Generator <select id="solG"><option value="log">as logged (G1 / G2)</option><option value="G1">G1 · 350 kVA only</option><option value="G2">G2 · 600 kVA only</option></select></label><label>Floor % <input id="solF" type="number" min="0" max="100" step="1" value="20"></label><label>Ceiling % <input id="solX" type="number" min="0" max="100" step="1" value="80"></label><label>Logger gaps <select id="solGap"><option value="edl">EDL</option><option value="gen">generator</option></select></label></span>
       <span class="solin batin"><label class="tick">System <select id="batOn"><option value="">On-grid · no battery</option><option value="1">Hybrid · battery</option></select></label><label>kWh <input id="batC" type="number" min="0" step="10" value="750"></label><label>Min % <input id="batM" type="number" min="0" max="90" step="1" value="10"></label><label>Max % <input id="batX" type="number" min="10" max="100" step="1" value="100"></label><label>System kW <input id="batP" type="number" min="0" step="5" value="375"></label><label>Gen start % <input id="batS" type="number" min="0" max="100" step="1" value="25"></label><label>Gen stop % <input id="batT" type="number" min="0" max="100" step="1" value="40"></label></span></h2>
     <div class="kpis" id="solK"></div>
@@ -307,6 +307,18 @@
       const m = $('sunM').value, d = $('sunD').value;
       if (!SUNDATA || m === 'ref') { prof = null; $('sunInfo').textContent = m === 'ref' ? '16.5 kWh / 8 panels on 4 Oct, read off the screenshot' : 'year of data not loaded — 4 Oct curve'; return; }
       const all = Object.keys(SUNDATA.days).sort(), day = k => SUNDATA.days[k];
+      if (m === 'year') {   // Mario 2026-10-04: the mean of the 12 month averages (months weigh the same, however many days each has)
+        const ms = [...new Set(all.map(k => k.slice(0, 7)))], byM = {};
+        for (const mm of ms) { const f = mm.slice(5); (byM[f] = byM[f] || []).push(mm); }   // Oct 2025 and Oct 2026 share one month slot
+        const slots = Object.keys(byM).sort(), pv = $('sunPv').checked;
+        const mprof = slots.map(f => { const ks = all.filter(k => byM[f].includes(k.slice(0, 7))), mref = ks.reduce((a, k) => a + day(k).kwh, 0) / ks.length;
+          const fct = pv && SUNDATA.pvgis ? SUNDATA.pvgis[+f - 1] * 0.54 / mref : 1;
+          return Array.from({ length: 288 }, (_, b) => ks.reduce((a, k) => a + day(k).p[b], 0) / ks.length / 1000 * fct); });
+        prof = Array.from({ length: 288 }, (_, b) => mprof.reduce((a, q) => a + q[b], 0) / mprof.length);
+        const kwh = prof.reduce((a, v) => a + v, 0) / 12, pg = SUNDATA.pvgis ? SUNDATA.pvgis.reduce((a, v) => a + v, 0) / 12 : null;
+        $('sunInfo').textContent = `year average · ${slots.length} months, ${all.length} days · ${kwh.toFixed(2)} kWh per 540 W panel (${(kwh / 0.54).toFixed(2)} kWh/kWp)${pg ? ` · PVGIS year ${pg.toFixed(2)} kWh/kWp` : ''}${pv ? ' (scaled to PVGIS)' : ''}`;
+        return;
+      }
       let keys = [];
       if (m === 'day') keys = all.includes(d) ? [d] : [all.filter(k => k <= d).pop() || all[0]];
       else if (m === 'last7' || m === 'last30') { const n = m === 'last7' ? 7 : 30, end = Date.parse(d + 'T00:00:00Z'); keys = all.filter(k => { const t = Date.parse(k + 'T00:00:00Z'); return t <= end && t > end - n * 86400e3; }); }
@@ -358,6 +370,9 @@
         if (prodOpen === r.m) for (const d of r.ds) { const x = SUNDATA.days[d];
           h += `<tr class="d${prodDay === d ? ' sel' : ''}" data-d="${d}"><td>&nbsp;&nbsp;&nbsp;${when(d + ' 00:00').replace(' 00:00', '')}</td><td></td><td>${fk(kwhOf(d))}</td><td colspan="2">${x.fill > 0.01 ? `<small>${fk(x.fill * f * fct(r.m))} topped up</small>` : ''}</td><td></td><td class="hide-sm"></td></tr>`; }
       }
+      { const vals = all.map(kwhOf), slots = {}; rows.forEach(r => (slots[r.m.slice(5)] = slots[r.m.slice(5)] || []).push(r.avg));
+        const ya = Object.values(slots).reduce((a, v) => a + v.reduce((x, y) => x + y, 0) / v.length, 0) / Object.keys(slots).length, pgY = SUNDATA.pvgis.reduce((a, v) => a + v, 0) / 12 * N * W / 1000;
+        h += `<tr class="tot"><td><b>Year average</b><small> ${Object.keys(slots).length} months</small></td><td>${all.length}</td><td><b>${fk(ya)}</b></td><td>${fk(Math.max(...vals))}</td><td>${fk(Math.min(...vals))}</td><td><b>${f0(ya * 365)}</b><small> /year</small></td><td class="hide-sm">${fk(pgY)}</td></tr>`; }
       $('prodT').innerHTML = h;
       $('prodT').querySelectorAll('tr.m').forEach(tr => tr.onclick = () => { prodOpen = prodOpen === tr.dataset.m ? null : tr.dataset.m; prodDay = null; prodRender(); });
       $('prodT').querySelectorAll('tr.d').forEach(tr => tr.onclick = () => { prodDay = tr.dataset.d; prodRender(); });
