@@ -1703,6 +1703,8 @@ function render() {
         + ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this proposed line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
         // second ✓ (Mario, 2026-09-23): the accepted line goes to Odoo from the row itself — no queue, no list
         + ((t.src === 'whatsapp' || t.src === 'site') && t.waAccepted && !t.bookedMove ? `<a class="bookrow" onclick="autoBook('${t.id}')" title="Book this accepted line in Odoo now (a bill paid from this cash, or a payment)">✓ book in Odoo</a><a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
+        // a line typed on the hub (manual / Telegram) books the same way, one click (Mario, 2026-10-04: "where is the button that allows to book in Odoo")
+        + ((t.src === 'manual' || t.src === 'telegram') && !t.bookedMove && !t.excluded && t.nature && t.nature !== 'note' && (t.debit || t.credit) && !(t.odoo && (t.odoo.matches || []).some(x => x.chosen)) ? `<a class="bookrow" onclick="autoBook('${t.id}')" title="Book this line in Odoo now — labour/expense goes onto its month bill, a vendor line becomes its own bill">✓ book in Odoo</a>` : '')
         + '';   // the line's paper is listed by name in the Odoo column now, not counted here
     return head + `<tr data-id="${t.id}" class="${co === 'Personal' ? 'personal' : ''}${t.excluded ? ' excluded' : ''}${unjustified(t) ? ' unjust' : ''}${selected.has(t.id) ? ' sel' : ''}">
       <td class="c-sel"><input type="checkbox" ${selected.has(t.id) ? 'checked' : ''} onchange="selRow('${t.id}', this.checked)"></td>
