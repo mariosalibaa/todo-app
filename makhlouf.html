@@ -375,7 +375,7 @@
       const batOn = $('batOn').value === '1';
       document.querySelector('.batin').classList.toggle('off', !batOn); $('batH').hidden = $('batK').hidden = $('batCard').hidden = $('batKCard').hidden = $('batNote').hidden = !batOn;
       const B = batOn ? battery(N, W) : null;
-      const ld = [], le = [], pv = [], pu = [], df = [], fl = [], cl = [];
+      const ld = [], le = [], pv = [], pu = [], df = [], fl = [], cl = [], gk = [];
       let mi = -1;
       let overMin = 0, overMax = 0;
       let ePV = 0, eUsed = 0, eSur = 0, eGen = 0, eEdl = 0, maxSur = 0, maxPV = 0, minNet = Infinity;
@@ -384,7 +384,8 @@
         const p = N * perPanel(hourOf(x), W), net = kw - p, fk = B ? 0 : floorOf(src);
         const room = B ? p - B.lost[mi] : Math.max(kw - Math.min(fk, kw), 0), used = Math.min(p, room);   // with the battery: no floor, only what the full battery / system kW cannot take is lost
         ld.push({ x, y: isEst ? null : kw }); le.push({ x, y: isEst ? kw : null }); pv.push({ x, y: p }); pu.push({ x, y: used }); df.push({ x, y: Math.max(p - room, 0) });
-        fl.push({ x, y: B ? null : fk }); const ck = ceilOf(src); cl.push({ x, y: ck }); if (ck != null && kw - used > ck) { overMin++; overMax = Math.max(overMax, kw - used - ck); }   // df above zero = solar the load cannot take once the running generator keeps its floor
+        fl.push({ x, y: B ? null : fk }); const onGrid = src === 'EDL' && gm === 'log'; gk.push({ x, y: onGrid ? null : B ? B.genK[mi] : kw - used });   // generator output (EDL hours: none)
+        const ck = ceilOf(src); cl.push({ x, y: ck }); if (ck != null && kw - used > ck) { overMin++; overMax = Math.max(overMax, kw - used - ck); }   // df above zero = solar the load cannot take once the running generator keeps its floor
         ePV += p / 60; eUsed += used / 60; eSur += (p - used) / 60; if (B) { /* totals from the battery run */ } else if (src === 'EDL' && gm === 'log') eEdl += (kw - used) / 60; else eGen += (kw - used) / 60; maxPV = Math.max(maxPV, p); maxSur = Math.max(maxSur, p - room); if (p > 0) minNet = Math.min(minNet, room - p);
       }
       if (B) { eGen = B.genKwh; eEdl = B.edlKwh; overMin = 0; overMax = 0;
@@ -401,6 +402,7 @@
         { label: `Solar made · ${N} × ${W} W`, data: pv, borderColor: '#a6e3a1', borderWidth: 1.5, borderDash: [5, 3] },
         { label: B ? 'Solar used (load + battery)' : 'Solar used', data: pu, borderColor: '#a6e3a1', borderWidth: 2, backgroundColor: 'rgba(166,227,161,.18)', fill: 'origin' },
         { label: B ? `Solar lost (battery full) · ${f0(eSur)} kWh` : `Solar lost = solar − gen floor − load · ${f0(eSur)} kWh`, data: df, borderColor: '#f38ba8', borderWidth: 1.5, backgroundColor: 'rgba(243,139,168,.30)', fill: 'origin' },
+        { label: `Generator output · ${f0(eGen)} kWh`, data: gk, borderColor: '#89b4fa', borderWidth: 1.8, spanGaps: false, order: -1 },
         { label: 'Generator floor', data: fl, borderColor: '#f38ba8', borderWidth: 1, borderDash: [4, 4] },
         { label: `Generator ceiling ${cpct} %`, data: cl, borderColor: '#fab387', borderWidth: 1.2, borderDash: [8, 4], spanGaps: false }];
       if (B) ds.push({ label: 'Battery SOC %', data: B.socS, borderColor: '#cba6f7', borderWidth: 2.2, yAxisID: 'ys' });
