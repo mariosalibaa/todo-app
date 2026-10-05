@@ -419,6 +419,23 @@
   .deck-done{text-align:center;padding:30px 16px;color:var(--sub);font-size:15px;line-height:1.7;} .deck-done b{display:block;font-size:22px;color:var(--text);margin-bottom:8px;}
   .deck-hint{position:absolute;top:50%;font-size:56px;opacity:0;pointer-events:none;transition:opacity .1s;} .deck-hint.l{left:14px;color:var(--red);} .deck-hint.r{right:14px;color:var(--green);}
   @media (max-width: 560px) { .bar #btn-todo{display:inline-flex!important;align-items:center;height:36px;padding:0 10px;white-space:nowrap;} .card{border-radius:14px;padding:14px;} .card .amt{font-size:28px;} }
+/* compact rows, the Odoo list way (Mario, 2026-10-05: "make line height consistent and smaller"): every row one line
+   high; the row you click into opens to its full height so nothing is lost for editing */
+@media (min-width:561px){
+body.compact #rows tr:not(.day):not(:focus-within) > td{height:34px;padding-top:1px;padding-bottom:1px;vertical-align:middle;}
+body.compact #rows tr:not(.day):not(:focus-within) :is(.c-date .ref,.c-date .wa-when,.c-desc .svc,.c-desc .who,.c-desc .flag,.c-desc .sug-act,.c-desc .sug-skip,.c-desc .fuel,.c-partner .co,.c-partner .or-cash,.c-partner .sug-act,.c-partner .sug-skip,.c-partner .odoo-partner,.c-company .sug-act,.c-proj .plan,.c-proj .pick:has(.division),.c-proj .split,.c-proj .splitlink,.c-proj .sug-act,.c-proj .sug-skip,.c-desc .sheetline,.c-rev .hint,.c-type .hint,.odoo-doc){display:none!important;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-desc .noteline{display:none;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-desc{max-height:34px;overflow:hidden;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-desc > div:first-child,body.compact #rows tr:not(.day):not(:focus-within) .c-desc .noteline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-desc .desc-in,body.compact #rows tr:not(.day):not(:focus-within) .c-desc .note-in{height:16px!important;overflow:hidden;white-space:nowrap;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-odoo .clip{max-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+body.compact #rows tr:not(.day) .c-date{position:relative;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-date .acts{position:absolute;right:2px;bottom:0;display:none;background:var(--surface0);border-radius:4px;padding:0 3px;z-index:2;}
+body.compact #rows tr:not(.day):not(:focus-within):hover .c-date .acts{display:block;}
+body.compact #rows tr:not(.day):not(:focus-within) .pick input,body.compact #rows tr:not(.day):not(:focus-within) .c-company select{height:24px;padding-top:0;padding-bottom:0;}
+}
+.dayview{display:inline-flex;align-items:center;gap:2px;font-size:12px;white-space:nowrap;} .dayview .btn{padding:1px 8px;} .dayview #dv-date{min-width:118px;text-align:center;color:var(--text);}
+.dayview .btn.on{background:var(--amber,#F2A93B);color:#15181C;}
 </style>
 </head>
 <body>
@@ -449,6 +466,8 @@
   <span id="rowcount" style="font-size:12px;color:var(--muted);white-space:nowrap;cursor:help"></span>
   <span class="pager" id="pager" hidden><span id="pg-range" title="Only this page is drawn: the grid stays light however many lines the account holds"></span><button class="btn" id="pg-prev" onclick="pageBy(-1)" title="Previous page">‹</button><button class="btn" id="pg-next" onclick="pageBy(1)" title="Next page">›</button></span>
   <span class="sp" style="flex:1"></span>
+  <button class="btn" id="btn-compact" onclick="setCompact(!document.body.classList.contains('compact'))" title="One line per row, like Odoo — click into a row to open it full height">▤ Compact</button>
+  <span class="dayview"><button class="btn" id="btn-day" onclick="dayView()" title="Show one day at a time; then ‹ › (or the ← → keys) step between the days that have lines">📅 Day</button><span id="dv-nav" hidden><button class="btn" onclick="dayStep(-1)" title="Previous day with lines (←)">‹</button><span id="dv-date"></span><button class="btn" onclick="dayStep(1)" title="Next day with lines (→)">›</button></span></span>
   <button class="btn" onclick="printView()" title="Print what is shown: the current period, filters and sort, every page, as a clean table with totals">🖨 Print</button>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
   <button class="btn" id="btn-undo" onclick="undoEdit()" title="Nothing to undo" disabled>↶ Undo</button>
@@ -729,8 +748,9 @@ function reconOf(t) {
   // the row IS a line of a bill (month bill, vendor bill, cash bill): its cost is booked there — "on bill", never
   // "open" (Mario, 2026-10-05: "since there is a bill, reconciled should be on bill")
   const bm = t.bookedMove;
-  if (bm && bm.id && bm.kind !== 'payment' && (!won || won.moveId === bm.id || /^(R?BILL|INV|RINV)/.test(won.move || ''))) return 'bill';
-  if (won && /^(R?BILL|RINV)/.test(won.move || '') && !/^P(CSH|SETT|BNK)/.test(won.move || '')) return 'bill';
+  const isBill = n => /^(R?BILL|RINV|INV)\d*\//.test(n || '');
+  if (bm && bm.id && bm.kind !== 'payment' && isBill(bm.name)) return 'bill';
+  if (won && isBill(won.move)) return 'bill';
   if (won) return won.settled || (won.docs || []).some(d => !/^P(CSH|SETT|BNK)/.test(d)) ? 'yes' : 'no';
   // a row on the worker's own monthly bill is settled by that bill: it is money of his account, the
   // bill IS the debt to him, and the cash Mario hands him later pays the bill, not the row
@@ -1614,6 +1634,39 @@ function pageBy(d) {
   window.scrollTo({ top: 0 });
 }
 let pageSig = '';
+// ── Compact rows + day by day (Mario, 2026-10-05) ──
+function setCompact(on) { document.body.classList.toggle('compact', on); document.getElementById('btn-compact').classList.toggle('on', on); try { localStorage.setItem('acct_compact', on ? '1' : '0'); } catch {} }
+// the days that have lines in what is loaded, newest first (the filter on the date column does the showing)
+const dvDays = () => [...new Set(tx.map(t => t.date).filter(Boolean))].sort().reverse();
+function dayShow(d) {
+  colF.date = d; buildHeader(); pageNo = 0; render();
+  document.getElementById('dv-date').textContent = dayDate(d);
+  document.getElementById('dv-nav').hidden = false; document.getElementById('btn-day').classList.add('on');
+}
+function dayView() {
+  if (document.getElementById('btn-day').classList.contains('on')) {   // second press: back to every day
+    delete colF.date; buildHeader(); render();
+    document.getElementById('dv-nav').hidden = true; document.getElementById('btn-day').classList.remove('on'); return;
+  }
+  const days = dvDays(); if (!days.length) return say('No lines to show by day', 'err');
+  const today = localYmd(new Date());
+  dayShow(days.find(d => d <= today) || days[0]);
+}
+function dayStep(dir) {
+  const days = dvDays(); if (!days.length) return;
+  const cur = colF.date && /^\d{4}-\d{2}-\d{2}$/.test(colF.date) ? colF.date : null;
+  if (!cur) return dayShow(days[0]);
+  // ‹ goes back in time, › forward; skip the days with no lines
+  const next = dir < 0 ? days.find(d => d < cur) : [...days].reverse().find(d => d > cur);
+  if (next) dayShow(next); else say(dir < 0 ? 'No earlier day with lines' : 'No later day with lines');
+}
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('btn-day') || !document.getElementById('btn-day').classList.contains('on')) return;
+  if (e.target.closest('input,textarea,select,[contenteditable]') || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); dayStep(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); dayStep(1); }
+});
+document.addEventListener('DOMContentLoaded', () => { let on = true; try { on = localStorage.getItem('acct_compact') !== '0'; } catch {} setCompact(on); });
+
 function render() {
   const all = visible();
   // any change to what is being looked at puts you back on page 1
@@ -1775,7 +1828,7 @@ function render() {
           : t.analyticText ? `<div class="sug-skip" title="Typed on the phone; nothing in Odoo looks like it">typed · no Odoo match</div>` : ''; })()}
         ${t.projectFrom && t.analyticName && t.analyticSrc !== 'manual' ? `<div class="sug-act" title="${esc('Not written in the sheet: taken from the ' + t.projectFrom + '. ✓ keeps it, ✕ clears it so you pick one.')}"><span class="sug-why">from the ${esc(t.projectFrom)}</span> <button class="yes" onclick="confirmAnalytic('${t.id}', true)">✓</button><button class="no" onclick="confirmAnalytic('${t.id}', false)">✕</button></div>` : ''}
       </td>`}
-      <td class="c-odoo">${odooCell(t)}</td>
+      <td class="c-odoo"><div class="clip">${odooCell(t)}</div></td>
       ${(() => { const r = reconOf(t); return `<td class="c-recon ${r === 'bill' ? 'yes' : r}" title="${r === 'yes' ? 'Reconciled in Odoo with a bill or invoice — the project cost is on that document' : r === 'bill' ? 'On his monthly bill ' + esc((t.bookedMove || {}).name || (t.bookedMove || {}).ref || ((t.odoo && (t.odoo.matches || []).find(x => x.chosen)) || {}).move || '') + ' — the cost is booked; the bill itself is paid by the next cash he receives' : r === 'no' ? 'In Odoo but not yet reconciled — the project shows this payment until it is' : 'Not in Odoo'}">${r === 'yes' ? '✓ reconciled' : r === 'bill' ? '✓ on bill' : r === 'no' ? `○ open <a class="recon" onclick="openReconcile('${t.id}')" title="Reconcile this payment with the partner's open bills or invoices in Odoo">⇄</a>` : '—'}</td>`; })()}
       <td class="c-rev${t.reviewed ? ' on' : ''}" title="${t.reviewed ? esc('Reviewed ' + stamp(t.reviewedAt) + ' by ' + (t.reviewedBy || '?')) : 'Tick when you have looked at this line — the time and your name are kept, and it goes in the log'}">
         <label><input type="checkbox" ${t.reviewed ? 'checked' : ''} onchange="setReviewed('${t.id}', this.checked, this)"> ${t.reviewed ? 'reviewed' : 'review'}</label>
