@@ -1193,6 +1193,25 @@ async function pushAnalytic(ctx, account, t) {
 // payment for Khoder, how to reconcile so it does not stay open"). Odoo pairs the open debits and credits itself.
 async function reconcilePayable(odooCall, partnerId, companies = [7, 2, 10]) {
   const out = {};
+  // a worker's SARL balance reads zero, carried to S LB through 451130 Affiliated Companies (Mario, 2026-09-08; the split
+  // of a "from mario" payment can leave a remainder there) — the same two entries as odoo/sweep-worker-sarl-to-slb.mjs
+  try {
+    const C2 = { allowed_company_ids: [2], company_id: 2 }, C7 = { allowed_company_ids: [7], company_id: 7 };
+    const g = await odooCall('account.move.line', 'read_group', [[['partner_id', '=', partnerId], ['account_id.account_type', '=', 'liability_payable'], ['parent_state', '=', 'posted'], ['company_id', '=', 2]], ['debit', 'credit'], []], { context: C2 });
+    const bal = g[0] ? money((g[0].debit || 0) - (g[0].credit || 0)) : 0;
+    if (Math.abs(bal) >= 0.01) {
+      const owed = -bal, date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Beirut' }), ref = 'SARL-TO-SLB-' + partnerId + '-' + date;
+      const mk = async (ctx, journal, payable, affiliated, other, flip) => {
+        const id = await odooCall('account.move', 'create', [{ move_type: 'entry', journal_id: journal, date, ref, line_ids: [
+          [0, 0, { name: 'worker balance carried ' + (flip ? 'from the SARL' : 'to S LB'), account_id: payable, partner_id: partnerId, debit: (owed > 0) !== flip ? owed > 0 ? owed : -owed : 0, credit: (owed > 0) !== flip ? 0 : owed > 0 ? owed : -owed }],
+          [0, 0, { name: flip ? 'receivable from the SARL' : 'owed to S LB', account_id: affiliated, partner_id: other, debit: (owed > 0) !== flip ? 0 : owed > 0 ? owed : -owed, credit: (owed > 0) !== flip ? owed > 0 ? owed : -owed : 0 }]] }], { context: ctx });
+        await odooCall('account.move', 'action_post', [[id]], { context: ctx });
+      };
+      await mk(C2, 17, 897, 1011, 44, false);
+      await mk(C7, 65, 5778, 5892, 7, true);
+      out.carried = owed;
+    }
+  } catch (e) { out.carryError = String(e.message || e).slice(0, 160); }
   for (const co of companies) {
     const ctx = { allowed_company_ids: [co], company_id: co };
     const ls = await odooCall('account.move.line', 'search_read', [[['partner_id', '=', partnerId], ['company_id', '=', co], ['account_id.account_type', '=', 'liability_payable'],
