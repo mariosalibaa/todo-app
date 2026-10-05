@@ -1502,6 +1502,7 @@ async function handle(req, res, url, user, ctx) {
   // invoice) stays a proposal.
   async function autoAccept(a, ids, by) {
     const col = txCol(a), out = { accepted: [], left: [], errors: [] };
+    let suppliers = null;
     if (!ids.length) return out;
     const rows = (await Promise.all(ids.map(id => col.doc(id).get()))).filter(d => d.exists).map(d => ({ id: d.id, ...d.data() }));
     const dates = [...new Set(rows.map(t => t.date))].sort();
@@ -1513,11 +1514,20 @@ async function handle(req, res, url, user, ctx) {
       const ph = t.fromPhoto || {};
       // a photo of a purchase he ALSO wrote as text ("Simon electric 10 $" + the Simon invoice 10.38) is one purchase:
       // the photo waits for the tick, flagged, instead of booking it twice
+      // text that names a supplier Odoo knows, or a big sum, is a purchase with a paper (official bill, resale): it
+      // waits for the tick (Mario 2026-10-05: Mitri's "5475 $" Narinco batteries landed on his month bill)
+      if (!t.fromPhoto && t.nature !== 'labour') {
+        if (t.debit > 150) { out.left.push(t.id + ': ' + t.debit + ' $ is a big purchase — waits for the tick'); continue; }
+        if (!suppliers) suppliers = await bills.suppliersPublic(odooCall).catch(() => []);
+        const text = ' ' + bills.norm(t.description || '') + ' ';
+        const sup = suppliers.find(p => p.words.some(x => text.includes(' ' + x + ' ') || (x.length >= 6 && text.includes(' ' + x))));
+        if (sup && !/benzin|fuel|essence|⛽/i.test(t.description || '')) { out.left.push(t.id + ': names ' + sup.name + ' — a supplier purchase, waits for the tick'); continue; }
+      }
       if (t.fromPhoto) {
         const w = s => String(s || '').toLowerCase().replace(/[^a-z؀-ۿ ]+/g, ' ').split(/\s+/).filter(x => x.length >= 4 && !['paints', 'company', 'store', 'stores', 's.a.l', 'sarl', 'photo', 'hardware', 'ironmongery'].includes(x));
         const mine = new Set(w(ph.vendor));
         const twin = mine.size && (await col.where('date', '>=', t.date.slice(0, 8) + '01').get()).docs.map(d => ({ id: d.id, ...d.data() }))
-          .find(x => x.id !== t.id && !x.fromPhoto && !x.dupOf && Math.abs(Date.parse(x.date) - Date.parse(t.date)) <= 2 * 864e5 && w(x.description).some(y => mine.has(y)));
+          .find(x => x.id !== t.id && !x.fromPhoto && !x.dupOf && Math.abs(Date.parse(x.date) - Date.parse(t.date)) <= 2 * 864e5 && w(x.description).some(y => mine.has(y)) && Math.abs((x.debit || 0) - (t.debit || 0)) <= 0.15 * Math.max(x.debit || 0, t.debit || 0, 1));
         if (twin) { await col.doc(t.id).set({ ask: null, note: [t.note, 'possible duplicate of "' + String(twin.description).slice(0, 60) + '" (' + twin.date + ')'].filter(Boolean).join(' · ') }, { merge: true }); out.left.push(t.id + ': possible duplicate of ' + twin.id); continue; }
       }
       let data;
