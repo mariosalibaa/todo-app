@@ -1511,6 +1511,15 @@ async function handle(req, res, url, user, ctx) {
       const day = dayRows.find(d => d.date === t.date);
       const an = t.analyticId ? null : day ? { analyticId: day.analyticId, analyticName: day.analyticName, analyticSrc: 'auto', analyticFrom: 'his day' } : null;
       const ph = t.fromPhoto || {};
+      // a photo of a purchase he ALSO wrote as text ("Simon electric 10 $" + the Simon invoice 10.38) is one purchase:
+      // the photo waits for the tick, flagged, instead of booking it twice
+      if (t.fromPhoto) {
+        const w = s => String(s || '').toLowerCase().replace(/[^a-z؀-ۿ ]+/g, ' ').split(/\s+/).filter(x => x.length >= 4 && !['paints', 'company', 'store', 'stores', 's.a.l', 'sarl', 'photo', 'hardware', 'ironmongery'].includes(x));
+        const mine = new Set(w(ph.vendor));
+        const twin = mine.size && (await col.where('date', '>=', t.date.slice(0, 8) + '01').get()).docs.map(d => ({ id: d.id, ...d.data() }))
+          .find(x => x.id !== t.id && !x.fromPhoto && !x.dupOf && Math.abs(Date.parse(x.date) - Date.parse(t.date)) <= 2 * 864e5 && w(x.description).some(y => mine.has(y)));
+        if (twin) { await col.doc(t.id).set({ ask: null, note: [t.note, 'possible duplicate of "' + String(twin.description).slice(0, 60) + '" (' + twin.date + ')'].filter(Boolean).join(' · ') }, { merge: true }); out.left.push(t.id + ': possible duplicate of ' + twin.id); continue; }
+      }
       let data;
       if (ph.kind === 'invoice' && ph.vat) {
         const v = t.partnerId && a.odooPartner && +t.partnerId !== +a.odooPartner.id ? { id: t.partnerId, name: t.partnerName } : await bills.vendorOf(odooCall, { description: ph.vendor + ' ' + (t.description || '') }, a).catch(() => null);
