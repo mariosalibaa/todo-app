@@ -34,10 +34,6 @@
       "schedule": "30 22 * * *"
     },
     {
-      "path": "/api/plants/check",
-      "schedule": "0 6 * * *"
-    },
-    {
       "path": "/api/cron/ajaltoun",
       "schedule": "0 5 * * *"
     },
