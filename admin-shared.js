@@ -216,7 +216,13 @@
     if (!me.viewAs && !people.length && !waLauncher.length) return;
     const bar = document.createElement('div');
     bar.id = 'view-as-bar';
-    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:1400;display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 12px;font:inherit;font-size:.8rem;background:' + (me.viewAs ? '#8a5a00' : 'transparent') + ';color:' + (me.viewAs ? '#fff' : 'inherit') + ';pointer-events:none;';
+    // at the TOP now, in the page's own header next to the name (Mario, 2026-10-05: "put this on top, not bottom");
+    // a page without that slot gets it pinned to the top-right corner
+    // on a phone the header has no room: it stays a strip along the bottom there
+    const phone = matchMedia('(max-width: 560px)').matches;
+    const slot = phone ? null : document.getElementById('who');
+    bar.style.cssText = (slot ? 'display:inline-flex;margin-right:10px;vertical-align:middle;' : phone ? 'position:fixed;left:0;right:0;bottom:0;z-index:1400;display:flex;justify-content:center;pointer-events:none;' : 'position:fixed;right:10px;top:6px;z-index:1400;display:flex;')
+      + 'align-items:center;justify-content:flex-end;gap:8px;padding:' + (me.viewAs ? '3px 8px' : '0') + ';border-radius:999px;font:inherit;font-size:.8rem;background:' + (me.viewAs ? '#8a5a00' : 'transparent') + ';color:' + (me.viewAs ? '#fff' : 'inherit') + ';';
     const box = document.createElement('div');
     box.style.cssText = 'pointer-events:auto;display:flex;align-items:center;gap:8px;background:' + (me.viewAs ? 'transparent' : 'rgba(0,0,0,.06)') + ';border-radius:999px;padding:4px 10px;';
     if (me.viewAs) {
@@ -241,8 +247,10 @@
       bar.append(a);
     }
     if (people.length || me.viewAs) bar.append(box);
+    if (slot) { slot.parentNode.insertBefore(bar, slot); return; }
     document.body.append(bar);
-    // it floats over the page, so give the page that much room back (the grid's totals line was underneath it)
+    if (!phone) return;
+    // the phone strip floats over the page, so give the page that much room back (the grid's totals line was underneath it)
     const pad = () => { document.body.style.paddingBottom = (bar.offsetHeight + 8) + 'px'; };
     pad();
     addEventListener('resize', pad);
