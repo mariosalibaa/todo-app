@@ -1199,4 +1199,12 @@ async function reconcilePayable(odooCall, partnerId, companies = [7, 2, 10]) {
   return out;
 }
 
-module.exports = { reconcilePayable, postOfficialSarl, isOfficialSarl, suppliersPublic: suppliers, handVendorPublic: handVendor, pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+// A project word a worker writes ("EAR", "Naqqache") → the Odoo analytic account: the sheet's map first, else a guess
+async function projectFor(ctx, account, text) {
+  const k = norm(text); if (!k) return null;
+  const map = await loadMap(ctx.ws);
+  if (map[k] && map[k].id) return { id: map[k].id, name: map[k].name };
+  const g = guess(text, await ctx.acc.analyticAccounts(ctx.odooCall), account.owner);
+  return g ? { id: g.id, name: g.name } : null;
+}
+module.exports = { projectFor, reconcilePayable, postOfficialSarl, isOfficialSarl, suppliersPublic: suppliers, handVendorPublic: handVendor, pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };

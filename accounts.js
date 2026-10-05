@@ -647,7 +647,7 @@ function dayFromMessages(messages, account) {
     }
   }
   const hours = arrived && finished && mins(finished) > mins(arrived)
-    ? Math.round((mins(finished) - mins(arrived)) / 6) / 10 : 0;
+    ? Math.round((mins(finished) - mins(arrived)) / 60 * 100) / 100 : 0;   // to the minute (2 decimals), as his lines are kept
   // his day is hours × the hourly rate plus a flat transport (see the labour-rate note)
   const rate = account.hourlyRate || 25 / 9, transport = account.transport == null ? 5 : account.transport;
   // Khoder from 2026-09-09: transport accrues per hour (5/9 $/h) and stops at the day's 5 $ (Mario 2026-10-05)
@@ -1819,4 +1819,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, resolve, listAccounts, txCol, applyCashPartner, cashPartnerPatch, refreshSettlements, journalsOf, ANNOT, paidByIn, importOdoo, importBudget };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server
+module.exports = { dayFromMessages, handle, resolve, listAccounts, txCol, applyCashPartner, cashPartnerPatch, refreshSettlements, journalsOf, ANNOT, paidByIn, importOdoo, importBudget };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server

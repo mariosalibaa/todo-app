@@ -757,6 +757,7 @@ async function importWhatsappLive(ctx, account, who, messages, since) {
     if (l) lines.push(l);
   }
   const r = await absorbWaLines(ctx, account, who, lines);
+  if (account.waDays) r.days = await absorbWaDays(ctx, account, messages || []);
   const last = (messages || []).reduce((mx, m) => m.date > mx ? m.date : mx, '');
   await account.ref.set({ waLive: { at: now(), since, messages: (messages || []).length, last, ...r } }, { merge: true });
   return { messages: (messages || []).length, ...r, skipped };
@@ -817,6 +818,40 @@ async function absorbWaLines(ctx, account, who, lines) {
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
   return { lines: lines.length, added, updated, kept, linked, review, accepted, dropped, first, last, autoBook };
+}
+
+// His working day, from his own messages (Mario, 2026-10-05: the days since 14 Sep were in WhatsApp and missing on the
+// hub): "انا وصلت" / "انا خلصت" + the project on its own line → a labour line at the account's rate, a PROPOSAL waiting
+// for the ✓ like every WhatsApp line. A day that already has a labour line (any source) is left alone.
+async function absorbWaDays(ctx, account, messages) {
+  const { txCol } = ctx;
+  const A = require('./accounts');
+  const byDay = {};
+  for (const m of messages) if (m.date && m.text && !m.fromMe) (byDay[m.date] = byDay[m.date] || []).push({ from: 'them', text: m.text, at: m.time || '12:00' });
+  const dates = Object.keys(byDay).filter(d => byDay[d].some(m => /وصلت|wasalt|arrived/i.test(m.text)));
+  if (!dates.length) return { proposed: 0 };
+  const col = txCol(account);
+  const have = new Set((await col.where('date', '>=', dates.sort()[0]).get()).docs.map(d => d.data())
+    .filter(t => t.nature === 'labour' && (!t.excluded || t.review)).map(t => t.date));
+  const gone = (account.waDeleted && typeof account.waDeleted === 'object') ? account.waDeleted : {};
+  let proposed = 0; const skipped = [];
+  for (const date of dates) {
+    const id = 'wa-day-' + date;
+    if (have.has(date) || gone[id]) continue;
+    const day = A.dayFromMessages(byDay[date], account);
+    if (!day.hours) { skipped.push(date + ': ' + (day.why || 'no hours')); continue; }
+    const pr = day.project ? await bills.projectFor(ctx, account, day.project).catch(() => null) : null;
+    await col.doc(id).set({ id, src: 'whatsapp', date, ref: '', service: 'WhatsApp', phone: '',
+      description: `${day.arrived}–${day.finished} · ${day.hours} h${day.project ? ' · ' + day.project : ''} (WhatsApp)`,
+      debit: day.amount, credit: 0, hours: day.hours, nature: 'labour', natureSrc: 'whatsapp', kind: 'work', kindSrc: 'whatsapp',
+      company: 'S LB', companySrc: 'whatsapp', partnerId: account.odooPartner ? +account.odooPartner.id : null, partnerName: account.odooPartner ? account.odooPartner.name : '', partnerSrc: 'auto',
+      analyticId: pr ? pr.id : null, analyticName: pr ? pr.name : '', analyticSrc: pr ? 'auto' : '', analyticText: pr ? '' : (day.project || ''),
+      note: `From his group: arrived ${day.arrived}, finished ${day.finished}${day.project ? ', "' + day.project + '"' : ''}`,
+      waFrom: 'them', waAt: new Date(Date.parse(date + 'T' + day.finished + ':00+03:00')).toISOString(),
+      excluded: true, review: true, dupOf: null, dupSrc: 'auto', waAccepted: false, importedAt: now() });
+    proposed++;
+  }
+  return { proposed, skipped };
 }
 
 // "100$ from mario", "200$ FROM MARIO", "from mario 50$" — written by Mario, money IN to the worker
