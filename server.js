@@ -1151,8 +1151,11 @@ const handler = async (req, res) => {
       const r = await require('./papers').sweep({ odooCall, admin, ws }, { listAccounts: A.listAccounts, resolve: A.resolve, txCol: A.txCol }, { since, deadline: 40e3 });
       // and what settled each booked bill (the payment shown above the bill in the Odoo column, Mario 2026-10-05)
       r.settlements = {};
-      for (const x of await A.listAccounts(ws)) {
-        if (x.archived || x.provider === 'whish' || Date.now() - t0 > 52e3) continue;
+      // a different account leads each hour, so the big ledgers (Ziad's 6,000 lines) are reached too
+      const accs = (await A.listAccounts(ws)).filter(x => !x.archived && x.provider !== 'whish');
+      const k = new Date().getUTCHours() % Math.max(1, accs.length);
+      for (const x of [...accs.slice(k), ...accs.slice(0, k)]) {
+        if (Date.now() - t0 > 52e3) break;
         try { r.settlements[x.id] = await A.refreshSettlements(odooCall, await A.resolve(ws, x.id), db); } catch (e) { r.settlements[x.id] = 'error: ' + String(e.message || e).slice(0, 120); }
       }
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ...r, errors: r.errors.slice(0, 20) }));
