@@ -170,7 +170,7 @@ function renderLead() {
     <h1>${ICON[L.channel] || '👤'} ${esc(L.name || L.phone || L.id)} <span class="st ${esc(L.stage)}">${esc(L.stage)}</span></h1>
     <p class="muted">${esc(L.channel)} · ${esc(L.phone || L.id)} · first ${fmt(L.firstAt)} · ${L.messages.length} messages${(L.labels || []).length ? ' · labels: ' + esc(L.labels.join(', ')) : ''}</p>
     <div class="bar">${wa ? `<a href="${wa}" target="_blank"><button class="primary">💬 Answer on WhatsApp</button></a>` : ''}
-      ${L.odooLeadId ? `<a href="https://shift2.odoo.com/odoo/action-crm.crm_lead_action_pipeline/${L.odooLeadId}" target="_blank"><button>Odoo lead #${L.odooLeadId}</button></a>` : `<button onclick="toOdoo()">＋ Create the Odoo lead</button>`}</div>
+      ${L.odooLeadId ? `<a href="https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=crm.lead&view_type=form&id=${L.odooLeadId}" target="_blank"><button>Odoo lead #${L.odooLeadId}</button></a>` : `<button onclick="toOdoo()">＋ Create the Odoo lead</button>`}</div>
     <div class="card"><div class="kv">
       <b>Name</b><input id="f-name" value="${esc(L.name || '')}" onchange="save({name:this.value})">
       <b>Stage</b><select onchange="save({stage:this.value})">${STAGES.map(s => `<option ${L.stage === s ? 'selected' : ''}>${s}</option>`).join('')}</select>

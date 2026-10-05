@@ -387,7 +387,7 @@ function render() {
   document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from Accounting → Accounts (📗 Pay).`;
 }
 const KIND = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate' };
-const ODOO_BILL = 'https://shift2.odoo.com/odoo/action-account.action_move_in_invoice_type/', ODOO_PAY = 'https://shift2.odoo.com/odoo/action-account.action_account_payments_payable/';
+const ODOO_BILL = 'https://shift2.odoo.com/web#cids=10-2-7-8-4-9&model=account.move&view_type=form&id=', ODOO_PAY = 'https://shift2.odoo.com/web#cids=10-2-7-8-4-9&model=account.payment&view_type=form&id=';   // /web# links open a Chrome tab, not the Odoo app (Mario, 2026-10-05)
 function renderBills() {
   const rows = ordered(D.bills.filter(b => inPeriod(b.date)).map((b, i) => ({ ...b, seq: i })));
   const T = rows.reduce((a, b) => ({ t: a.t + b.total, p: a.p + (b.total - b.residual), o: a.o + b.residual }), { t: 0, p: 0, o: 0 });
@@ -398,8 +398,8 @@ function renderBills() {
 // ledger shows Georges — the balance runs from the very first entry whatever the period shown (Mario, 2026-09-13)
 function renderStatement() {
   const all = [
-    ...D.bills.map((b, i) => ({ date: b.date, seq: 1000 + i, name: b.name, what: b.ref, kind: KIND[b.kind], debit: 0, credit: b.total, href: ODOO_BILL + b.id + '?cids=10-2-7-8-4-9' })),
-    ...D.payments.map((p, i) => ({ date: p.date, seq: i, name: p.name, what: p.memo, kind: p.amount < 0 ? 'Money back' : p.collector, debit: p.amount > 0 ? p.amount : 0, credit: p.amount < 0 ? -p.amount : 0, href: ODOO_PAY + p.id + '?cids=10-2-7-8-4-9' })),
+    ...D.bills.map((b, i) => ({ date: b.date, seq: 1000 + i, name: b.name, what: b.ref, kind: KIND[b.kind], debit: 0, credit: b.total, href: ODOO_BILL + b.id })),
+    ...D.payments.map((p, i) => ({ date: p.date, seq: i, name: p.name, what: p.memo, kind: p.amount < 0 ? 'Money back' : p.collector, debit: p.amount > 0 ? p.amount : 0, credit: p.amount < 0 ? -p.amount : 0, href: ODOO_PAY + p.id })),
   ].sort((x, y) => x.date.localeCompare(y.date) || x.seq - y.seq);
   let bal = 0; for (const r of all) { bal += r.debit - r.credit; r.bal = bal; }
   const rows = ordered(all.filter(r => inPeriod(r.date)));
@@ -418,7 +418,7 @@ function renderPays() {
     .filter(p => !open || !p.reconciled).filter(p => inPeriod(p.date));
   ordered(rows);
   document.getElementById('pays').innerHTML = `<thead><tr><th>Date</th><th>Payment</th><th>Collected by</th><th>From account</th><th>Memo</th><th class="n">Amount</th><th>Reconciled</th></tr></thead><tbody>${rows.map(p => `<tr>
-    <td>${esc(p.date)}</td><td>${p.pending ? '<span class="warn">pending</span>' : `<a target="_blank" href="https://shift2.odoo.com/odoo/action-account.action_account_payments_payable/${p.id}?cids=10-2-7-8-4-9">${esc(p.name)}</a>`}</td><td>${esc(p.collector)}</td><td>${esc(p.journal)}</td><td class="small muted">${esc(p.memo)}</td><td class="n">${f(p.amount)}</td>
+    <td>${esc(p.date)}</td><td>${p.pending ? '<span class="warn">pending</span>' : `<a target="_blank" href="https://shift2.odoo.com/web#cids=10-2-7-8-4-9&model=account.payment&view_type=form&id=${p.id}">${esc(p.name)}</a>`}</td><td>${esc(p.collector)}</td><td>${esc(p.journal)}</td><td class="small muted">${esc(p.memo)}</td><td class="n">${f(p.amount)}</td>
     <td>${p.pending ? '<span class="muted">—</span>' : p.reconciled ? '<span class="ok">✓ ' + p.bills + ' bill' + (p.bills > 1 ? 's' : '') + '</span>' : '<span class="warn">○ open</span>'}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="tot" onclick="toggleFold('pays')" title="click to unfold the lines"><td colspan="5"><span class="arrow" data-for="pays">▸</span>${rows.length} payments</td><td class="n">${f(rows.reduce((s, p) => s + p.amount, 0))}</td><td></td></tr></tfoot>`;
 }

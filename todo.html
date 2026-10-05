@@ -2981,7 +2981,7 @@ function renderClientsView() {
         <span style="color:var(--subtext0);overflow:hidden;text-overflow:ellipsis;">${esc(c.email || '—')}</span>
         <span style="color:var(--subtext0);">${esc(c.phone || '—')}</span>
         <span style="color:${open ? 'var(--accent)' : 'var(--overlay0)'};">${open ? open + ' open' : 'no tasks'}</span>
-        <a href="https://shift2.odoo.com/odoo/contacts/${c.odooId}" target="_blank"
+        <a href="https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=res.partner&view_type=form&id=${c.odooId}" target="_blank"
            style="color:var(--overlay0);text-decoration:none;font-size:0.75rem;" title="Open in Odoo">Odoo ↗</a>
       </div>`;
   }).join('');
