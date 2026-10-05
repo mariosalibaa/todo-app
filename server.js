@@ -1147,7 +1147,14 @@ const handler = async (req, res) => {
     try {
       const ws = db.collection('workspaces').doc(TEAM_ID), A = require('./accounts');
       const since = new Date(Date.now() - 3 * 864e5).toISOString();
-      const r = await require('./papers').sweep({ odooCall, admin, ws }, { listAccounts: A.listAccounts, resolve: A.resolve, txCol: A.txCol }, { since, deadline: 50e3 });
+      const t0 = Date.now();
+      const r = await require('./papers').sweep({ odooCall, admin, ws }, { listAccounts: A.listAccounts, resolve: A.resolve, txCol: A.txCol }, { since, deadline: 40e3 });
+      // and what settled each booked bill (the payment shown above the bill in the Odoo column, Mario 2026-10-05)
+      r.settlements = {};
+      for (const x of await A.listAccounts(ws)) {
+        if (x.archived || x.provider === 'whish' || Date.now() - t0 > 52e3) continue;
+        try { r.settlements[x.id] = await A.refreshSettlements(odooCall, await A.resolve(ws, x.id), db); } catch (e) { r.settlements[x.id] = 'error: ' + String(e.message || e).slice(0, 120); }
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ...r, errors: r.errors.slice(0, 20) }));
     } catch (e) { console.error('papers cron:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;

@@ -726,6 +726,11 @@ function cashOf(t) {
 // no = it sits in Odoo unreconciled; '' = not in Odoo at all
 function reconOf(t) {
   const won = t.odoo && (t.odoo.matches || []).find(x => x.chosen);
+  // the row IS a line of a bill (month bill, vendor bill, cash bill): its cost is booked there — "on bill", never
+  // "open" (Mario, 2026-10-05: "since there is a bill, reconciled should be on bill")
+  const bm = t.bookedMove;
+  if (bm && bm.id && bm.kind !== 'payment' && (!won || won.moveId === bm.id || /^(R?BILL|INV|RINV)/.test(won.move || ''))) return 'bill';
+  if (won && /^(R?BILL|RINV)/.test(won.move || '') && !/^P(CSH|SETT|BNK)/.test(won.move || '')) return 'bill';
   if (won) return won.settled || (won.docs || []).some(d => !/^P(CSH|SETT|BNK)/.test(d)) ? 'yes' : 'no';
   // a row on the worker's own monthly bill is settled by that bill: it is money of his account, the
   // bill IS the debt to him, and the cash Mario hands him later pays the bill, not the row
@@ -1513,7 +1518,10 @@ function odooCell(t) {
   // What the hub itself wrote is as good as a match: a vendor bill goes straight to Odoo and
   // leaves no match behind, so its column read "—" though the bill was posted and paid
   // (Mario, 2026-09-09: "not booked on odoo (khoder hub)").
-  if (!won && t.bookedMove && t.bookedMove.id) {
+  // a row that is a line of a bill shows what paid the bill too, above it (Mario, 2026-10-05: "we should see the
+  // payment in Odoo, not only the bill")
+  const billPays = t.bookedMove && t.bookedMove.id && (t.bookedMove.paidBy || []).some(x => x.name) && (!won || won.moveId === t.bookedMove.id);
+  if ((!won || billPays) && t.bookedMove && t.bookedMove.id) {
     const b = t.bookedMove;
     const tip = ['Booked by the hub' + (b.at ? ' on ' + String(b.at).slice(0, 10) : ''), b.kind || '', b.state || '', b.paymentState || ''].filter(Boolean).join(' · ');
     // the money side first — what settled the bill — then the bill under it (Mario, 2026-09-13)

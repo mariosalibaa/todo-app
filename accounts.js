@@ -155,6 +155,39 @@ const cashPartnerPatch = (a, t) => {
   if (t.partnerSrc === 'manual' || t.src === 'odoo' || t.provider === 'whish') return null;
   return { partnerId: +p.id, partnerName: String(p.name || ''), partnerSrc: 'auto', partnerKind: 'partner' };
 };
+// A row booked as (part of) a BILL shows the money side first (Mario, 2026-09-13: "first we see the payment;
+// once reconciled, the invoice under it"): each bill's payment state and what settled it, by bill id.
+async function settlementsOf(odooCall, txs) {
+  const settled = {};
+  const bmIds = [...new Set(txs.map(t => t.bookedMove && t.bookedMove.id).filter(Number.isInteger))];
+  if (!bmIds.length) return settled;
+  const ctxAll = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
+  const mv = await odooCall('account.move', 'read', [bmIds, ['name', 'move_type', 'payment_state', 'amount_total', 'amount_residual', 'invoice_payments_widget']], { context: ctxAll });
+  // the widget labels a settlement by its line label ("Manual: 72023"); the entry's own name is what the grid shows
+  const settleMoveIds = [...new Set(mv.flatMap(m => (m.invoice_payments_widget && m.invoice_payments_widget.content || []).map(c => c.move_id).filter(Boolean)))];
+  const settleNames = settleMoveIds.length ? Object.fromEntries((await odooCall('account.move', 'read', [settleMoveIds, ['name', 'ref']], { context: ctxAll })).map(x => [x.id, x])) : {};
+  for (const m of mv) {
+    if (!['in_invoice', 'in_refund', 'out_invoice', 'out_refund'].includes(m.move_type)) continue;
+    const w = m.invoice_payments_widget && m.invoice_payments_widget.content ? m.invoice_payments_widget.content : [];
+    settled[m.id] = { paymentState: m.payment_state, residual: m.amount_residual,
+      paidBy: w.map(c => { const sm = settleNames[c.move_id] || {}; return { name: sm.name || c.name || c.ref || '', label: c.name || '', ref: sm.ref || '', moveId: c.move_id || null, paymentId: c.account_payment_id || null, amount: c.amount, date: c.date || '' }; }) };
+  }
+  return settled;
+}
+// Only the settlement of the booked bills, nothing else of the row (matches stay as they are): the hourly
+// cron keeps "paid by PSETT/… · PCSH1/…" current on every ledger without a full Odoo check.
+async function refreshSettlements(odooCall, a, db) {
+  const col = txCol(a);
+  const txs = (await col.get()).docs.map(d => d.data()).filter(t => t.bookedMove && Number.isInteger(t.bookedMove.id));
+  if (!txs.length) return 0;
+  const settled = await settlementsOf(odooCall, txs);
+  const same = (x, y) => JSON.stringify(x || null) === JSON.stringify(y || null);
+  const writes = txs.filter(t => settled[t.bookedMove.id] && !(same(t.bookedMove.paidBy, settled[t.bookedMove.id].paidBy) && t.bookedMove.paymentState === settled[t.bookedMove.id].paymentState && t.bookedMove.residual === settled[t.bookedMove.id].residual))
+    .map(t => ({ ref: col.doc(String(t.id)), data: { bookedMove: { ...t.bookedMove, ...settled[t.bookedMove.id] } } }));
+  await acc.batchSet(db, writes);
+  return writes.length;
+}
+
 async function applyCashPartner(a) {
   if (!a || !a.odooPartner || !a.odooPartner.id) return 0;
   const snap = await txCol(a).get();
@@ -1306,23 +1339,8 @@ async function handle(req, res, url, user, ctx) {
       const at = now();
       // A row booked as (part of) a BILL shows the money side first (Mario, 2026-09-13: "first we see the payment;
       // once reconciled, the invoice under it"): read each bill's payment state and what settled it.
-      const settled = {};
-      const bmIds = [...new Set(txs.map(t => t.bookedMove && t.bookedMove.id).filter(Number.isInteger))];
-      if (bmIds.length) {
-        try {
-          const ctxAll = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
-          const mv = await odooCall('account.move', 'read', [bmIds, ['name', 'move_type', 'payment_state', 'amount_total', 'amount_residual', 'invoice_payments_widget']], { context: ctxAll });
-          // the widget labels a settlement by its line label ("Manual: 72023"); the entry's own name is what the grid shows
-          const settleMoveIds = [...new Set(mv.flatMap(m => (m.invoice_payments_widget && m.invoice_payments_widget.content || []).map(c => c.move_id).filter(Boolean)))];
-          const settleNames = settleMoveIds.length ? Object.fromEntries((await odooCall('account.move', 'read', [settleMoveIds, ['name', 'ref']], { context: ctxAll })).map(x => [x.id, x])) : {};
-          for (const m of mv) {
-            if (!['in_invoice', 'in_refund', 'out_invoice', 'out_refund'].includes(m.move_type)) continue;
-            const w = m.invoice_payments_widget && m.invoice_payments_widget.content ? m.invoice_payments_widget.content : [];
-            settled[m.id] = { paymentState: m.payment_state, residual: m.amount_residual,
-              paidBy: w.map(c => { const sm = settleNames[c.move_id] || {}; return { name: sm.name || c.name || c.ref || '', label: c.name || '', ref: sm.ref || '', moveId: c.move_id || null, paymentId: c.account_payment_id || null, amount: c.amount, date: c.date || '' }; }) };
-          }
-        } catch (e) { console.warn('odoo-check: bill settlements', e.message); }
-      }
+      let settled = {};
+      try { settled = await settlementsOf(odooCall, txs); } catch (e) { console.warn('odoo-check: bill settlements', e.message); }
       const writes = txs.map(t => {
         const matches = found[t.id] || [];
         const data = { odoo: { checkedAt: at, matches } };
@@ -1748,4 +1766,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { handle, resolve, listAccounts, txCol, applyCashPartner, cashPartnerPatch, journalsOf, ANNOT, paidByIn, importOdoo, importBudget };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server
+module.exports = { handle, resolve, listAccounts, txCol, applyCashPartner, cashPartnerPatch, refreshSettlements, journalsOf, ANNOT, paidByIn, importOdoo, importBudget };   // importOdoo: for standalone runs (scratchpad scripts) that must not go through the shared local server
