@@ -431,6 +431,10 @@ body.compact #rows tr:not(.day):not(:focus-within) .c-desc .noteline{display:non
 body.compact #rows tr:not(.day):not(:focus-within) .c-desc{max-height:34px;overflow:hidden;}
 body.compact #rows tr:not(.day):not(:focus-within) .c-desc > div:first-child,body.compact #rows tr:not(.day):not(:focus-within) .c-desc .noteline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
 body.compact #rows tr:not(.day):not(:focus-within) .c-desc .desc-in,body.compact #rows tr:not(.day):not(:focus-within) .c-desc .note-in{height:16px!important;overflow:hidden;white-space:nowrap;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-odoo .pays{display:none;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-odoo .odoo-doc.bill-doc{display:block!important;margin:0;font-size:inherit;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-odoo .bill-doc a{color:var(--green);font-weight:600;text-decoration:none;}
+body.compact #rows tr:not(.day):not(:focus-within) .c-odoo .bill-doc a::before{content:"✓ ";}
 body.compact #rows tr:not(.day):not(:focus-within) .c-odoo .clip{max-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 body.compact #rows tr:not(.day) .c-date{position:relative;}
 body.compact #rows tr:not(.day):not(:focus-within) .c-date .acts{position:absolute;right:2px;bottom:0;display:none;background:var(--surface0);border-radius:4px;padding:0 3px;z-index:2;}
@@ -1552,8 +1556,10 @@ function odooCell(t) {
     const tip = ['Booked by the hub' + (b.at ? ' on ' + String(b.at).slice(0, 10) : ''), b.kind || '', b.state || '', b.paymentState || ''].filter(Boolean).join(' · ');
     // the money side first — what settled the bill — then the bill under it (Mario, 2026-09-13)
     const pays = (b.paidBy || []).filter(x => x.name);
-    if (pays.length) return pays.map(x => `<a class="odoo-ok" target="_blank" href="${ODOO}${x.moveId || b.id}${ODOO_Q}" title="${esc('Settled ' + fmt(x.amount) + (x.date ? ' on ' + x.date : '') + (x.ref ? ' — ' + x.ref : ''))}">✓ ${esc(x.name)}</a>`).join('<br>')
-      + `<div class="odoo-doc"><a target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip)}">${esc(b.name || '')}</a>${b.ref && b.ref !== b.name ? ' (' + esc(b.ref) + ')' : ''}</div>` + fileLinks(t);
+    // compact rows show the BILL (the project lives on it); the payments that settled it show when the row is opened
+    // (Mario, 2026-10-05: "in the Odoo column show the bills as the primary visible on compact mode")
+    if (pays.length) return `<span class="pays">${pays.map(x => `<a class="odoo-ok" target="_blank" href="${ODOO}${x.moveId || b.id}${ODOO_Q}" title="${esc('Settled ' + fmt(x.amount) + (x.date ? ' on ' + x.date : '') + (x.ref ? ' — ' + x.ref : ''))}">✓ ${esc(x.name)}</a>`).join('<br>')}</span>`
+      + `<div class="odoo-doc bill-doc"><a target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip)}">${esc(b.name || '')}</a>${b.ref && b.ref !== b.name ? ' (' + esc(b.ref) + ')' : ''}</div>` + fileLinks(t);
     return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip)}">✓ ${esc(b.name || '')}</a>`
       + (b.ref && b.ref !== b.name ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(b.ref)}</div>` : '')
       + fileLinks(t);
