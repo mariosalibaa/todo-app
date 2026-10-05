@@ -434,7 +434,7 @@ body.compact #rows tr:not(.day):not(:focus-within) .c-date .acts{position:absolu
 body.compact #rows tr:not(.day):not(:focus-within):hover .c-date .acts{display:block;}
 body.compact #rows tr:not(.day):not(:focus-within) .pick input,body.compact #rows tr:not(.day):not(:focus-within) .c-company select{height:24px;padding-top:0;padding-bottom:0;}
 }
-.dayview{display:inline-flex;align-items:center;gap:2px;font-size:12px;white-space:nowrap;} .dayview .btn{padding:1px 8px;} .dayview #dv-date{min-width:118px;text-align:center;color:var(--text);}
+.dayview{display:inline-flex;align-items:center;gap:2px;font-size:12px;white-space:nowrap;} .dayview .btn{padding:1px 8px;} .dayview #dv-date{display:inline-block;width:122px;text-align:center;color:var(--text);}
 .dayview .btn.on{background:var(--amber,#F2A93B);color:#15181C;}
 </style>
 </head>
@@ -467,7 +467,7 @@ body.compact #rows tr:not(.day):not(:focus-within) .pick input,body.compact #row
   <span class="pager" id="pager" hidden><span id="pg-range" title="Only this page is drawn: the grid stays light however many lines the account holds"></span><button class="btn" id="pg-prev" onclick="pageBy(-1)" title="Previous page">‹</button><button class="btn" id="pg-next" onclick="pageBy(1)" title="Next page">›</button></span>
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-compact" onclick="setCompact(!document.body.classList.contains('compact'))" title="One line per row, like Odoo — click into a row to open it full height">▤ Compact</button>
-  <span class="dayview"><button class="btn" id="btn-day" onclick="dayView()" title="Show one day at a time; then ‹ › (or the ← → keys) step between the days that have lines">📅 Day</button><span id="dv-nav" hidden><button class="btn" onclick="dayStep(-1)" title="Previous day with lines (←)">‹</button><span id="dv-date"></span><button class="btn" onclick="dayStep(1)" title="Next day with lines (→)">›</button></span></span>
+  <span class="dayview"><button class="btn" id="btn-day" onclick="dayView()" title="Show one day at a time; then ‹ › (or the ← → keys) step between the days that have lines">📅 Day</button><span id="dv-nav" style="visibility:hidden"><button class="btn" onclick="dayStep(-1)" title="Previous day with lines (←)">‹</button><span id="dv-date"></span><button class="btn" onclick="dayStep(1)" title="Next day with lines (→)">›</button></span></span>
   <button class="btn" onclick="printView()" title="Print what is shown: the current period, filters and sort, every page, as a clean table with totals">🖨 Print</button>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
   <button class="btn" id="btn-undo" onclick="undoEdit()" title="Nothing to undo" disabled>↶ Undo</button>
@@ -1641,12 +1641,12 @@ const dvDays = () => [...new Set(tx.map(t => t.date).filter(Boolean))].sort().re
 function dayShow(d) {
   colF.date = d; buildHeader(); pageNo = 0; render();
   document.getElementById('dv-date').textContent = dayDate(d);
-  document.getElementById('dv-nav').hidden = false; document.getElementById('btn-day').classList.add('on');
+  document.getElementById('dv-nav').style.visibility = 'visible'; document.getElementById('btn-day').classList.add('on');
 }
 function dayView() {
   if (document.getElementById('btn-day').classList.contains('on')) {   // second press: back to every day
     delete colF.date; buildHeader(); render();
-    document.getElementById('dv-nav').hidden = true; document.getElementById('btn-day').classList.remove('on'); return;
+    document.getElementById('dv-nav').style.visibility = 'hidden'; document.getElementById('btn-day').classList.remove('on'); return;
   }
   const days = dvDays(); if (!days.length) return say('No lines to show by day', 'err');
   const today = localYmd(new Date());
