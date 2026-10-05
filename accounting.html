@@ -1550,17 +1550,15 @@ function odooCell(t) {
   // (Mario, 2026-09-09: "not booked on odoo (khoder hub)").
   // a row that is a line of a bill shows what paid the bill too, above it (Mario, 2026-10-05: "we should see the
   // payment in Odoo, not only the bill")
-  const billPays = t.bookedMove && t.bookedMove.id && (t.bookedMove.paidBy || []).some(x => x.name) && (!won || won.moveId === t.bookedMove.id);
-  if ((!won || billPays) && t.bookedMove && t.bookedMove.id) {
+  // a line booked as a bill shows the BILL only — the payments that settled it are Odoo's business; a transfer shows its
+  // payment (Mario, 2026-10-05: "show bills, or PCSH for a transfer; no need to show the PCSH with the bills")
+  const billName = n => /^(R?BILL|RINV|INV)\d*\//.test(n || '');
+  if (t.bookedMove && t.bookedMove.id && (!won || (billName(t.bookedMove.name) && !billName(won.move)))) {
     const b = t.bookedMove;
     const tip = ['Booked by the hub' + (b.at ? ' on ' + String(b.at).slice(0, 10) : ''), b.kind || '', b.state || '', b.paymentState || ''].filter(Boolean).join(' · ');
-    // the money side first — what settled the bill — then the bill under it (Mario, 2026-09-13)
-    const pays = (b.paidBy || []).filter(x => x.name);
-    // compact rows show the BILL (the project lives on it); the payments that settled it show when the row is opened
-    // (Mario, 2026-10-05: "in the Odoo column show the bills as the primary visible on compact mode")
-    if (pays.length) return `<span class="pays">${pays.map(x => `<a class="odoo-ok" target="_blank" href="${ODOO}${x.moveId || b.id}${ODOO_Q}" title="${esc('Settled ' + fmt(x.amount) + (x.date ? ' on ' + x.date : '') + (x.ref ? ' — ' + x.ref : ''))}">✓ ${esc(x.name)}</a>`).join('<br>')}</span>`
-      + `<div class="odoo-doc bill-doc"><a target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip)}">${esc(b.name || '')}</a>${b.ref && b.ref !== b.name ? ' (' + esc(b.ref) + ')' : ''}</div>` + fileLinks(t);
-    return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip)}">✓ ${esc(b.name || '')}</a>`
+    const pays = (b.paidBy || []).filter(x => x.name);   // named in the tooltip only
+    return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip + (pays.length ? '
+Paid by ' + pays.map(x => x.name + ' ' + fmt(x.amount)).join(', ') : ''))}">✓ ${esc(b.name || '')}</a>`
       + (b.ref && b.ref !== b.name ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(b.ref)}</div>` : '')
       + fileLinks(t);
   }
