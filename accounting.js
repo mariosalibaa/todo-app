@@ -403,7 +403,10 @@ async function odooCheck(odooCall, txs, opts = {}) {
     const ordered = win ? [win, ...rest] : rest;
     // ambiguous only when the runner-up is just as good AND is still free
     const ambiguous = ordered.length > 1 && ordered[1].score >= ordered[0].score - 0.01 && !takenLine.has(ordered[1].l.id);
-    out[t.id] = ordered.map((c, i) => ({ ...asMatch(c.l, c.score, c.why), chosen: i === 0 && !ambiguous }));
+    // only the row that WON the line is matched: a row that lost its line to a better one used to get the next
+    // candidate marked chosen even when another row already held it — 3 Whish lines on one $100 payment, so two of
+    // them looked booked and were not (Mario, 2026-10-05: "make sure no duplication between Odoo and hub")
+    out[t.id] = ordered.map((c, i) => ({ ...asMatch(c.l, c.score, c.why), chosen: !!win && i === 0 && !ambiguous }));
   }
   return out;
 }
