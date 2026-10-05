@@ -122,7 +122,7 @@ const amt = n => (n ? num(n) : '');   // an empty side of the ledger reads bette
 const dmy = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '';
 function say(t, cls) { const m = document.getElementById('msg'); m.textContent = t || ''; m.className = 'msg ' + (t ? (cls || 'ok') : ''); }
 
-const ODOO = 'https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=account.move&view_type=form&id=';
+const ODOO = 'https://shift2.odoo.com/odoo/action-account.action_move_journal_line/', ODOO_Q = '?cids=2-7-10-8-4-9';   // Odoo 18's own link form, every company ticked so an S LB / S DEV entry opens (Mario, 2026-10-05: links not opening)
 let partners = [], companies = [], analytic = [];
 let sugFilter = '';   // '' | 'pending' — the Review button
 
@@ -303,7 +303,7 @@ function odooCell(t) {
   if (!m.length) return `<span class="odoo-no" title="Checked ${esc(String(t.odoo.checkedAt).slice(0, 10))}: nothing in the Wise journals">—</span>`;
   const win = m.find(x => x.chosen);
   const tip = x => [x.move, x.date, x.company, x.partner || x.label].filter(Boolean).join(' · ');
-  if (win) return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip(win))}">✓ ${esc(win.move)}</a>`;
+  if (win) return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}${ODOO_Q}" title="${esc(tip(win))}">✓ ${esc(win.move)}</a>`;
   return `<span class="odoo-multi" title="${esc(m.slice(0, 4).map(tip).join(' | '))}">? ${m.length}</span>`;
 }
 

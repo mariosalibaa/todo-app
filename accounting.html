@@ -701,7 +701,7 @@ const longDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? new Date(d.slice(0, 1
 // today / yesterday, from the local calendar — never toISOString(), Beirut is UTC+3
 const localYmd = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 const dayTag = d => { const now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1); return d === localYmd(now) ? 'today' : d === localYmd(y) ? 'yesterday' : ''; };
-const ODOO = 'https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=account.move&view_type=form&id=';
+const ODOO = 'https://shift2.odoo.com/odoo/action-account.action_move_journal_line/', ODOO_Q = '?cids=2-7-10-8-4-9';   // Odoo 18's own link form, every company ticked so an S LB / S DEV entry opens (Mario, 2026-10-05: links not opening)
 const SAME_CAP = 60;   // one number's repeats may go together; a crowd may not
 let accounts = [], acc = null, account = null, tx = [], contacts = {}, partners = [], companies = [], analytic = [], rules = []
 let plans = [], journals = [], budgetAccounts = [];
@@ -1453,7 +1453,7 @@ function ruleFor(t) {
 }
 function bookButton(t) {
   const bk = t.booked;
-  if (bk && bk.paymentState === 'paid') return `<a class="odoo-ok booked-ref" target="_blank" href="${ODOO}${bk.moveId}" title="${esc('Booked from this page: ' + bk.move + (bk.payment ? ', paid by ' + bk.payment.name : ''))}">✓ ${esc(bk.move)}</a>`
+  if (bk && bk.paymentState === 'paid') return `<a class="odoo-ok booked-ref" target="_blank" href="${ODOO}${bk.moveId}${ODOO_Q}" title="${esc('Booked from this page: ' + bk.move + (bk.payment ? ', paid by ' + bk.payment.name : ''))}">✓ ${esc(bk.move)}</a>`
     + (bk.ref && bk.ref !== bk.move ? `<div class="odoo-doc" title="The reference the hub gave it in Odoo">${esc(bk.ref)}</div>` : '');
   const r = ruleFor(t) || adHocRule(t);
   if (!r) return '';
@@ -1552,9 +1552,9 @@ function odooCell(t) {
     const tip = ['Booked by the hub' + (b.at ? ' on ' + String(b.at).slice(0, 10) : ''), b.kind || '', b.state || '', b.paymentState || ''].filter(Boolean).join(' · ');
     // the money side first — what settled the bill — then the bill under it (Mario, 2026-09-13)
     const pays = (b.paidBy || []).filter(x => x.name);
-    if (pays.length) return pays.map(x => `<a class="odoo-ok" target="_blank" href="${ODOO}${x.moveId || b.id}" title="${esc('Settled ' + fmt(x.amount) + (x.date ? ' on ' + x.date : '') + (x.ref ? ' — ' + x.ref : ''))}">✓ ${esc(x.name)}</a>`).join('<br>')
-      + `<div class="odoo-doc"><a target="_blank" href="${ODOO}${b.id}" title="${esc(tip)}">${esc(b.name || '')}</a>${b.ref && b.ref !== b.name ? ' (' + esc(b.ref) + ')' : ''}</div>` + fileLinks(t);
-    return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}" title="${esc(tip)}">✓ ${esc(b.name || '')}</a>`
+    if (pays.length) return pays.map(x => `<a class="odoo-ok" target="_blank" href="${ODOO}${x.moveId || b.id}${ODOO_Q}" title="${esc('Settled ' + fmt(x.amount) + (x.date ? ' on ' + x.date : '') + (x.ref ? ' — ' + x.ref : ''))}">✓ ${esc(x.name)}</a>`).join('<br>')
+      + `<div class="odoo-doc"><a target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip)}">${esc(b.name || '')}</a>${b.ref && b.ref !== b.name ? ' (' + esc(b.ref) + ')' : ''}</div>` + fileLinks(t);
+    return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip)}">✓ ${esc(b.name || '')}</a>`
       + (b.ref && b.ref !== b.name ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(b.ref)}</div>` : '')
       + fileLinks(t);
   }
@@ -1566,10 +1566,10 @@ function odooCell(t) {
     const differs = t.src !== 'excel' && t.partnerName && win.partner && (win.partnerId && t.partnerId ? win.partnerId !== t.partnerId : similarity(win.partner, t.partnerName) < 0.6);
     const docs = [...new Set((win.docs || []).filter(d => d && d !== win.move))];
     const oref = (t.bookedMove && t.bookedMove.ref) || win.odooRef || '';
-    return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
+    return `<a class="odoo-ok" target="_blank" href="${ODOO}${win.moveId}${ODOO_Q}" title="${esc(tip)}">✓ ${esc(win.move)}</a>`
       + (oref && oref !== win.move ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(oref)}</div>` : '')
       + fileLinks(t)
-      + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => { const id = win.docIds && (win.docIds[d] || (Object.entries(win.docIds).find(([k]) => d.startsWith(k)) || [])[1]); return id ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${id}">${esc(d)}</a>` : esc(d); }).join(', ')}</div>` : '')
+      + (docs.length ? `<div class="odoo-doc" title="${esc('Settles ' + docs.join(', '))}">${docs.map(d => { const id = win.docIds && (win.docIds[d] || (Object.entries(win.docIds).find(([k]) => d.startsWith(k)) || [])[1]); return id ? `<a class="odoo-ok" style="font-weight:normal" target="_blank" href="${ODOO}${id}${ODOO_Q}">${esc(d)}</a>` : esc(d); }).join(', ')}</div>` : '')
       + (differs ? `<div class="odoo-warn" title="${esc('The Odoo payment is booked to ' + win.partner)}">⚠ Odoo says ${esc(win.partner)}</div>` : '');
   }
   const tip = m.map(matchTip).join('\n');
@@ -2552,7 +2552,7 @@ async function openReconcile(id) {
       <span class="hint">${fmt(p.residual)} still to apply${p.reconciled ? ` · already on ${p.reconciled} document${p.reconciled > 1 ? 's' : ''}` : ''}</span></p>
       ${r.open.length ? `<p class="hint">Open ${what} of ${esc(p.partner)} in ${esc(p.company)} — ticked oldest first up to the amount of the payment; change the ticks as you like:</p>
       <table class="months" style="width:100%;border-collapse:collapse"><thead><tr><th></th><th>Date</th><th>Document</th><th>Reference</th><th class="num">Total</th><th class="num">Open</th></tr></thead><tbody>
-      ${r.open.map(d => { const held = /retention/i.test(d.ref); const tick = !held && left > 0.005; if (tick) left -= d.residual; return `<tr><td><input type="checkbox" class="recon-pick" value="${d.id}" ${tick ? 'checked' : ''}></td><td>${esc(d.date)}</td><td><a target="_blank" href="${ODOO}${d.id}">${esc(d.name)}</a></td><td>${esc(d.ref)}${held ? ' <span class="hint" style="color:var(--odoo)">— retention, held until the project ends: not ticked</span>' : ''}</td><td class="num">${fmt(d.total)}</td><td class="num">${fmt(d.residual)}</td></tr>`; }).join('')}
+      ${r.open.map(d => { const held = /retention/i.test(d.ref); const tick = !held && left > 0.005; if (tick) left -= d.residual; return `<tr><td><input type="checkbox" class="recon-pick" value="${d.id}" ${tick ? 'checked' : ''}></td><td>${esc(d.date)}</td><td><a target="_blank" href="${ODOO}${d.id}${ODOO_Q}">${esc(d.name)}</a></td><td>${esc(d.ref)}${held ? ' <span class="hint" style="color:var(--odoo)">— retention, held until the project ends: not ticked</span>' : ''}</td><td class="num">${fmt(d.total)}</td><td class="num">${fmt(d.residual)}</td></tr>`; }).join('')}
       </tbody></table>` : `<p class="hint">${esc(p.partner)} has no open ${what} in ${esc(p.company)}. The payment stays open as an advance until a ${what.slice(0, -1)} is posted — then come back here.</p>`}`;
     document.getElementById('recon-go').disabled = !r.open.length || p.residual < 0.005;
   } catch (e) { body.innerHTML = `<p class="hint" style="color:var(--red)">${esc(e.message)}</p>`; document.getElementById('recon-go').disabled = true; }
@@ -2746,7 +2746,7 @@ function drawTimesheet() {
       <td>${Object.entries(m.projects || {}).sort((a, b2) => b2[1] - a[1]).map(([p, h]) => `<span class="tag">${esc(p)} <b>${h}</b>h</span>`).join(' ')
         + (m.loose > 0.005 ? ` <span class="tag warn" title="Days where he wrote no project: they fall on GENERAL until the day says where he was">no project <b>${m.loose}</b>h</span>` : '') || '<span class="hint">no project on any day</span>'}</td>
       <td style="white-space:nowrap">${ob
-        ? `<a class="odoo-ok" target="_blank" href="${ODOO}${ob.moveId}">✓ ${esc(ob.move)}</a><br><button class="btn" onclick="bookTimesheet('${m.month}', true, this)">Rewrite</button>`
+        ? `<a class="odoo-ok" target="_blank" href="${ODOO}${ob.moveId}${ODOO_Q}">✓ ${esc(ob.move)}</a><br><button class="btn" onclick="bookTimesheet('${m.month}', true, this)">Rewrite</button>`
         : `<button class="btn primary" onclick="bookTimesheet('${m.month}', false, this)">📗 Book</button>`}</td></tr>`;
   }).join('');
 
@@ -2754,7 +2754,7 @@ function drawTimesheet() {
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
       <select onchange="tsPick(this.value)">${months.slice().reverse().map(m =>
         `<option value="${m.month}" ${m.month === M.month ? 'selected' : ''}>${m.month} · ${m.hours} h</option>`).join('')}</select>
-      ${b ? `<a class="odoo-ok" target="_blank" href="${ODOO}${b.moveId}">✓ ${esc(b.move)} in Odoo</a>
+      ${b ? `<a class="odoo-ok" target="_blank" href="${ODOO}${b.moveId}${ODOO_Q}">✓ ${esc(b.move)} in Odoo</a>
              <button class="btn" onclick="bookTimesheet('${M.month}', true, this)">↻ Rewrite</button>`
     : `<button class="btn primary" onclick="bookTimesheet('${M.month}', false, this)">📗 Book in Odoo</button>`}
       <button class="btn" onclick="tsRefresh(this)" title="Read the workbook again and put the open month's cost into Odoo now">↻ Refresh Odoo</button>
@@ -3476,7 +3476,7 @@ function drawMonths() {
   const cell = (m, part, n, amount) => {
     const bill = (m.bills || {})[part];
     if (!n) return '<td class="hint">—</td><td></td>';
-    const state = bill ? (bill.state === 'draft' ? `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">${esc(bill.name)}</a> <span class="hint">draft</span>` : `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}">✓ ${esc(bill.name)}</a> <span class="hint">${esc(bill.state)}${bill.paymentState && bill.paymentState !== 'not_paid' ? ' · ' + esc(bill.paymentState.replace('_', ' ')) : ''}</span>`) : '<span class="hint">not in Odoo</span>';
+    const state = bill ? (bill.state === 'draft' ? `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}${ODOO_Q}">${esc(bill.name)}</a> <span class="hint">draft</span>` : `<a class="odoo-ok" target="_blank" href="${ODOO}${bill.id}${ODOO_Q}">✓ ${esc(bill.name)}</a> <span class="hint">${esc(bill.state)}${bill.paymentState && bill.paymentState !== 'not_paid' ? ' · ' + esc(bill.paymentState.replace('_', ' ')) : ''}</span>`) : '<span class="hint">not in Odoo</span>';
     const can = !bill || bill.state === 'draft';
     return `<td>${n} line${n === 1 ? '' : 's'} · ${fmt(amount)}<div>${state}</div></td><td><button class="btn sm" ${can ? '' : 'disabled'} onclick="bookMonth('${m.month}', '${part}', this)">${bill ? (can ? 'Rewrite' : 'Posted') : 'Create'}</button></td>`;
   };
@@ -3560,9 +3560,9 @@ function drawBills() {
     <span class="grow"><b>${esc(c.rule.partnerName || c.rule.label || '')}</b>
       <div class="what">${esc([c.rule.accountCode, c.rule.analyticName, c.rule.companyName].filter(Boolean).join(' · '))} — ${esc(c.description || '')}</div></span>
     ${c.booked && c.booked.payment_state === 'paid'
-      ? `<a class="odoo-ok" target="_blank" href="${ODOO}${c.booked.id}">✓ ${esc(c.booked.name)}</a>`
+      ? `<a class="odoo-ok" target="_blank" href="${ODOO}${c.booked.id}${ODOO_Q}">✓ ${esc(c.booked.name)}</a>`
       : c.booked
-      ? `<a class="odoo-ok" target="_blank" href="${ODOO}${c.booked.id}" style="color:var(--muted)">${esc(c.booked.name || 'draft')}</a> <button class="btn" onclick="bookOne('${c.id}', this)">Post & pay</button>`
+      ? `<a class="odoo-ok" target="_blank" href="${ODOO}${c.booked.id}${ODOO_Q}" style="color:var(--muted)">${esc(c.booked.name || 'draft')}</a> <button class="btn" onclick="bookOne('${c.id}', this)">Post & pay</button>`
       : `<button class="btn" onclick="bookOne('${c.id}', this)">Book in Odoo</button>`}</div>`;
   document.getElementById('bills-body').innerHTML =
     (waiting.length ? `<h4>${waiting.length} payment${waiting.length > 1 ? 's' : ''} waiting for a bill</h4>` + waiting.map(line).join('')

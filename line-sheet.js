@@ -65,7 +65,7 @@
     const lock = booked || odoo;
     o.querySelector('.ls').innerHTML = `
     <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : cancelled ? 'cancelled' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
-      <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=account.move&view_type=form&id=${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
+      <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/odoo/action-account.action_move_journal_line/${+t.bookedMove.id}?cids=2-7-10-8-4-9" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
     <label>Description<input id="ls-desc" value="${esc(t.description || '')}" ${lock ? 'disabled' : ''}></label>
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
       <label>Money<select id="ls-side" ${lock ? 'disabled' : ''}><option value="debit" ${side === 'debit' ? 'selected' : ''}>out (paid)</option><option value="credit" ${side === 'credit' ? 'selected' : ''}>in (received)</option></select></label></div>
