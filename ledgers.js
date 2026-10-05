@@ -782,6 +782,7 @@ async function absorbWaLines(ctx, account, who, lines) {
   const supplierList = partner && ctx.odooCall && lines.some(t => t.debit > 0) ? await bills.suppliersPublic(ctx.odooCall).catch(() => []) : [];
   const vendorHit = t => { const text = ' ' + bills.norm(t.description || '') + ' '; return !!bills.handVendorPublic(t, account) || supplierList.some(p => p.words.some(w => text.includes(' ' + w + ' ') || (w.length >= 6 && text.includes(' ' + w)))); };
   let added = 0, updated = 0, linked = 0, review = 0, accepted = 0, kept = 0;
+  const autoBook = [];
   // A line Mario has already been through is his: reviewed, accepted, booked in Odoo, or edited
   // by hand. A re-import never rewrites it — not its words, not its pairing, not whether it counts
   // (Mario, 2026-09-09: "WhatsApp should not mess with my work and my review").
@@ -802,6 +803,12 @@ async function absorbWaLines(ctx, account, who, lines) {
     else {
       const d = dup.get(t.id);
       if (d) { data.dupOf = d.id; data.excluded = true; data.dupSrc = 'auto'; data.review = false; linked++; }
+      else if (isFromMario(t) && account.odooPartner && account.odooPartner.id) {
+        // standing rule (Mario, 2026-10-05): "<N>$ from mario" that Mario wrote himself is accepted on the spot — cash
+        // from Mario cash (S LB), no project, booked in Odoo and reconciled; only the ✓ reviewed stays his
+        Object.assign(data, FROM_MARIO_SIDE, { dupOf: null, excluded: false, dupSrc: 'auto', review: false, waAccepted: true, autoRule: 'from-mario' });
+        autoBook.push(t.id); accepted++;
+      }
       else { data.dupOf = null; data.excluded = true; data.dupSrc = 'auto'; data.review = true; review++; }
     }
     if (existing[t.id]) updated++; else added++;
@@ -809,8 +816,14 @@ async function absorbWaLines(ctx, account, who, lines) {
   });
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
-  return { lines: lines.length, added, updated, kept, linked, review, accepted, dropped, first, last };
+  return { lines: lines.length, added, updated, kept, linked, review, accepted, dropped, first, last, autoBook };
 }
+
+// "100$ from mario", "200$ FROM MARIO", "from mario 50$" — written by Mario, money IN to the worker
+const isFromMario = t => t.waFrom === 'mario' && t.credit > 0 && /^\s*(\d[\d.,]*\s*\$?\s*)?from\s+mario\b(\s*\d[\d.,]*\s*\$?)?\s*$/i.test(String(t.description || ''));
+const FROM_MARIO_SIDE = { nature: 'transfer', natureSrc: 'rule', kind: 'transfer', kindSrc: 'rule', partnerKind: 'cash', cashAccountId: 'mario-cash',
+  cashJournalId: 87, cashJournalName: 'Cash Mario USD', cashJournalCompany: 'S LB', company: 'S LB', companySrc: 'rule',
+  partnerId: null, partnerName: '', partnerSrc: '', analyticId: null, analyticName: '', analyticSrc: '' };
 
 // ── Transfers between this account and the other people's ───────────────────
 // "100$ from mario" here and 100 leaving Mario's cash days apart are one movement; so are
@@ -1092,4 +1105,4 @@ async function writeExcelRow(ctx, account, t, patch) {
   return { wrote, file: base, row: r };
 }
 
-module.exports = { importExcel, adoptTransfers, importWhatsapp, importWhatsappLive, linkTransfers, listGroups, readExcel, readTimesheet, rateAt, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };
+module.exports = { isFromMario, FROM_MARIO_SIDE, importExcel, adoptTransfers, importWhatsapp, importWhatsappLive, linkTransfers, listGroups, readExcel, readTimesheet, rateAt, parseMoney, LAYOUTS, readGold, closeStatement, writeExcelRow };

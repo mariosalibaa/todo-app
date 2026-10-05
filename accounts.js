@@ -1476,6 +1476,32 @@ async function handle(req, res, url, user, ctx) {
   }
   // the nightly live read (wa-contacts/nightly.mjs) pushes what range-read.mjs saw in his group;
   // the lines land as proposals behind the ✓ gate exactly like the archive import
+  // the "N$ from mario" rule: book each accepted line (a payment from Cash Mario S LB to him), reconcile his payable,
+  // and let the row show it — only the ✓ reviewed is left to Mario (2026-10-05)
+  async function bookFromMario(a, ids, by) {
+    const out = { booked: [], errors: [] };
+    for (const id of ids) {
+      try { const r = await bills.bookRow(ledgerCtx, a, id, 'auto (rule: from mario) · ' + by); out.booked.push(r.move || id); }
+      catch (e) { out.errors.push(id + ': ' + String(e.message || e).slice(0, 160)); }
+    }
+    if (out.booked.length && a.odooPartner && a.odooPartner.id) {
+      try { out.reconciled = await bills.reconcilePayable(odooCall, +a.odooPartner.id); out.refreshed = await refreshSettlements(odooCall, a, db); }
+      catch (e) { out.errors.push('reconcile: ' + String(e.message || e).slice(0, 160)); }
+    }
+    return out;
+  }
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/from-mario$/)) && req.method === 'POST') {
+    // apply the rule to what is already there (body { since }): the waiting "N$ from mario" lines of this account
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req), since = String(b.since || '2026-09-14');
+    const col = txCol(a);
+    const rows = (await col.get()).docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(t => t.date >= since && (t.src === 'whatsapp' || t.src === 'site') && !t.bookedMove && !t.dupOf && ledgers.isFromMario(t));
+    for (const t of rows) await col.doc(t.id).set({ ...ledgers.FROM_MARIO_SIDE, excluded: false, review: false, waAccepted: true, autoRule: 'from-mario', updatedAt: new Date().toISOString(), updatedBy: 'rule: from mario' }, { merge: true });
+    const r = rows.length ? await bookFromMario({ ...a }, rows.map(t => t.id), who) : { booked: [] };
+    return json(res, 200, { lines: rows.map(t => t.date + ' ' + (t.credit || 0)), ...r });
+  }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/whatsapp-live$/)) && req.method === 'POST') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });
@@ -1484,6 +1510,7 @@ async function handle(req, res, url, user, ctx) {
     try {
       const r = await ledgers.importWhatsappLive(ledgerCtx, a, who, b.messages, String(b.since || ''));
       r.cashPartner = await applyCashPartner(a).catch(() => 0);
+      if ((r.autoBook || []).length) r.autoBooked = await bookFromMario(a, r.autoBook, who);
       await hubLog(ws, 'whatsapp', { who, txId: 'live', line: `${a.id}: ${r.messages} msgs → ${r.added} new, ${r.updated} updated, ${r.kept} kept`, before: {}, after: r });
       return json(res, 200, r);
     } catch (e) { console.error('whatsapp-live', e); return json(res, 400, { error: String(e.message || e) }); }

@@ -1181,4 +1181,22 @@ async function pushAnalytic(ctx, account, t) {
   return { ...out, move: named.join(', '), distribution: dist, already: !changed.length, changed };
 }
 
-module.exports = { postOfficialSarl, isOfficialSarl, suppliersPublic: suppliers, handVendorPublic: handVendor, pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
+// The cash handed to a worker pays his bills: match his payable oldest first, per company (Mario, 2026-10-05: "it is a
+// payment for Khoder, how to reconcile so it does not stay open"). Odoo pairs the open debits and credits itself.
+async function reconcilePayable(odooCall, partnerId, companies = [7, 2, 10]) {
+  const out = {};
+  for (const co of companies) {
+    const ctx = { allowed_company_ids: [co], company_id: co };
+    const ls = await odooCall('account.move.line', 'search_read', [[['partner_id', '=', partnerId], ['company_id', '=', co], ['account_id.account_type', '=', 'liability_payable'],
+      ['parent_state', '=', 'posted'], ['reconciled', '=', false], ['amount_residual', '!=', 0]]], { fields: ['id', 'account_id', 'amount_residual'], context: ctx });
+    const byAcc = {}; for (const l of ls) (byAcc[l.account_id[0]] = byAcc[l.account_id[0]] || []).push(l);
+    for (const L of Object.values(byAcc)) {
+      if (L.length < 2 || !L.some(l => l.amount_residual > 0) || !L.some(l => l.amount_residual < 0)) continue;
+      await odooCall('account.move.line', 'reconcile', [L.map(l => l.id)], { context: ctx });
+      out[co] = (out[co] || 0) + L.length;
+    }
+  }
+  return out;
+}
+
+module.exports = { reconcilePayable, postOfficialSarl, isOfficialSarl, suppliersPublic: suppliers, handVendorPublic: handVendor, pushAnalytic, cashAccountFor, alreadyInOdoo, postTransfers, postRefunds, postCashBox, postPayments, postVendors, vendorize, bookRow, natureOf, vendorOf, analyticMapFor, saveMapEntry, applyMap, months, bookMonth, bookTimesheetMonth, refreshOpenTimesheet, norm, SLB, loadMapPublic: loadMap, PARTS, GENERAL };
