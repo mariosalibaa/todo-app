@@ -1557,8 +1557,7 @@ function odooCell(t) {
     const b = t.bookedMove;
     const tip = ['Booked by the hub' + (b.at ? ' on ' + String(b.at).slice(0, 10) : ''), b.kind || '', b.state || '', b.paymentState || ''].filter(Boolean).join(' · ');
     const pays = (b.paidBy || []).filter(x => x.name);   // named in the tooltip only
-    return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip + (pays.length ? '
-Paid by ' + pays.map(x => x.name + ' ' + fmt(x.amount)).join(', ') : ''))}">✓ ${esc(b.name || '')}</a>`
+    return `<a class="odoo-ok" target="_blank" href="${ODOO}${b.id}${ODOO_Q}" title="${esc(tip + (pays.length ? ' · paid by ' + pays.map(x => x.name + ' ' + fmt(x.amount)).join(', ') : ''))}">✓ ${esc(b.name || '')}</a>`
       + (b.ref && b.ref !== b.name ? `<div class="odoo-doc" title="The reference entered in Odoo">${esc(b.ref)}</div>` : '')
       + fileLinks(t);
   }
