@@ -181,7 +181,10 @@
   tfoot td{font-weight:600;background:var(--bg);border-top:2px solid var(--line);}
   .empty{padding:60px 20px;text-align:center;color:var(--muted);}
   .empty b{display:block;font-size:15px;color:var(--text);margin-bottom:6px;}
-  .msg{padding:6px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);display:none;}
+  .msg{position:fixed;left:14px;bottom:14px;max-width:min(720px,calc(100vw - 120px));z-index:70;border:1px solid var(--surface1);border-radius:10px;background:var(--surface0);padding:8px 12px;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.4);color:var(--muted);display:none;}
+  .legend:not(:has(.clr.on)):not(:has(#q-note:not([hidden]))):not(:has(#lg-src:not([hidden]):not(:empty))){display:none;}
+  #btn-more{font-size:16px;line-height:1;}
+  @media (min-width:561px){ #rowcount{display:inline-block;max-width:420px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;} #rowcount:hover{max-width:none;} }
   .msg.err{color:var(--red);display:block;} .msg.ok{color:var(--green);display:block;}
   /* accounts: a line not counted (duplicate of another record), who really paid, the source of a line */
   tr.excluded td{color:var(--overlay0);} tr.excluded td.debit,tr.excluded td.credit{text-decoration:line-through;}
@@ -468,10 +471,11 @@ body.compact #rows tr:not(.day):not(:focus-within) .pick input,body.compact #row
   <span class="sp" style="flex:1"></span>
   <button class="btn" id="btn-compact" onclick="setCompact(!document.body.classList.contains('compact'))" title="One line per row, like Odoo — click into a row to open it full height">▤ Compact</button>
   <span class="dayview"><button class="btn" id="btn-day" onclick="dayView()" title="Show one day at a time; then ‹ › (or the ← → keys) step between the days that have lines">📅 Day</button><span id="dv-nav" style="visibility:hidden"><button class="btn" onclick="dayStep(-1)" title="Previous day with lines (←)">‹</button><span id="dv-date"></span><button class="btn" onclick="dayStep(1)" title="Next day with lines (→)">›</button></span></span>
-  <button class="btn" onclick="printView()" title="Print what is shown: the current period, filters and sort, every page, as a clean table with totals">🖨 Print</button>
+  <button class="btn" id="btn-print" onclick="printView()" title="Print what is shown: the current period, filters and sort, every page, as a clean table with totals">🖨 Print</button>
   <button class="btn" id="btn-review" onclick="reviewSuggestions()" title="Show only the lines with a partner or company suggestion waiting">⚡ Review suggestions</button>
   <button class="btn" id="btn-undo" onclick="undoEdit()" title="Nothing to undo" disabled>↶ Undo</button>
   <button class="btn" id="btn-redo" onclick="redoEdit()" title="Nothing to redo" disabled>↷ Redo</button>
+  <button class="btn" id="btn-skipped" onclick="showSkipped()" title="Lines whose suggestion you waved away">⤼ Skipped suggestions</button>
   <button class="btn" id="btn-log" onclick="openLog()" title="Every edit made on this account's lines: when, who, from what to what">🕘 Log</button>
   <button class="btn" id="btn-check" onclick="toggleReviewImported()" title="WhatsApp messages that match nothing in the Excel or in Odoo: not counted until you accept them" style="display:none">❓ To review</button>
   <button class="btn primary" id="btn-line" onclick="openLineForm()" title="Type a line: money in or out of this account">＋ Line</button>
@@ -524,7 +528,6 @@ body.compact #rows tr:not(.day):not(:focus-within) .pick input,body.compact #row
 <div class="legend">
   <span class="q-note" id="q-note" hidden></span>
   <span id="lg-src" hidden></span>
-  <span class="clr on" style="margin-left:0;display:inline" onclick="showSkipped()" title="Lines whose suggestion you waved away">skipped</span>
   <span class="clr" id="clr" onclick="clearFilters()">✕ Clear column filters</span>
 </div>
 <div class="sheet" id="queue" hidden>
@@ -641,7 +644,7 @@ body.compact #rows tr:not(.day):not(:focus-within) .pick input,body.compact #row
     <div class="sheet-foot"><span class="hint" id="trform-msg" style="flex:1"></span><button class="btn primary" onclick="saveTransfer()">Save transfer</button></div>
   </div>
 </div>
-<div class="msg" id="msg"></div>
+<div class="msg" id="msg" onclick="this.className='msg'" title="Click to close"></div>
 <div class="wrap">
   <table id="grid" style="display:none">
     <thead>
@@ -803,7 +806,10 @@ const isExcelKept = () => !!(account && account.excel && account.excel.file);
 // (those come by themselves — Mario, 2026-09-09); Odoo, Telegram and transfers wait behind their chip
 const resetSources = () => { srcOff = isExcelKept() ? new Set(['odoo', 'telegram', 'transfer']) : new Set(); };
 
-function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg'; }
+let _sayT = null;
+function say(text, cls) { const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (cls || 'ok'); if (!text) m.className = 'msg';
+  // a toast now (no row of its own): good news fades after 6 s, an error stays until the next message or a click
+  clearTimeout(_sayT); if (text && cls !== 'err') _sayT = setTimeout(() => { if (m.textContent === text) m.className = 'msg'; }, 6000); }
 
 Admin.require('accounting', async me => {
   document.getElementById('who').textContent = me.name || me.email;
@@ -4160,9 +4166,12 @@ async function saveTransfer() {
 }
 
 // ── Phone: re-parent the bar's buttons into the ⋯ sheet (ids, handlers and disabled state travel with them) ──
-const MORE_GROUPS = { review: ['btn-review', 'btn-check', 'btn-queue'], edit: ['btn-undo', 'btn-redo', 'btn-log'],
+const MORE_GROUPS = { review: ['btn-review', 'btn-check', 'btn-queue', 'btn-skipped'], edit: ['btn-undo', 'btn-redo', 'btn-log'],
   period: ['period', 'from', 'to', 'pager', 'rowcount'], import: ['btn-upload', 'btn-import', 'btn-wa', 'btn-xl', 'btn-contacts'],
-  odoo: ['btn-odoo', 'btn-months', 'btn-bills'], views: ['btn-timesheet', 'btn-projects', 'btn-stmt'], account: ['btn-edit'] };
+  odoo: ['btn-odoo', 'btn-months', 'btn-bills'], views: ['btn-timesheet', 'btn-projects', 'btn-stmt', 'btn-print'], account: ['btn-edit'] };
+const DESK_MORE = { review: ['btn-review', 'btn-check', 'btn-queue', 'btn-skipped'], edit: ['btn-undo', 'btn-redo', 'btn-log'],
+  import: ['btn-upload', 'btn-import', 'btn-wa', 'btn-xl', 'btn-contacts'], odoo: ['btn-odoo', 'btn-months', 'btn-bills'],
+  views: ['btn-timesheet', 'btn-projects', 'btn-stmt', 'btn-print'] };
 const _home = new Map();   // element → [parent, nextSibling] in the desktop bar
 function isPhone() { return matchMedia('(max-width: 560px)').matches; }
 function phoneBar() {
@@ -4179,7 +4188,16 @@ function phoneBar() {
     document.getElementById('btn-more').hidden = false;
   } else {
     for (const [el, [parent, next]] of _home) { if (el.parentNode !== parent) parent.insertBefore(el, next && next.parentNode === parent ? next : null); }
-    document.getElementById('btn-more').hidden = true;
+    // the desktop bar keeps the everyday ones (account, period, dates, search, Compact, Day, ＋ Line, ✓ To review);
+    // the rest wait behind ⋯ (Mario, 2026-10-05: "can we minimise these?")
+    for (const [g, ids] of Object.entries(DESK_MORE)) {
+      const row = document.querySelector(`.more-g[data-g="${g}"] .more-row`); if (!row) continue;
+      for (const id of ids) { const el = document.getElementById(id); if (!el || row.contains(el)) continue;
+        if (!_home.has(el)) _home.set(el, [el.parentNode, el.nextSibling]); row.appendChild(el); }
+    }
+    const fuel = [...document.querySelectorAll('button')].find(b => /openFuel/.test(b.getAttribute('onclick') || ''));
+    if (fuel) { const row = document.querySelector('.more-g[data-g="views"] .more-row'); if (fuel.parentNode !== row) { if (!_home.has(fuel)) _home.set(fuel, [fuel.parentNode, fuel.nextSibling]); row.appendChild(fuel); } }
+    document.getElementById('btn-more').hidden = false;
   }
   moreBadge();
 }
