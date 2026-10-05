@@ -84,7 +84,8 @@ async function writeDay(ctx, ws, thread, date, opts = {}) {
   const site = day.start && day.start.siteId ? { id: day.start.analyticId, name: day.start.analyticName } : (account.defaultProject || null);
   // his pay: hours × hourly rate + transport when the account is hourly (Khodr, Ziad), else the day rate; no rate → priced by Mario
   const hourly = !!account.hourlyRate;
-  const amount = hourly ? (day.hours ? money(day.hours * account.hourlyRate + (account.transport == null ? 0 : account.transport)) : 0) : money(account.defaultRate || 0);
+  const tr = account.transport == null ? 0 : account.transport;
+  const amount = hourly ? (day.hours ? money(day.hours * account.hourlyRate + (account.transportPerHour ? Math.min(tr, day.hours * tr / 9) : tr)) : 0) : money(account.defaultRate || 0);
   const tags = [];
   if (day.start && !day.finish) tags.push('no finish');
   if (day.noStart) tags.push('no start');

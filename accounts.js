@@ -649,8 +649,10 @@ function dayFromMessages(messages, account) {
   const hours = arrived && finished && mins(finished) > mins(arrived)
     ? Math.round((mins(finished) - mins(arrived)) / 6) / 10 : 0;
   // his day is hours × the hourly rate plus a flat transport (see the labour-rate note)
-  const rate = account.hourlyRate || 30 / 9, transport = account.transport == null ? 5 : account.transport;
-  const amount = hours ? Math.round((hours * rate + transport) * 100) / 100 : 0;
+  const rate = account.hourlyRate || 25 / 9, transport = account.transport == null ? 5 : account.transport;
+  // Khoder from 2026-09-09: transport accrues per hour (5/9 $/h) and stops at the day's 5 $ (Mario 2026-10-05)
+  const tr = account.transportPerHour ? Math.min(transport, hours * transport / 9) : transport;
+  const amount = hours ? Math.round((hours * rate + tr) * 100) / 100 : 0;
   return {
     accountId: account.id, arrived, finished, hours, amount,
     projects: [...new Set(projects)],
@@ -851,6 +853,7 @@ async function handle(req, res, url, user, ctx) {
     // an hourly man: $ per hour (Khoder 30/9 from 2026-09-09, was 25/9) and the flat transport of his day
     if ('hourlyRate' in b) data.hourlyRate = b.hourlyRate == null ? null : Number(b.hourlyRate) || null;
     if ('transport' in b) data.transport = b.transport == null ? null : money(b.transport);
+    if ('transportPerHour' in b) data.transportPerHour = !!b.transportPerHour;   // transport × hours/9, never above the day's transport
     if ('defaultProject' in b) data.defaultProject = b.defaultProject || null;
     if ('opening' in b) data.opening = openingIn(b.opening);
     if ('excel' in b) data.excel = excelIn(b.excel) ? { ...(a.excel || {}), ...excelIn(b.excel) } : null;
