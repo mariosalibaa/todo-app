@@ -302,6 +302,9 @@ async function check(ctx, send) {
   const prev = (await ref.get()).data() || {};
   const seen = prev.plants || {}, first = !prev.at;
   const L = await list(ctx, true), now = Date.now(), msgs = [];
+  // offline / back-online messages are OFF (Mario 2026-10-05: "stop plant offline for one hour … keep Bookstop alert");
+  // the state is still kept so switching them back on (env PLANTS_OFFLINE_ALERTS=1) does not replay old outages
+  const offline = process.env.PLANTS_OFFLINE_ALERTS === '1' ? msgs : [];
   if (!L.plants.length) return { ok: false, sources: L.sources };
   for (const p of L.plants) {
     const k = `${p.src}:${p.id}`, s = seen[k] || {};
@@ -313,11 +316,11 @@ async function check(ctx, send) {
         let what = '';
         try { const d = (await devices(ctx, p.src, p.id)).filter(x => !x.online && (x.type === 'inverter' || x.type === 'collector'));
           what = d.map(x => `${x.type} ${x.sn}${x.role ? ' (' + x.role + ')' : ''}${x.last ? ' — last data ' + new Date(x.last).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}`).join('\n'); } catch (e) {}
-        msgs.push(`⚠ ${p.name} — ${p.status === 'partial' ? 'partly offline' : p.status} for over an hour${what ? '\n' + what : ''}`);
+        offline.push(`⚠ ${p.name} — ${p.status === 'partial' ? 'partly offline' : p.status} for over an hour${what ? '\n' + what : ''}`);
         seen[k] = { status: p.status, badSince: since, told: true, note };
       } else seen[k] = { status: p.status, badSince: since, told: s.told || false, quiet: first || s.quiet || false };
     } else {
-      if (s.told) msgs.push(`✅ ${p.name} — back online`);
+      if (s.told) offline.push(`✅ ${p.name} — back online`);
       seen[k] = { status: p.status };
     }
   }
