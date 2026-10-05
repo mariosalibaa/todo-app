@@ -178,12 +178,32 @@ async function settlementsOf(odooCall, txs) {
 // cron keeps "paid by PSETT/… · PCSH1/…" current on every ledger without a full Odoo check.
 async function refreshSettlements(odooCall, a, db) {
   const col = txCol(a);
-  const txs = (await col.get()).docs.map(d => d.data()).filter(t => t.bookedMove && Number.isInteger(t.bookedMove.id));
-  if (!txs.length) return 0;
-  const settled = await settlementsOf(odooCall, txs);
+  const all = (await col.get()).docs.map(d => d.data());
+  const txs = all.filter(t => t.bookedMove && Number.isInteger(t.bookedMove.id));
+  const settled = txs.length ? await settlementsOf(odooCall, txs) : {};
   const same = (x, y) => JSON.stringify(x || null) === JSON.stringify(y || null);
   const writes = txs.filter(t => settled[t.bookedMove.id] && !(same(t.bookedMove.paidBy, settled[t.bookedMove.id].paidBy) && t.bookedMove.paymentState === settled[t.bookedMove.id].paymentState && t.bookedMove.residual === settled[t.bookedMove.id].residual))
     .map(t => ({ ref: col.doc(String(t.id)), data: { bookedMove: { ...t.bookedMove, ...settled[t.bookedMove.id] } } }));
+  // a PAYMENT row (cash handed to a worker, a Whish payment…) is reconciled once its payable/receivable line is matched
+  // in Odoo — the cash Mario hands a worker pays his month bills, oldest first (Mario, 2026-10-05: "it is a payment for
+  // Khoder, how to reconcile so it does not stay open")
+  const isBill = n => /^(R?BILL|RINV|INV)\d*\//.test(n || '');
+  const payRows = all.filter(t => { const w = t.odoo && (t.odoo.matches || []).find(x => x.chosen); return w && Number.isInteger(w.moveId) && !isBill(w.move); });
+  const ids = [...new Set(payRows.map(t => t.odoo.matches.find(x => x.chosen).moveId))];
+  const state = {};
+  for (let i = 0; i < ids.length; i += 400) {
+    const ls = await odooCall('account.move.line', 'search_read', [[['move_id', 'in', ids.slice(i, i + 400)], ['account_id.account_type', 'in', ['liability_payable', 'asset_receivable']]]],
+      { fields: ['move_id', 'reconciled', 'amount_residual'], context: { allowed_company_ids: [2, 4, 7, 8, 9, 10] } });
+    for (const l of ls) { const s = state[l.move_id[0]] || (state[l.move_id[0]] = { n: 0, done: 0 }); s.n++; if (l.reconciled || Math.abs(l.amount_residual) < 0.005) s.done++; }
+  }
+  for (const t of payRows) {
+    const w = t.odoo.matches.find(x => x.chosen), s = state[w.moveId];
+    if (!s || !s.n) continue;
+    const now = s.done === s.n;
+    if (!!w.settled === now) continue;
+    w.settled = now;
+    writes.push({ ref: col.doc(String(t.id)), data: { odoo: t.odoo } });
+  }
   await acc.batchSet(db, writes);
   return writes.length;
 }
