@@ -912,7 +912,7 @@ async function selectAccount(a) {
   if (detteFor !== a) { detteRows = null; detteFor = null; }   // his dette is fetched once, in the background
   document.getElementById('acc').value = a;
   accShow();
-  buildCols(); colF = {}; buildHeader();
+  buildCols(); colF = {}; viewLoad(); buildHeader();
   // which buttons make sense here: a statement account is fed by uploads, the others by typing and Odoo
   const st = isStatement(), hasJ = !!(account && ((account.odooJournals || []).length || (account.odooPartner && account.odooPartner.id)));
   const hasWa = !!(account && (account.whatsapp || {}).chatId), hasXl = !!(account && (account.excel || {}).file);
@@ -1644,15 +1644,30 @@ let pageSig = '';
 function setCompact(on) { document.body.classList.toggle('compact', on); document.getElementById('btn-compact').classList.toggle('on', on); try { localStorage.setItem('acct_compact', on ? '1' : '0'); } catch {} }
 // the days that have lines in what is loaded, newest first (the filter on the date column does the showing)
 const dvDays = () => [...new Set(tx.map(t => t.date).filter(Boolean))].sort().reverse();
-function dayShow(d) {
-  colF.date = d; buildHeader(); pageNo = 0; render();
-  document.getElementById('dv-date').textContent = dayDate(d);
-  document.getElementById('dv-nav').style.visibility = 'visible'; document.getElementById('btn-day').classList.add('on');
+function dayShow(d) { colF.date = d; buildHeader(); pageNo = 0; render(); }
+// the Day button and its ‹ date › show whatever one-day filter is on — pressed, typed in the column, or restored
+function daySync() {
+  const d = colF.date && /^\d{4}-\d{2}-\d{2}$/.test(colF.date) ? colF.date : '';
+  const btn = document.getElementById('btn-day'), nav = document.getElementById('dv-nav'); if (!btn || !nav) return;
+  btn.classList.toggle('on', !!d); nav.style.visibility = d ? 'visible' : 'hidden';
+  document.getElementById('dv-date').textContent = d ? dayDate(d) : '';
+}
+// what you were looking at comes back after a refresh, per account (Mario, 2026-10-05: "save view to last opening,
+// even when we refresh the page"): column filters (the Day too), sort, from/to
+function viewSave() {
+  if (!acc) return;
+  try { localStorage.setItem('acct_view_' + acc, JSON.stringify({ colF, sort, from: document.getElementById('from').value, to: document.getElementById('to').value })); } catch {}
+}
+function viewLoad() {
+  let v = null; try { v = JSON.parse(localStorage.getItem('acct_view_' + acc) || 'null'); } catch {}
+  if (!v) return;
+  if (v.colF && typeof v.colF === 'object') colF = { ...v.colF };
+  if (v.sort && v.sort.k) sort = v.sort;
+  for (const k of ['from', 'to']) { const el = document.getElementById(k); if (el && typeof v[k] === 'string') el.value = v[k]; }
 }
 function dayView() {
   if (document.getElementById('btn-day').classList.contains('on')) {   // second press: back to every day
-    delete colF.date; buildHeader(); render();
-    document.getElementById('dv-nav').style.visibility = 'hidden'; document.getElementById('btn-day').classList.remove('on'); return;
+    delete colF.date; buildHeader(); render(); return;
   }
   const days = dvDays(); if (!days.length) return say('No lines to show by day', 'err');
   const today = localYmd(new Date());
@@ -1674,6 +1689,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('DOMContentLoaded', () => { let on = true; try { on = localStorage.getItem('acct_compact') !== '0'; } catch {} setCompact(on); });
 
 function render() {
+  daySync(); viewSave();
   const all = visible();
   // any change to what is being looked at puts you back on page 1
   const sig = JSON.stringify([document.getElementById('q').value, document.getElementById('from').value,
