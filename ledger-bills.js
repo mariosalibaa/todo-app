@@ -1074,7 +1074,8 @@ async function bookRow(ctx, account, txId, who) {
   // (Mario, 2026-10-05: "booking in Odoo not working" — a WhatsApp line "50 $ مسكة ضوء للشيروكي" had no type)
   if (!t.nature) {
     const own = !t.partnerId || (account.odooPartner && +t.partnerId === +account.odooPartner.id);
-    const guess = t.debit > 0 && own ? 'expense' : t.credit > 0 && (t.kind === 'transfer' || t.cashAccountId) ? 'transfer' : '';
+    // another supplier picked on the line: a purchase from him — its own bill, paid by the worker ([[worker-vendor-rows-rule]])
+    const guess = t.debit > 0 ? (own ? 'expense' : 'vendor') : t.credit > 0 && (t.kind === 'transfer' || t.cashAccountId) ? 'transfer' : '';
     if (guess) { t.nature = guess; await col.doc(txId).set({ nature: guess, natureSrc: 'auto', updatedAt: now(), updatedBy: who }, { merge: true }); }
   }
   if (!t.nature || t.nature === 'note') throw new Error('the line has no type yet — pick one first');

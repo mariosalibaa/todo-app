@@ -783,7 +783,7 @@ async function absorbWaLines(ctx, account, who, lines) {
   const supplierList = partner && ctx.odooCall && lines.some(t => t.debit > 0) ? await bills.suppliersPublic(ctx.odooCall).catch(() => []) : [];
   const vendorHit = t => { const text = ' ' + bills.norm(t.description || '') + ' '; return !!bills.handVendorPublic(t, account) || supplierList.some(p => p.words.some(w => text.includes(' ' + w + ' ') || (w.length >= 6 && text.includes(' ' + w)))); };
   let added = 0, updated = 0, linked = 0, review = 0, accepted = 0, kept = 0;
-  const autoBook = [];
+  const autoBook = [], theirs = [];
   // A line Mario has already been through is his: reviewed, accepted, booked in Odoo, or edited
   // by hand. A re-import never rewrites it — not its words, not its pairing, not whether it counts
   // (Mario, 2026-09-09: "WhatsApp should not mess with my work and my review").
@@ -810,14 +810,14 @@ async function absorbWaLines(ctx, account, who, lines) {
         Object.assign(data, FROM_MARIO_SIDE, { dupOf: null, excluded: false, dupSrc: 'auto', review: false, waAccepted: true, autoRule: 'from-mario' });
         autoBook.push(t.id); accepted++;
       }
-      else { data.dupOf = null; data.excluded = true; data.dupSrc = 'auto'; data.review = true; review++; }
+      else { data.dupOf = null; data.excluded = true; data.dupSrc = 'auto'; data.review = true; review++; if (t.waFrom === 'them' && t.debit > 0) theirs.push(t.id); }
     }
     if (existing[t.id]) updated++; else added++;
     return { ref: col.doc(t.id), data };
   });
   await acc.batchSet(account.ref.firestore, writes);
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
-  return { lines: lines.length, added, updated, kept, linked, review, accepted, dropped, first, last, autoBook };
+  return { lines: lines.length, added, updated, kept, linked, review, accepted, dropped, first, last, autoBook, theirs };
 }
 
 // His working day, from his own messages (Mario, 2026-10-05: the days since 14 Sep were in WhatsApp and missing on the
@@ -834,7 +834,7 @@ async function absorbWaDays(ctx, account, messages) {
   const have = new Set((await col.where('date', '>=', dates.sort()[0]).get()).docs.map(d => d.data())
     .filter(t => t.nature === 'labour' && (!t.excluded || t.review)).map(t => t.date));
   const gone = (account.waDeleted && typeof account.waDeleted === 'object') ? account.waDeleted : {};
-  let proposed = 0; const skipped = [];
+  let proposed = 0; const skipped = [], ids = [];
   for (const date of dates) {
     const id = 'wa-day-' + date;
     if (have.has(date) || gone[id]) continue;
@@ -849,9 +849,9 @@ async function absorbWaDays(ctx, account, messages) {
       note: `From his group: arrived ${day.arrived}, finished ${day.finished}${day.project ? ', "' + day.project + '"' : ''}`,
       waFrom: 'them', waAt: new Date(Date.parse(date + 'T' + day.finished + ':00+03:00')).toISOString(),
       excluded: true, review: true, dupOf: null, dupSrc: 'auto', waAccepted: false, importedAt: now() });
-    proposed++;
+    proposed++; ids.push(id);
   }
-  return { proposed, skipped };
+  return { proposed, skipped, ids };
 }
 
 // "100$ from mario", "200$ FROM MARIO", "from mario 50$" — written by Mario, money IN to the worker

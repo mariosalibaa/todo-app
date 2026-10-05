@@ -854,7 +854,8 @@ async function handle(req, res, url, user, ctx) {
     if ('hourlyRate' in b) data.hourlyRate = b.hourlyRate == null ? null : Number(b.hourlyRate) || null;
     if ('transport' in b) data.transport = b.transport == null ? null : money(b.transport);
     if ('transportPerHour' in b) data.transportPerHour = !!b.transportPerHour;
-    if ('waDays' in b) data.waDays = !!b.waDays;   // his "arrived / finished" messages become work-day proposals   // transport × hours/9, never above the day's transport
+    if ('waDays' in b) data.waDays = !!b.waDays;
+    if ('autoAccept' in b) data.autoAccept = !!b.autoAccept;   // his WhatsApp lines are counted and booked at once (Mario 2026-10-05)   // his "arrived / finished" messages become work-day proposals   // transport × hours/9, never above the day's transport
     if ('defaultProject' in b) data.defaultProject = b.defaultProject || null;
     if ('opening' in b) data.opening = openingIn(b.opening);
     if ('excel' in b) data.excel = excelIn(b.excel) ? { ...(a.excel || {}), ...excelIn(b.excel) } : null;
@@ -1494,6 +1495,49 @@ async function handle(req, res, url, user, ctx) {
     }
     return out;
   }
+  // Auto-accept (Mario, 2026-10-05: "auto accept" — only the reviewed tick stays his): what the worker wrote or
+  // photographed is counted and booked at once. A day / a cash ticket → his month bill (S LB); a VAT invoice read off a
+  // photo → an official SARL bill under its own number, settled paid by him. The project: the line's, else the one of
+  // his working day that date. A line that cannot be placed (no supplier in Odoo for an invoice, no project for an
+  // invoice) stays a proposal.
+  async function autoAccept(a, ids, by) {
+    const col = txCol(a), out = { accepted: [], left: [], errors: [] };
+    if (!ids.length) return out;
+    const rows = (await Promise.all(ids.map(id => col.doc(id).get()))).filter(d => d.exists).map(d => ({ id: d.id, ...d.data() }));
+    const dates = [...new Set(rows.map(t => t.date))].sort();
+    const dayRows = dates.length ? (await col.where('date', '>=', dates[0]).get()).docs.map(d => d.data()).filter(t => t.nature === 'labour' && t.analyticId) : [];
+    for (const t of rows) {
+      if (t.bookedMove || t.dupOf || !(t.debit > 0) || t.waAccepted) continue;
+      const day = dayRows.find(d => d.date === t.date);
+      const an = t.analyticId ? null : day ? { analyticId: day.analyticId, analyticName: day.analyticName, analyticSrc: 'auto', analyticFrom: 'his day' } : null;
+      const ph = t.fromPhoto || {};
+      let data;
+      if (ph.kind === 'invoice' && ph.vat) {
+        const v = t.partnerId && a.odooPartner && +t.partnerId !== +a.odooPartner.id ? { id: t.partnerId, name: t.partnerName } : await bills.vendorOf(odooCall, { description: ph.vendor + ' ' + (t.description || '') }, a).catch(() => null);
+        if (!v || !v.id || (!t.analyticId && !an)) { out.left.push(t.id + ': ' + (!v || !v.id ? 'supplier not in Odoo' : 'no project')); continue; }
+        data = { nature: 'vendor', natureSrc: 'auto', vat: true, official: true, company: 'SHIFT GROUP SARL (USD)', companySrc: 'auto', ref: ph.doc || t.ref || '', partnerId: v.id, partnerName: v.name, partnerSrc: 'auto' };
+      } else data = { nature: t.nature || 'expense', natureSrc: t.natureSrc || 'auto', company: 'S LB', companySrc: 'auto' };
+      Object.assign(data, an || {}, { excluded: false, review: false, waAccepted: true, autoRule: 'auto-accept', updatedAt: new Date().toISOString(), updatedBy: 'rule: auto-accept' });
+      await col.doc(t.id).set(data, { merge: true });
+      try { const r = await bills.bookRow(ledgerCtx, a, t.id, 'auto (rule: auto-accept) · ' + by); out.accepted.push(t.date + ' ' + t.debit + ' → ' + (r.move || '?')); }
+      catch (e) { out.errors.push(t.id + ': ' + String(e.message || e).slice(0, 160)); }
+    }
+    if (out.accepted.length && a.odooPartner && a.odooPartner.id) {
+      try { out.reconciled = await bills.reconcilePayable(odooCall, +a.odooPartner.id); await refreshSettlements(odooCall, a, db); }
+      catch (e) { out.errors.push('reconcile: ' + String(e.message || e).slice(0, 160)); }
+    }
+    return out;
+  }
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/auto-accept$/)) && req.method === 'POST') {
+    // { ids } — or { since }: every waiting proposal of his (WhatsApp text, photo, day) from that date
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const b = await readBody(req);
+    let ids = Array.isArray(b.ids) ? b.ids.map(String) : [];
+    if (!ids.length && b.since) ids = (await txCol(a).where('date', '>=', String(b.since)).get()).docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(t => (t.src === 'whatsapp' || t.src === 'site') && t.review && t.excluded && !t.dupOf && t.waFrom !== 'mario' && t.debit > 0).map(t => t.id);
+    return json(res, 200, await autoAccept(a, ids, who));
+  }
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/from-mario$/)) && req.method === 'POST') {
     // apply the rule to what is already there (body { since }): the waiting "N$ from mario" lines of this account
     const a = await resolve(ws, m[1]);
@@ -1515,6 +1559,7 @@ async function handle(req, res, url, user, ctx) {
       const r = await ledgers.importWhatsappLive(ledgerCtx, a, who, b.messages, String(b.since || ''));
       r.cashPartner = await applyCashPartner(a).catch(() => 0);
       if ((r.autoBook || []).length) r.autoBooked = await bookFromMario(a, r.autoBook, who);
+      if (a.autoAccept) { const ids = [...(r.theirs || []), ...((r.days && r.days.ids) || [])]; if (ids.length) r.autoAccepted = await autoAccept(a, ids, who); }
       await hubLog(ws, 'whatsapp', { who, txId: 'live', line: `${a.id}: ${r.messages} msgs → ${r.added} new, ${r.updated} updated, ${r.kept} kept`, before: {}, after: r });
       return json(res, 200, r);
     } catch (e) { console.error('whatsapp-live', e); return json(res, 400, { error: String(e.message || e) }); }
