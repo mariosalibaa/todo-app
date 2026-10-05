@@ -1070,6 +1070,13 @@ async function bookRow(ctx, account, txId, who) {
     if (f.length) await col.doc(txId).set({ fileIds: f, files: f.map(x => x.name), updatedAt: now(), updatedBy: who }, { merge: true });
     return { already: true, move: mv.name, id: mv.id, photos: f.length };
   }
+  // no type yet: what he paid out of his own pocket on his own account is an expense; money he received is a transfer
+  // (Mario, 2026-10-05: "booking in Odoo not working" — a WhatsApp line "50 $ مسكة ضوء للشيروكي" had no type)
+  if (!t.nature) {
+    const own = !t.partnerId || (account.odooPartner && +t.partnerId === +account.odooPartner.id);
+    const guess = t.debit > 0 && own ? 'expense' : t.credit > 0 && (t.kind === 'transfer' || t.cashAccountId) ? 'transfer' : '';
+    if (guess) { t.nature = guess; await col.doc(txId).set({ nature: guess, natureSrc: 'auto', updatedAt: now(), updatedBy: who }, { merge: true }); }
+  }
   if (!t.nature || t.nature === 'note') throw new Error('the line has no type yet — pick one first');
   const CO = bookCo(account);
   const opts = { only: [txId], post: true };

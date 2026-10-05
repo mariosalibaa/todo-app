@@ -853,7 +853,8 @@ async function handle(req, res, url, user, ctx) {
     // an hourly man: $ per hour (Khoder 30/9 from 2026-09-09, was 25/9) and the flat transport of his day
     if ('hourlyRate' in b) data.hourlyRate = b.hourlyRate == null ? null : Number(b.hourlyRate) || null;
     if ('transport' in b) data.transport = b.transport == null ? null : money(b.transport);
-    if ('transportPerHour' in b) data.transportPerHour = !!b.transportPerHour;   // transport × hours/9, never above the day's transport
+    if ('transportPerHour' in b) data.transportPerHour = !!b.transportPerHour;
+    if ('waDays' in b) data.waDays = !!b.waDays;   // his "arrived / finished" messages become work-day proposals   // transport × hours/9, never above the day's transport
     if ('defaultProject' in b) data.defaultProject = b.defaultProject || null;
     if ('opening' in b) data.opening = openingIn(b.opening);
     if ('excel' in b) data.excel = excelIn(b.excel) ? { ...(a.excel || {}), ...excelIn(b.excel) } : null;
