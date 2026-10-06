@@ -162,6 +162,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'cpr-fuel.html'));
   fs.readFileSync(path.join(__dirname, 'cpr-dynamic.html'));
   fs.readFileSync(path.join(__dirname, 'mahab.html'));
+  fs.readFileSync(path.join(__dirname, 'khoder.html'));
   fs.readFileSync(path.join(__dirname, 'makhlouf.html'));
   fs.readFileSync(path.join(__dirname, 'plants.html'));
   fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'));
@@ -737,6 +738,7 @@ const handler = async (req, res) => {
     'cpr-fuel.html': path.join(__dirname, 'cpr-fuel.html'),
     'cpr-dynamic.html': path.join(__dirname, 'cpr-dynamic.html'),
     'mahab.html': path.join(__dirname, 'mahab.html'),
+    'khoder.html': path.join(__dirname, 'khoder.html'),
     'makhlouf.html': path.join(__dirname, 'makhlouf.html'),
     'plants.html': path.join(__dirname, 'plants.html'),
     'bonvin.html': path.join(__dirname, 'bonvin.html'),
@@ -758,6 +760,7 @@ const handler = async (req, res) => {
     '/bonvin/shop': 'bonvin-shop.html',   // the same shop for a renter: plans, photos, office layout — PUBLIC, nothing private
     '/plants': 'plants.html',   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
     '/makhlouf': 'makhlouf.html',   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
+    '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
     '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
     '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
@@ -1095,6 +1098,16 @@ const handler = async (req, res) => {
     const acc = await cprAccess();
     if (!acc.isAdmin) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'admin' })); return; }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=3600' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-sun.json'))); return;
+  }
+  // /api/khoder — khoder.js. A hub admin signed in, or the share link's key (HMAC of the machine key) for Walid.
+  if (url.split('?')[0] === '/api/khoder' && req.method === 'GET') {
+    const K = require('./khoder');
+    const k = new URL(req.url, 'http://x').searchParams.get('k') || '';
+    const ok = (k && k === K.shareKey()) || (await cprAccess()).isAdmin;
+    if (!ok) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'share link needed' })); return; }
+    try { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(await K.data({ db, TEAM_ID }))); }
+    catch (e) { console.error('khoder:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
   }
   if (url.split('?')[0] === '/api/mahab' && req.method === 'GET') {
     const acc = await cprAccess();   // its isAdmin = the hub session check; the CPR password plays no part here

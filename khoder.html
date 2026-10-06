@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Khoder · Shift and Walid</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  html,body{background:var(--base);}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  header{padding:14px 16px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1rem;}
+  .wordmark span{color:var(--amber);}
+  main{max-width:1000px;margin:0 auto;padding:16px 16px 50px;}
+  h1{font-size:1.2rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.82rem;margin:0 0 14px;line-height:1.5;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;}
+  .kpi h2{margin:0 0 6px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--overlay0);font-weight:600;}
+  .kpi b{display:block;font-size:1.5rem;font-variant-numeric:tabular-nums;}
+  .kpi.shift b{color:var(--amber);} .kpi.walid b{color:var(--blue);} .kpi.both b{color:var(--green);}
+  .kpi small{display:block;color:var(--sub);font-size:.76rem;margin-top:3px;line-height:1.5;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  th.grp{text-align:center;font-size:.68rem;} th.s{color:var(--amber);} th.w{color:var(--blue);}
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:8px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  td small{display:block;color:var(--overlay0);font-size:.66rem;}
+  td.s{color:#f6c27a;} td.w{color:#a9c8fb;} td .z{color:var(--surface1);}
+  td.sep,th.sep{border-left:1px solid var(--surface0);}
+  tr.tot td{font-weight:700;border-top:2px solid var(--amber);background:rgba(242,169,59,.07);}
+  .ok{color:var(--green);font-size:.7rem;} .warn{color:#f38ba8;font-size:.7rem;font-weight:600;}
+  .foot{color:var(--overlay0);font-size:.72rem;margin-top:12px;line-height:1.5;}
+  .err{color:#f38ba8;padding:20px;}
+  @media (max-width:640px){ td,th{padding:6px 5px;} table{font-size:.74rem;} }
+</style>
+</head>
+<body>
+<header><div class="wordmark">SHIFT <span>GROUP</span></div></header>
+<main>
+  <h1>Khoder — days with Shift and with Walid</h1>
+  <p class="lead" id="lead">Loading…</p>
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><table id="tbl"></table></div>
+  <p class="foot" id="foot"></p>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const usd = n => '$' + (+n || 0).toFixed(2);
+const hm = h => { const m = Math.round((+h || 0) * 60); return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`; };
+const dayName = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+const toMin = s => { if (!s) return null; const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+// Walid writes 12-hour times without am/pm ("4:33"): before 7 means afternoon
+const walidMin = s => { const v = toMin(s); return v == null ? null : (v < 7 * 60 ? v + 12 * 60 : v); };
+(async () => {
+  const k = new URLSearchParams(location.search).get('k') || '';
+  const r = await fetch('/api/khoder' + (k ? '?k=' + encodeURIComponent(k) : ''));
+  if (!r.ok) { $('#lead').innerHTML = '<span class="err">This page needs its share link.</span>'; return; }
+  const d = await r.json();
+  $('#lead').textContent = `${dayName(d.from)} → ${dayName(d.to)} · Shift: hours × $${d.rate.shift.toFixed(2)} + transport ($5 a full day, less on a short one) · Walid: hours × $${d.rate.walid.toFixed(2)} + $${d.rate.walidTransport} a day.`;
+  const t = d.totals;
+  $('#kpis').innerHTML = `
+    <div class="kpi shift"><h2>Paid by Shift</h2><b>${usd(t.shift.total)}</b><small>${t.shift.days} days · ${hm(t.shift.hours)}<br>work ${usd(t.shift.labour)} + transport ${usd(t.shift.transport)}</small></div>
+    <div class="kpi walid"><h2>Paid by Walid</h2><b>${usd(t.walid.total)}</b><small>${t.walid.days} days · ${hm(t.walid.hours)}<br>work ${usd(t.walid.labour)} + transport ${usd(t.walid.transport)}</small></div>
+    <div class="kpi both"><h2>Khoder in total</h2><b>${usd(t.shift.total + t.walid.total)}</b><small>${hm(t.shift.hours + t.walid.hours)} · transport ${usd(t.shift.transport + t.walid.transport)}</small></div>`;
+  const cell = (x, cls) => x ? `<td class="${cls}">${x.from && x.to ? x.from + '–' + x.to : '—'}<small>${hm(x.hours)}${x.project ? ' · ' + x.project : ''}</small></td><td class="${cls}">${usd(x.labour)}</td><td class="${cls}">${usd(x.transport)}</td><td class="${cls}"><b>${usd(x.total)}</b></td>`
+    : `<td class="${cls}"><span class="z">—</span></td><td></td><td></td><td></td>`;
+  const rows = d.days.map(x => {
+    // the two hours of a day side by side: they must not overlap
+    let chk = '';
+    if (x.shift && x.walid && x.shift.from && x.walid.from) {
+      const a1 = toMin(x.shift.from), a2 = toMin(x.shift.to), b1 = walidMin(x.walid.from), b2 = walidMin(x.walid.to);
+      const over = Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
+      chk = over > 5 ? `<span class="warn">${over} min overlap</span>` : '<span class="ok">✓ no overlap</span>';
+    }
+    return `<tr><td>${dayName(x.date)}<small>${chk}</small></td>${cell(x.shift, 's sep')}${cell(x.walid, 'w sep')}<td class="sep"><b>${usd((x.shift ? x.shift.total : 0) + (x.walid ? x.walid.total : 0))}</b></td></tr>`;
+  }).join('');
+  $('#tbl').innerHTML = `<thead>
+    <tr><th></th><th class="grp s sep" colspan="4">Shift</th><th class="grp w sep" colspan="4">Walid</th><th class="sep"></th></tr>
+    <tr><th>Day</th><th class="sep">Hours</th><th>Work</th><th>Transport</th><th>Paid</th><th class="sep">Hours</th><th>Work</th><th>Transport</th><th>Paid</th><th class="sep">Day total</th></tr></thead>
+    <tbody>${rows}<tr class="tot"><td>Total</td>
+      <td class="s sep">${hm(t.shift.hours)}</td><td class="s">${usd(t.shift.labour)}</td><td class="s">${usd(t.shift.transport)}</td><td class="s">${usd(t.shift.total)}</td>
+      <td class="w sep">${hm(t.walid.hours)}</td><td class="w">${usd(t.walid.labour)}</td><td class="w">${usd(t.walid.transport)}</td><td class="w">${usd(t.walid.total)}</td>
+      <td class="sep">${usd(t.shift.total + t.walid.total)}</td></tr></tbody>`;
+  $('#foot').textContent = (d.note ? d.note + ' · ' : '') + 'Shift hours are Khoder\'s own "arrived / finished" messages; Walid\'s are his Work Hours Summary.';
+})();
+</script>
+</body>
+</html>
