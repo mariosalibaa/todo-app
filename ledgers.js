@@ -837,7 +837,7 @@ async function absorbWaLines(ctx, account, who, lines) {
         if (row) { d = { id: row.id }; data.secondReport = true; }
       }
       if (d) { data.dupOf = d.id; data.excluded = true; data.dupSrc = 'auto'; data.review = false; linked++; }
-      else if (isFromMario(t) && account.odooPartner && account.odooPartner.id) {
+      else if (isFromMario(t) && account.odooPartner && account.odooPartner.id && !(account.balanceLock && account.balanceLock.date && t.date <= account.balanceLock.date)) {
         // standing rule (Mario, 2026-10-05): "<N>$ from mario" that Mario wrote himself is accepted on the spot — cash
         // from Mario cash (S LB), no project, booked in Odoo and reconciled; only the ✓ reviewed stays his
         Object.assign(data, FROM_MARIO_SIDE, viaWhish[t.id] ? WHISH_SIDE : {}, { dupOf: null, excluded: false, dupSrc: 'auto', review: false, waAccepted: true, autoRule: viaWhish[t.id] ? 'from-mario-whish' : 'from-mario' });

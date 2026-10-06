@@ -208,6 +208,29 @@ async function refreshSettlements(odooCall, a, db) {
   return writes.length;
 }
 
+// ── Balance lock (Mario, 2026-10-06: "add a lock to the balance, as an option in the top bar of the conversation") ──
+// account.balanceLock = { date, balance, at, by }: the balance at the END of `date` is agreed (a statement was sent); no
+// line dated on or before it may change the balance any more — amount, date, counted or not, new or deleted. Project,
+// partner, note, review stay editable.
+const lockOf = a => (a && a.balanceLock && /^\d{4}-\d{2}-\d{2}$/.test(a.balanceLock.date || '')) ? a.balanceLock : null;
+const movement = t => t.excluded ? 0 : t.xlAmount != null ? -(+t.xlAmount) : (t.credit || 0) - (t.debit || 0);
+async function balanceAt(a, date) {   // the grid's balance at the end of `date` (opening + counted movements up to it)
+  const snap = await txCol(a).select('date', 'debit', 'credit', 'excluded', 'xlAmount').get();
+  const rows = snap.docs.map(d => d.data()).filter(t => !date || t.date <= date);
+  const op = a.opening && a.opening.date ? a.opening : null;
+  const bal = op ? op.amount + rows.filter(t => t.date >= op.date).reduce((s, t) => s + movement(t), 0) : rows.reduce((s, t) => s + movement(t), 0);
+  return Math.round(bal * 100) / 100;
+}
+// why a write would move a locked balance ('' = fine). cur = the line now (or null for a new one), next = what it becomes
+function lockRefusal(a, cur, next) {
+  const L = lockOf(a); if (!L) return '';
+  const inLock = t => t && t.date && t.date <= L.date;
+  if (!inLock(cur) && !inLock(next)) return '';
+  const mv = t => t ? movement(t) : 0;
+  if (Math.abs(mv(cur) - mv(next)) < 0.005 && (!cur || !next || inLock(cur) === inLock(next))) return '';
+  return `the balance is locked at ${L.balance} up to ${L.date} (${L.by || ''}) — this would change it; unlock first`;
+}
+
 async function applyCashPartner(a) {
   if (!a || !a.odooPartner || !a.odooPartner.id) return 0;
   const snap = await txCol(a).get();
@@ -1152,6 +1175,18 @@ async function handle(req, res, url, user, ctx) {
     if (!d.exists) return json(res, 404, { error: 'no such line' });
     return json(res, 200, { ...d.data(), account: { id: a.id, name: a.name, currency: a.currency || 'USD', odooPartner: !!(a.odooPartner && a.odooPartner.id), excel: !!(a.excel && a.excel.file) } });
   }
+  // POST { date } locks the balance at the end of that day (the hub computes it); { unlock: true } removes the lock
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/lock$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a || a.provider === 'whish') return json(res, 404, { error: 'no such ledger' });
+    const b = await readBody(req);
+    if (b.unlock) { await a.ref.set({ balanceLock: null, updatedAt: now(), updatedBy: who }, { merge: true }); await hubLog(ws, 'lock', { who, txId: a.id, line: `${a.id}: balance unlocked`, before: a.balanceLock || {}, after: {} }); return json(res, 200, { ok: true, lock: null }); }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.date || ''))) return json(res, 400, { error: 'date (yyyy-mm-dd) required' });
+    const lock = { date: b.date, balance: await balanceAt(a, b.date), at: now(), by: who };
+    await a.ref.set({ balanceLock: lock, updatedAt: now(), updatedBy: who }, { merge: true });
+    await hubLog(ws, 'lock', { who, txId: a.id, line: `${a.id}: balance locked at ${lock.balance} up to ${lock.date}`, before: a.balanceLock || {}, after: lock });
+    return json(res, 200, { ok: true, lock });
+  }
   // the closing balance of an account, the way the grid computes it (opening + credit − debit over the counted lines)
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/balance$/)) && req.method === 'GET') {
     const a = await resolve(ws, m[1]);
@@ -1162,7 +1197,9 @@ async function handle(req, res, url, user, ctx) {
     let bal = 0;
     if (op) bal = op.amount + snap.docs.map(d => d.data()).filter(t => t.date >= op.date).reduce((s, t) => s + mv(t), 0);
     else bal = snap.docs.reduce((s, d) => s + mv(d.data()), 0);
-    return json(res, 200, { id: a.id, name: a.name, currency: a.currency || 'USD', balance: Math.round(bal * 100) / 100, lines: snap.size });
+    const L = lockOf(a);
+    const lock = L ? { ...L, now: await balanceAt(a, L.date) } : null;   // now ≠ balance: something before the lock moved anyway
+    return json(res, 200, { id: a.id, name: a.name, currency: a.currency || 'USD', balance: Math.round(bal * 100) / 100, lines: snap.size, lock });
   }
 
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx$/)) && req.method === 'POST') {
@@ -1173,6 +1210,7 @@ async function handle(req, res, url, user, ctx) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.date || ''))) return json(res, 400, { error: 'date (yyyy-mm-dd) required' });
     const debit = money(b.debit), credit = money(b.credit);
     if (!debit && !credit) return json(res, 400, { error: 'an amount is required' });
+    { const why = lockRefusal(a, null, { date: b.date, debit, credit, excluded: !!b.excluded }); if (why) return json(res, 423, { error: why }); }
     const id = b.id ? String(b.id) : 'm-' + newId();
     const t = { id, src: b.src === 'telegram' ? 'telegram' : 'manual', date: b.date, ref: String(b.ref || ''), service: '', phone: '',
       description: String(b.description || '').trim(), debit, credit, createdAt: now(), createdBy: who, updatedAt: now(), updatedBy: who };
@@ -1198,6 +1236,8 @@ async function handle(req, res, url, user, ctx) {
     const data = {};
     for (const k of ANNOT) if (k in body) data[k] = body[k];
     if (data.waAt) data.waAt = waInstant(data.waAt, body.date || cur.date);
+    { const next = { ...cur, ...data }; for (const k of ['date', 'debit', 'credit', 'xlAmount']) if (k in body) next[k] = k === 'date' ? body[k] : money(body[k]);
+      const why = lockRefusal(a, cur, next); if (why) return json(res, 423, { error: why }); }
     // the line itself may be edited only when a person wrote it
     // a person wrote it, or it is a row of the workbook — which is corrected in the sheet below
     // a /site post is a proposal the same way (2026-09-12)
@@ -1299,6 +1339,7 @@ async function handle(req, res, url, user, ctx) {
     const ref = txCol(a).doc(m[2]);
     const cur = (await ref.get()).data();
     if (!cur) return json(res, 404, { error: 'no such line' });
+    { const why = lockRefusal(a, cur, null); if (why) return json(res, 423, { error: why }); }
     // An Odoo row is a fact and cannot be deleted — as long as the entry behind it is still there.
     // When that entry has been deleted in Odoo (a purchase rebooked in another company leaves the
     // old chain behind), the row mirrors nothing and is just an orphan, so it may go.
@@ -1344,6 +1385,11 @@ async function handle(req, res, url, user, ctx) {
     if (!a) return json(res, 404, { error: 'no such account' });
     const body = await readBody(req);
     const col = txCol(a), at = now();
+    if (lockOf(a) && (body.items || []).some(i => i && 'excluded' in i)) {
+      const curs = Object.fromEntries((await Promise.all((body.items || []).filter(i => i && /^[\w-]+$/.test(String(i.id))).map(i => col.doc(String(i.id)).get()))).filter(d => d.exists).map(d => [d.id, d.data()]));
+      const bad = (body.items || []).find(i => i && curs[i.id] && lockRefusal(a, curs[i.id], { ...curs[i.id], ...i }));
+      if (bad) return json(res, 423, { error: lockRefusal(a, curs[bad.id], { ...curs[bad.id], ...bad }) });
+    }
     const writes = (body.items || []).filter(i => i && /^[\w-]+$/.test(String(i.id))).map(i => {
       const data = { updatedAt: at, updatedBy: who };
       for (const k of ANNOT) if (k in i) data[k] = i[k];
@@ -1511,8 +1557,10 @@ async function handle(req, res, url, user, ctx) {
     const rows = (await Promise.all(ids.map(id => col.doc(id).get()))).filter(d => d.exists).map(d => ({ id: d.id, ...d.data() }));
     const dates = [...new Set(rows.map(t => t.date))].sort();
     const dayRows = dates.length ? (await col.where('date', '>=', dates[0]).get()).docs.map(d => d.data()).filter(t => t.nature === 'labour' && t.analyticId) : [];
+    const L = lockOf(a);
     for (const t of rows) {
       if (t.bookedMove || t.dupOf || !(t.debit > 0) || t.waAccepted) continue;
+      if (L && t.date <= L.date) { out.left.push(t.id + ': before the balance lock (' + L.date + ')'); continue; }
       const day = dayRows.find(d => d.date === t.date);
       const an = t.analyticId ? null : day ? { analyticId: day.analyticId, analyticName: day.analyticName, analyticSrc: 'auto', analyticFrom: 'his day' } : null;
       const ph = t.fromPhoto || {};
@@ -1568,7 +1616,7 @@ async function handle(req, res, url, user, ctx) {
     const b = await readBody(req), since = String(b.since || '2026-09-14');
     const col = txCol(a);
     const rows = (await col.get()).docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(t => t.date >= since && (t.src === 'whatsapp' || t.src === 'site') && !t.bookedMove && !t.dupOf && ledgers.isFromMario(t));
+      .filter(t => t.date >= since && (t.src === 'whatsapp' || t.src === 'site') && !t.bookedMove && !t.dupOf && ledgers.isFromMario(t) && !(lockOf(a) && t.date <= lockOf(a).date));
     for (const t of rows) await col.doc(t.id).set({ ...ledgers.FROM_MARIO_SIDE, excluded: false, review: false, waAccepted: true, autoRule: 'from-mario', updatedAt: new Date().toISOString(), updatedBy: 'rule: from mario' }, { merge: true });
     const r = rows.length ? await bookFromMario({ ...a }, rows.map(t => t.id), who) : { booked: [] };
     return json(res, 200, { lines: rows.map(t => t.date + ' ' + (t.credit || 0)), ...r });
