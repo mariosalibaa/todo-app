@@ -798,6 +798,23 @@ async function absorbWaLines(ctx, account, who, lines) {
   // (Mario, 2026-09-09: "WhatsApp should not mess with my work and my review").
   const his = t => !!(t.reviewed || t.reviewedAt || t.waAccepted === true || t.bookedMove || t.ref || t.dupSrc === 'manual'
     || (t.updatedBy && t.updatedBy !== 'import'));
+  // RULE (Mario, 2026-10-06): "<N>$ from mario" on a day Mario's Whish sent exactly N to this worker's number = money from
+  // MARIO'S WHISH to his cash (journal Cash Whish Mario USD - S_LB), linked to that Whish line as one transfer — never a
+  // second movement next to the Whish one, never from Mario's cash box.
+  const wphone = WORKER_PHONE[account.id];
+  const viaWhish = {};
+  if (wphone) {
+    const want = lines.filter(t => isFromMario(t) && !(existing[t.id] && his(existing[t.id])));
+    const wcol = account.ref.firestore.collection('workspaces').doc(ctx.TEAM_ID || 'team').collection('whishAccounts').doc(MARIO_WHISH).collection('tx');
+    const usedW = new Set();
+    for (const t of want) {
+      try {
+        const w = (await wcol.where('date', '==', t.date).get()).docs.map(d => ({ id: d.id, ...d.data() }))
+          .find(w => !usedW.has(w.id) && !w.transferId && Math.abs((w.debit || 0) - amt(t)) < 0.011 && String(w.phone || w.description || '').replace(/\D/g, '').endsWith(wphone.slice(-8)));
+        if (w) { usedW.add(w.id); viaWhish[t.id] = w.id; }
+      } catch (e) { /* the Whish ledger unreadable: Mario's cash, as before */ }
+    }
+  }
   const writes = lines.filter(t => { if (existing[t.id] && his(existing[t.id])) { kept++; if (!existing[t.id].excluded) accepted++; return false; } return true; }).map(t => {
     const prev = existing[t.id] || {};
     const data = { ...t };
@@ -823,7 +840,8 @@ async function absorbWaLines(ctx, account, who, lines) {
       else if (isFromMario(t) && account.odooPartner && account.odooPartner.id) {
         // standing rule (Mario, 2026-10-05): "<N>$ from mario" that Mario wrote himself is accepted on the spot — cash
         // from Mario cash (S LB), no project, booked in Odoo and reconciled; only the ✓ reviewed stays his
-        Object.assign(data, FROM_MARIO_SIDE, { dupOf: null, excluded: false, dupSrc: 'auto', review: false, waAccepted: true, autoRule: 'from-mario' });
+        Object.assign(data, FROM_MARIO_SIDE, viaWhish[t.id] ? WHISH_SIDE : {}, { dupOf: null, excluded: false, dupSrc: 'auto', review: false, waAccepted: true, autoRule: viaWhish[t.id] ? 'from-mario-whish' : 'from-mario' });
+        if (viaWhish[t.id]) data.note = 'by Whish, txn ' + viaWhish[t.id];
         autoBook.push(t.id); accepted++;
       }
       else { data.dupOf = null; data.excluded = true; data.dupSrc = 'auto'; data.review = true; review++; if (t.waFrom === 'them' && t.debit > 0) theirs.push(t.id); }
@@ -832,6 +850,14 @@ async function absorbWaLines(ctx, account, who, lines) {
     return { ref: col.doc(t.id), data };
   });
   await acc.batchSet(account.ref.firestore, writes);
+  for (const [txId, wid] of Object.entries(viaWhish)) {
+    const t = lines.find(x => x.id === txId); if (!t) continue;
+    const ws = account.ref.firestore.collection('workspaces').doc(ctx.TEAM_ID || 'team');
+    const id = 'trw-' + wid;
+    await ws.collection('transfers').doc(id).set({ id, date: t.date, fromId: MARIO_WHISH, toId: account.id, amount: amt(t), currency: 'USD', note: 'Mario Whish → ' + (account.name || account.id) + ' (rule)', fromTxId: wid, toTxId: txId, createdAt: now(), createdBy: 'rule: from-mario-whish' }, { merge: true });
+    await ws.collection('whishAccounts').doc(MARIO_WHISH).collection('tx').doc(wid).set({ transferId: id, kind: 'transfer', kindSrc: 'transfer', updatedAt: now() }, { merge: true });
+    await account.ref.collection('tx').doc(txId).set({ transferId: id }, { merge: true });
+  }
   const first = lines.reduce((m, l) => !m || l.date < m ? l.date : m, ''), last = lines.reduce((m, l) => l.date > m ? l.date : m, '');
   return { lines: lines.length, added, updated, kept, linked, review, accepted, dropped, first, last, autoBook, theirs };
 }
@@ -872,6 +898,10 @@ async function absorbWaDays(ctx, account, messages) {
 
 // "100$ from mario", "200$ FROM MARIO", "from mario 50$" — written by Mario, money IN to the worker
 const isFromMario = t => t.waFrom === 'mario' && t.credit > 0 && /^\s*(\d[\d.,]*\s*\$?\s*)?from\s+mario\b(\s*\d[\d.,]*\s*\$?)?\s*$/i.test(String(t.description || ''));
+const MARIO_WHISH = '20222279';   // Whish · Mario Saliba
+// the workers' WhatsApp numbers (their accounting groups' main writer); Georges' is not known for sure, left out
+const WORKER_PHONE = { 'ziad-cash': '96171117530', 'khodr-cash': '96170449809', 'mitri-cash': '9613255604', 'abed-cash': '96170573879' };
+const WHISH_SIDE = { cashAccountId: MARIO_WHISH, cashJournalId: 184, cashJournalName: 'Cash Whish Mario USD - S_LB', cashJournalCompany: 'S LB' };
 const FROM_MARIO_SIDE = { nature: 'transfer', natureSrc: 'rule', kind: 'transfer', kindSrc: 'rule', partnerKind: 'cash', cashAccountId: 'mario-cash',
   cashJournalId: 87, cashJournalName: 'Cash Mario USD', cashJournalCompany: 'S LB', company: 'S LB', companySrc: 'rule',
   partnerId: null, partnerName: '', partnerSrc: '', analyticId: null, analyticName: '', analyticSrc: '' };
