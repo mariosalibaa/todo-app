@@ -451,7 +451,16 @@ function pairUp(rows, targets, opts) {
     // message (same instant) pairs with the line it already became
     if (r.waAt && o.waAt && Math.abs(Date.parse(r.waAt) - Date.parse(o.waAt)) > 30 * 60e3) continue;
     const a = amt(r), b = amt(o), diff = Math.abs(a - b);
+    // Learned 2026-10-06: a line booked by hand from a message carries that message's time (waAt) but its own English
+    // words and its own LBP rate ("800,000 LBP" → 8.89 at 90,000 vs the proposal's 8.94 at 89,500) — the same instant
+    // and an amount within 20 % is the same movement, words or not (Ziad 9 Sep: two grey twins stayed on screen)
+    const sameInstant = r.waAt && o.waAt && Math.abs(Date.parse(r.waAt) - Date.parse(o.waAt)) <= 2 * 60e3;
     if (diff < 0.011) pairs.push({ r, o, d, w: 0 });
+    // an Excel row has no message time and English words: the same day and the amount to 1 % ($0.10) is enough
+    // ("٧٨ دولار و٩ سنت من عند عتال" = 78.09 vs the sheet's "Attal · official" 78.00 — Ziad, 2026-10-06)
+    else if (loose && o.src === 'excel' && !o.waAt && diff <= Math.max(0.1, Math.max(a, b) * 0.01)) pairs.push({ r, o, d, w: 0.8 });
+    else if (sameInstant && diff <= Math.max(0.5, Math.max(a, b) * 0.2))   // nearest in time, then in amount, wins
+      pairs.push({ r, o, d, w: 0.5 + Math.min(0.4, Math.abs(Date.parse(r.waAt) - Date.parse(o.waAt)) / 60e3 * 0.1 + diff / (Math.max(a, b) || 1)) });
     else if (loose && diff <= Math.max(1, a * 0.1)) {
       const wr = words(r.description + ' ' + (r.partnerName || '')), wo = words(o.description + ' ' + (o.partnerName || '') + ' ' + (o.files || []).join(' '));
       if (wr.some(w => wo.includes(w))) pairs.push({ r, o, d, w: 1 });
@@ -802,7 +811,14 @@ async function absorbWaLines(ctx, account, who, lines) {
     }
     if (prev.dupSrc === 'manual') { if (!prev.excluded) accepted++; }
     else {
-      const d = dup.get(t.id);
+      let d = dup.get(t.id);
+      // the same movement told twice (Mario "100$ from ziad to mitri" + Ziad "١٠٠ دولار للمعلم متري"): the first report
+      // already sits on the sheet's row, the second joins it — only when the sheet has no free row of that amount that day
+      if (!d) {
+        const row = targets.find(o => o.src === 'excel' && o.date === t.date && sameDir(t, o) && Math.abs(amt(t) - amt(o)) <= Math.max(0.1, amt(o) * 0.01)
+          && Object.entries(existing).some(([id, w]) => id !== t.id && (w.src === 'whatsapp' || w.src === 'site') && w.dupOf === o.id));
+        if (row) { d = { id: row.id }; data.secondReport = true; }
+      }
       if (d) { data.dupOf = d.id; data.excluded = true; data.dupSrc = 'auto'; data.review = false; linked++; }
       else if (isFromMario(t) && account.odooPartner && account.odooPartner.id) {
         // standing rule (Mario, 2026-10-05): "<N>$ from mario" that Mario wrote himself is accepted on the spot — cash
