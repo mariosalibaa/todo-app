@@ -33,7 +33,7 @@
   th:first-child,td:first-child{text-align:left;}
   td{padding:7px 8px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   td small{display:block;color:var(--overlay0);font-size:.64rem;}
-  td.mix{color:#cba6f7;} td.edl{color:var(--blue);} td.gen{color:var(--red);} td.sol{color:var(--amber);}
+  td.mix{color:#cba6f7;} td.edl{color:var(--blue);} td.gen{color:var(--red);} td.sol{color:var(--amber);} td.exp{color:var(--green,#a6e3a1);}
   td .z{color:var(--surface1);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
   tr.day td{background:rgba(49,50,68,.35);font-size:.74rem;}
@@ -98,11 +98,11 @@
   // one day → the sources. Before the ATS (2 Jul 2026) EDL came in on the grid port and there was no generator;
   // from then on EDL and both generators share the generator port, so that input is "EDL + generator".
   function split(day, v) {
-    const r = { pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, gen: 0, mix: 0 };
+    const r = { pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, exp: (v.genOut || 0) + (v.gridOut || 0), gen: 0, mix: 0 };
     if (day < D.atsFrom) r.gen = v.gen || 0; else r.mix = v.gen || 0;
     return r;
   }
-  const add = (a, b) => { for (const k of ['pv', 'use', 'dis', 'edl', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
+  const add = (a, b) => { for (const k of ['pv', 'use', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
 
   async function load() {
     const r = await fetch('/api/mahab', { credentials: 'same-origin' });
@@ -138,15 +138,15 @@
     const supply = T.pv + T.edl + T.gen + T.mix;
     $('kpis').innerHTML =
       `<div class="kpi solar"><span>Solar</span><b>${fmt(T.pv)} kWh</b><small>${pc(T.pv, supply)} of supply</small></div>` +
-      `<div class="kpi edl"><span>EDL</span><b>${fmt(T.edl)} kWh</b><small>grid port${anyMix ? ', until 1 Jul' : ''}</small></div>` +
+      `<div class="kpi edl"><span>Port grid</span><b>${fmt(T.edl)} kWh</b><small>EDL${anyMix ? ', until 1 Jul' : ''}</small></div>` +
       (anyGen ? `<div class="kpi gen"><span>Generator</span><b>${fmt(T.gen)} kWh</b></div>` : '') +
-      (anyMix ? `<div class="kpi mix"><span>EDL + generator</span><b>${fmt(T.mix)} kWh</b><small>shared input from 2 Jul — ${pc(T.mix, supply)} of supply</small></div>` : '') +
+      (anyMix ? `<div class="kpi mix"><span>Port gen</span><b>${fmt(T.mix)} kWh</b><small>EDL + generator from 2 Jul — ${pc(T.mix, supply)} of supply</small></div>` : '') +
       `<div class="kpi"><span>Consumption</span><b>${fmt(T.use)} kWh</b><small>${T.days} days</small></div>`;
-    const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>Solar</th><th>EDL<small>grid port</small></th>` +
-      `<th>Gen + EDL<small>gen port, from 2 Jul</small></th><th>Load</th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
+    const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>Solar</th><th>Port grid<small>EDL</small></th><th>Export<small>grid + gen port</small></th>` +
+      `<th>Port gen<small>EDL + gen, from 2 Jul</small></th><th>Load</th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
     const phx = t => `<span class="ph">${t.days} days · battery ${fmt(t.dis)} · solar ${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</span>`;
     const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}${phx(t)}</td><td class="hide-sm">${t.days}</td>` +
-      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="mix">${fmt(t.mix + t.gen)}</td>` +
+      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="exp">${fmt(t.exp)}</td><td class="mix">${fmt(t.mix + t.gen)}</td>` +
       `<td>${fmt(t.use)}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
     let rows = '';
     for (const k of keys) {
@@ -156,7 +156,7 @@
       if (open[k]) for (const s of m.list) {
         const dd = +s.day.slice(8), t = { ...s, days: '' };
         rows += `<tr class="day${s.n < 280 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${s.n < 280 ? s.n + '/288 readings · ' : ''}solar ${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</span></td><td class="hide-sm">${s.n < 280 ? s.n + '/288' : ''}</td>` +
-          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td>${fmt1(s.use)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
+          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td>${fmt1(s.use)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
       }
     }
     rows += line('tot', 'Total ' + year, T);
