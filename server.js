@@ -1105,7 +1105,11 @@ const handler = async (req, res) => {
     const k = new URL(req.url, 'http://x').searchParams.get('k') || '';
     const ok = (k && k === K.shareKey()) || (await cprAccess()).isAdmin;
     if (!ok) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'share link needed' })); return; }
-    try { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(await K.data({ db, TEAM_ID }))); }
+    try {
+      const v = await K.data({ db, TEAM_ID });
+      if (!(await cprAccess()).isAdmin) for (const d of v.days) if (d.shift) d.shift.project = '';   // Walid sees hours and money, not our project names
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v));
+    }
     catch (e) { console.error('khoder:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
