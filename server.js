@@ -1269,7 +1269,9 @@ const handler = async (req, res) => {
   // "allow to forward to shift whatsapp accounts") — that door writes chat posts, so it goes in as an admin
   const machineSite = keyed && url.startsWith('/api/site/') && !agentCall;
   // … and the Ajaltoun divisions list (read only) for the WhatsApp viewer's accounting cards (2026-10-06)
-  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || (url.split('?')[0] === '/api/ajaltoun/sections' && req.method === 'GET'));
+  // … and adding a new one from there (POST, Mario 2026-10-06: "allow to add new division from here")
+  const machineSections = keyed && url.split('?')[0] === '/api/ajaltoun/sections' && (req.method === 'GET' || req.method === 'POST');
+  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || machineSections);
 
   // All API endpoints require auth
   const user = agentCall ? { uid: 'shift-agent', email: 'shift@shift-group.co' }
@@ -1287,7 +1289,7 @@ const handler = async (req, res) => {
   let access = agentCall
     ? { email: user.email, apps: ['site'], admin: false, agent: true }
     : machine
-    ? (machineSite ? { email: user.email, apps: ['site'], admin: true } : { email: user.email, apps: ['accounting'], admin: false })
+    ? (machineSite ? { email: user.email, apps: ['site'], admin: true } : machineSections ? { email: user.email, apps: ['accounting', 'ajaltoun'], admin: true } : { email: user.email, apps: ['accounting'], admin: false })
     : AUTH_DISABLED
       ? { email: user.email || '', apps: APPS.slice(), admin: true }
       : await accessFor(user.email);
