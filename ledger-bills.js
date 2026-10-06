@@ -216,6 +216,9 @@ function analyticsFor(rows, map) {
   let last = '';
   const out = {};
   for (const t of ordered) {
+    // a fuel line kept without a project on purpose (Mario 2026-10-06: "allow to keep project empty, I will book it later
+    // on the site the car is used for") goes on the bill with no analytic until one is chosen
+    if (t.analyticSrc === 'pending') { out[t.id] = { id: null, name: '', project: '', from: 'pending — project chosen later' }; continue; }
     let project = t.project || byDay[t.date] || last || nextAfter(t.date), from = t.project ? 'row' : byDay[t.date] ? 'same day' : last ? 'day before' : nextAfter(t.date) ? 'day after' : '';
     if (project) last = project;
     // a project set by hand, or read off the worker's day in WhatsApp (whatsapp-local/tools/day-project.cjs), wins over the sheet's
@@ -259,7 +262,7 @@ async function bookMonth(ctx, account, month, part, who, opts) {
   const lines = rows.map(t => {
     const a = an[t.id];
     const accountId = t.nature === 'labour' || t.nature === 'opening' ? CO.accounts.labour : isFuel(t.partnerName + ' ' + t.description) ? CO.accounts.fuel : CO.accounts.other;
-    const line = { name: `${t.date} · ${t.description || t.nature} · ${a.project || a.name}`, quantity: 1, price_unit: money(t.debit), account_id: accountId, tax_ids: [[6, 0, []]], analytic_distribution: distOf(t, a) };
+    const line = { name: `${t.date} · ${t.description || t.nature} · ${a.project || a.name || 'project later'}`, quantity: 1, price_unit: money(t.debit), account_id: accountId, tax_ids: [[6, 0, []]], analytic_distribution: distOf(t, a) };
     return { t, line, a, accountId };
   });
 
@@ -299,7 +302,7 @@ async function bookMonth(ctx, account, month, part, who, opts) {
     ref: moveName, service: CO.company,
     company: CO.company, companySrc: 'odoo', kind: l.t.kind || 'work', kindSrc: l.t.kindSrc || 'odoo',
     partnerId: +partner.id, partnerName: partner.name, partnerSrc: 'odoo',
-    analyticId: l.a.id, analyticName: l.a.name, analyticSrc: l.t.analyticSrc === 'manual' || l.t.analyticSrc === 'whatsapp-day' ? l.t.analyticSrc : 'excel', analyticFrom: l.t.analyticSrc === 'whatsapp-day' ? l.t.analyticFrom : l.a.from,
+    analyticId: l.a.id, analyticName: l.a.name, analyticSrc: ['manual', 'whatsapp-day', 'pending'].includes(l.t.analyticSrc) ? l.t.analyticSrc : 'excel', analyticFrom: l.t.analyticSrc === 'whatsapp-day' ? l.t.analyticFrom : l.a.from,
     odoo: { checkedAt: at, matches: [{ chosen: true, moveId, move: moveName, date: dateOf, amount: total, partner: partner.name, partnerId: +partner.id,
       label: l.line.name, company: CO.company, journal: CO.journal, state, docs: [], analytics: [{ id: l.a.id, name: l.a.name, from: 'bill' }],
       score: 10, why: ['one line of the month\'s ' + PARTS[part].label + ' bill, made from this row'] }] },
