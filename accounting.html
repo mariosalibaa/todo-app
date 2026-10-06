@@ -1768,7 +1768,7 @@ function render() {
     // when the message behind the line was sent (Beirut time), and by whom
     const waWhen = t.waAt ? (d => { const b = new Date(d.getTime() + 3 * 3600e3); const hm = b.toISOString().slice(11, 16), dy = b.toISOString().slice(0, 10);
       return `<div class="ref wa-when" title="WhatsApp message of ${dy} ${hm} (Beirut)${t.waFrom ? ', ' + (t.waFrom === 'mario' ? 'from you' : 'from him') : ''}">💬 ${dy === t.date ? '' : dy.slice(5) + ' '}${hm}${t.waFrom ? ' · ' + (t.waFrom === 'mario' ? 'Mario' : 'him') : ''}</div>`; })(new Date(t.waAt)) : '';
-    const isTr = t.nature === 'transfer';
+    const isTr = t.nature === 'transfer' || !!t.transferId;   // a line linked to another account (Whish → Ziad cash) is a transfer: no project
     const typeCell = !isExcelKept() ? '' : t.src === 'excel'
       ? `<td class="c-type ${t.natureSrc === 'manual' ? 'src-manual' : ''}" title="${esc(TYPE_TIP[t.nature] || '')}"><select onchange="saveType('${t.id}', this.value, this)"><option value="" ${!t.nature ? 'selected' : ''}>? which type</option>${TYPES.map(k => `<option value="${k}" ${t.nature === k ? 'selected' : ''}>${k}</option>`).join('')}</select>${t.retype ? '<div class="hint" title="The type changed after this row was booked: press Rewrite on its month in Book months">↻ rebook month</div>' : ''}</td>`
       : `<td class="c-type hint">${esc(t.nature || '')}</td>`;

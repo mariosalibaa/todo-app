@@ -565,10 +565,14 @@ async function writeTransferLines(ws, tr) {
   const [from, to] = await Promise.all([resolve(ws, tr.fromId), resolve(ws, tr.toId)]);
   if (!from || !to) throw new Error('unknown account');
   const b = ws.firestore.batch();
-  // an existing line (a Whish top-up, an Odoo entry) is linked, not doubled
-  if (tr.fromTxId) b.set(txCol(from).doc(String(tr.fromTxId)), { transferId: tr.id, kind: 'transfer', kindSrc: 'transfer', updatedAt: now() }, { merge: true });
+  // an existing line (a Whish top-up, an Odoo entry) is linked, not doubled — and reads as what it is: a transfer to /
+  // from the other account, no partner and no project (Mario, 2026-10-06: the Whish 100 to Ziad, "same rule we use for
+  // the accounting of the team")
+  const linked = other => ({ transferId: tr.id, kind: 'transfer', kindSrc: 'transfer', nature: 'transfer', natureSrc: 'transfer', partnerKind: 'cash', cashAccountId: other.id,
+    partnerId: null, partnerName: '', partnerSrc: '', analyticId: null, analyticName: '', analyticSrc: 'transfer', analyticSplit: null, updatedAt: now() });
+  if (tr.fromTxId) b.set(txCol(from).doc(String(tr.fromTxId)), linked(to), { merge: true });
   else b.set(txCol(from).doc('tr-' + tr.id), trLine(tr, 'out', to.name), { merge: true });
-  if (tr.toTxId) b.set(txCol(to).doc(String(tr.toTxId)), { transferId: tr.id, kind: 'transfer', kindSrc: 'transfer', updatedAt: now() }, { merge: true });
+  if (tr.toTxId) b.set(txCol(to).doc(String(tr.toTxId)), linked(from), { merge: true });
   else b.set(txCol(to).doc('tr-' + tr.id), trLine(tr, 'in', from.name), { merge: true });
   await b.commit();
   return { from, to };
