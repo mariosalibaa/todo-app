@@ -35,7 +35,23 @@
   .ok{color:var(--green);font-size:.7rem;} .warn{color:#f38ba8;font-size:.7rem;font-weight:600;}
   .foot{color:var(--overlay0);font-size:.72rem;margin-top:12px;line-height:1.5;}
   .err{color:#f38ba8;padding:20px;}
-  @media (max-width:640px){ td,th{padding:6px 5px;} table{font-size:.74rem;} }
+  /* phone, portrait (Mario 2026-10-06): one card per day instead of the 10-column table */
+  .cards{display:none;}
+  @media (max-width:700px){
+    .card{display:none;} .cards{display:grid;gap:8px;}
+    .kpis{grid-template-columns:1fr;gap:8px;} .kpi{padding:10px 12px;} .kpi b{font-size:1.25rem;}
+    main{padding:12px 12px 40px;} h1{font-size:1.05rem;} .lead{font-size:.76rem;}
+  }
+  .dc{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;}
+  .dc .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;}
+  .dc .top b{font-size:.95rem;} .dc .top span{font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;}
+  .dc .side{display:grid;grid-template-columns:52px 1fr auto;gap:2px 8px;align-items:baseline;font-size:.8rem;padding:4px 0;border-top:1px solid var(--surface0);}
+  .dc .side .who{font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;}
+  .dc .side.s .who,.dc .side.s .amt{color:var(--amber);} .dc .side.w .who,.dc .side.w .amt{color:var(--blue);}
+  .dc .side .amt{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+  .dc .side .det{color:var(--sub);font-size:.72rem;grid-column:2 / 4;}
+  .dc .chk{font-size:.7rem;}
+  .dc.tot{border-color:var(--amber);}
 </style>
 </head>
 <body>
@@ -45,6 +61,7 @@
   <p class="lead" id="lead">Loading…</p>
   <div class="kpis" id="kpis"></div>
   <div class="card"><table id="tbl"></table></div>
+  <div id="cards" class="cards"></div>
   <p class="foot" id="foot"></p>
 </main>
 <script>
@@ -85,6 +102,19 @@ const walidMin = s => { const v = toMin(s); return v == null ? null : (v < 7 * 6
       <td class="s sep">${hm(t.shift.hours)}</td><td class="s">${usd(t.shift.labour)}</td><td class="s">${usd(t.shift.transport)}</td><td class="s">${usd(t.shift.total)}</td>
       <td class="w sep">${hm(t.walid.hours)}</td><td class="w">${usd(t.walid.labour)}</td><td class="w">${usd(t.walid.transport)}</td><td class="w">${usd(t.walid.total)}</td>
       <td class="sep">${usd(t.shift.total + t.walid.total)}</td></tr></tbody>`;
+  // the same, one card a day, for a phone held upright
+  const side = (x, cls, who) => x ? `<div class="side ${cls}"><span class="who">${who}</span><span>${x.from && x.to ? x.from + '–' + x.to : '—'} · ${hm(x.hours)}</span><span class="amt">${usd(x.total)}</span>
+      <span class="det">work ${usd(x.labour)} + transport ${usd(x.transport)}${x.project ? ' · ' + x.project : ''}</span></div>` : `<div class="side ${cls}"><span class="who">${who}</span><span class="z" style="color:var(--surface1)">—</span><span></span></div>`;
+  $('#cards').innerHTML = d.days.map(x => {
+    let chk = '';
+    if (x.shift && x.walid && x.shift.from && x.walid.from) {
+      const over = Math.max(0, Math.min(toMin(x.shift.to), walidMin(x.walid.to)) - Math.max(toMin(x.shift.from), walidMin(x.walid.from)));
+      chk = over > 5 ? `<span class="warn chk">${over} min overlap</span>` : '<span class="ok chk">✓ no overlap</span>';
+    }
+    return `<div class="dc"><div class="top"><b>${dayName(x.date)}</b>${chk}<span>${usd((x.shift ? x.shift.total : 0) + (x.walid ? x.walid.total : 0))}</span></div>${side(x.shift, 's', 'Shift')}${side(x.walid, 'w', 'Walid')}</div>`;
+  }).join('') + `<div class="dc tot"><div class="top"><b>Total</b><span>${usd(t.shift.total + t.walid.total)}</span></div>
+      <div class="side s"><span class="who">Shift</span><span>${t.shift.days} days · ${hm(t.shift.hours)}</span><span class="amt">${usd(t.shift.total)}</span><span class="det">work ${usd(t.shift.labour)} + transport ${usd(t.shift.transport)}</span></div>
+      <div class="side w"><span class="who">Walid</span><span>${t.walid.days} days · ${hm(t.walid.hours)}</span><span class="amt">${usd(t.walid.total)}</span><span class="det">work ${usd(t.walid.labour)} + transport ${usd(t.walid.transport)}</span></div></div>`;
   $('#foot').textContent = (d.note ? d.note + ' · ' : '') + 'Shift hours are Khoder\'s own "arrived / finished" messages; Walid\'s are his Work Hours Summary.';
 })();
 </script>
