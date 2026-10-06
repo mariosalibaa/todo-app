@@ -218,8 +218,10 @@ function analyticsFor(rows, map) {
   for (const t of ordered) {
     let project = t.project || byDay[t.date] || last || nextAfter(t.date), from = t.project ? 'row' : byDay[t.date] ? 'same day' : last ? 'day before' : nextAfter(t.date) ? 'day after' : '';
     if (project) last = project;
-    let id = t.analyticSrc === 'manual' && t.analyticId ? t.analyticId : ((map[norm(project)] || {}).id || null);
-    let name = t.analyticSrc === 'manual' && t.analyticId ? t.analyticName : ((map[norm(project)] || {}).name || '');
+    // a project set by hand, or read off the worker's day in WhatsApp (whatsapp-local/tools/day-project.cjs), wins over the sheet's
+    const kept = (t.analyticSrc === 'manual' || t.analyticSrc === 'whatsapp-day') && t.analyticId;
+    let id = kept ? t.analyticId : ((map[norm(project)] || {}).id || null);
+    let name = kept ? t.analyticName : ((map[norm(project)] || {}).name || '');
     if (!id) { id = GENERAL; name = 'GENERAL'; from = project ? from + ', unmapped → GENERAL' : 'GENERAL'; }
     out[t.id] = { id, name, project, from };
   }
@@ -297,7 +299,7 @@ async function bookMonth(ctx, account, month, part, who, opts) {
     ref: moveName, service: CO.company,
     company: CO.company, companySrc: 'odoo', kind: l.t.kind || 'work', kindSrc: l.t.kindSrc || 'odoo',
     partnerId: +partner.id, partnerName: partner.name, partnerSrc: 'odoo',
-    analyticId: l.a.id, analyticName: l.a.name, analyticSrc: l.t.analyticSrc === 'manual' ? 'manual' : 'excel', analyticFrom: l.a.from,
+    analyticId: l.a.id, analyticName: l.a.name, analyticSrc: l.t.analyticSrc === 'manual' || l.t.analyticSrc === 'whatsapp-day' ? l.t.analyticSrc : 'excel', analyticFrom: l.t.analyticSrc === 'whatsapp-day' ? l.t.analyticFrom : l.a.from,
     odoo: { checkedAt: at, matches: [{ chosen: true, moveId, move: moveName, date: dateOf, amount: total, partner: partner.name, partnerId: +partner.id,
       label: l.line.name, company: CO.company, journal: CO.journal, state, docs: [], analytics: [{ id: l.a.id, name: l.a.name, from: 'bill' }],
       score: 10, why: ['one line of the month\'s ' + PARTS[part].label + ' bill, made from this row'] }] },

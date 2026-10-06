@@ -62,7 +62,11 @@
     const booked = !!t.bookedMove, accepted = !!t.waAccepted, odoo = t.src === 'odoo';
     const cancelled = !booked && !odoo && !!t.excluded && !t.review;
     const stateTxt = booked ? `in Odoo ✓✓ ${esc(t.bookedMove.name || '')}` : odoo ? 'an Odoo entry' : cancelled ? 'cancelled — off the ledger, kept on the paper' : accepted ? 'accepted ✓ — counts on the ledger, not in Odoo yet' : 'proposal — not counted until you accept it';
-    const lock = booked || odoo;
+    // A line inside a worker's MONTH bill (bookedMove.month) stays editable — description, amount, partner, project:
+    // the month bill is rewritten from the hub lines right after (Mario, 2026-10-06: "allow to edit here … amount").
+    // Its company is the bill's. A line booked on its own (book-row / a payment) or an Odoo mirror stays locked.
+    const monthLine = booked && !!t.bookedMove.month && !odoo;
+    const lockAll = booked || odoo, lock = lockAll && !monthLine;
     o.querySelector('.ls').innerHTML = `
     <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : cancelled ? 'cancelled' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
       <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=account.move&view_type=form&id=${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
@@ -70,18 +74,18 @@
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
       <label>Money<select id="ls-side" ${lock ? 'disabled' : ''}><option value="debit" ${side === 'debit' ? 'selected' : ''}>out (paid)</option><option value="credit" ${side === 'credit' ? 'selected' : ''}>in (received)</option></select></label></div>
     <label>Note<input id="ls-note" value="${esc(t.note || '')}" placeholder="what it was for"></label>
-    <label>Partner (supplier)<span class="combo"><input id="ls-partner" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="type to search Odoo partners" ${lock ? 'disabled' : ''}>${lock ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-partner-menu" hidden></div></span></label>
-    <div class="ls-row"><label>Company<select id="ls-co" ${lock ? 'disabled' : ''}><option value="">—</option>${(REFS.companies || []).map(c => `<option value="${esc(c.name)}" ${t.company === c.name ? 'selected' : ''}>${esc(A.coShort ? A.coShort(c.name) : c.name)}</option>`).join('')}${t.company && !(REFS.companies || []).some(c => c.name === t.company) ? `<option value="${esc(t.company)}" selected>${esc(A.coShort ? A.coShort(t.company) : t.company)}</option>` : ''}</select></label>
+    <label>Partner (supplier)<span class="combo"><input id="ls-partner" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="type to search Odoo partners" ${lockAll ? 'disabled' : ''}>${lockAll ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-partner-menu" hidden></div></span></label>
+    <div class="ls-row"><label>Company<select id="ls-co" ${lockAll ? 'disabled' : ''}><option value="">—</option>${(REFS.companies || []).map(c => `<option value="${esc(c.name)}" ${t.company === c.name ? 'selected' : ''}>${esc(A.coShort ? A.coShort(c.name) : c.name)}</option>`).join('')}${t.company && !(REFS.companies || []).some(c => c.name === t.company) ? `<option value="${esc(t.company)}" selected>${esc(A.coShort ? A.coShort(t.company) : t.company)}</option>` : ''}</select></label>
       <label>Project<span class="combo"><input id="ls-proj" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="type or pick a project" ${lock ? 'disabled' : ''}>${lock ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-proj-menu" hidden></div></span></label></div>
     <label id="ls-div-wrap" ${isAj ? '' : 'hidden'}>Division (Ajaltoun work section — type a new name to create one)<span class="combo"><input id="ls-div" autocomplete="off" value="${esc(secName(t.section))}" placeholder="prefab, excavation, stone walls…"><button type="button" class="caret" tabindex="-1">▾</button><div class="menu" id="ls-div-menu" hidden></div></span></label>
-    ${lock ? '' : `<div class="ls-extra"><div class="hint">Additional expenses on the same paper — each becomes its own line on this ledger (one Odoo bill per line)</div>
+    ${lockAll ? '' : `<div class="ls-extra"><div class="hint">Additional expenses on the same paper — each becomes its own line on this ledger (one Odoo bill per line)</div>
       ${S.extra.map((x, i) => `<div class="ls-row"><input placeholder="e.g. transport" value="${esc(x.description)}" oninput="LineSheet.S.extra[${i}].description=this.value"><input type="number" step="0.01" inputmode="decimal" placeholder="25" value="${x.amount || ''}" oninput="LineSheet.S.extra[${i}].amount=this.value" style="max-width:110px"><button class="x" onclick="LineSheet.S.extra.splice(${i},1);LineSheet.draw()">✕</button></div>`).join('')}
       <button class="ls-add" onclick="LineSheet.S.extra.push({description:'',amount:''});LineSheet.draw();setTimeout(()=>{const l=document.querySelectorAll('.ls-extra input');l[l.length-2]&&l[l.length-2].focus()},0)">+ add an expense</button></div>`}
     <div class="ls-actions">
       <button onclick="LineSheet.save()">Save</button>
-      ${!accepted && !lock ? `<button class="ok" onclick="LineSheet.save('accept')">✓ Accept</button>` : ''}
-      ${accepted && !lock ? `<button class="ok" onclick="LineSheet.save('book')">✓ Book in Odoo</button><button class="warn" onclick="LineSheet.hold()">↩ hold</button>` : ''}
-      ${!lock && !cancelled ? `<button class="warn" onclick="LineSheet.cancelEntry()">✕ Cancel entry</button>` : ''}
+      ${!accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('accept')">✓ Accept</button>` : ''}
+      ${accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('book')">✓ Book in Odoo</button><button class="warn" onclick="LineSheet.hold()">↩ hold</button>` : ''}
+      ${!lockAll && !cancelled ? `<button class="warn" onclick="LineSheet.cancelEntry()">✕ Cancel entry</button>` : ''}
       ${cancelled ? `<button onclick="LineSheet.restoreEntry()">↩ Put it back</button>` : ''}
       <button class="ghost" onclick="LineSheet.close()">Close</button></div>
     <div class="err" id="ls-err"></div>`;
@@ -189,7 +193,28 @@
     const btns = [...document.querySelectorAll('.ls-actions button')]; btns.forEach(b => b.disabled = true);
     try {
       const t = S.t, lock = !!t.bookedMove || t.src === 'odoo';
+      const monthLine = !!t.bookedMove && !!t.bookedMove.month && t.src !== 'odoo';
       const f = await fields();
+      if (monthLine) {
+        if (!f.debit && !f.credit) throw new Error('an amount is needed');
+        const { company, companySrc, partnerId, partnerName, partnerSrc, ...rest } = f;   // company and partner are the month bill's (the worker)
+        await A.api('PATCH', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`, { ...rest, retype: true });
+        // … then the month bill is rewritten from the hub lines; a posted one only after a yes
+        const bm = t.bookedMove, body = { month: bm.month, part: bm.part || 'expenses' };
+        let rebook = '';
+        try { await A.api('POST', `/api/accounting/accounts/${S.acc}/book-month`, body); rebook = `${bm.name || 'the month bill'} rewritten in Odoo`; }
+        catch (e) {
+          if (/already (posted|paid)|reset it to draft/i.test(e.message) && confirm(`${bm.name || 'The month bill'} is posted in Odoo.\n\nRewrite it now with this change? (back to draft, rewritten from the hub lines, posted again)`)) {
+            await A.api('POST', `/api/accounting/accounts/${S.acc}/book-month`, { ...body, redo: true, post: true }); rebook = `${bm.name || 'the month bill'} rewritten and posted again`;
+          } else rebook = 'saved on the hub — ' + (e.message.length < 140 ? e.message : 'the Odoo bill was not rewritten') + ' (rewrite the month in Book months)';
+        }
+        S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`);
+        if (S.onChange) { try { await S.onChange(); } catch {} }
+        draw();
+        const ok = g('ls-err'); if (ok) { ok.style.color = '#3fb950'; ok.textContent = 'saved · ' + rebook; }
+        btns.forEach(b => b.disabled = false);
+        return;
+      }
       // 1. the hub first: the line itself …
       if (!lock) {
         if (!f.debit && !f.credit) throw new Error('an amount is needed');
