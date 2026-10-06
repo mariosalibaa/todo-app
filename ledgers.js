@@ -966,7 +966,7 @@ async function linkTransfers(ctx, account, who, opts) {
       if (!same) continue;
       const d = days(a.date, m.date); if (d > 4) continue;
       const sameMove = aMove && moveOf(m) === aMove;
-      pairs.push({ a, m, other, d, w: sameMove ? 0 : PEOPLE_LAT[owner].test(text(m)) ? 1 : 2, side });
+      pairs.push({ a, m, other, d, w: sameMove ? 0 : (PEOPLE_LAT[owner] && PEOPLE_LAT[owner].test(text(m))) ? 1 : 2, side });
     }
   }
   pairs.sort((x, y) => x.w - y.w || x.d - y.d);
