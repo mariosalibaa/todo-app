@@ -689,6 +689,34 @@ function dayFromMessages(messages, account) {
   };
 }
 
+
+// Delete one Odoo entry for good (Mario purges, he does not keep cancelled shells — see memory
+// odoo-delete-cancelled-entries): a payment goes through account.payment (its move follows), a
+// bill/entry through account.move; reconciliations on it are undone first, then draft → cancel →
+// unlink with force_delete. Returns what was removed, for the log.
+async function deleteOdooEntry(odooCall, moveId) {
+  const ctx = { allowed_company_ids: [2, 7, 8, 9, 10, 4] };
+  const [mv] = await odooCall('account.move', 'read', [[moveId], ['name', 'move_type', 'amount_total', 'company_id', 'state', 'attachment_ids']], { context: ctx });
+  if (!mv) throw new Error('entry not found');
+  const c = { allowed_company_ids: [mv.company_id[0]], company_id: mv.company_id[0] };
+  const rec = await odooCall('account.move.line', 'search_read', [[['move_id', '=', moveId], ['reconciled', '=', true]]], { fields: ['id'], context: c });
+  const partial = await odooCall('account.move.line', 'search_read', [[['move_id', '=', moveId], '|', ['matched_debit_ids', '!=', false], ['matched_credit_ids', '!=', false]]], { fields: ['id'], context: c });
+  const ids = [...new Set([...rec, ...partial].map(l => l.id))];
+  if (ids.length) await odooCall('account.move.line', 'remove_move_reconcile', [ids], { context: c });
+  const pays = await odooCall('account.payment', 'search_read', [[['move_id', '=', moveId]]], { fields: ['id', 'name'], context: c });
+  if (pays.length) {
+    const pid = pays.map(p => p.id);
+    try { await odooCall('account.payment', 'action_draft', [pid], { context: c }); } catch {}
+    try { await odooCall('account.payment', 'action_cancel', [pid], { context: c }); } catch {}
+    await odooCall('account.payment', 'unlink', [pid], { context: { ...c, force_delete: true } });
+    return { id: moveId, name: mv.name, kind: 'payment', amount: mv.amount_total, company: mv.company_id[1], attachments: mv.attachment_ids };
+  }
+  if (mv.state === 'posted') await odooCall('account.move', 'button_draft', [[moveId]], { context: c });
+  if (mv.state !== 'cancel') await odooCall('account.move', 'button_cancel', [[moveId]], { context: c });
+  await odooCall('account.move', 'unlink', [[moveId]], { context: { ...c, force_delete: true } });
+  return { id: moveId, name: mv.name, kind: mv.move_type, amount: mv.amount_total, company: mv.company_id[1], attachments: mv.attachment_ids };
+}
+
 async function handle(req, res, url, user, ctx) {
   const { db, admin, TEAM_ID, odooCall, local } = ctx;
   // Everything that reads or writes a workbook on D:\ or the WhatsApp archive only exists on
@@ -1353,7 +1381,21 @@ async function handle(req, res, url, user, ctx) {
       let live = [];
       try { live = await odooCall('account.move', 'read', [[moveId], ['name']], {}); }
       catch (e) { return json(res, 400, { error: 'could not ask Odoo whether that entry still exists: ' + String(e.message || e) }); }
-      if (live.length) return json(res, 400, { error: `this line mirrors ${live[0].name} in Odoo, which still exists — Odoo lines are facts` });
+      // Mario, 2026-10-07 ("allow to delete a line"): with ?odoo=1 the entry behind the row goes too —
+      // its reconciliation undone, cancelled, then force-deleted the way delete-cancelled.mjs does — and
+      // every row of this account that mirrors the same entry is dropped with it.
+      const wantOdoo = new URL(req.url, 'http://x').searchParams.get('odoo') === '1';
+      if (live.length && !wantOdoo) return json(res, 400, { error: `this line mirrors ${live[0].name} in Odoo, which still exists — delete it with the Odoo entry (🗑 asks) or leave it` });
+      if (live.length && wantOdoo) {
+        let gone;
+        try { gone = await deleteOdooEntry(odooCall, moveId); }
+        catch (e) { return json(res, 400, { error: 'Odoo refused to delete ' + live[0].name + ': ' + String(e.message || e).slice(0, 200) }); }
+        const sibs = (await txCol(a).where('src', '==', 'odoo').get()).docs.map(d => d.data())
+          .filter(t => t.id !== m[2] && ((t.odoo && (t.odoo.matches || []).some(x => x.chosen && x.moveId === moveId)) || (t.bookedMove && t.bookedMove.id === moveId)));
+        for (const t of sibs) await txCol(a).doc(t.id).delete();
+        await hubLog(ws, 'odoo-delete', { who, txId: m[2], line: `${cur.date} · ${gone.name} deleted in Odoo (${gone.kind}, ${gone.amount}) with ${1 + sibs.length} hub line(s)`, before: { move: gone, rows: [cur, ...sibs].map(t => ({ id: t.id, date: t.date, debit: t.debit || 0, credit: t.credit || 0, description: t.description || '' })) }, after: {}, undo: false });
+        cur.odooDeleted = gone;
+      }
       // a /site post is a proposal the same way (2026-09-12)
     } else if (!['manual', 'telegram', 'budget', 'excel', 'whatsapp', 'site'].includes(cur.src)) {
       return json(res, 400, { error: 'only typed or imported ledger lines can be deleted; statement lines are facts' });
@@ -1377,7 +1419,7 @@ async function handle(req, res, url, user, ctx) {
       line: [cur.date, cur.description].filter(Boolean).join(' · ').slice(0, 80),
       before: { date: cur.date, description: cur.description || '', debit: cur.debit || 0, credit: cur.credit || 0, src: cur.src },
       after: {}, undo: false });
-    return json(res, 200, { ok: true, before: cur, after: {} });
+    return json(res, 200, { ok: true, before: cur, after: {}, odooDeleted: cur.odooDeleted || null });
   }
 
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx-bulk$/)) && req.method === 'POST') {

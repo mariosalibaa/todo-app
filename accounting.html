@@ -1785,7 +1785,7 @@ function render() {
         + (t.src === 'manual' || t.src === 'telegram' ? `<a onclick="openLineForm('${t.id}')" title="Edit">✎</a>` : '')
         + `<a onclick="openLineForm('${t.id}', true)" title="Duplicate this line — a new line filled in like this one, for you to adjust and save">⧉</a>`
         // a /site post is a proposal the same way (2026-09-12)
-        + (['manual', 'telegram', 'budget', 'excel', 'whatsapp', 'site'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="Delete this line">🗑</a>` : '')
+        + (['manual', 'telegram', 'budget', 'excel', 'whatsapp', 'site', 'odoo'].includes(t.src) && !t.transferId ? `<a onclick="deleteLine('${t.id}')" title="${t.src === 'odoo' ? 'Delete this line AND its entry in Odoo' : 'Delete this line'}">🗑</a>` : '')
         + ((t.src === 'whatsapp' || t.src === 'site') && !t.excluded && !t.review && !t.waAccepted ? `<a onclick="acceptWa('${t.id}', true)" title="Accept this proposed line — from then on it can be booked in Odoo and written into the workbook">✓ accept</a>` : '')
         // second ✓ (Mario, 2026-09-23): the accepted line goes to Odoo from the row itself — no queue, no list
         + ((t.src === 'whatsapp' || t.src === 'site') && t.waAccepted && !t.bookedMove ? `<a class="bookrow" onclick="autoBook('${t.id}')" title="Book this accepted line in Odoo now (a bill paid from this cash, or a payment)">✓ book in Odoo</a><a onclick="acceptWa('${t.id}', false)" title="Accepted. Click to put it back on hold — it will not be booked.">↩ hold</a>` : '')
@@ -4145,9 +4145,14 @@ async function saveLine() {
 }
 async function deleteLine(id) {
   const t = tx.find(x => x.id === id); if (!t) return;
-  if (!confirm(`Delete this line?\n${t.date} · ${fmt(t.debit || t.credit)} · ${t.description || ''}`)) return;
+  const odooRow = t.src === 'odoo';
+  const entry = odooRow ? (((t.odoo && (t.odoo.matches || []).find(x => x.chosen)) || {}).move || (t.bookedMove && t.bookedMove.name) || t.ref || 'the Odoo entry') : '';
+  if (!confirm(odooRow
+    ? `Delete this line AND ${entry} in Odoo?\n${t.date} · ${fmt(t.debit || t.credit)} · ${t.description || ''}\n\nThe entry is unreconciled, cancelled and removed from Odoo for good (its payments and attachments with it). Every hub line of that entry goes too. No undo.`
+    : `Delete this line?\n${t.date} · ${fmt(t.debit || t.credit)} · ${t.description || ''}`)) return;
   try {
-    await Admin.api('DELETE', `/api/accounting/accounts/${accOf(t)}/tx/${id}`);
+    const r = await Admin.api('DELETE', `/api/accounting/accounts/${accOf(t)}/tx/${id}${odooRow ? '?odoo=1' : ''}`);
+    if (odooRow) { await reloadTx(); computeBalances(); render(); say(r && r.odooDeleted ? `${r.odooDeleted.name} deleted in Odoo and here` : 'Line deleted'); return; }
     tx = tx.filter(x => x.id !== id); computeBalances(); render(); say('Line deleted');
   } catch (e) { say('Could not delete: ' + e.message, 'err'); }
 }
