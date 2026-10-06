@@ -1251,7 +1251,8 @@ const handler = async (req, res) => {
   // the laptop forwarding a WhatsApp message into Shift WhatsApp carries the same key (Mario, 2026-09-25:
   // "allow to forward to shift whatsapp accounts") — that door writes chat posts, so it goes in as an admin
   const machineSite = keyed && url.startsWith('/api/site/') && !agentCall;
-  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall);
+  // … and the Ajaltoun divisions list (read only) for the WhatsApp viewer's accounting cards (2026-10-06)
+  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || (url.split('?')[0] === '/api/ajaltoun/sections' && req.method === 'GET'));
 
   // All API endpoints require auth
   const user = agentCall ? { uid: 'shift-agent', email: 'shift@shift-group.co' }

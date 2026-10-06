@@ -278,7 +278,7 @@ async function mirrorTimesheet(a, read) {
   return { months: read.months.length, days: (read.days || []).length, at };
 }
 
-const CARS = ['BMW', 'RAV4', 'Laredo', 'Tacoma'];
+const CARS = ['BMW', 'RAV4', 'Laredo', 'Tacoma', 'Ziad car'];   // Ziad's own car (Mario 2026-10-06)
 const OWN_CAR = { abed: 'BMW', georges: 'RAV4' };
 const isFuel = s => /benzin|fuel|essence|petrol|gasoline|mazout|gasoil|diesel|\btank\b|⛽/i.test(s || '') && !/water tank/i.test(s || '');
 const carIn = s => { const m = String(s || '').match(/\b(bmw|rav ?4|laredo|tacoma)\b/i); return m ? CARS.find(c => c.toLowerCase() === m[1].replace(/\s/g, '').toLowerCase()) : ''; };
