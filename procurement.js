@@ -6,8 +6,14 @@
 // Firestore layout (under workspaces/<team>):
 //   procurement/<id>  { id, supplier, contact, item, brand, price, currency, unit, description,
 //                       source, date, project, trade (topography, ppr, sanitary…), division (Mechanical,
-//                       Electrical, Civil, Steel, Solar…), addedBy, addedAt, updatedBy, updatedAt }
+//                       Electrical, Civil, Steel, Solar…), photos [{ id, name, mime, size, key, store, at, by }],
+//                       addedBy, addedAt, updatedBy, updatedAt }
 // `date` = the day of the quote (yyyy-mm-dd, Beirut); `source` = URL or "WhatsApp call" etc.
+// `photos` = the offer itself — the handwritten note, the WhatsApp screenshot, the supplier's PDF
+// (Mario 2026-10-07: "attach the photo"); bytes live in the Storage bucket via hub-files,
+// key procurement/<rowId>/<photoId>.<ext>, served back on GET (cookie auth works for <img>).
+
+const files = require('./hub-files');
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const now = () => new Date().toISOString();
@@ -56,8 +62,41 @@ async function handle(req, res, url, user, ctx) {
   }
 
   if ((m = url.match(/^\/api\/procurement\/([\w-]+)$/)) && req.method === 'DELETE') {
+    const cur = (await col.doc(m[1]).get()).data();
+    for (const ph of (cur && cur.photos) || []) { try { await files.deleteFile(ctx, ph); } catch (e) { console.warn('procurement photo delete:', e.message); } }
     await col.doc(m[1]).delete();
     res.writeHead(204); res.end(); return true;
+  }
+
+  // Photos of the offer: add one (base64 body), read one back, remove one
+  if ((m = url.match(/^\/api\/procurement\/([\w-]+)\/photo$/)) && req.method === 'POST') {
+    const ref = col.doc(m[1]); const cur = (await ref.get()).data();
+    if (!cur) return json(res, 404, { error: 'row not found' });
+    const b = await readBody(req, 12e6);
+    if (!b.dataBase64) return json(res, 400, { error: 'dataBase64 required' });
+    const buf = Buffer.from(String(b.dataBase64).replace(/^data:[^,]*,/, ''), 'base64');
+    if (buf.length > 8e6) return json(res, 400, { error: 'photo over 8 MB' });
+    const mime = /^image\/|pdf$/.test(b.mime || '') ? String(b.mime) : 'image/jpeg';
+    const ext = /pdf$/.test(mime) ? 'pdf' : /png$/.test(mime) ? 'png' : /webp$/.test(mime) ? 'webp' : 'jpg';
+    const pid = newId();
+    const saved = await files.saveFile(ctx, { buf, mime, name: b.name || `${cur.supplier || 'offer'} ${cur.date || ''}.${ext}`.trim(), key: `procurement/${m[1]}/${pid}.${ext}`, who, meta: { procurement: m[1] } });
+    const photo = { ...saved, id: pid };
+    await ref.set({ photos: [...(cur.photos || []), photo], updatedAt: now(), updatedBy: who }, { merge: true });
+    return json(res, 200, (await ref.get()).data());
+  }
+  if ((m = url.match(/^\/api\/procurement\/([\w-]+)\/photo\/([\w-]+)$/)) && req.method === 'GET') {
+    const cur = (await col.doc(m[1]).get()).data();
+    const ph = cur && (cur.photos || []).find(p => p.id === m[2]);
+    if (!ph) { res.writeHead(404); res.end('no such photo'); return true; }
+    await files.streamFile(ctx, ph, res, req); return true;
+  }
+  if ((m = url.match(/^\/api\/procurement\/([\w-]+)\/photo\/([\w-]+)$/)) && req.method === 'DELETE') {
+    const ref = col.doc(m[1]); const cur = (await ref.get()).data();
+    const ph = cur && (cur.photos || []).find(p => p.id === m[2]);
+    if (!ph) return json(res, 404, { error: 'no such photo' });
+    try { await files.deleteFile(ctx, ph); } catch (e) { console.warn('procurement photo delete:', e.message); }
+    await ref.set({ photos: cur.photos.filter(p => p.id !== m[2]), updatedAt: now(), updatedBy: who }, { merge: true });
+    return json(res, 200, (await ref.get()).data());
   }
 
   return false;

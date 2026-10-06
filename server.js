@@ -1462,7 +1462,7 @@ const handler = async (req, res) => {
   }
   if (url.startsWith('/api/procurement')) {
     if (!access.admin) return noApp('admin');
-    try { const handled = await procurement.handle(req, res, url, user, { db, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
+    try { const handled = await procurement.handle(req, res, url, user, { db, admin, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('procurement error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
