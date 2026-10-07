@@ -15,7 +15,8 @@ const bonvin = require('./bonvin');            // /api/bonvin/* (Sin El Fil 2292
 const procurement = require('./procurement');  // /api/procurement/* (the price book: supplier, item, price, description — admin only)
 const cprFuel = require('./cpr-fuel');        // /api/cpr/fuel (Kamal's diesel fills: photo + litres + $, private link key or admin)
 const energy = require('./energy');            // /api/cpr (CPR meters + Deye: kWh per building / source per day, history + live — PUBLIC, read-only)
-const waOutbox = require('./wa-outbox');      // /api/wa-outbox — WhatsApp messages queued on the hub while the laptop is off (2026-10-07)
+const waOutbox = require('./wa-outbox');
+const devRequests = require('./dev-requests');   // /api/dev-requests — code changes Mario asked the hub assistant for; Claude Code drains them from VS Code (2026-10-07)      // /api/wa-outbox — WhatsApp messages queued on the hub while the laptop is off (2026-10-07)
 const aiFill = require('./ai-fill');            // POST /api/ai/fill — Dictate: a voice/typed note → a form's fields (any member; extraction only)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
@@ -149,6 +150,9 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'emoji-picker.js'));
   fs.readFileSync(path.join(__dirname, 'line-sheet.js'));
   fs.readFileSync(path.join(__dirname, 'ask.js'));
+  fs.readFileSync(path.join(__dirname, 'dev.html'));
+  fs.readFileSync(path.join(__dirname, 'dev-requests.js'));
+  fs.readFileSync(path.join(__dirname, 'shift-context.md'));
   fs.readFileSync(path.join(__dirname, 'scan-editor.js'));
   fs.readFileSync(path.join(__dirname, 'hub-history.js'));
   fs.readFileSync(path.join(__dirname, 'naccache.html'));
@@ -768,6 +772,7 @@ const handler = async (req, res) => {
     '/plants': 'plants.html',   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
     '/makhlouf': 'makhlouf.html',   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
     '/whatsapp-outbox': 'wa-outbox.html',   // WhatsApp messages queued while the laptop is off (Mario 2026-10-07)
+    '/dev': 'dev.html',   // the dev queue: what the ✦ assistant could not do because it needs code; Claude Code drains it (Mario 2026-10-07)
     '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
     '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
     '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
@@ -1314,7 +1319,9 @@ const handler = async (req, res) => {
   const machineFill = keyed && url === '/api/ai/fill' && req.method === 'POST';
   // … and the laptop draining the WhatsApp outbox and mirroring its chat list (wa-contacts/outbox.mjs, 2026-10-07)
   const machineOutbox = keyed && url.startsWith('/api/wa-outbox');
-  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || machineSections || machineFill || machineOutbox);
+  // … and Claude Code on the laptop reading / closing the dev queue (dev-queue.mjs, 2026-10-07)
+  const machineDev = keyed && url.startsWith('/api/dev-requests');
+  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || machineSections || machineFill || machineOutbox || machineDev);
 
   // All API endpoints require auth
   const user = agentCall ? { uid: 'shift-agent', email: 'shift@shift-group.co' }
@@ -1332,7 +1339,7 @@ const handler = async (req, res) => {
   let access = agentCall
     ? { email: user.email, apps: ['site'], admin: false, agent: true }
     : machine
-    ? (machineSite ? { email: user.email, apps: ['site'], admin: true } : machineSections ? { email: user.email, apps: ['accounting', 'ajaltoun'], admin: true } : { email: user.email, apps: ['accounting'], admin: false })
+    ? (machineSite ? { email: user.email, apps: ['site'], admin: true } : machineDev ? { email: user.email, apps: ['todo'], admin: true } : machineSections ? { email: user.email, apps: ['accounting', 'ajaltoun'], admin: true } : { email: user.email, apps: ['accounting'], admin: false })
     : AUTH_DISABLED
       ? { email: user.email || '', apps: APPS.slice(), admin: true }
       : await accessFor(user.email);
@@ -1369,11 +1376,18 @@ const handler = async (req, res) => {
     return;
   }
 
-  // ── Ask: the chat box on every page. Read-only, scoped to whoever is signed in (assistant.js)
+  // ── the dev queue (dev-requests.js): Mario on /dev, the assistant's dev_request tool, Claude Code with the machine key
+  if (url.startsWith('/api/dev-requests')) {
+    try { if (await devRequests.handle(req, res, url, { ws: db.collection('workspaces').doc(TEAM_ID), access })) return; }
+    catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e).slice(0, 200) })); return; }
+  }
+
+  // ── Ask: the chat box on every page. Read-only for everyone; for Mario it also proposes lines (behind his ✓)
+  // and queues dev requests (assistant.js)
   if (url === '/api/assistant' && req.method === 'POST') {
     const b = await new Promise(resolve => { let d = ''; req.on('data', c => { d += c; if (d.length > 2e5) req.destroy(); }); req.on('end', () => { try { resolve(JSON.parse(d || '{}')); } catch { resolve({}); } }); });
     try {
-      const out = await assistant.ask({ accounts, ws: db.collection('workspaces').doc(TEAM_ID), access }, b);
+      const out = await assistant.ask({ accounts, ws: db.collection('workspaces').doc(TEAM_ID), access, odooCall }, b);
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out));
     } catch (e) {
       res.writeHead(e.status || 502, { 'Content-Type': 'application/json' });

@@ -248,6 +248,8 @@ function jumpTo(postId) {
 
 // ── attendance: Start / Finish with location (part 2) ─────────────────────────
 let day = null;
+// what ✦ Ask sees as open here: the chat and the day shown (ask.js sends it with every question, 2026-10-07)
+window.HubAskContext = () => { const t = threads.find(x => x.id === cur); return { page: 'site chat', chat: cur || '', chatName: t ? t.name : '', chatKind: t ? t.kind : '', day: day && (day.date || day.day || null) }; };
 const isWorkerChat = () => { const t = threads.find(x => x.id === cur); return !!(t && t.kind === 'worker'); };
 async function loadDay() {
   if (!isWorkerChat()) { el('att').hidden = true; return; }

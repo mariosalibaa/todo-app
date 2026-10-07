@@ -35,7 +35,10 @@
 
   function draw() {
     const body = panel.querySelector('.body');
-    body.innerHTML = msgs.length ? '' : `<div class="hint">Ask about the ledgers — "what did we pay Attal this month", "balance of Mario cash", "Ziad's lines not in Odoo". It reads; it never changes anything.</div>`;
+    const mario = A.me && A.me.admin && !A.me.viewAs;
+    body.innerHTML = msgs.length ? '' : mario
+      ? `<div class="hint">Ask about the ledgers — "what did we pay Attal this month", "balance of Mario cash", "Ziad's lines not in Odoo".<br>Tell it about money — "Ziad paid 19 for Elias' phone today" — it puts a line on the ledger that waits for your ✓.<br>Ask for a change to the hub — it goes to <a href="/dev" style="color:inherit">/dev</a> for Claude Code. It never books, never sends, never accepts.</div>`
+      : `<div class="hint">Ask about the ledgers — "what did we pay Attal this month", "balance of Mario cash", "Ziad's lines not in Odoo". It reads; it never changes anything.</div>`;
     for (const m of msgs) {
       const d = document.createElement('div');
       d.className = 'm ' + (m.role === 'user' ? 'me' : m.error ? 'err' : 'it');
@@ -43,7 +46,9 @@
       if (m.used && m.used.length) {
         const u = document.createElement('div');
         u.className = 'used';
-        u.textContent = 'looked up: ' + m.used.map(x => x.tool.replace(/_/g, ' ')).join(', ');
+        const NAME = { list_accounts: 'ledgers', account_balance: 'balance', find_lines: 'lines', lookup_refs: 'Odoo names',
+          propose_line: 'proposed a line — waits for your ✓', fill_line: 'filled the line — waits for your ✓', dev_request: 'queued at /dev' };
+        u.textContent = m.used.map(x => (NAME[x.tool] || x.tool.replace(/_/g, ' ')) + (x.ok === false ? ' (refused)' : '')).join(' · ');
         d.append(u);
       }
       body.append(d);
@@ -58,7 +63,9 @@
     if (!text || busy) return;
     ta.value = ''; msgs.push({ role: 'user', content: text }); busy = true; draw();
     try {
-      const r = await A.api('POST', '/api/assistant', { messages: msgs.map(m => ({ role: m.role, content: m.content })), page: location.pathname });
+      // what is open on the page goes along (site: the chat and the day; accounts: the ledger in the hash) — set by the page as window.HubAskContext
+      let context; try { context = typeof window.HubAskContext === 'function' ? window.HubAskContext() : undefined; } catch { context = undefined; }
+      const r = await A.api('POST', '/api/assistant', { messages: msgs.map(m => ({ role: m.role, content: m.content })), page: location.pathname + (location.hash || ''), context });
       msgs.push({ role: 'assistant', content: r.answer || '—', used: r.used || [] });
     } catch (e) {
       msgs.push({ role: 'assistant', content: (e.data && e.data.error) || e.message || 'it did not answer', error: true });
@@ -71,7 +78,8 @@
     if (panel) return;
     panel = document.createElement('div');
     panel.id = 'ask';
-    panel.innerHTML = `<div class="hd"><b>Ask</b><span class="sp"></span><button title="Start again">↻</button><button title="Close">✕</button></div>
+    const devLink = A.me && A.me.admin && !A.me.viewAs ? '<a href="/dev" title="Dev requests — what needs code" style="color:inherit;opacity:.7;text-decoration:none;font-size:.78rem">🛠 dev</a>' : '';
+    panel.innerHTML = `<div class="hd"><b>Ask</b><span class="sp"></span>${devLink}<button title="Start again">↻</button><button title="Close">✕</button></div>
       <div class="body"></div>
       <div class="ft"><textarea rows="1" placeholder="Ask about the ledgers…"></textarea><button>Send</button></div>`;
     document.body.append(panel);

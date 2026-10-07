@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111b21">
+<title>Dev requests · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--bg:#0b141a;--panel:#111b21;--panel2:#202c33;--line:#2a3942;--text:#e9edef;--sub:#8696a0;--green:#00a884;--amber:#F2A93B;--red:#f15c6d;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
+  .hleft{display:flex;align-items:center;gap:12px;min-width:0;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.88rem;font-weight:600;padding:6px 11px;border:1px solid var(--line);border-radius:8px;white-space:nowrap;}
+  h1{font-size:1rem;margin:0;font-weight:600;} .who{font-size:.75rem;color:var(--sub);}
+  main{max-width:860px;margin:0 auto;padding:14px 14px 90px;}
+  .banner{border-radius:10px;padding:10px 13px;font-size:.84rem;line-height:1.45;margin-bottom:12px;background:#0f2a22;border:1px solid #1f5f4b;color:#b7f0dc;}
+  .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;} .tabs button{flex:1;min-width:90px;}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font:inherit;font-size:.85rem;cursor:pointer;}
+  button.on{background:var(--green);border-color:var(--green);color:#04150f;font-weight:700;}
+  button.go{background:var(--green);border-color:var(--green);color:#04150f;font-weight:700;}
+  button.lnk{background:none;border:0;color:var(--sub);padding:2px 4px;font-size:.78rem;text-decoration:underline;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;}
+  input,textarea{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:inherit;font-size:.92rem;}
+  textarea{min-height:80px;resize:vertical;font-size:.86rem;}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;} .row .sp{flex:1;}
+  .item{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--panel);}
+  .item .h{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px;}
+  .item .h b{font-size:.92rem;} .item .meta{color:var(--sub);font-size:.74rem;}
+  .item .p{white-space:pre-wrap;word-break:break-word;font-size:.84rem;color:#cfd8dc;background:var(--panel2);border-radius:8px;padding:8px 10px;}
+  .item .asked{white-space:pre-wrap;font-size:.78rem;color:var(--sub);margin-top:6px;border-left:2px solid var(--line);padding-left:8px;}
+  .st{font-weight:700;font-size:.78rem;} .st.open{color:var(--amber);} .st.doing{color:#53bdeb;} .st.done{color:var(--green);} .st.dropped{color:var(--sub);}
+  .muted{color:var(--sub);font-size:.8rem;} .err{color:var(--red);font-size:.82rem;margin-top:6px;}
+  pre.all{white-space:pre-wrap;font-size:.8rem;background:var(--panel2);border-radius:9px;padding:10px;max-height:50vh;overflow:auto;}
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><a class="hback" href="/">‹ Hub</a><div><h1>Dev requests</h1><div class="who" id="who"></div></div></div>
+  <button id="copyall" class="go" title="One prompt with every open request, for Claude Code">Copy prompt</button>
+</header>
+<main>
+  <div class="banner">What the hub assistant (✦) could not do because it needs code lands here. On the laptop: open VS Code in <b>D:\vscode\todo</b> and run <b>/hub-dev-queue</b> — Claude Code reads this list, does the work, and marks each one done with its commit.</div>
+  <div class="card">
+    <input id="title" placeholder="New request — one line, like a commit subject" autocomplete="off">
+    <textarea id="prompt" placeholder="The brief: which page, what happens now, what should happen, how to tell it is done" style="margin-top:8px"></textarea>
+    <div class="row"><input id="page" placeholder="/page it concerns (optional)" style="max-width:260px"><span class="sp"></span><button class="go" id="add">Queue</button></div>
+    <div class="err" id="err"></div>
+  </div>
+  <div class="tabs"><button data-s="open" class="on">Open</button><button data-s="done">Done</button><button data-s="dropped">Dropped</button></div>
+  <div id="items"></div>
+  <div class="card" id="allbox" hidden><b style="font-size:.9rem">The prompt</b> <span class="muted">— copied to the clipboard; paste it in VS Code</span><pre class="all" id="all"></pre></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const when = iso => iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+let show = 'open', D = { items: [], counts: {} };
+
+Admin.require('todo', me => {
+  if (!me.admin) { document.querySelector('main').innerHTML = '<p>Mario’s alone.</p>'; return; }
+  document.getElementById('who').textContent = me.name || me.email;
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { show = b.dataset.s; document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); load(); });
+  document.getElementById('add').onclick = add;
+  document.getElementById('copyall').onclick = copyAll;
+  load();
+});
+
+async function load() {
+  try { D = await Admin.api('GET', '/api/dev-requests?status=' + show); } catch (e) { document.getElementById('items').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  const c = D.counts || {};
+  document.querySelectorAll('.tabs button').forEach(b => b.textContent = b.dataset.s[0].toUpperCase() + b.dataset.s.slice(1) + ' ' + (b.dataset.s === 'open' ? (c.open || 0) + (c.doing || 0) : c[b.dataset.s] || 0));
+  draw();
+}
+function draw() {
+  const items = D.items || [];
+  document.getElementById('items').innerHTML = items.length ? items.map(x => `<div class="item" data-id="${esc(x.id)}">
+    <div class="h"><b contenteditable="true" data-f="title">${esc(x.title)}</b><span class="st ${esc(x.status)}">${esc(x.status)}${x.commit ? ' · ' + esc(x.commit.slice(0, 7)) : ''}</span></div>
+    <div class="meta">${esc(when(x.createdAt))}${x.page ? ' · ' + esc(x.page) : ''}${x.doneAt ? ' · done ' + esc(when(x.doneAt)) : ''}</div>
+    <div class="p" contenteditable="true" data-f="prompt">${esc(x.prompt || '')}</div>
+    ${x.asked ? `<div class="asked">${esc(x.asked)}</div>` : ''}
+    ${x.notes ? `<div class="asked">${esc(x.notes)}</div>` : ''}
+    <div class="row">
+      ${x.status === 'open' || x.status === 'doing' ? `<button class="lnk" onclick="set('${esc(x.id)}',{status:'done'})">done</button><button class="lnk" onclick="set('${esc(x.id)}',{status:'dropped'})">drop</button>` : `<button class="lnk" onclick="set('${esc(x.id)}',{status:'open'})">reopen</button>`}
+      <button class="lnk" onclick="del('${esc(x.id)}')">delete</button><span class="sp"></span><span class="muted">edit the text in place — it saves when you leave the box</span>
+    </div></div>`).join('') : '<div class="muted" style="padding:8px 2px">Nothing here.</div>';
+  document.querySelectorAll('[contenteditable]').forEach(el => el.onblur = () => {
+    const id = el.closest('.item').dataset.id, f = el.dataset.f, v = el.innerText.trim();
+    const cur = (D.items || []).find(x => x.id === id); if (!cur || cur[f] === v) return;
+    set(id, { [f]: v }, true);
+  });
+}
+async function add() {
+  const err = document.getElementById('err'); err.textContent = '';
+  const title = document.getElementById('title').value.trim(), prompt = document.getElementById('prompt').value.trim(), page = document.getElementById('page').value.trim();
+  if (!title) { err.textContent = 'Give it a title.'; return; }
+  try {
+    await Admin.api('POST', '/api/dev-requests', { title, prompt, page });
+    ['title', 'prompt', 'page'].forEach(id => document.getElementById(id).value = '');
+    show = 'open'; document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.s === 'open')); load();
+  } catch (e) { err.textContent = e.message; }
+}
+async function set(id, patch, quiet) { try { await Admin.api('PATCH', '/api/dev-requests/' + id, patch); if (!quiet) load(); else { const cur = D.items.find(x => x.id === id); if (cur) Object.assign(cur, patch); } } catch (e) { alert(e.message); } }
+async function del(id) { if (!confirm('Delete this request?')) return; try { await Admin.api('DELETE', '/api/dev-requests/' + id); load(); } catch (e) { alert(e.message); } }
+function promptText(items) {
+  return ['Hub dev queue — ' + items.length + ' open request(s) from hub.shift-group.co/dev. Work them one by one in D:\\vscode\\todo, run node verify-hub.mjs on the touched pages, deploy, then mark each done: node dev-queue.mjs --done <id> --commit <hash>.', '',
+    ...items.map((x, i) => `${i + 1}. [${x.id}] ${x.title}${x.page ? '  (' + x.page + ')' : ''}\n${x.prompt || '(no brief — ask Mario)'}${x.asked ? '\nMario said: ' + x.asked : ''}`)].join('\n\n');
+}
+async function copyAll() {
+  let items = D.items;
+  if (show !== 'open') { try { items = (await Admin.api('GET', '/api/dev-requests?status=open')).items; } catch (e) { alert(e.message); return; } }
+  const text = promptText(items || []);
+  document.getElementById('all').textContent = text; document.getElementById('allbox').hidden = false;
+  try { await navigator.clipboard.writeText(text); } catch {}
+}
+</script>
+</body>
+</html>
