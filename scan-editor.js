@@ -16,7 +16,8 @@ window.ScanEditor = (function () {
   function readPrefs() { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch { return {}; } }
   function savePrefs() { try { localStorage.setItem(LS, JSON.stringify(prefs)); } catch {} }
 
-  const CSS = `
+  const CSS = `body:has(.scanx) #ask-btn, body:has(.scanx) #hub-install, body:has(.scanx) #ask { display: none !important; }
+
   .scanx{position:fixed;inset:0;z-index:1200;background:#101215;color:#e7e9ea;display:flex;flex-direction:column;
     font:inherit;-webkit-user-select:none;user-select:none;touch-action:none;}
   .scanx .top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top));font-size:.9rem;}
@@ -57,7 +58,8 @@ window.ScanEditor = (function () {
       const DPR = () => Math.min(3, window.devicePixelRatio || 1);
       function layout() {
         const box = stage.getBoundingClientRect();
-        const s = Math.min((box.width - 12) / src.width, (box.height - 12) / src.height);
+        // room around the photo so a handle on its very edge can still be reached with a thumb (Mario 2026-10-07)
+        const s = Math.min((box.width - 56) / src.width, (box.height - 56) / src.height);
         fit = { s, w: Math.round(src.width * s), h: Math.round(src.height * s), dpr: DPR() };
         [view, over].forEach(c => {
           c.width = Math.round(fit.w * fit.dpr); c.height = Math.round(fit.h * fit.dpr);
@@ -78,22 +80,44 @@ window.ScanEditor = (function () {
         g.fillStyle = 'rgba(16,18,21,.55)'; g.fill('evenodd'); g.restore();
         g.beginPath(); g.moveTo(p[0][0], p[0][1]); p.slice(1).forEach(q => g.lineTo(q[0], q[1])); g.closePath();
         g.strokeStyle = '#25d366'; g.lineWidth = 2 * d; g.stroke();
-        p.forEach(q => { g.beginPath(); g.arc(q[0], q[1], 11 * d, 0, 7); g.fillStyle = 'rgba(37,211,102,.25)'; g.fill(); g.strokeStyle = '#25d366'; g.lineWidth = 2.5 * d; g.stroke(); });
+        p.forEach(q => { g.beginPath(); g.arc(q[0], q[1], 13 * d, 0, 7); g.fillStyle = 'rgba(37,211,102,.25)'; g.fill(); g.strokeStyle = '#25d366'; g.lineWidth = 2.5 * d; g.stroke(); });
+        // a pill in the middle of each side: drag it and the whole side moves (Mario 2026-10-07: "also the sides, not only corners")
+        for (let i = 0; i < 4; i++) {
+          const a1 = p[i], a2 = p[(i + 1) % 4], mx = (a1[0] + a2[0]) / 2, my = (a1[1] + a2[1]) / 2, ang = Math.atan2(a2[1] - a1[1], a2[0] - a1[0]);
+          g.save(); g.translate(mx, my); g.rotate(ang);
+          g.beginPath(); g.roundRect ? g.roundRect(-16 * d, -5 * d, 32 * d, 10 * d, 5 * d) : g.rect(-16 * d, -5 * d, 32 * d, 10 * d);
+          g.fillStyle = '#25d366'; g.fill(); g.restore();
+        }
       }
-      let drag = -1;
-      over.addEventListener('pointerdown', e => {
-        const r = over.getBoundingClientRect(), x = (e.clientX - r.left) / fit.s, y = (e.clientY - r.top) / fit.s;
-        let best = -1, bd = 40 / fit.s;
-        quad.forEach(([qx, qy], i) => { const d = Math.hypot(qx - x, qy - y); if (d < bd) { bd = d; best = i; } });
-        if (best >= 0) { drag = best; over.setPointerCapture(e.pointerId); }
+      // drag a corner, or a side's middle pill (moves that side's two corners together); the stage takes the pointer
+      // anywhere near the photo, so a corner sitting on the photo's border is still easy to grab
+      let drag = null;
+      over.style.touchAction = 'none'; stage.style.touchAction = 'none';
+      const at = e => { const r = over.getBoundingClientRect(); return [(e.clientX - r.left) / fit.s, (e.clientY - r.top) / fit.s]; };
+      stage.addEventListener('pointerdown', e => {
+        if (step !== 1) return;
+        const [x, y] = at(e), reach = 44 / fit.s;
+        let best = null, bd = reach;
+        quad.forEach(([qx, qy], i) => { const d = Math.hypot(qx - x, qy - y); if (d < bd) { bd = d; best = { kind: 'corner', i }; } });
+        if (!best) for (let i = 0; i < 4; i++) {
+          const a1 = quad[i], a2 = quad[(i + 1) % 4], d = Math.hypot((a1[0] + a2[0]) / 2 - x, (a1[1] + a2[1]) / 2 - y);
+          if (d < bd) { bd = d; best = { kind: 'side', i }; }
+        }
+        if (!best) return;
+        drag = { ...best, last: [x, y] }; e.preventDefault();
+        try { stage.setPointerCapture(e.pointerId); } catch {}
       });
-      over.addEventListener('pointermove', e => {
-        if (drag < 0) return;
-        const r = over.getBoundingClientRect();
-        quad[drag] = [clamp((e.clientX - r.left) / fit.s, 0, src.width), clamp((e.clientY - r.top) / fit.s, 0, src.height)];
-        drawQuad();
+      stage.addEventListener('pointermove', e => {
+        if (!drag) return;
+        const [x, y] = at(e);
+        if (drag.kind === 'corner') quad[drag.i] = [clamp(x, 0, src.width), clamp(y, 0, src.height)];
+        else {
+          const dx = x - drag.last[0], dy = y - drag.last[1];
+          for (const j of [drag.i, (drag.i + 1) % 4]) quad[j] = [clamp(quad[j][0] + dx, 0, src.width), clamp(quad[j][1] + dy, 0, src.height)];
+        }
+        drag.last = [x, y]; drawQuad();
       });
-      ['pointerup', 'pointercancel'].forEach(t => over.addEventListener(t, () => { drag = -1; }));
+      ['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, () => { drag = null; }));
 
       // ── stage 2: the look ──────────────────────────────────────────────
       function preview() {
