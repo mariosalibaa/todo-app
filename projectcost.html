@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Project cost · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1200px;margin:0 auto;padding:22px 16px 60px;}
+  h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 14px;line-height:1.5;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .bar .sp{flex:1;}
+  select,input,button{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:7px 10px;font-size:.82rem;font-family:inherit;}
+  select{max-width:100%;} #pick{min-width:260px;}
+  button{cursor:pointer;} button:hover{border-color:var(--amber);} button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;overflow-x:auto;margin-bottom:14px;}
+  .card h2{font-size:.95rem;margin:0 0 8px;font-weight:600;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  td{padding:5px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;}
+  td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  tr.grp td{background:var(--surface0);font-weight:600;cursor:pointer;} tr.grp td .arr{display:inline-block;width:14px;color:var(--overlay0);}
+  tr.cat td{cursor:pointer;} tr.cat td:first-child{padding-left:22px;}
+  tr.ln td{font-size:.74rem;color:var(--sub);} tr.ln td:first-child{padding-left:36px;white-space:nowrap;}
+  tr.tot td{font-weight:600;background:rgba(242,169,59,.10);color:var(--amber);border-top:2px solid var(--amber);}
+  tr.proj td{cursor:pointer;} tr.proj:hover td{background:var(--surface0);}
+  .pos{color:var(--green);} .neg{color:var(--red);} .muted{color:var(--overlay0);} .small{font-size:.74rem;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;}
+  .kpi .v{font-size:1.15rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.68rem;color:var(--sub);margin-top:2px;}
+  .kpi.inv .v{color:var(--blue);} .kpi.cost .v{color:var(--amber);} .kpi.profit .v{color:var(--green);} .kpi.profit.neg .v{color:var(--red);}
+  .bars{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:4px 0 10px;background:var(--surface0);}
+  .bars div{height:100%;} .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.72rem;color:var(--sub);margin-bottom:6px;}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
+  #msg{font-size:.8rem;color:var(--sub);margin:8px 0;}
+  @media (max-width:640px){ main{padding:14px 12px 50px;} #pick{min-width:0;width:100%;} th,td{padding:5px 6px;} tr.ln td:first-child{padding-left:14px;} tr.cat td:first-child{padding-left:12px;} }
+  @media print{ header,.bar,.note,#msg{display:none!important;} body{background:#fff;color:#000;} .card{border:0;} td,th{color:#000!important;border-color:#ccc;} tr.grp td{background:#eee!important;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><a class="hback" href="/">‹ Hub</a><div class="wordmark">S<span>H</span>IFT<small>HUB · PROJECT COST</small></div></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1>Project cost</h1>
+  <p class="lead">One project (Odoo analytic account): what it was invoiced, what it cost — labour per person, materials by supplier, fuel and transport — and the profit. VAT paid on supplier invoices counts as cost: clients are billed from S LB without VAT, so it is never recovered (unless the client asked for an official bill).</p>
+  <div class="bar">
+    <select id="pick" onchange="openProject(+this.value)"><option value="">All projects…</option></select>
+    <input type="search" id="find" placeholder="Find a project…" oninput="filterPick(this.value)" style="width:180px">
+    <span class="sp"></span>
+    <button onclick="load(true)" title="Pull the analytic lines again from Odoo (they are cached 10 minutes)">⟳ Refresh</button>
+    <button onclick="window.print()">🖨 Print</button>
+  </div>
+  <div id="msg"></div>
+  <div id="view"></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+const fmt = n => (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = n => n == null ? '' : n.toFixed(1) + '%';
+const COLORS = { labour: '#89b4fa', materials: '#F2A93B', transport: '#a6e3a1', rounding: '#6c7086', other: '#cba6f7' };
+let LIST = [], CUR = null, open = {};
+const say = (t, cls) => { const m = document.getElementById('msg'); m.textContent = t || ''; m.style.color = cls === 'err' ? 'var(--red)' : ''; };
+
+Admin.require(['accounting', 'reports'], me => {
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  load(false);
+});
+
+async function load(fresh) {
+  say('Reading the projects from Odoo…');
+  try {
+    const d = await Admin.api('GET', '/api/projectcost/list' + (fresh ? '?fresh=1' : ''));
+    LIST = d.projects;
+    const sel = document.getElementById('pick');
+    sel.innerHTML = '<option value="">All projects…</option>' + LIST.map(p => `<option value="${p.id}">${esc(p.name)} · ${fmt(p.cost)}</option>`).join('');
+    const want = +(new URL(location.href).searchParams.get('id') || 0);
+    say('');
+    if (want) { sel.value = String(want); await openProject(want, fresh); } else renderList();
+  } catch (e) { say('Could not read Odoo: ' + e.message, 'err'); }
+}
+function filterPick(q) {
+  q = q.trim().toLowerCase();
+  const sel = document.getElementById('pick');
+  for (const o of sel.options) { if (!o.value) continue; o.hidden = q && !o.textContent.toLowerCase().includes(q); }
+  if (!CUR) renderList(q);
+}
+function renderList(q) {
+  q = (q || '').toLowerCase();
+  const rows = LIST.filter(p => !q || p.name.toLowerCase().includes(q));
+  const tot = rows.reduce((s, p) => ({ invoiced: s.invoiced + p.invoiced, cost: s.cost + p.cost }), { invoiced: 0, cost: 0 });
+  document.getElementById('view').innerHTML = `
+    <div class="card"><h2>All projects <span class="muted small">(${rows.length}, newest activity first — click one)</span></h2>
+    <table><thead><tr><th>Project</th><th>Activity</th><th class="n">Invoiced</th><th class="n">Cost</th><th class="n">Profit</th><th class="n">Margin</th><th class="n">Lines</th></tr></thead><tbody>
+    ${rows.map(p => `<tr class="proj" onclick="pickProject(${p.id})"><td>${esc(p.name)}${p.active ? '' : ' <span class="muted small">(archived)</span>'}</td><td class="small muted">${p.first.slice(0, 7)} → ${p.last}</td><td class="n">${fmt(p.invoiced)}</td><td class="n">${fmt(p.cost)}</td><td class="n ${p.profit < 0 ? 'neg' : 'pos'}">${fmt(p.profit)}</td><td class="n">${pct(p.margin)}</td><td class="n muted">${p.lines}</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td></td><td class="n">${fmt(tot.invoiced)}</td><td class="n">${fmt(tot.cost)}</td><td class="n">${fmt(tot.invoiced - tot.cost)}</td><td class="n">${tot.invoiced ? pct((tot.invoiced - tot.cost) / tot.invoiced * 100) : ''}</td><td></td></tr>
+    </tbody></table></div>
+    <div class="note">A project with cost and no invoice is a job not yet billed (or billed under another tag). Invoiced = the customer invoice lines carrying this project's analytic.</div>`;
+}
+function pickProject(id) { document.getElementById('pick').value = String(id); openProject(id); }
+async function openProject(id, fresh) {
+  if (!id) { CUR = null; history.replaceState(null, '', '/projectcost'); renderList(document.getElementById('find').value); return; }
+  say('Reading ' + id + '…');
+  try {
+    CUR = await Admin.api('GET', `/api/projectcost/one?id=${id}` + (fresh ? '&fresh=1' : ''));
+    history.replaceState(null, '', '/projectcost?id=' + id);
+    open = {}; say(''); renderProject();
+  } catch (e) { say('Could not read the project: ' + e.message, 'err'); }
+}
+function toggle(k) { open[k] = open[k] === undefined ? (k.startsWith('g:') ? false : true) : !open[k]; renderProject(); }
+function renderProject() {
+  const d = CUR; const groups = d.groups, cats = d.categories;
+  const bar = groups.filter(g => g.total > 0).map(g => `<div style="width:${(g.total / d.cost * 100).toFixed(2)}%;background:${COLORS[g.key] || COLORS.other}" title="${esc(g.key)} ${fmt(g.total)}"></div>`).join('');
+  const legend = groups.map(g => `<span><i style="background:${COLORS[g.key] || COLORS.other}"></i>${esc(g.key)} ${fmt(g.total)} (${d.cost ? (g.total / d.cost * 100).toFixed(0) : 0}%)</span>`).join('');
+  const groupRows = groups.map(g => {
+    const mine = cats.filter(c => c.key.split(' · ')[0] === g.key);
+    const catRows = mine.map(c => {
+      const key = c.key, lines = open[key] ? c.lines.slice().sort((a, b) => a.date < b.date ? -1 : 1).map(l => `<tr class="ln"><td>${l.date}</td><td>${esc(l.partner)}</td><td>${esc(l.name.slice(0, 110))} <span class="muted">${esc(l.move)}</span></td><td class="n">${fmt(l.amount)}</td><td class="n muted"></td></tr>`).join('') : '';
+      return `<tr class="cat" onclick="toggle(${JSON.stringify(key).replace(/"/g, '&quot;')})"><td><span class="arr">${open[key] ? '▾' : '▸'}</span>${esc(c.key.split(' · ').slice(1).join(' · '))}</td><td></td><td class="muted small">${c.n} line${c.n === 1 ? '' : 's'}</td><td class="n">${fmt(c.total)}</td><td class="n muted">${d.cost ? (c.total / d.cost * 100).toFixed(1) + '%' : ''}</td></tr>${lines}`;
+    }).join('');
+    const closed = open['g:' + g.key] === false;
+    return `<tr class="grp" onclick="toggle('g:${esc(g.key)}')"><td><span class="arr">${closed ? '▸' : '▾'}</span>${esc(g.key)}</td><td></td><td class="muted small">${g.n} lines</td><td class="n">${fmt(g.total)}</td><td class="n">${d.cost ? (g.total / d.cost * 100).toFixed(1) + '%' : ''}</td></tr>${closed ? '' : catRows}`;
+  }).join('');
+  const rev = d.revenue.slice().sort((a, b) => a.date < b.date ? -1 : 1).map(r => `<tr class="ln"><td>${r.date}</td><td>${esc(r.partner)}</td><td>${esc(r.name.replace(/\s+/g, ' ').slice(0, 110))} <span class="muted">${esc(r.move)}</span></td><td class="n">${fmt(r.amount)}</td></tr>`).join('');
+  document.getElementById('view').innerHTML = `
+    <h2 style="margin:0 0 2px;font-size:1.1rem">${esc(d.name)} <span class="muted small">${esc(d.plan)} · ${d.first} → ${d.last} · ${d.lines} lines</span></h2>
+    <div class="kpis">
+      <div class="kpi inv"><div class="v">${fmt(d.invoiced)}</div><div class="l">Invoiced to the client</div></div>
+      <div class="kpi cost"><div class="v">${fmt(d.cost)}</div><div class="l">Cost, VAT included</div></div>
+      <div class="kpi profit ${d.profit < 0 ? 'neg' : ''}"><div class="v">${fmt(d.profit)}</div><div class="l">Profit</div></div>
+      <div class="kpi"><div class="v">${pct(d.margin) || '—'}</div><div class="l">Margin on invoiced</div></div>
+    </div>
+    <div class="bars">${bar}</div><div class="legend">${legend}</div>
+    <div class="card"><h2>Cost by nature <span class="muted small">— click a line to see what is behind it</span></h2>
+    <table><thead><tr><th>Nature</th><th></th><th></th><th class="n">USD</th><th class="n">of cost</th></tr></thead><tbody>${groupRows}
+    <tr class="tot"><td>Total cost</td><td></td><td></td><td class="n">${fmt(d.cost)}</td><td class="n">100%</td></tr></tbody></table></div>
+    <div class="card"><h2>Invoiced <span class="muted small">— ${d.revenue.length} customer invoice line${d.revenue.length === 1 ? '' : 's'}</span></h2>
+    <table><thead><tr><th>Date</th><th>Client</th><th>Line</th><th class="n">USD</th></tr></thead><tbody>${rev || '<tr><td colspan="4" class="muted">Nothing invoiced on this project yet.</td></tr>'}
+    <tr class="tot"><td>Total invoiced</td><td></td><td></td><td class="n">${fmt(d.invoiced)}</td></tr></tbody></table></div>
+    <div class="note">Labour is read off the workers' month bills (Sub Contractor): Abed's "day with son" is 50 for Abed and the rest for his son; a "helper from Raashin" is his own line. Materials bought by a worker with his own money sit under "small purchases by the workers". Pulled from Odoo ${new Date(d.pulledAt).toLocaleString()}.</div>`;
+}
+</script>
+</body>
+</html>

@@ -136,6 +136,7 @@ const APPS = [
   { id: 'crm', ico: '🤝', name: 'Clients', desc: 'Every client conversation — WhatsApp (Shift Development line), Instagram, Messenger — with stage, owner, next action and the Odoo lead', href: '/crm' },
   // one tile for both sides (Mario, 2026-09-20 "combine into one"): a partner opens his list (/decide), Mario his desk (/ask)
   { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide', adminHref: '/ask', adminDesc: 'Put a question to a partner from its own link — approve or hold, you get a Telegram when he answers' },
+  { id: 'projectcost', key: ['accounting', 'reports'], ico: '📐', name: 'Project cost', desc: 'One project (Odoo analytic): invoiced, cost by nature — labour per person, materials, VAT, fuel, transport — profit and margin', href: '/projectcost' },
   { id: 'reports', ico: '📊', name: 'Reports', desc: 'SHIFT GROUP SARL trial balance and general ledger in LBP at historical rates — for the accountant', href: '/reports' },
   { id: 'daily', ico: '📋', name: 'Day report', desc: 'Who worked on your project each day, what he did and what it cost.', href: '/accounting/daily' },
   { id: 'members', ico: '👥', name: 'Members & access', desc: 'Who may open which app — Google accounts and phone sign-ins, ledger and projects per member', href: '/members', admin: true },
@@ -219,7 +220,7 @@ document.addEventListener('keydown', e => { if (e.key === '/' && document.active
 
 let ME = null;
 function renderTiles(who) {
-  const on = a => a.everyone || a.admin || who.apps.includes(a.id);   // 'admin' tiles: Mario-only hand-out pages, not an app key
+  const on = a => a.everyone || a.admin || who.apps.includes(a.id) || (a.key || []).some(k => who.apps.includes(k));   // 'key': shown to whoever holds one of these apps   // 'admin' tiles: Mario-only hand-out pages, not an app key
   // a member sees only the tiles he may open — no faded ones (Mario, 2026-09-20)
   document.getElementById('tiles').innerHTML = APPS.filter(a => on(a) && (!a.admin || who.admin) && (!a.only || (who.apps.includes(a.id) && !who.apps.includes('ajaltoun')))).map(a => `
     <a class="tile" href="${who.admin && a.adminHref || a.href}">
