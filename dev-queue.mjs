@@ -16,6 +16,8 @@ const HUB = process.env.HUB_URL || 'https://hub.shift-group.co';
 let key = process.env.ACCOUNTING_API_KEY || '';
 if (!key) { try { key = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.whish-watcher.json'), 'utf8')).accountingApiKey || ''; } catch {} }
 const args = process.argv.slice(2);
+// a synchronous process.exit right after fetch trips a libuv assertion on node 24 / Windows — let the loop drain first
+const bye = () => setTimeout(() => process.exit(0), 200);
 const opt = n => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 
 async function call(method, p, body) {
@@ -33,8 +35,9 @@ if (id) {
   console.log(`${r.id} → ${r.status}${r.commit ? ' (' + r.commit.slice(0, 7) + ')' : ''}: ${r.title}`);
 } else {
   const { items } = await call('GET', '/api/dev-requests?status=open');
-  if (args.includes('--json')) { console.log(JSON.stringify(items, null, 2)); process.exit(0); }
-  if (!items.length) { console.log('The dev queue is empty.'); process.exit(0); }
+  if (args.includes('--json')) { console.log(JSON.stringify(items, null, 2)); }
+  else if (!items.length) { console.log('The dev queue is empty.'); }
+  else {
   console.log(`# Hub dev queue — ${items.length} open\n`);
   for (const [i, x] of items.entries()) {
     console.log(`## ${i + 1}. [${x.id}] ${x.title}${x.page ? '  (' + x.page + ')' : ''}${x.status === 'doing' ? '  — already started' : ''}`);
@@ -44,6 +47,6 @@ if (id) {
     if (x.notes) console.log(`\nnotes: ${x.notes}`);
     console.log();
   }
+  }
 }
-// node 24 on Windows sometimes trips a libuv assertion while tearing down the fetch socket — leave cleanly
-process.exit(0);
+bye();
