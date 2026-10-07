@@ -32,6 +32,12 @@ window.ScanEditor = (function () {
   .scanx .seg button.on{background:#25d366;color:#0b1a10;font-weight:700;}
   .scanx .seg button.ic{flex:0 0 auto;min-width:46px;font-size:1rem;}
   .scanx .lbl{font-size:.68rem;color:#8b9298;text-align:center;letter-spacing:.04em;text-transform:uppercase;}
+  /* WhatsApp style (Mario 2026-10-07: "send below right, details up"): the choices sit under the title, the stage
+     below them, and the green round button bottom-right does Next / Send */
+  .scanx .top{order:0;} .scanx .bar{order:1;padding:6px 10px 8px;background:#16181c;} .scanx .stage{order:2;}
+  .scanx .top button.go{visibility:hidden;}
+  .scanx .fab{position:absolute;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:3;width:60px;height:60px;border-radius:50%;border:0;
+    background:#25d366;color:#0b1a10;font-size:1.6rem;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
   .scanx .busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(16,18,21,.6);font-size:.9rem;}
   `;
 
@@ -49,6 +55,8 @@ window.ScanEditor = (function () {
         <div class="stage" id="sxStage"><canvas id="sxView"></canvas><canvas id="sxOver"></canvas></div>
         <div class="bar" id="sxBar"></div>`;
       document.body.appendChild(root);
+      const fab = document.createElement('button'); fab.type = 'button'; fab.className = 'fab'; fab.textContent = '›'; fab.title = 'Next';
+      fab.onclick = () => root.querySelector('#sxNext').click(); root.appendChild(fab);
       const stage = root.querySelector('#sxStage'), view = root.querySelector('#sxView'), over = root.querySelector('#sxOver');
       let quad = detect(src), step = 1, warped = null, fit = null;
 
@@ -172,11 +180,12 @@ window.ScanEditor = (function () {
       function close(val) { window.removeEventListener('resize', onResize); root.remove(); resolve(val); }
       const onResize = () => { if (step === 1) layout(); else preview(); };
       window.addEventListener('resize', onResize);
-      root.querySelector('#sxCancel').onclick = () => { if (step === 2) { step = 1; root.querySelector('#sxTitle').textContent = 'Crop'; root.querySelector('#sxNext').textContent = 'Next ›'; root.querySelector('#sxCancel').textContent = 'Cancel'; bar(); layout(); } else close(null); };
+      root.querySelector('#sxCancel').onclick = () => { if (step === 2) { step = 1; root.querySelector('#sxTitle').textContent = 'Crop'; root.querySelector('#sxNext').textContent = 'Next ›'; root.querySelector('#sxCancel').textContent = 'Cancel'; fab.textContent = '›'; fab.title = 'Next'; bar(); layout(); } else close(null); };
       root.querySelector('#sxNext').onclick = async () => {
         if (step === 1) {
           step = 2; root.querySelector('#sxTitle').textContent = 'Scan';
           root.querySelector('#sxNext').textContent = 'Send ✓'; root.querySelector('#sxCancel').textContent = '‹ Back';
+          fab.textContent = '➤'; fab.title = 'Send';
           bar(); preview(); return;
         }
         const busy = document.createElement('div'); busy.className = 'busy'; busy.textContent = 'Preparing…'; stage.appendChild(busy);
