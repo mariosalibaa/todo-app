@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Session Notes 2026-10-07 - WhatsApp viewer and Shift Hub</title>
+<style>
+@page{size:A4;margin:16mm 15mm}
+body{font-family:"Segoe UI",sans-serif;font-size:10.5pt;color:#1d1d1d;line-height:1.4}
+h1{font-size:16pt;margin:0 0 2px} .d{color:#666;margin-bottom:12px}
+h2{color:#B7791F;font-size:12pt;margin:14px 0 5px;border-bottom:1px solid #e6d3b0;padding-bottom:2px}
+ul{margin:4px 0 4px 18px;padding:0} li{margin:2px 0}
+table{border-collapse:collapse;width:100%;font-size:9.5pt} td,th{border:1px solid #ddd;padding:3px 6px;text-align:left;vertical-align:top} th{background:#faf3e6}
+code{font-family:Consolas,monospace;font-size:9pt}
+</style></head><body>
+<h1>Session Notes — WhatsApp viewer and Shift Hub</h1>
+<div class="d">6–7 October 2026 · Mario Saliba with Claude Code</div>
+
+<h2>Facts</h2>
+<ul>
+<li><b>Odoo white screen (6–7 Oct)</b> was caused by a style file a Claude script added on 5 Oct (ir.asset 133 "analytic split wraps", path to a non-existent add-on). Deactivated 7 Oct → Odoo loads again. Analytic tags are cut off ("…") again.</li>
+<li><b>Khoder ↔ Walid:</b> page <code>hub.shift-group.co/khoder?k=3837c15ab766891acd59</code>, 28 Sep–5 Oct: Shift $92.77, Walid $92.74 (coincidence), no overlaps. Phone view = one card per day.</li>
+<li><b>Ziad</b> is a foreman on public transport — no car; "Ziad car" removed everywhere. His 14 Sep $21 benzine = BMW → Ajaltoun 4193, division Prefab, "transportation for door prefab" (BILL/2026/09/0016 reposted, residual 167.00). His 16 Sep fares are EAR. 6 Oct day: 08:00–12:47, GENERAL (Mario's car at Walid Berkachi).</li>
+<li><b>Georges</b> 6 Oct: half day $20, Ajaltoun 4193.</li>
+<li><b>16 Sep whereabouts:</b> Khoder — Joseph Aswad pickup + Sin el Fil errand, day tagged EAR; Abed — Raashin (Charbel Akiki), PU boards and insulation.</li>
+<li><b>Tanks:</b> Tacoma 79 L · Laredo 78 · BMW 318 (1995) 65 · RAV4 57 (also BMW 320 63, Grand Cherokee 2016 93, Pathfinder 2005 80 / 2014 74).</li>
+<li><b>Sign rule (hub = Odoo):</b> positive = on Shift's side (holds Shift's money / owes Shift, customer); negative = Shift owes (vendor, worker). Shown on each WhatsApp card.</li>
+</ul>
+
+<h2>Built / changed</h2>
+<table><tr><th>Where</th><th>What</th></tr>
+<tr><td>WhatsApp viewer</td><td>Sending ~2× faster (only the sent chat reloads); phone header lighter, date via the day bar; balance meaning on cards; Division = type-to-search; Whish screenshots tied to their "from mario" line (card shows under the photo); day view jumps to today after a send.</td></tr>
+<tr><td>Hub — every page</td><td><b>Rule:</b> photos and papers open in the same page (<code>media-viewer.js</code> injected by server.js). Every page installable as its own app (⬇ Install on Android). ☰ menu = fast navigation + AI button on/off; ✦ AI button draggable; phone bottom strip removed.</td></tr>
+<tr><td>Shift WhatsApp (/site)</td><td>In-page photo/PDF viewer; receipts auto-suggest partner/project/company (history, then Claude); edit ▸ has ✦ Suggest and 🎤 Dictate / ✎ note; scan: drag sides and corners, WhatsApp-style layout (choices on top, green ›/➤ bottom-right).</td></tr>
+<tr><td>WhatsApp outbox</td><td><code>/whatsapp-outbox</code>: queue messages while the laptop is off; task <b>WhatsAppOutbox</b> (every minute) sends them one by one through the ban-safety guard, Telegram summary; &gt;12 h old waits for "send anyway"; /whatsapp redirects there when the laptop is offline.</td></tr>
+<tr><td>Rules for the hub</td><td><code>D:\vscode\todo\CLAUDE.md</code> (new) — same-page media, installable pages, verify before deploy, Beirut dates.</td></tr>
+<tr><td>Claude Code</td><td><code>~/.claude/keybindings.json</code>: Esc no longer cancels in the terminal version; the VS Code chat panel has no such setting.</td></tr>
+</table>
+
+<h2>Decisions</h2>
+<ul>
+<li>Every hub photo/paper opens in the same page — past and future pages (memory <code>feedback-hub-media-same-page</code>).</li>
+<li>Never add Odoo backend styles (ir.asset) from a script (memory <code>odoo-custom-asset-white-screen</code>).</li>
+<li>Outbox: unconfirmed sends are marked "check", never retried.</li>
+</ul>
+
+<h2>Next actions</h2>
+<ul>
+<li>Outbox step 2 (offline copy of recent chats in the page) and step 3 (react / delete / save contact through the queue) — on request.</li>
+<li>Test the outbox with the laptop really off; test ⬇ Install on an Android phone; first real ✦ Suggest / Dictate.</li>
+<li>Optional: fuel account rule to recognise بنزين (would rewrite September bills once more).</li>
+<li>Waiting on Mario: CallMeBot @username (generator call alert); Kassab contact to save by hand; Ziad's workbook timesheet blank 24–30 Sep and October.</li>
+</ul>
+
+<h2>Files</h2>
+<ul>
+<li><code>D:\vscode\todo\</code> — media-viewer.js, install.js, wa-outbox.js, wa-outbox.html, khoder.html/js, line-sheet.js, ask.js, admin-shared.js, scan-editor.js, site.js, server.js, CLAUDE.md</li>
+<li><code>D:\vscode\whatsapp-local\</code> — server.js, hub-review.js, public/app.js, public/style.css, tools/fuel-odometer.cjs</li>
+<li><code>D:\vscode\wa-contacts\</code> — outbox.mjs (+ outbox.log), send.mjs</li>
+<li><code>D:\vscode\wa-photos\tie-photos.mjs</code> — Whish screenshot → existing line</li>
+</ul>
+</body></html>
