@@ -142,6 +142,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'ledgers.js'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
   fs.readFileSync(path.join(__dirname, 'media-viewer.js'));
+  fs.readFileSync(path.join(__dirname, 'install.js'));
   fs.readFileSync(path.join(__dirname, 'phone-preview.js'));
   fs.readFileSync(path.join(__dirname, 'dictate.js'));
   fs.readFileSync(path.join(__dirname, 'emoji-picker.js'));
@@ -883,10 +884,36 @@ const handler = async (req, res) => {
   if (/^\/decide\/[\w-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(withViewer(fs.readFileSync(FILE['decision.html'], 'utf8'))); return; }
   // HUB RULE (Mario 2026-10-07): photos and papers open in the same page, on every page, old and new — media-viewer.js
   // is put into each page here, so no page has to remember it
-  function withViewer(html) { return html.includes('/media-viewer.js') ? html : html.replace(/<\/body>(?![\s\S]*<\/body>)/i, '<script src="/media-viewer.js"></script></body>') + (/<\/body>/i.test(html) ? '' : '<script src="/media-viewer.js"></script>'); }
+  function withViewer(html, pagePath) {
+    let h = html;
+    if (!h.includes('/media-viewer.js')) h = /<\/body>/i.test(h) ? h.replace(/<\/body>(?![\s\S]*<\/body>)/i, '<script src="/media-viewer.js"></script></body>') : h + '<script src="/media-viewer.js"></script>';
+    // every page installable as its own app (Mario 2026-10-07) — the hub home keeps "Shift Hub" (already installed)
+    if (pagePath && !h.includes('/install.js')) {
+      // the home page and the admin views keep the manifest they have ("Shift Hub" / the To-Do app — already installed)
+      const keep = /^\/(admin|members|ask)?$/.test(pagePath) && /<link[^>]+rel=["']manifest["']/i.test(h);
+      const link = '<link rel="manifest" href="/app.webmanifest?p=' + encodeURIComponent(pagePath) + '">';
+      if (!keep) h = /<link[^>]+rel=["']manifest["'][^>]*>/i.test(h) ? h.replace(/<link[^>]+rel=["']manifest["'][^>]*>/i, link) : h.replace(/<\/head>/i, link + '</head>');
+      if (!/apple-touch-icon/i.test(h)) h = h.replace(/<\/head>/i, '<link rel="apple-touch-icon" href="/icons/hub-192.png"></head>');
+      h = /<\/body>/i.test(h) ? h.replace(/<\/body>(?![\s\S]*<\/body>)/i, '<script src="/install.js"></script></body>') : h + '<script src="/install.js"></script>';
+    }
+    return h;
+  }
+  // the per-page manifest: start_url and id = that page, the name from the page's <title>
+  if (url.split('?')[0] === '/app.webmanifest') {
+    const p = new URL(req.url, 'http://x').searchParams.get('p') || '/';
+    const pg = /^\/[\w\/-]*$/.test(p) ? p : '/';
+    const file = PAGES[pg] ? (FILE[PAGES[pg]] || path.join(__dirname, PAGES[pg])) : null;
+    let title = 'Shift Hub';
+    try { if (file) title = ((fs.readFileSync(file, 'utf8').match(/<title>([^<]*)<\/title>/i) || [])[1] || title).replace(/\s*[·|–-]\s*Shift Hub\s*$/i, '').trim() || title; } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ id: pg, name: title, short_name: title.slice(0, 24), start_url: pg, scope: '/', display: 'standalone',
+      background_color: '#f5f1e8', theme_color: '#1e1e2e',
+      icons: [{ src: '/icons/hub-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icons/hub-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }] }));
+    return;
+  }
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
-    const html = withViewer(fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8'));
+    const html = withViewer(fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8'), url === '/' ? '/' : url);
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store'
@@ -898,7 +925,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
