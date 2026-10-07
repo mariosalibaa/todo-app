@@ -141,6 +141,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'dashboard.html'));
   fs.readFileSync(path.join(__dirname, 'ledgers.js'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
+  fs.readFileSync(path.join(__dirname, 'media-viewer.js'));
   fs.readFileSync(path.join(__dirname, 'phone-preview.js'));
   fs.readFileSync(path.join(__dirname, 'dictate.js'));
   fs.readFileSync(path.join(__dirname, 'emoji-picker.js'));
@@ -876,13 +877,16 @@ const handler = async (req, res) => {
     return;
   }
   // /decide/<id> — the decision page; any hub member may open it, the API decides who may answer
-  if (/^\/crm\/[\w+-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['crm.html'], 'utf8')); return; }
+  if (/^\/crm\/[\w+-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(withViewer(fs.readFileSync(FILE['crm.html'], 'utf8'))); return; }
   // Meta calls the webhook with its own signature, never with a hub token
   if (url.split('?')[0] === '/api/meta/webhook') { try { await crm.handle(req, res, url, null, { db, TEAM_ID, access: null, machine: false, odooCall }); } catch (e) { console.error('meta webhook:', e); res.writeHead(500); res.end('error'); } return; }
-  if (/^\/decide\/[\w-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(FILE['decision.html'], 'utf8')); return; }
+  if (/^\/decide\/[\w-]+$/.test(url)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(withViewer(fs.readFileSync(FILE['decision.html'], 'utf8'))); return; }
+  // HUB RULE (Mario 2026-10-07): photos and papers open in the same page, on every page, old and new — media-viewer.js
+  // is put into each page here, so no page has to remember it
+  function withViewer(html) { return html.includes('/media-viewer.js') ? html : html.replace(/<\/body>(?![\s\S]*<\/body>)/i, '<script src="/media-viewer.js"></script></body>') + (/<\/body>/i.test(html) ? '' : '<script src="/media-viewer.js"></script>'); }
   const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
-    const html = fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8');
+    const html = withViewer(fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8'));
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store'
@@ -894,7 +898,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
