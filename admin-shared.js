@@ -400,7 +400,7 @@
         .mob-menu{position:fixed;top:0;right:0;bottom:0;width:min(78vw,300px);background:var(--mantle,#181825);border-left:1px solid var(--surface0,#313244);z-index:1000;padding:14px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 30px rgba(0,0,0,.4);}
         .mob-menu[hidden]{display:none;} .mob-menu a,.mob-menu span.u{display:block;padding:12px 12px;border-radius:9px;color:var(--text,#cdd6f4);text-decoration:none;font-size:1rem;}
         .mob-menu a.on{color:var(--amber,#F2A93B);background:rgba(242,169,59,.12);font-weight:600;} .mob-menu .x{align-self:flex-end;font-size:1.3rem;padding:4px 10px;} .mob-menu .u{margin-top:auto;color:var(--sub,#a6adc8);font-size:.85rem;border-top:1px solid var(--surface0,#313244);padding-top:14px;}
-        .mob-menu .u a{display:inline;padding:0;margin-left:10px;color:var(--overlay0,#6c7086);}
+        .mob-menu .u a{display:inline;padding:0;margin-left:10px;color:var(--overlay0,#6c7086);} .mob-menu{overflow-y:auto;} .mob-menu .nav-go,.mob-menu .nav-tabs{display:flex;flex-direction:column;gap:2px;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--surface0,#313244);} .mob-menu .nav-go a{padding:10px 12px;} .mob-menu .ai-tog{color:#128c7e !important;}
         .mob-back{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;} .mob-back[hidden]{display:none;}
         .fold-txt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;} .fold-txt.open{display:block;-webkit-line-clamp:unset;}
         .fold-more{display:inline-block;color:var(--amber,#F2A93B);font-size:.78rem;cursor:pointer;margin:2px 0 8px;}
@@ -412,7 +412,18 @@
       const btn = document.createElement('button'); btn.className = 'mob-btn'; btn.type = 'button'; btn.textContent = '☰'; btn.title = 'Menu';
       const back = document.createElement('div'); back.className = 'mob-back'; back.hidden = true;
       const menu = document.createElement('div'); menu.className = 'mob-menu'; menu.hidden = true;
-      const fill = () => { menu.innerHTML = '<span class="x">✕</span>' + (tabs ? tabs.innerHTML : '') + (who && who.innerHTML.trim() ? `<span class="u">${who.innerHTML}</span>` : ''); menu.querySelector('.x').onclick = close; };
+      // fast navigation (Mario 2026-10-07: "use this menu for fast navigation"): every hub app he may open, then the page's own tabs,
+      // then the ✦ AI button on/off (drag the button itself to move it)
+      const NAV = [['/', '⌂ Hub', null], ['/site', '💬 Shift WhatsApp', 'site'], ['/whatsapp', '📱 WhatsApp archive', 'admin'], ['/accounting/accounts', '▦ Accounts', 'accounting'],
+        ['/accounting/daily', '📋 Day report', 'daily'], ['/accounting/statements', '🧾 Statements', 'accounting'], ['/ajaltoun', '🏡 Ajaltoun', 'ajaltoun'],
+        ['/ajaltoun/excavation', '🚜 Excavation', 'excavation'], ['/partners', '🤝 Partners', 'partners'], ['/reports', '📊 Reports', 'reports'],
+        ['/crm', '📇 CRM', 'crm'], ['/todo', '✅ To-Do', 'todo'], ['/mahab', '☀️ Mahab plant', 'admin'], ['/khoder', '👷 Khoder & Walid', 'admin']];
+      const navHtml = () => { const me = A.me || {}, apps = me.apps || [], here = location.pathname.replace(/\/+$/, '') || '/';
+        const items = NAV.filter(([h, , k]) => !k || (k === 'admin' ? me.admin : (me.admin || apps.includes(k))));
+        return items.length > 1 ? '<div class="nav-go">' + items.map(([h, l]) => `<a href="${h}"${h === here ? ' class="on"' : ''}>${l}</a>`).join('') + '</div>' : ''; };
+      const aiItem = () => window.HubAsk ? `<a href="#" class="ai-tog">✦ AI button: ${window.HubAsk.isOn() ? 'on — tap to hide' : 'off — tap to show'}</a>` : '';
+      const fill = () => { menu.innerHTML = '<span class="x">✕</span>' + navHtml() + (tabs ? '<div class="nav-tabs">' + tabs.innerHTML + '</div>' : '') + aiItem() + (who && who.innerHTML.trim() ? `<span class="u">${who.innerHTML}</span>` : ''); menu.querySelector('.x').onclick = close;
+        const t = menu.querySelector('.ai-tog'); if (t) t.onclick = e => { e.preventDefault(); window.HubAsk.set(!window.HubAsk.isOn()); fill(); }; };
       const open = () => { fill(); menu.hidden = false; back.hidden = false; }, close = () => { menu.hidden = true; back.hidden = true; };
       btn.onclick = open; back.onclick = close;
       hdr.appendChild(btn); document.body.append(back, menu);

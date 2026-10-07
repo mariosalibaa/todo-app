@@ -86,6 +86,19 @@
     panel.querySelector('textarea').focus();
   }
 
+  // the ✦ button: where Mario dragged it, and whether he switched it off from the menu (Mario 2026-10-07)
+  const POS_KEY = 'askBtnPos', OFF_KEY = 'askBtnOff';
+  function place(b, x, y) {
+    const w = b.offsetWidth || 46, h = b.offsetHeight || 46;
+    x = Math.max(4, Math.min(innerWidth - w - 4, x)); y = Math.max(4, Math.min(innerHeight - h - 4, y));
+    b.style.left = x + 'px'; b.style.top = y + 'px'; b.style.right = 'auto'; b.style.bottom = 'auto';
+  }
+  function askOff() { try { return localStorage.getItem(OFF_KEY) === '1'; } catch { return false; } }
+  window.HubAsk = {
+    isOn: () => !askOff(),
+    set(on) { try { if (on) localStorage.removeItem(OFF_KEY); else localStorage.setItem(OFF_KEY, '1'); } catch {} const b = document.getElementById('ask-btn'); if (b) b.hidden = !on; if (!on && panel) open(false); },
+    resetPlace() { try { localStorage.removeItem(POS_KEY); } catch {} location.reload(); },
+  };
   function mount() {
     if (document.getElementById('ask-btn')) return;
     const st = document.createElement('style'); st.textContent = CSS; document.head.append(st);
@@ -93,8 +106,23 @@
     b.id = 'ask-btn'; b.title = 'Ask the hub'; b.textContent = '✦';
     // a chat page has its send button in that corner — ✦ sits above the message box there (Mario 2026-10-07: "ask ai overlaps send")
     if (/^\/site/.test(location.pathname)) b.style.bottom = (matchMedia('(max-width: 700px)').matches ? 92 : 96) + 'px';
-    b.onclick = () => open(!panel);
+    // moved by hand: press and drag it anywhere; the place is kept (Mario 2026-10-07: "allow to move the AI icon by hand")
+    try { const pos = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); if (pos) place(b, pos.x, pos.y); } catch {}
+    let drag = null, moved = false;
+    b.addEventListener('pointerdown', e => { const r = b.getBoundingClientRect(); drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY }; moved = false; try { b.setPointerCapture(e.pointerId); } catch {} });
+    b.addEventListener('pointermove', e => {
+      if (!drag) return;
+      if (!moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 8) return;
+      moved = true; place(b, e.clientX - drag.dx, e.clientY - drag.dy);
+    });
+    b.addEventListener('pointerup', () => {
+      if (drag && moved) { const r = b.getBoundingClientRect(); try { localStorage.setItem(POS_KEY, JSON.stringify({ x: r.left, y: r.top })); } catch {} }
+      drag = null;
+    });
+    b.style.touchAction = 'none';
+    b.onclick = e => { if (moved) { e.preventDefault(); moved = false; return; } open(!panel); };
     document.body.append(b);
+    if (askOff()) b.hidden = true;
     let was = null; try { was = localStorage.getItem(KEY); } catch {}
     if (was === '1') open(true);
   }

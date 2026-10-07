@@ -1304,7 +1304,9 @@ const handler = async (req, res) => {
   // … and the Ajaltoun divisions list (read only) for the WhatsApp viewer's accounting cards (2026-10-06)
   // … and adding a new one from there (POST, Mario 2026-10-06: "allow to add new division from here")
   const machineSections = keyed && url.split('?')[0] === '/api/ajaltoun/sections' && (req.method === 'GET' || req.method === 'POST');
-  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || machineSections);
+  // … and ✦ Suggest / Dictate inside the line sheet there (extraction only, writes nothing — 2026-10-07)
+  const machineFill = keyed && url === '/api/ai/fill' && req.method === 'POST';
+  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || machineSections || machineFill);
 
   // All API endpoints require auth
   const user = agentCall ? { uid: 'shift-agent', email: 'shift@shift-group.co' }

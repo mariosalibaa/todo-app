@@ -27,6 +27,7 @@
   .ls .ls-row{display:flex;gap:8px;align-items:flex-end;} .ls .ls-row label{flex:1;} .ls .ls-row>input{margin-top:6px;}
   .ls .ls-head{font-size:.92rem;margin-bottom:4px;} .ls .ls-state{display:block;font-size:.74rem;margin-top:2px;} .ls .ls-state.waiting{color:#e0a020;} .ls .ls-state.accepted{color:#3fb950;} .ls .ls-state.booked{color:#89b4fa;} .ls .ls-state.cancelled{color:#f38ba8;}
   .ls .ls-extra{margin-top:10px;padding:8px 10px;border:1px dashed var(--surface1,#585b70);border-radius:10px;} .ls .hint{font-size:.74rem;color:var(--sub,var(--muted,#a6adc8));} .ls .ls-extra .ls-row{margin-top:6px;} .ls .ls-extra button.x{background:none;border:0;color:#f38ba8;font-size:1rem;cursor:pointer;} .ls .ls-add{margin-top:8px;background:none;border:1px solid var(--surface1,#585b70);border-radius:8px;padding:6px 10px;font:inherit;font-size:.8rem;color:inherit;cursor:pointer;}
+  .ls .ls-ai{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;} .ls .ls-ai .ls-sug{border:1px solid #128c7e;color:#128c7e;background:transparent;border-radius:999px;padding:6px 13px;font:inherit;font-size:.82rem;cursor:pointer;} .ls .ls-ai-set{outline:2px solid rgba(18,140,126,.45);}
   .ls .ls-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;} .ls .ls-actions button{padding:9px 14px;border-radius:10px;border:0;font:inherit;font-size:.88rem;cursor:pointer;background:var(--surface1,#585b70);color:inherit;} .ls .ls-actions button.ok{background:#128c7e;color:#fff;} .ls .ls-actions button.warn{background:#fde2e4;color:#b3261e;} .ls .ls-actions button.ghost{background:transparent;color:var(--sub,var(--muted,#a6adc8));} .ls .ls-actions button:disabled{opacity:.5;}
   .ls .err{color:#f38ba8;font-size:.78rem;margin-top:6px;white-space:pre-wrap;} .ls .ls-bal{font-weight:400;color:var(--sub,var(--muted,#a6adc8));}
   .ls .ls-links{font-size:.76rem;margin-top:4px;} .ls .ls-links a{color:#89b4fa;}
@@ -81,6 +82,7 @@
     ${lockAll ? '' : `<div class="ls-extra"><div class="hint">Additional expenses on the same paper — each becomes its own line on this ledger (one Odoo bill per line)</div>
       ${S.extra.map((x, i) => `<div class="ls-row"><input placeholder="e.g. transport" value="${esc(x.description)}" oninput="LineSheet.S.extra[${i}].description=this.value"><input type="number" step="0.01" inputmode="decimal" placeholder="25" value="${x.amount || ''}" oninput="LineSheet.S.extra[${i}].amount=this.value" style="max-width:110px"><button class="x" onclick="LineSheet.S.extra.splice(${i},1);LineSheet.draw()">✕</button></div>`).join('')}
       <button class="ls-add" onclick="LineSheet.S.extra.push({description:'',amount:''});LineSheet.draw();setTimeout(()=>{const l=document.querySelectorAll('.ls-extra input');l[l.length-2]&&l[l.length-2].focus()},0)">+ add an expense</button></div>`}
+    ${lock ? '' : `<div class="ls-ai"><button type="button" class="ls-sug" onclick="LineSheet.suggest(this)">✦ Suggest</button><span id="ls-dict"></span></div>`}
     <div class="ls-actions">
       <button onclick="LineSheet.save()">Save</button>
       ${!accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('accept')">✓ Accept</button>` : ''}
@@ -90,6 +92,7 @@
       <button class="ghost" onclick="LineSheet.close()">Close</button></div>
     <div class="err" id="ls-err"></div>`;
     wireProjCombo();
+    if (!lock) wireAI();
   }
   // Project autocomplete: type to filter, tap to choose, ▾ shows them all. Plain divs, so it
   // works on the iPhone (a <datalist> does not) and the list is readable with one thumb.
@@ -279,5 +282,55 @@
     try { await A.api('PATCH', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`, { waAccepted: false }); S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`); if (S.onChange) await S.onChange(); draw(); }
     catch (e) { g('ls-err').textContent = e.message; }
   }
-  window.LineSheet = { open, close, draw, save, hold, cancelEntry, restoreEntry, projChanged, get S() { return S; } };
+  // ── AI inside the sheet (Mario 2026-10-07: "use AI to auto suggest — can I add voice or text AI inside this view?") ──
+  // ✦ Suggest: Claude fills the empty fields from what the line already says (the receipt reading, the words);
+  // 🎤 Dictate / ✎ From a note: say or type "partner naccache generator, project milede mum" and the fields change.
+  // Nothing is saved until Save / ✓ — the fields only change on screen.
+  function aiSchema() {
+    return { name: 'one ledger line (a payment / receipt)', intro: 'Mario corrects or completes ONE line. Only return the fields he names or that the line clearly implies; leave the rest out.',
+      fields: [
+        { key: 'description', hint: 'what was bought / paid, short' },
+        { key: 'amount', hint: 'number, the total' },
+        { key: 'side', hint: '"debit" = money out (paid), "credit" = money in (received)' },
+        { key: 'partner', hint: 'the supplier or person — one of PARTNERS when it matches, else as said' },
+        { key: 'company', hint: 'one of COMPANIES' },
+        { key: 'project', hint: 'one of PROJECTS (analytic)' },
+        { key: 'division', hint: 'Ajaltoun work section, one of DIVISIONS — only for Ajaltoun' },
+        { key: 'note', hint: 'what it was for' }],
+      context: { PARTNERS: (REFS.partners || []).map(x => x.name), COMPANIES: (REFS.companies || []).map(x => x.name), PROJECTS: (REFS.analytic || []).map(x => x.name), DIVISIONS: (REFS.sections || []).map(x => x.name) } };
+  }
+  function applyAI(f) {
+    if (!f || typeof f !== 'object') return 0;
+    let n = 0; const set = (id, v) => { const el = g(id); if (el && !el.disabled && v != null && v !== '') { el.value = v; el.classList.add('ls-ai-set'); n++; } };
+    set('ls-desc', f.description); set('ls-amt', f.amount); if (f.side === 'debit' || f.side === 'credit') set('ls-side', f.side);
+    set('ls-partner', f.partner); set('ls-note', f.note); set('ls-proj', f.project);
+    if (f.company) { const co = (REFS.companies || []).find(c => c.name.toLowerCase() === String(f.company).toLowerCase() || c.name.toLowerCase().includes(String(f.company).toLowerCase())); if (co) set('ls-co', co.name); }
+    projChanged(); if (f.division && !g('ls-div-wrap').hidden) set('ls-div', f.division);
+    return n;
+  }
+  function wireAI() {
+    const host = g('ls-dict'); if (!host) return;
+    const go = () => window.Dictate && window.Dictate({ host, api: A.api, schema: aiSchema, note: true, onFilled: f => applyAI(f) });
+    if (window.Dictate) go();
+    else { const sc = document.createElement('script'); sc.src = (window.HUB_ORIGIN || '') + '/dictate.js'; sc.onload = go; document.head.append(sc); }
+  }
+  async function suggest(btn) {
+    const t = S.t || {};
+    const text = ['Suggest the missing fields of this line.', 'Line: ' + (g('ls-desc').value || t.description || ''), t.note ? 'Note: ' + t.note : '',
+      'Amount: ' + (g('ls-amt').value || ''), t.ref ? 'Paper number: ' + t.ref : '', t.official ? 'Official paper (SARL, VAT)' : '',
+      'Already set — partner: ' + (g('ls-partner').value || 'none') + ', company: ' + (g('ls-co').value || 'none') + ', project: ' + (g('ls-proj').value || 'none'),
+      'Account: ' + (t.account ? t.account.name : S.acc)].filter(Boolean).join('\n');
+    btn.disabled = true; const was = btn.textContent; btn.textContent = '✦ thinking…';
+    try {
+      const j = await A.api('POST', '/api/ai/fill', { text, schema: aiSchema() });
+      const f = j.fields || {};
+      // a suggestion only fills what is empty — it never overwrites what is already there
+      for (const [k, id] of [['partner', 'ls-partner'], ['project', 'ls-proj'], ['company', 'ls-co'], ['note', 'ls-note'], ['division', 'ls-div'], ['description', 'ls-desc'], ['amount', 'ls-amt']]) if (g(id) && g(id).value) delete f[k];
+      delete f.side;
+      btn.textContent = applyAI(f) ? '✦ suggested — check, then Save' : '✦ nothing to add';
+    } catch (e) { btn.textContent = '✦ ' + e.message.slice(0, 60); }
+    btn.disabled = false; setTimeout(() => { btn.textContent = was; }, 6000);
+  }
+
+  window.LineSheet = { open, close, draw, save, hold, cancelEntry, restoreEntry, projChanged, suggest, get S() { return S; } };
 })();
