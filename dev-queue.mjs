@@ -45,3 +45,5 @@ if (id) {
     console.log();
   }
 }
+// node 24 on Windows sometimes trips a libuv assertion while tearing down the fetch socket — leave cleanly
+process.exit(0);
