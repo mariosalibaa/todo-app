@@ -15,6 +15,7 @@ const bonvin = require('./bonvin');            // /api/bonvin/* (Sin El Fil 2292
 const procurement = require('./procurement');  // /api/procurement/* (the price book: supplier, item, price, description — admin only)
 const cprFuel = require('./cpr-fuel');        // /api/cpr/fuel (Kamal's diesel fills: photo + litres + $, private link key or admin)
 const energy = require('./energy');            // /api/cpr (CPR meters + Deye: kWh per building / source per day, history + live — PUBLIC, read-only)
+const waOutbox = require('./wa-outbox');      // /api/wa-outbox — WhatsApp messages queued on the hub while the laptop is off (2026-10-07)
 const aiFill = require('./ai-fill');            // POST /api/ai/fill — Dictate: a voice/typed note → a form's fields (any member; extraction only)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
@@ -166,6 +167,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'cpr-dynamic.html'));
   fs.readFileSync(path.join(__dirname, 'mahab.html'));
   fs.readFileSync(path.join(__dirname, 'khoder.html'));
+  fs.readFileSync(path.join(__dirname, 'wa-outbox.html'));
   fs.readFileSync(path.join(__dirname, 'makhlouf.html'));
   fs.readFileSync(path.join(__dirname, 'plants.html'));
   fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'));
@@ -742,6 +744,7 @@ const handler = async (req, res) => {
     'cpr-dynamic.html': path.join(__dirname, 'cpr-dynamic.html'),
     'mahab.html': path.join(__dirname, 'mahab.html'),
     'khoder.html': path.join(__dirname, 'khoder.html'),
+    'wa-outbox.html': path.join(__dirname, 'wa-outbox.html'),
     'makhlouf.html': path.join(__dirname, 'makhlouf.html'),
     'plants.html': path.join(__dirname, 'plants.html'),
     'bonvin.html': path.join(__dirname, 'bonvin.html'),
@@ -764,6 +767,7 @@ const handler = async (req, res) => {
     '/bonvin/shop': 'bonvin-shop.html',   // the same shop for a renter: plans, photos, office layout — PUBLIC, nothing private
     '/plants': 'plants.html',   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
     '/makhlouf': 'makhlouf.html',   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
+    '/whatsapp-outbox': 'wa-outbox.html',   // WhatsApp messages queued while the laptop is off (Mario 2026-10-07)
     '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
     '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
     '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
@@ -806,6 +810,8 @@ const handler = async (req, res) => {
     try { meta = await archiveMeta(); } catch {}
     const target = meta && (line === '70165168' ? meta.urlDev : meta.url);
     const fresh = target && Date.now() - Date.parse(meta.at || 0) < 15 * 60000;
+    // offline: the page itself opens the hub's outbox — write now, it goes out when the laptop is back (Mario 2026-10-07)
+    if ((!fresh || !key) && req.method === 'GET' && rest.split('?')[0] === '/') { res.writeHead(302, { Location: '/whatsapp-outbox?line=' + line }); res.end(); return; }
     if (!fresh || !key) return page(503, 'The laptop is offline', `The archive lives on Mario’s laptop and answers only while it is on and online${meta && meta.at ? ` — last seen ${new Date(meta.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' })}` : ''}.`);
     const exp = Date.now() + 10 * 60000;
     const token = exp + '.' + crypto.createHmac('sha256', key).update('open:' + exp).digest('hex');
@@ -832,7 +838,7 @@ const handler = async (req, res) => {
       if (!r.body) { res.end(); return; }
       const { Readable } = require('stream');
       Readable.fromWeb(r.body).pipe(res);
-    } catch (e) { page(502, 'The laptop did not answer', String(e.message || e).slice(0, 200)); }
+    } catch (e) { if (req.method === 'GET' && rest.split('?')[0] === '/') { res.writeHead(302, { Location: '/whatsapp-outbox?line=' + line }); res.end(); return; } page(502, 'The laptop did not answer', String(e.message || e).slice(0, 200)); }
     return;
   }
   // /app/<key> — a laptop app (photo-map, lead-hub, invoice-renamer, power-analyzer) behind
@@ -1306,7 +1312,9 @@ const handler = async (req, res) => {
   const machineSections = keyed && url.split('?')[0] === '/api/ajaltoun/sections' && (req.method === 'GET' || req.method === 'POST');
   // … and ✦ Suggest / Dictate inside the line sheet there (extraction only, writes nothing — 2026-10-07)
   const machineFill = keyed && url === '/api/ai/fill' && req.method === 'POST';
-  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || machineSections || machineFill);
+  // … and the laptop draining the WhatsApp outbox and mirroring its chat list (wa-contacts/outbox.mjs, 2026-10-07)
+  const machineOutbox = keyed && url.startsWith('/api/wa-outbox');
+  const machine = keyed && (url.startsWith('/api/accounting/') || url === '/api/crm/ingest' || machineSite || agentCall || machineSections || machineFill || machineOutbox);
 
   // All API endpoints require auth
   const user = agentCall ? { uid: 'shift-agent', email: 'shift@shift-group.co' }
@@ -1480,6 +1488,11 @@ const handler = async (req, res) => {
   if (url.startsWith('/api/decisions')) {
     try { const handled = await decisions.handle(req, res, url, user, { db, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('decisions error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+  if (url.startsWith('/api/wa-outbox')) {
+    try { if ((await waOutbox.handle(req, res, url, user, { db, TEAM_ID, access, machine: machineOutbox })) === false) { res.writeHead(404); res.end('not found'); } }
+    catch (e) { console.error('wa-outbox error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   if (url === '/api/ai/fill') {

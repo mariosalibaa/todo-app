@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111b21">
+<title>WhatsApp outbox · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--bg:#0b141a;--panel:#111b21;--panel2:#202c33;--line:#2a3942;--text:#e9edef;--sub:#8696a0;--green:#00a884;--amber:#F2A93B;--red:#f15c6d;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
+  .hleft{display:flex;align-items:center;gap:12px;min-width:0;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.88rem;font-weight:600;padding:6px 11px;border:1px solid var(--line);border-radius:8px;white-space:nowrap;}
+  h1{font-size:1rem;margin:0;font-weight:600;} .who{font-size:.75rem;color:var(--sub);}
+  main{max-width:860px;margin:0 auto;padding:14px 14px 90px;}
+  .banner{border-radius:10px;padding:10px 13px;font-size:.84rem;line-height:1.45;margin-bottom:12px;background:#2a2112;border:1px solid #5c4515;color:#f5d8a0;}
+  .banner.on{background:#0f2a22;border-color:#1f5f4b;color:#b7f0dc;}
+  .lines{display:flex;gap:6px;margin-bottom:12px;} .lines button{flex:1;}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font:inherit;font-size:.85rem;cursor:pointer;}
+  button.on{background:var(--green);border-color:var(--green);color:#04150f;font-weight:700;}
+  button.go{background:var(--green);border-color:var(--green);color:#04150f;font-weight:700;}
+  button.lnk{background:none;border:0;color:var(--sub);padding:2px 4px;font-size:.78rem;text-decoration:underline;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;}
+  input,textarea{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:inherit;font-size:.92rem;}
+  textarea{min-height:90px;resize:vertical;}
+  .chats{max-height:300px;overflow:auto;margin-top:8px;border-radius:9px;}
+  .chat{display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:.88rem;}
+  .chat:hover{background:var(--panel2);} .chat .l{color:var(--sub);font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;}
+  .to{font-size:.86rem;margin:4px 0 8px;} .to b{color:var(--green);}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;} .row .sp{flex:1;}
+  .row label{font-size:.78rem;color:var(--sub);display:flex;align-items:center;gap:6px;} .row input[type=datetime-local]{width:auto;padding:6px 8px;font-size:.8rem;}
+  .item{border-bottom:1px solid var(--line);padding:9px 2px;font-size:.86rem;}
+  .item .h{display:flex;justify-content:space-between;gap:8px;color:var(--sub);font-size:.75rem;margin-bottom:3px;}
+  .item .t{white-space:pre-wrap;word-break:break-word;}
+  .st{font-weight:700;} .st.queued{color:var(--amber);} .st.sending{color:#53bdeb;} .st.sent{color:var(--green);} .st.failed,.st.check{color:var(--red);} .st.held{color:#e2a7ff;} .st.cancelled{color:var(--sub);}
+  .muted{color:var(--sub);font-size:.8rem;} .err{color:var(--red);font-size:.82rem;margin-top:6px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><a class="hback" href="/">‹ Hub</a><div><h1>WhatsApp outbox</h1><div class="who" id="who"></div></div></div>
+  <a class="hback" id="open-wa" href="/whatsapp/">Open WhatsApp</a>
+</header>
+<main>
+  <div class="banner" id="banner">Loading…</div>
+  <div class="lines"><button data-line="03165168" class="on">03 165 168</button><button data-line="70165168">70 165 168</button></div>
+  <div class="card">
+    <input id="q" placeholder="Search a chat — name or number" autocomplete="off">
+    <div class="chats" id="chats"></div>
+    <div class="to" id="to"></div>
+    <textarea id="text" placeholder="Message — it goes out from the laptop's WhatsApp as soon as the laptop is online"></textarea>
+    <div class="row"><label>Send at (optional) <input type="datetime-local" id="at"></label><span class="sp"></span><button class="go" id="queue">Queue ➤</button></div>
+    <div class="err" id="err"></div>
+  </div>
+  <div class="card"><b style="font-size:.9rem">Queue</b> <span class="muted" id="qmeta"></span><div id="items"></div></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script>
+// The hub keeps what Mario wants sent while the laptop is off; the laptop sends it when it is back (wa-contacts/outbox.mjs).
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const when = iso => iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+const ST = { queued: '⏳ waiting for the laptop', sending: '… sending', sent: '✓ sent', failed: '⚠ failed', check: '⚠ check WhatsApp — not confirmed', held: '⏸ held — old, send anyway?', cancelled: 'cancelled' };
+let line = new URLSearchParams(location.search).get('line') === '70165168' ? '70165168' : '03165168', D = null, pick = null;
+
+Admin.require('site', me => {
+  if (!me.admin) { document.querySelector('main').innerHTML = '<p>Mario’s alone.</p>'; return; }
+  document.getElementById('who').textContent = me.name || me.email;
+  document.querySelectorAll('.lines button').forEach(b => { b.classList.toggle('on', b.dataset.line === line); b.onclick = () => { line = b.dataset.line; pick = null; document.querySelectorAll('.lines button').forEach(x => x.classList.toggle('on', x === b)); load(); }; });
+  document.getElementById('q').oninput = drawChats;
+  document.getElementById('queue').onclick = queue;
+  load(); setInterval(load, 20000);
+});
+
+async function load() {
+  try { D = await Admin.api('GET', '/api/wa-outbox?line=' + line); } catch (e) { document.getElementById('banner').textContent = 'Could not load: ' + e.message; return; }
+  const on = D.laptopAt && Date.now() - Date.parse(D.laptopAt) < 15 * 60000;
+  const b = document.getElementById('banner'); b.classList.toggle('on', !!on);
+  b.innerHTML = on ? `🟢 The laptop is online (seen ${esc(when(D.laptopAt))}) — queued messages go out within a minute. <a href="/${line === '70165168' ? '70165168' : 'whatsapp'}/" style="color:inherit">Open the full WhatsApp ›</a>`
+    : `🟠 The laptop is offline${D.laptopAt ? ' — last seen ' + esc(when(D.laptopAt)) : ''}. Write here: the messages wait on the hub and go out, one by one, as soon as it is back. Anything older than ${D.holdHours} h waits for your “send anyway”.`;
+  document.getElementById('open-wa').href = line === '70165168' ? '/70165168/' : '/whatsapp/';
+  drawChats(); drawItems();
+}
+function drawChats() {
+  const q = document.getElementById('q').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+  const list = (D && D.chats || []).filter(c => !q || c.name.toLowerCase().includes(q) || (qd && c.jid.replace(/\D/g, '').includes(qd))).slice(0, 80);
+  document.getElementById('chats').innerHTML = list.length ? list.map((c, i) => `<div class="chat" data-i="${i}"><span>${c.group ? '👥 ' : ''}${esc(c.name || c.jid)}</span><span class="l">${esc(c.lastText || '')}</span></div>`).join('')
+    : `<div class="muted" style="padding:8px">${D && D.chats.length ? 'No chat matches.' : 'No chat list yet — the laptop sends it the next time it is on.'}${qd.length >= 8 ? ` <button class="lnk" id="num">Send to ${esc(qd)}</button>` : ''}</div>`;
+  document.querySelectorAll('#chats .chat').forEach(el => el.onclick = () => { pick = list[+el.dataset.i]; drawTo(); });
+  const n = document.getElementById('num'); if (n) n.onclick = () => { const d = qd.startsWith('961') ? qd : '961' + qd.replace(/^0/, ''); pick = { jid: d + '@s.whatsapp.net', name: '+' + d }; drawTo(); };
+  drawTo();
+}
+function drawTo() { document.getElementById('to').innerHTML = pick ? `To: <b>${esc(pick.name || pick.jid)}</b> <button class="lnk" onclick="pick=null;drawTo()">change</button>` : '<span class="muted">Pick a chat above.</span>'; }
+function drawItems() {
+  const items = D.items || [];
+  document.getElementById('qmeta').textContent = items.filter(x => x.status === 'queued').length + ' waiting';
+  document.getElementById('items').innerHTML = items.length ? items.map(x => `<div class="item"><div class="h"><span>→ <b style="color:var(--text)">${esc(x.name || x.jid)}</b> · ${esc(when(x.createdAt))}${x.sendAt && Date.parse(x.sendAt) > Date.parse(x.createdAt) + 60000 ? ' · for ' + esc(when(x.sendAt)) : ''}</span>
+      <span class="st ${x.status}">${ST[x.status] || x.status}${x.sentAt ? ' ' + esc(when(x.sentAt)) : ''}</span></div><div class="t">${esc(x.text)}</div>
+      ${x.error ? `<div class="err">${esc(x.error)}</div>` : ''}
+      ${['queued', 'held'].includes(x.status) ? `<button class="lnk" onclick="act('${x.id}','cancel')">cancel</button>` : ''}${x.status === 'held' ? ` <button class="lnk" onclick="act('${x.id}','release')">send anyway</button>` : ''}</div>`).join('')
+    : '<div class="muted" style="padding:8px 2px">Nothing queued.</div>';
+}
+async function queue() {
+  const err = document.getElementById('err'); err.textContent = '';
+  const text = document.getElementById('text').value.trim(), at = document.getElementById('at').value;
+  if (!pick) { err.textContent = 'Pick a chat first.'; return; }
+  if (!text) { err.textContent = 'Write the message.'; return; }
+  try {
+    await Admin.api('POST', '/api/wa-outbox', { line, jid: pick.jid, name: pick.name, text, sendAt: at ? new Date(at).toISOString() : undefined });
+    document.getElementById('text').value = ''; document.getElementById('at').value = ''; load();
+  } catch (e) { err.textContent = e.message; }
+}
+async function act(id, what) { try { await Admin.api('POST', `/api/wa-outbox/${id}/${what}`); load(); } catch (e) { alert(e.message); } }
+</script>
+</body>
+</html>
