@@ -220,6 +220,9 @@
     // a page without that slot gets it pinned to the top-right corner
     // on a phone the header has no room: it stays a strip along the bottom there
     const phone = matchMedia('(max-width: 560px)').matches;
+    // on the phone the strip covered the last row and the send button — gone there (Mario 2026-10-07: "remove these");
+    // it only comes back while viewing as someone, for its Leave button
+    if (phone && !me.viewAs) return;
     const slot = phone ? null : document.getElementById('who');
     bar.style.cssText = (slot ? 'display:inline-flex;margin-right:10px;vertical-align:middle;' : phone ? 'position:fixed;left:0;right:0;bottom:0;z-index:1400;display:flex;justify-content:center;pointer-events:none;' : 'position:fixed;right:10px;top:6px;z-index:1400;display:flex;')
       + 'align-items:center;justify-content:flex-end;gap:8px;padding:' + (me.viewAs ? '3px 8px' : '0') + ';border-radius:999px;font:inherit;font-size:.8rem;background:' + (me.viewAs ? '#8a5a00' : 'transparent') + ';color:' + (me.viewAs ? '#fff' : 'inherit') + ';';

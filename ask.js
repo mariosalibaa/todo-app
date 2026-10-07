@@ -91,6 +91,8 @@
     const st = document.createElement('style'); st.textContent = CSS; document.head.append(st);
     const b = document.createElement('button');
     b.id = 'ask-btn'; b.title = 'Ask the hub'; b.textContent = '✦';
+    // a chat page has its send button in that corner — ✦ sits above the message box there (Mario 2026-10-07: "ask ai overlaps send")
+    if (/^\/site/.test(location.pathname)) b.style.bottom = (matchMedia('(max-width: 700px)').matches ? 92 : 96) + 'px';
     b.onclick = () => open(!panel);
     document.body.append(b);
     let was = null; try { was = localStorage.getItem(KEY); } catch {}
