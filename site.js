@@ -97,6 +97,43 @@ async function writeLine(ctx, ws, post, target, fields) {
   return { accountId: a.id, txId: id, state: 'waiting' };
 }
 
+// AI auto-suggest for a receipt (Mario 2026-10-07: "use AI to auto suggest"): who, which project, which company.
+// 1. history — the last accepted line on the same ledger whose words share the vendor's name: same partner, project, company
+// 2. else Claude picks from Odoo's own partner and project lists, reading the vendor, who it is billed to and the note
+// Every pick stays a SUGGESTION (the line waits for ✓, src 'ai'); an exact name match still wins for the partner.
+async function suggestFor(ctx, ws, parsed, text, target, partners) {
+  const out = { partner: parsed.vendor ? parse.matchName(parsed.vendor, partners) : null, analytic: null, company: '' };
+  const words = String(parsed.vendor || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 3 && !/^(company|sarl|s\.?a\.?l|ste|group|center|shop|store|station)$/.test(w));
+  try {
+    const a = await acc.resolve(ws, target);
+    if (a && words.length) {
+      const since = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
+      const rows = (await acc.txCol(a).where('date', '>=', since).get()).docs.map(d => d.data())
+        .filter(t => !t.excluded && (t.analyticId || t.partnerId) && words.some(w => String(t.description || '').toLowerCase().includes(w)))
+        .sort((x, y) => String(y.date).localeCompare(String(x.date)));
+      const h = rows[0];
+      if (h) {
+        if (!out.partner && h.partnerId && h.partnerName) out.partner = { id: h.partnerId, name: h.partnerName };
+        if (h.analyticId) out.analytic = { id: h.analyticId, name: h.analyticName };
+        if (h.company) out.company = h.company;
+        if (out.partner && out.analytic) return out;
+      }
+    }
+  } catch (e) { console.error('suggest history:', e.message); }
+  try {
+    const { analytics } = await refs(ctx);
+    const pick = await parse.anthropic({ model: 'claude-haiku-4-5-20251001', max_tokens: 200,
+      system: `You complete one receipt line for Shift (Lebanon). Return JSON only: {"partner":string|null,"project":string|null}.
+partner = the supplier, EXACTLY one of PARTNERS when one clearly matches the vendor, else null. project = EXACTLY one of PROJECTS when the receipt says where it was for (an address, a building, a site, a person's home), else null. Never guess wildly.
+PARTNERS: ${(partners || []).map(x => x.name).slice(0, 400).join(' | ')}
+PROJECTS: ${(analytics || []).map(x => x.name).join(' | ')}`,
+      messages: [{ role: 'user', content: `Vendor: ${parsed.vendor || ''}\nBilled to: ${parsed.billedTo || ''}\nWhat: ${parsed.note || ''}\nCaption: ${text || ''}\nNumber: ${parsed.invoiceNo || ''}` }] });
+    if (!out.partner && pick.partner) out.partner = (partners || []).find(x => x.name === pick.partner) || null;
+    if (!out.analytic && pick.project) { const an = (analytics || []).find(x => x.name === pick.project); if (an) out.analytic = { id: an.id, name: an.name }; }
+  } catch (e) { console.error('suggest ai:', e.message); }
+  return out;
+}
+
 // after the post is stored: read it, decide, write the line, record the outcome on the post
 async function digest(ctx, ws, ref, post, buf) {
   const isGeneral = post.thread === 'general';
@@ -110,10 +147,10 @@ async function digest(ctx, ws, ref, post, buf) {
       if (post.receiptOverride != null) parsed.receipt = !!post.receiptOverride;
       if (parsed.receipt && (parsed.amount || post.receiptOverride === true)) {
         const { partners } = await refs(ctx);
-        const partner = parsed.vendor ? parse.matchName(parsed.vendor, partners) : null;
+        const { partner, analytic, company: sugCo } = await suggestFor(ctx, ws, parsed, text, isGeneral ? MARIO_CASH : post.thread, partners);
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense',
-            company: parse.officialCompany(parsed), official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });
+          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
+            company: parse.officialCompany(parsed) || sugCo || '', official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });
       }
     }
     if (post.kind === 'photo' || post.kind === 'video') {
@@ -122,12 +159,12 @@ async function digest(ctx, ws, ref, post, buf) {
       if (post.receiptOverride != null) parsed.receipt = !!post.receiptOverride;
       if (parsed.receipt && (parsed.amount || post.receiptOverride === true)) {
         const { partners, analytics } = await refs(ctx);
-        const partner = parsed.vendor ? parse.matchName(parsed.vendor, partners) : null;
+        const { partner, analytic, company: sugCo } = await suggestFor(ctx, ws, parsed, text, isGeneral ? MARIO_CASH : post.thread, partners);
         // a caption on a receipt photo rides along on the same line instead of spawning a second one (see below)
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic: null, nature: 'expense',
+          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
             // an official paper (SHIFT GROUP SARL + VAT) belongs to the SARL and carries it by itself
-            company: parse.officialCompany(parsed), official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });   // a receipt is always an expense — bookable right after ✓
+            company: parse.officialCompany(parsed) || sugCo || '', official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });   // a receipt is always an expense — bookable right after ✓
       }
       // a site photo/video = progress; it is kept on the post and the Day report shows it under the day (part 2 hangs it on the attendance line)
     }
