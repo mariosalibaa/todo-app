@@ -141,6 +141,18 @@
   .lf .err{color:var(--red);font-size:.78rem;margin-top:6px;} .lf .hint{font-size:.8rem;color:var(--sub);}
   .sheet .list{max-height:40vh;overflow:auto;} .sheet .list .it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--surface0);font-size:.86rem;} .sheet .list .it small{display:block;color:var(--sub);}
   .pull{display:none;height:0;overflow:hidden;text-align:center;font-size:.74rem;color:var(--sub);line-height:48px;transition:height .15s;}
+/* in-page viewer — the hub runs as an installed Chrome app, where a new tab is a dead end (Mario 2026-10-07) */
+#mv { position: fixed; inset: 0; z-index: 9999; background: rgba(10,12,14,.94); display: none; flex-direction: column; }
+#mv.on { display: flex; }
+#mv .bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; color: #e9edef; font-size: 13px; }
+#mv .bar .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .85; }
+#mv .bar button, #mv .bar a { background: rgba(255,255,255,.1); color: #e9edef; border: 0; border-radius: 8px; padding: 6px 12px; font-size: 14px; cursor: pointer; text-decoration: none; }
+#mv .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; position: relative; }
+#mv .stage img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; }
+#mv .stage img.full { max-width: none; max-height: none; cursor: zoom-out; }
+#mv .stage iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+#mv .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14); color: #fff; font-size: 28px; cursor: pointer; }
+#mv .nav.prev { left: 12px; } #mv .nav.next { right: 12px; } #mv .nav[hidden] { display: none; }
 </style></head>
 <body>
 <header><div class="hleft"><span id="crumbs"></span><a class="wordmark" href="/" title="Back to the hub">SHIFT <span>GROUP</span><small>WHATSAPP</small></a><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Shift WhatsApp']]));</script></div><div class="who" id="who"></div></header>
@@ -489,9 +501,9 @@ function draw() {
     if (p.by === 'shift' && !p.deleted) return `${dayHdr}${agentPost(p)}`;
     if (p.deleted) return `${dayHdr}<div class="post ${mine ? 'me' : ''} gone" data-id="${esc(p.id)}">🚫 This message was deleted<div class="meta"><span>${esc(mine ? 'you' : p.by.split('@')[0])}</span><span>${hhmm(p.at)}</span></div></div>`;
     if (p.kind === 'start' || p.kind === 'finish') return `${dayHdr}<div class="post tap" data-id="${esc(p.id)}">${p.kind === 'start' ? '▶' : '■'} <b>${p.kind === 'start' ? 'Started' : 'Finished'} ${hhmm(p.at)}</b>${p.siteName ? ' · 📍 ' + esc(p.siteName) : p.loc ? ' · outside every site' : ' · no location'}${p.distanceM != null ? ` <span title="from the site’s centre">(${p.distanceM} m)</span>` : ''}${p.manual ? ` · entered by hand at ${hhmm(p.enteredAt)}` : ''}${p.noStart ? ' · ⚠ no Start before it' : ''}</div>`;
-    const body = p.kind === 'photo' ? `<a href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><img src="/api/site/${cur}/posts/${p.id}/file" ${ix >= posts.length - 8 ? '' : 'loading="lazy"'} onload="feedGrew()"></a>`
+    const body = p.kind === 'photo' ? `<a href="/api/site/${cur}/posts/${p.id}/file" onclick="event.preventDefault();viewMedia('${esc(p.id)}')"><img src="/api/site/${cur}/posts/${p.id}/file" ${ix >= posts.length - 8 ? '' : 'loading="lazy"'} onload="feedGrew()"></a>`
       : p.kind === 'video' ? `<video src="/api/site/${cur}/posts/${p.id}/file" controls preload="metadata"></video>`
-      : p.kind === 'doc' ? `<a class="doc" href="/api/site/${cur}/posts/${p.id}/file" target="_blank" rel="noopener"><span class="ic">📄</span><span><span class="nm">${esc((p.file && p.file.name) || 'document.pdf')}</span><span class="sz">${p.file && p.file.size ? Math.round(p.file.size / 1024) + ' KB · ' : ''}PDF</span></span></a>`
+      : p.kind === 'doc' ? `<a class="doc" href="/api/site/${cur}/posts/${p.id}/file" onclick="event.preventDefault();viewMedia('${esc(p.id)}')"><span class="ic">📄</span><span><span class="nm">${esc((p.file && p.file.name) || 'document.pdf')}</span><span class="sz">${p.file && p.file.size ? Math.round(p.file.size / 1024) + ' KB · ' : ''}PDF</span></span></a>`
       : p.kind === 'voice' ? `<audio src="/api/site/${cur}/posts/${p.id}/file" controls></audio>${p.parsed && p.parsed.transcript ? `<div style="margin-top:6px;font-style:italic">${esc(p.parsed.transcript)}</div>` : ''}`
       : esc(p.text).replace(/^(@(?:shift|s)\b)/i, '<span class="trig">$1</span>');
     const canDel = mine || me.admin;
@@ -710,4 +722,34 @@ Admin.require('site', async m => {
   if (h && threads.some(t => t.id === h)) open_(h, want);
   else if (innerWidth > 800 && threads[0]) open_(threads[0].id);
 });
+
+// ---- in-page viewer for photos and PDFs (Mario 2026-10-07: "open the photo in the same chrome page, same as hub rule") ----
+let mvList = [], mvAt = 0;
+function viewMedia(id) {
+  const box = document.getElementById('mv') || (() => {
+    const d = document.createElement('div'); d.id = 'mv';
+    d.innerHTML = '<div class="bar"><button type="button" data-a="close">‹ Back</button><span class="t"></span><a data-a="dl" download>⬇</a><button type="button" data-a="close">✕</button></div><div class="stage"><button class="nav prev" type="button" data-a="prev">‹</button><button class="nav next" type="button" data-a="next">›</button></div>';
+    d.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) { if (e.target.classList.contains('stage')) mvClose(); return; }
+      if (a.dataset.a === 'close') mvClose(); else if (a.dataset.a === 'prev') mvShow(mvAt - 1); else if (a.dataset.a === 'next') mvShow(mvAt + 1); });
+    let x0 = null; d.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+    d.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 60 && !d.querySelector('img.full')) mvShow(mvAt + (dx < 0 ? 1 : -1)); });
+    document.body.append(d); return d; })();
+  mvList = (typeof posts !== 'undefined' ? posts : []).filter(p => !p.deleted && (p.kind === 'photo' || p.kind === 'doc'));
+  mvAt = Math.max(0, mvList.findIndex(p => p.id === id));
+  box.classList.add('on'); history.pushState({ mv: 1 }, ''); mvShow(mvAt);
+}
+function mvShow(i) {
+  if (i < 0 || i >= mvList.length) return;
+  mvAt = i; const p = mvList[i], box = document.getElementById('mv'), url = `/api/site/${cur}/posts/${p.id}/file`;
+  const stage = box.querySelector('.stage'); stage.querySelectorAll('img,iframe').forEach(x => x.remove());
+  if (p.kind === 'doc') { const f = document.createElement('iframe'); f.src = url; stage.prepend(f); }
+  else { const im = document.createElement('img'); im.src = url; im.onclick = () => im.classList.toggle('full'); stage.prepend(im); }
+  box.querySelector('.t').textContent = (p.kind === 'doc' ? ((p.file && p.file.name) || 'document.pdf') : 'Photo') + ' · ' + new Date(p.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (mvList.length > 1 ? ` · ${i + 1} / ${mvList.length}` : '');
+  box.querySelector('[data-a=dl]').href = url;
+  box.querySelector('.prev').hidden = i === 0; box.querySelector('.next').hidden = i === mvList.length - 1;
+}
+function mvClose() { const b = document.getElementById('mv'); if (b && b.classList.contains('on')) { b.classList.remove('on'); b.querySelectorAll('.stage img,.stage iframe').forEach(x => x.remove()); if (history.state && history.state.mv) history.back(); } }
+window.addEventListener('popstate', () => { const b = document.getElementById('mv'); if (b && b.classList.contains('on')) { b.classList.remove('on'); b.querySelectorAll('.stage img,.stage iframe').forEach(x => x.remove()); } });
+document.addEventListener('keydown', e => { const b = document.getElementById('mv'); if (!b || !b.classList.contains('on')) return;
+  if (e.key === 'Escape') mvClose(); else if (e.key === 'ArrowLeft') mvShow(mvAt - 1); else if (e.key === 'ArrowRight') mvShow(mvAt + 1); });
 </script></body></html>
