@@ -309,6 +309,61 @@
   };
 
   A.esc = esc;
+  // ── Admin.pick: the hub's chooser (Mario 2026-10-08: "dropdown autocomplete same as Accounts, everywhere, and for
+  // future features"). One box you type in; the list filters as you type, ↓ ↑ Enter pick, Esc closes, the chosen item
+  // is marked, groups get a heading. Any list longer than a handful of items uses THIS, never a plain <select>.
+  //   Admin.pick(hostEl, { items: [{id, label, group?, extra?, search?}], value, placeholder, onPick(id, item), onType(q) })
+  //   → { set(id), refresh(items), value, el, input }.  hostEl may be an existing <select>: it is replaced in place.
+  A.pick = function (host, opts) {
+    const o = Object.assign({ items: [], value: null, placeholder: 'Type to find…', onPick: () => {} }, opts || {});
+    if (!document.getElementById('hub-pick-css')) {
+      const st = document.createElement('style'); st.id = 'hub-pick-css'; st.textContent = `
+        .hub-pick{position:relative;display:inline-block;width:300px;max-width:100%;vertical-align:middle;}
+        .hub-pick input{width:100%;box-sizing:border-box;padding:7px 26px 7px 10px;font:inherit;font-size:.82rem;color:var(--text,#cdd6f4);border:1px solid var(--surface0,#313244);border-radius:7px;
+          background:var(--mantle,#181825) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a6adc8' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center/10px 6px;}
+        .hub-pick input:focus{outline:none;border-color:var(--amber,#F2A93B);}
+        .hub-pick .hp-list{position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--mantle,#181825);border:1px solid var(--surface0,#313244);border-radius:0 0 8px 8px;max-height:320px;overflow:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.3);}
+        .hub-pick .hp-list.on{display:block;} .hub-pick .hp-list div{padding:6px 10px;cursor:pointer;display:flex;align-items:baseline;gap:8px;font-size:.8rem;color:var(--text,#cdd6f4);}
+        .hub-pick .hp-list div.hi{background:var(--surface1,#45475a);} .hub-pick .hp-list div .g{margin-left:auto;color:var(--amber,#F2A93B);font-size:.72rem;white-space:nowrap;}
+        .hub-pick .hp-list div.grp{cursor:default;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0,#6c7086);padding:7px 10px 2px;border-top:1px solid var(--surface0,#313244);}
+        .hub-pick .hp-list div.grp:first-child{border-top:0;} .hub-pick .hp-list div.none{color:var(--overlay0,#6c7086);cursor:default;}
+        @media (max-width:700px){ .hub-pick{width:100%;} .hub-pick input{font-size:16px;padding-top:9px;padding-bottom:9px;} }`;
+      document.head.appendChild(st);
+    }
+    const wrap = document.createElement('span'); wrap.className = 'hub-pick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.autocomplete = 'off'; inp.placeholder = o.placeholder; inp.setAttribute('aria-label', o.placeholder);
+    const list = document.createElement('div'); list.className = 'hp-list';
+    wrap.append(inp, list);
+    if (host.tagName === 'SELECT') { if (host.id) wrap.id = host.id + '-pick'; host.replaceWith(wrap); } else host.appendChild(wrap);
+    const S = { items: o.items, value: o.value, hits: [], hi: -1 };
+    const byId = id => S.items.find(x => String(x.id) === String(id));
+    const show = () => { if (document.activeElement !== inp) { const it = byId(S.value); inp.value = it ? it.label : ''; } };
+    const matches = q => { const w = q.trim().toLowerCase().split(/\s+/).filter(Boolean); return S.items.filter(x => w.every(k => (x.label + ' ' + (x.search || '') + ' ' + (x.group || '')).toLowerCase().includes(k))); };
+    const paint = () => {
+      let last = null;
+      list.innerHTML = S.hits.length
+        ? S.hits.map((x, n) => { const head = x.group && x.group !== last ? `<div class="grp">${esc(x.group)}</div>` : ''; if (x.group) last = x.group;
+            return head + `<div class="${n === S.hi ? 'hi' : ''}" data-n="${n}">${esc(x.label)}${x.extra ? `<span class="g">${esc(x.extra)}</span>` : ''}${String(x.id) === String(S.value) ? '<span class="g">open</span>' : ''}</div>`; }).join('')
+        : '<div class="none">nothing matches</div>';
+      list.classList.add('on'); const hi = list.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });
+    };
+    const openAll = () => { S.hits = matches(''); inp.select(); S.hi = Math.max(0, S.hits.findIndex(x => String(x.id) === String(S.value))); paint(); };
+    const close = () => list.classList.remove('on');
+    const pickN = n => { const x = S.hits[n]; if (!x) return; close(); inp.blur(); if (String(x.id) !== String(S.value)) { S.value = x.id; show(); o.onPick(x.id, x); } else show(); };
+    inp.addEventListener('focus', openAll);
+    inp.addEventListener('input', () => { S.hits = matches(inp.value); S.hi = S.hits.length ? 0 : -1; paint(); if (o.onType) o.onType(inp.value); });
+    inp.addEventListener('blur', () => { close(); show(); });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); S.hi = Math.min(S.hits.length - 1, S.hi + 1); paint(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); S.hi = Math.max(0, S.hi - 1); paint(); }
+      else if (e.key === 'Enter') { e.preventDefault(); pickN(S.hi); }
+      else if (e.key === 'Escape') { close(); inp.blur(); }
+    });
+    list.addEventListener('mousedown', e => { const d = e.target.closest('div[data-n]'); if (d) { e.preventDefault(); pickN(+d.dataset.n); } });
+    list.addEventListener('mousemove', e => { const d = e.target.closest('div[data-n]'); if (d && +d.dataset.n !== S.hi) { S.hi = +d.dataset.n; paint(); } });
+    show();
+    return { set(id) { S.value = id; show(); }, refresh(items) { S.items = items; show(); }, get value() { return S.value; }, el: wrap, input: inp };
+  };
 
   // The Odoo company names are long and the columns are narrow, so the screen says what Mario says:
   // SHIFT GROUP SARL (USD) → S SARL (2026-09-25). Only the label — the stored value stays the Odoo name.

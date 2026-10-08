@@ -26,7 +26,7 @@
   h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 14px;line-height:1.5;}
   .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;} .bar .sp{flex:1;}
   select,input,button,textarea{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:7px 10px;font-size:.82rem;font-family:inherit;}
-  select{max-width:100%;} #pick{min-width:260px;}
+  select{max-width:100%;}
   button{cursor:pointer;} button:hover{border-color:var(--amber);} button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
   button.sm{padding:4px 8px;font-size:.74rem;}
   .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;overflow-x:auto;margin-bottom:14px;}
@@ -55,7 +55,7 @@
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
   #msg{font-size:.8rem;color:var(--sub);margin:8px 0;}
   .filters{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;} .filters button{padding:4px 10px;font-size:.74rem;border-radius:12px;}
-  @media (max-width:640px){ main{padding:14px 12px 50px;} #pick{min-width:0;width:100%;} th,td{padding:5px 6px;} .form{grid-template-columns:1fr;} .form .full{grid-column:1;} }
+  @media (max-width:640px){ main{padding:14px 12px 50px;} th,td{padding:5px 6px;} .form{grid-template-columns:1fr;} .form .full{grid-column:1;} }
   @media print{ header,.bar,.note,#msg,.form,.filters,button{display:none!important;} body{background:#fff;color:#000;} .card{border:0;} td,th{color:#000!important;border-color:#ccc;} }
 </style>
 </head>
@@ -68,8 +68,7 @@
   <h1>Suppliers</h1>
   <p class="lead">One supplier across every company: his bills and returns in Odoo, the payments that reached him, what is still open per company, the hub lines that name him — whoever paid — and his latest statement of account to check against.</p>
   <div class="bar">
-    <select id="pick" onchange="openSupplier(+this.value)"><option value="">All suppliers…</option></select>
-    <input type="search" id="find" placeholder="Find a supplier…" oninput="filterPick(this.value)" style="width:180px">
+    <span id="pick-host"></span>
     <span class="sp"></span>
     <button onclick="load(true)" title="Pull again from Odoo (the list is cached 5 minutes)">⟳ Refresh</button>
     <button onclick="window.print()">🖨 Print</button>
@@ -101,19 +100,16 @@ async function load(fresh) {
   try {
     const d = await Admin.api('GET', '/api/suppliers/list' + (fresh ? '?fresh=1' : ''));
     LIST = d.suppliers;
-    const sel = document.getElementById('pick');
-    sel.innerHTML = '<option value="">All suppliers…</option>' + LIST.map(p => `<option value="${p.id}">${esc(p.name)}${p.open ? ' · open ' + fmt(p.open) : ''}</option>`).join('');
     const want = +(new URL(location.href).searchParams.get('id') || 0);
     say('');
-    if (want) { sel.value = String(want); await openSupplier(want, fresh); } else renderList();
+    if (want) await openSupplier(want, fresh); else { pickShow(); renderList(); }
   } catch (e) { say('Could not read Odoo: ' + e.message, 'err'); }
 }
-function filterPick(q) {
-  q = q.trim().toLowerCase();
-  const sel = document.getElementById('pick');
-  for (const o of sel.options) { if (!o.value) continue; o.hidden = q && !o.textContent.toLowerCase().includes(q); }
-  if (!CUR) renderList(q);
-}
+// the picker = Admin.pick, the hub's shared chooser (one box, type to find)
+let PICK = null;
+const pickItems = () => [{ id: 0, label: '🗂 All suppliers', search: 'everything all' }, ...LIST.map(p => ({ id: p.id, label: p.name, extra: p.open ? 'open ' + fmt(p.open) : '' }))];
+function pickShow() { if (!PICK) PICK = Admin.pick(document.getElementById('pick-host'), { items: pickItems(), value: CUR ? CUR.partner.id : 0, placeholder: 'Supplier — type to find', onPick: id => openSupplier(+id), onType: q => { if (!CUR) renderList(q); } });
+  else { PICK.refresh(pickItems()); PICK.set(CUR ? CUR.partner.id : 0); } }
 function renderList(q) {
   q = (q || '').toLowerCase();
   const rows = LIST.filter(p => !q || p.name.toLowerCase().includes(q));
@@ -126,14 +122,14 @@ function renderList(q) {
     </tbody></table></div>
     <div class="note">"Still open" is Odoo's view: bills posted and not yet paid, in any company. A supplier's own statement may say otherwise — open him, add his statement, and the page shows the difference.</div>`;
 }
-function pickSupplier(id) { document.getElementById('pick').value = String(id); openSupplier(id); }
+function pickSupplier(id) { openSupplier(id); }
 async function openSupplier(id, fresh) {
-  if (!id) { CUR = null; history.replaceState(null, '', '/suppliers'); renderList(document.getElementById('find').value); return; }
+  if (!id) { CUR = null; history.replaceState(null, '', '/suppliers'); pickShow(); renderList(''); return; }
   say('Reading…');
   try {
     CUR = await Admin.api('GET', `/api/suppliers/one?id=${id}`);
     history.replaceState(null, '', '/suppliers?id=' + id);
-    F = { kind: 'all', company: '' }; say(''); render();
+    F = { kind: 'all', company: '' }; say(''); pickShow(); render();
   } catch (e) { say('Could not read the supplier: ' + e.message, 'err'); }
 }
 function setF(k, v) { F[k] = F[k] === v ? (k === 'kind' ? 'all' : '') : v; render(); }
