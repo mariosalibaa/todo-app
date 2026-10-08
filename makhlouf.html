@@ -51,6 +51,7 @@
   .tipbox b{color:var(--text);margin-right:4px} .tipbox i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
   #yrH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   details.notes{margin-top:8px;} details.notes>summary{cursor:pointer;list-style:none;font-size:.75rem;color:var(--sub);padding:4px 2px;} details.notes>summary::before{content:'B8  ';color:var(--amber);} details.notes[open]>summary::before{content:'BE  ';} details.notes .note{margin-top:4px;}
+  #prT th,#prT td{white-space:normal} #prT td:first-child{min-width:0}
   #prH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;} .prodT tr.best td{background:rgba(166,227,161,.08)}
   #batH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   #solH{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
@@ -211,8 +212,8 @@
     <div class="kpis" id="yrK"></div>
     <div class="card"><table id="yrT" class="prodT"></table></div>
     <details class="notes"><summary>How this is calculated</summary><div class="note" id="yrNote"></div></details>
-    <h2 class="mh" id="prH"><span>Proposals · size and payback</span><span class="solin"><label>Panel $/W <input id="prPW" type="number" min="0" step="0.01" value="0.42"></label><label>Install $/W <input id="prIW" type="number" min="0" step="0.01" value="0"></label><label>Narinco + % <input id="prMk" type="number" min="0" step="1" value="20"></label><label>Diesel $/L <input id="prD" type="number" min="0" step="0.05" value="1.00"></label><label class="tick"><input id="prPv" type="checkbox" checked> scale to PVGIS</label></span></h2>
-    <div class="card"><table id="prT" class="prodT"></table></div>
+    <h2 class="mh" id="prH"><span>Proposals · size and payback</span><span class="solin"><label>Panel $/W <input id="prPW" type="number" min="0" step="0.01" value="0.42"></label><label>Install $/W <input id="prIW" type="number" min="0" step="0.01" value="0"></label><label>Equipment + % <input id="prMk" type="number" min="0" step="1" value="20"></label><label>Diesel $/L <input id="prD" type="number" min="0" step="0.05" value="1.00"></label><label class="tick"><input id="prPv" type="checkbox" checked> scale to PVGIS</label></span></h2>
+    <div class="card"><table id="prT" class="prodT" style="table-layout:auto"></table></div>
     <details class="notes"><summary>How this is calculated</summary><div class="note" id="prNote"></div></details>
     <h2 class="mh" id="batH">Battery · state of charge</h2>
     <div class="kpis" id="batK"></div>
@@ -414,9 +415,9 @@
     const GK = { G1: { kva: 350, name: 'G1 · 350 kVA' }, G2: { kva: 600, name: 'G2 · 600 kVA' } };   // kW = kVA × 0.8
     const hourOf = ms => { const d = new Date(ms + 3 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60; };
 
-    // ── Proposals (Mario 2026-10-05): 300 / 600 panels × no battery / 768 kWh, Narinco option-2 parts + 20 %, panels $/W,
+    // ── Proposals (Mario 2026-10-05): 300 / 600 panels × no battery / 768 kWh, supplier option-2 parts + 20 %, panels $/W,
     // payback = cost ÷ (diesel saved a year × $/L). Year = every reference day on Makhlouf's load (the year-table engine).
-    const NAR = { pcs: 4000, sts: 5500, bat: 30000, rack: 4500, mppt: 1750 };   // Narinco cost 30 Sep 2026: PCS 125 kW, STS 500 kW, battery 256 kWh, racks, MPPT 200 kWp
+    const NAR = { pcs: 4000, sts: 5500, bat: 30000, rack: 4500, mppt: 1750 };   // supplier cost 30 Sep 2026: PCS 125 kW, STS 500 kW, battery 256 kWh, racks, MPPT 200 kWp
     const PROPS = [
       { name: '300 panels · no battery', N: 300, cap: 0, parts: { mppt: 1, pcs: 1, sts: 1 } },
       { name: '300 panels · 768 kWh battery', N: 300, cap: 768, parts: { mppt: 1, pcs: 3, sts: 1, bat: 3, rack: 1 } },
@@ -451,14 +452,14 @@
         return { ...pr, y, kwp, panels, inst, nar, cost, saveL, saveUsd, pay: saveUsd > 0 ? cost / saveUsd : Infinity };
       });
       const best = rows.reduce((a, r) => r.pay < a.pay ? r : a);
-      let h = `<tr><th>Proposal</th><th>kWp</th><th>Battery</th><th>Cost $</th><th>Solar used</th><th>Generator on</th><th>Diesel saved / yr</th><th>Saved $ / yr</th><th>Payback</th></tr>`;
-      for (const r of rows) h += `<tr class="${r === best ? 'best' : ''}"><td><b>${r.name}</b><small><br>panels ${f0(r.panels)}${r.inst ? ` + install ${f0(r.inst)}` : ''} + Narinco ${f0(r.nar)}: ${Object.entries(r.parts).map(([k, q]) => `${q} × ${PART[k]}`).join(', ')}</small></td>` +
-        `<td>${f1(r.kwp)}</td><td>${r.cap ? r.cap + ' kWh' : '—'}</td><td><b>${f0(r.cost)}</b></td><td>${f0(r.y.used)} kWh<small> ${Math.round(r.y.used / load * 100)} %</small></td>` +
-        `<td>${f1(r.y.genH / 365)} h/day</td><td>${f0(r.saveL)} L<small> ${Math.round(r.saveL / none * 100)} %</small></td><td>${f0(r.saveUsd)}</td><td><b>${isFinite(r.pay) ? f1(r.pay) + ' yr' : '—'}</b>${r === best ? '<small> best</small>' : ''}</td></tr>`;
-      h += `<tr class="tot"><td>No solar (today)</td><td>—</td><td>—</td><td>0</td><td>0</td><td>${f1(rows.length ? simDay(new Array(288).fill(0), 0, W, false, 0, set).genH : 0)} h/day</td><td colspan="3">≈ ${f0(none)} L diesel a year (≈ $${f0(none * dl)})</td></tr>`;
+      // Mario 2026-10-08: compact (no sideways scroll) — proposal, cost, diesel saved, payback; the rest in small print
+      let h = `<tr><th>Proposal</th><th>Cost $</th><th>Diesel saved a year</th><th>Payback</th></tr>`;
+      for (const r of rows) h += `<tr class="${r === best ? 'best' : ''}"><td><b>${r.name}</b><small><br>${f1(r.kwp)} kWp · solar ${Math.round(r.y.used / load * 100)} % of the load · generator ${f1(r.y.genH / 365)} h/day</small></td>` +
+        `<td><b>${f0(r.cost)}</b></td><td>${f0(r.saveL)} L<small><br>${Math.round(r.saveL / none * 100)} % · $${f0(r.saveUsd)}</small></td><td><b>${isFinite(r.pay) ? f1(r.pay) + ' yr' : '—'}</b>${r === best ? '<small><br>best</small>' : ''}</td></tr>`;
+      h += `<tr class="tot"><td>No solar (today)<small><br>generator ${f1(rows.length ? simDay(new Array(288).fill(0), 0, W, false, 0, set).genH : 0)} h/day</small></td><td>0</td><td colspan="2">≈ ${f0(none)} L diesel a year (≈ $${f0(none * dl)})</td></tr>`;
       $('prT').innerHTML = h;
       $('prNote').innerHTML = `<b>Proposals.</b> Each line runs the whole reference year on Makhlouf's load (${f0(load)} kWh a year, the “Load kWh/month” box), with the generator, floor % and gen start/stop set in Solar vs load. ` +
-        `Costs: panels = kWp × panel $/W (645 W panels); Narinco = option-2 parts at their 30 Sep cost (PCS 125 kW $4,000 · STS 500 kW $5,500 · battery 256 kWh $30,000 · racks $4,500 · MPPT 200 kWp $1,750) + the % above. ` +
+        `Costs: panels = kWp × panel $/W (645 W panels); equipment = ${PROPS.map(pr => `${pr.name}: ${Object.entries(pr.parts).map(([k, q]) => `${q} × ${PART[k]}`).join(', ')}`).join(' · ')} — at cost (PCS 125 kW $4,000 · STS 500 kW $5,500 · battery 256 kWh $30,000 · racks $4,500 · MPPT 200 kWp $1,750) + the “Equipment + %” above. ` +
         `Without a battery the line keeps the MPPT + PCS + STS to run the panels with the generator (2 PCS for 600 panels, 1 for 300). Structure, cabling and installation are not in unless you put them in “Install $/W”. ` +
         `Diesel saved is against the same year with no solar; payback = cost ÷ (litres saved × $/L), no maintenance, no battery replacement, no price change.`;
     };
