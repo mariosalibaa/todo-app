@@ -309,6 +309,9 @@
   };
 
   A.esc = esc;
+  // the hub's money format (Mario 2026-10-08: "4,000.00$"): thousands separated, two decimals, $ after; LBP keeps its name
+  A.money = (n, cur) => { const v = Number(n || 0); const s = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (v < 0 ? '−' : '') + s + (cur === 'LBP' ? ' LBP' : '$'); };
   // ── Admin.pick: the hub's chooser (Mario 2026-10-08: "dropdown autocomplete same as Accounts, everywhere, and for
   // future features"). One box you type in; the list filters as you type, ↓ ↑ Enter pick, Esc closes, the chosen item
   // is marked, groups get a heading. Any list longer than a handful of items uses THIS, never a plain <select>.

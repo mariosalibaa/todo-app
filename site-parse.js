@@ -73,9 +73,9 @@ COMPANIES: ${(companies || []).join(' | ')}`;
 
 async function visionRead(buf, mime) {
   const out = await anthropic({ model: 'claude-sonnet-5', max_tokens: 400,
-    system: 'Look at the image. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","date":"yyyy-mm-dd"|null,"invoiceNo":string|null,"billedTo":string|null,"vat":true|false,"note":string}. billedTo = the customer the paper is made out to, copied as printed (the "Messrs"/"Client" line), null when it is a plain cash receipt with no customer. vat = true only when the paper charges VAT/TVA (a VAT line, ض.ق.م, or 11%). invoiceNo = the invoice number the supplier printed on it. If it is a photo of a construction site or work in progress return {"receipt":false,"note":one line describing the work}. JSON only.',
+    system: 'Look at the image. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","usd":number|null,"date":"yyyy-mm-dd"|null,"invoiceNo":string|null,"billedTo":string|null,"vat":true|false,"note":string}. billedTo = the customer the paper is made out to, copied as printed (the "Messrs"/"Client" line), null when it is a plain cash receipt with no customer. usd = the total in US dollars when the paper ALSO prints one (e.g. "TOTAL $: 14.22" under a TOTAL LL), else null. vat = true only when the paper charges VAT/TVA (a VAT line, ض.ق.م, or 11%). invoiceNo = the invoice number the supplier printed on it. If it is a photo of a construction site or work in progress return {"receipt":false,"note":one line describing the work}. JSON only.',
     messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data: buf.toString('base64') } }] }] });
-  return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', date: out.date || null,
+  return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', usd: +out.usd || null, date: out.date || null,
     invoiceNo: String(out.invoiceNo || '').slice(0, 40), billedTo: String(out.billedTo || '').slice(0, 80), vat: !!out.vat,
     note: String(out.note || '').slice(0, 160) };
 }
@@ -84,9 +84,9 @@ async function visionRead(buf, mime) {
 // the document itself. Claude reads the PDF pages; amount = the TOTAL to pay, the way the paper prints it.
 async function pdfRead(buf) {
   const out = await anthropic({ model: 'claude-sonnet-5', max_tokens: 400,
-    system: 'You read one PDF a Lebanese contractor received. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","date":"yyyy-mm-dd"|null,"invoiceNo":string|null,"billedTo":string|null,"vat":true|false,"note":string}. amount = the final total to pay (TTC when VAT is charged). billedTo = the customer the paper is made out to, copied as printed, null when there is none. vat = true only when it charges VAT/TVA (a VAT line, ض.ق.م, or 11%). If it is not a receipt or an invoice (a drawing, a contract, a catalogue) return {"receipt":false,"note":one line saying what the document is}. JSON only.',
+    system: 'You read one PDF a Lebanese contractor received. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","usd":number|null,"date":"yyyy-mm-dd"|null,"invoiceNo":string|null,"billedTo":string|null,"vat":true|false,"note":string}. amount = the final total to pay (TTC when VAT is charged). billedTo = the customer the paper is made out to, copied as printed, null when there is none. usd = the total in US dollars when the paper ALSO prints one (e.g. "TOTAL $: 14.22" under a TOTAL LL), else null. vat = true only when it charges VAT/TVA (a VAT line, ض.ق.م, or 11%). If it is not a receipt or an invoice (a drawing, a contract, a catalogue) return {"receipt":false,"note":one line saying what the document is}. JSON only.',
     messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buf.toString('base64') } }] }] });
-  return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', date: out.date || null,
+  return { receipt: !!out.receipt, vendor: out.vendor || '', amount: +out.amount || 0, currency: out.currency || 'USD', usd: +out.usd || null, date: out.date || null,
     invoiceNo: String(out.invoiceNo || '').slice(0, 40), billedTo: String(out.billedTo || '').slice(0, 80), vat: !!out.vat,
     note: String(out.note || '').slice(0, 160) };
 }
@@ -123,4 +123,13 @@ async function whisper(buf, mime) {
   return String(j.text || '').trim();
 }
 
-module.exports = { quickParse, matchName, claudeParse, claudeParseMany, visionRead, pdfRead, fuelRead, whisper, anthropic, officialCompany, SARL };
+// Mario cash is a USD ledger (Mario 2026-10-08: "always enter in USD from Mario cash"): an LBP paper becomes its dollar
+// figure — the $ total the paper prints when it has one, else LBP / 89,500 — and the LBP amount stays in the description.
+const LBP_RATE = 89500;
+function toUsd(parsed) {
+  if (!parsed || parsed.currency !== 'LBP' || !(+parsed.amount > 0)) return parsed;
+  const lbp = +parsed.amount, usd = +parsed.usd > 0 && +parsed.usd < lbp ? +parsed.usd : Math.round(lbp / LBP_RATE * 100) / 100;
+  return { ...parsed, amount: usd, currency: 'USD', lbp, lbpNote: lbp.toLocaleString('en-US') + ' LBP' + (+parsed.usd > 0 ? '' : ' at ' + LBP_RATE.toLocaleString('en-US')) };
+}
+
+module.exports = { toUsd, LBP_RATE, quickParse, matchName, claudeParse, claudeParseMany, visionRead, pdfRead, fuelRead, whisper, anthropic, officialCompany, SARL };

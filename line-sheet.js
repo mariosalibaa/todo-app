@@ -52,7 +52,7 @@
       const [t] = await Promise.all([A.api('GET', `/api/accounting/accounts/${acc}/tx/${txId}`), loadRefs()]);
       S = { acc, txId, t, extra: [], onChange: (opts || {}).onChange || null, bal: null };
       draw();
-      A.api('GET', `/api/accounting/accounts/${acc}/balance`).then(b => { if (S && S.acc === acc) { S.bal = b; const el = g('ls-bal'); if (el) el.textContent = ' · balance ' + b.balance.toFixed(2); } }).catch(() => {});
+      A.api('GET', `/api/accounting/accounts/${acc}/balance`).then(b => { if (S && S.acc === acc) { S.bal = b; const el = g('ls-bal'); if (el) el.textContent = ' · balance ' + A.money(b.balance); } }).catch(() => {});
     } catch (e) { o.querySelector('.ls').innerHTML = `<div class="err">${esc(e.message)}</div><div class="ls-actions"><button class="ghost" onclick="LineSheet.close()">Close</button></div>`; }
   }
   // the clock time the paper carries: the WhatsApp/chat message's minute, else when the line was written
@@ -74,7 +74,7 @@
     const rebook = booked && !odoo && !monthLine;
     const lockAll = (booked && !rebook) || odoo, lock = lockAll && !monthLine;
     o.querySelector('.ls').innerHTML = `
-    <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : cancelled ? 'cancelled' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
+    <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + A.money(S.bal.balance) : ''}</span><span class="ls-state ${booked ? 'booked' : cancelled ? 'cancelled' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
       <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=account.move&view_type=form&id=${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
     <label>Description<input id="ls-desc" value="${esc(t.description || '')}" ${lock ? 'disabled' : ''}></label>
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
