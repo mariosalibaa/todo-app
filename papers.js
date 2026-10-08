@@ -72,7 +72,8 @@ async function syncLine(deps, t, opts = {}) {
           await odooCall('ir.attachment', 'write', [[a.id], { res_model: 'account.move', res_id: m.id }], { context: { allowed_company_ids: ALL_CO } });
           staged = false; out.moved++;
         } else {
-          await odooCall('ir.attachment', 'copy', [[a.id]], { default: { res_model: 'account.move', res_id: m.id }, context: C });
+          // the source may sit on another company's entry (worker's S LB line → SARL official bill): read it with every company allowed
+          await odooCall('ir.attachment', 'copy', [[a.id]], { default: { res_model: 'account.move', res_id: m.id }, context: { allowed_company_ids: [C.allowed_company_ids[0], ...ALL_CO.filter(c => c !== C.allowed_company_ids[0])] } });
           out.copied++;
         }
         have[m.id].add(a.checksum); note(m.id, a.name);
