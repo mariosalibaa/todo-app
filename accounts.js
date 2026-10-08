@@ -1361,6 +1361,41 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, { entries: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
   }
 
+  // Edit a line that is already in Odoo (Mario 2026-10-08: "when I hit edit, allow me to edit"): its own Odoo entries go —
+  // the bill and the payment that paid only this bill, or the single payment entry — the hub line keeps everything and
+  // loses only its bookedMove, so the sheet books it again with the new values right after. A month bill is rewritten
+  // by book-month instead, and an Odoo mirror line (src odoo) has nothing of the hub's to undo.
+  if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)\/unbook$/)) && req.method === 'POST') {
+    const a = await resolve(ws, m[1]);
+    if (!a) return json(res, 404, { error: 'no such account' });
+    const ref = txCol(a).doc(m[2]); const cur = (await ref.get()).data();
+    if (!cur) return json(res, 404, { error: 'no such line' });
+    if (cur.src === 'odoo') return json(res, 400, { error: 'this line mirrors an Odoo entry — edit that entry in Odoo' });
+    const bm = cur.bookedMove;
+    if (!bm || !Number.isInteger(bm.id)) return json(res, 400, { error: 'this line is not in Odoo' });
+    if (bm.month) return json(res, 400, { error: 'a line of a month bill — save it, the month bill is rewritten' });
+    const C = { allowed_company_ids: [2, 7, 8, 9, 10, 4] };
+    const [mv] = await odooCall('account.move', 'read', [[bm.id], ['name', 'move_type', 'state']], { context: C });
+    const gone = [];
+    try {
+      if (mv && /^in_(invoice|refund)$/.test(mv.move_type)) {
+        // the payments that settled ONLY this bill were made with it — they go too; one shared with other bills stays
+        const pays = await odooCall('account.payment', 'search_read', [[['reconciled_bill_ids', 'in', [bm.id]]]], { fields: ['id', 'move_id', 'reconciled_bill_ids'], context: C });
+        gone.push(await deleteOdooEntry(odooCall, bm.id));
+        for (const p of pays) if ((p.reconciled_bill_ids || []).length === 1 && p.move_id) gone.push(await deleteOdooEntry(odooCall, p.move_id[0]));
+      } else if (mv) gone.push(await deleteOdooEntry(odooCall, bm.id));
+    } catch (e) { return json(res, 400, { error: 'Odoo refused: ' + String(e.message || e).slice(0, 220) + (gone.length ? ' (already removed: ' + gone.map(g => g.name).join(', ') + ')' : '') }); }
+    const FV = admin.firestore.FieldValue;
+    await ref.set({ bookedMove: FV.delete(), booked: FV.delete(), odoo: FV.delete(), updatedAt: now(), updatedBy: who }, { merge: true });
+    // mirror rows of the same entries on this account go with them
+    const ids = new Set(gone.map(g => g.id));
+    const sibs = (await txCol(a).where('src', '==', 'odoo').get()).docs.map(d => d.data())
+      .filter(t => (t.bookedMove && ids.has(t.bookedMove.id)) || (t.odoo && (t.odoo.matches || []).some(x => x.chosen && ids.has(x.moveId))));
+    for (const t of sibs) await txCol(a).doc(t.id).delete();
+    await hubLog(ws, 'odoo-delete', { who, txId: m[2], line: `${cur.date} · edited after booking: ${gone.map(g => g.name).join(' + ')} removed from Odoo, to be booked again`, before: { move: bm, gone }, after: {}, undo: false });
+    return json(res, 200, { gone: gone.map(g => ({ name: g.name, kind: g.kind, amount: g.amount })), mirrors: sibs.length });
+  }
+
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/tx\/([\w-]+)$/)) && req.method === 'DELETE') {
     const a = await resolve(ws, m[1]);
     if (!a) return json(res, 404, { error: 'no such account' });

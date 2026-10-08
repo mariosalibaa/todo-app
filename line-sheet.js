@@ -67,7 +67,10 @@
     // the month bill is rewritten from the hub lines right after (Mario, 2026-10-06: "allow to edit here … amount").
     // Its company is the bill's. A line booked on its own (book-row / a payment) or an Odoo mirror stays locked.
     const monthLine = booked && !!t.bookedMove.month && !odoo;
-    const lockAll = booked || odoo, lock = lockAll && !monthLine;
+    // a line booked on its own (a bill + its payment, or one payment) opens for editing too (Mario 2026-10-08):
+    // Save removes its Odoo entries and books it again with what is on the sheet
+    const rebook = booked && !odoo && !monthLine;
+    const lockAll = (booked && !rebook) || odoo, lock = lockAll && !monthLine;
     o.querySelector('.ls').innerHTML = `
     <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + S.bal.balance.toFixed(2) : ''}</span><span class="ls-state ${booked ? 'booked' : cancelled ? 'cancelled' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
       <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/web#cids=2-7-10-8-4-9&model=account.move&view_type=form&id=${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
@@ -84,10 +87,10 @@
       <button class="ls-add" onclick="LineSheet.S.extra.push({description:'',amount:''});LineSheet.draw();setTimeout(()=>{const l=document.querySelectorAll('.ls-extra input');l[l.length-2]&&l[l.length-2].focus()},0)">+ add an expense</button></div>`}
     ${lock ? '' : `<div class="ls-ai"><button type="button" class="ls-sug" onclick="LineSheet.suggest(this)">✦ Suggest</button><span id="ls-dict"></span></div>`}
     <div class="ls-actions">
-      <button onclick="LineSheet.save()">Save</button>
-      ${!accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('accept')" title="Accept and book in Odoo in one press">✓ Accept &amp; book</button>` : ''}
-      ${accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('book')">✓ Book in Odoo</button><button class="warn" onclick="LineSheet.hold()">↩ hold</button>` : ''}
-      ${!lockAll && !cancelled ? `<button class="warn" onclick="LineSheet.cancelEntry()">✕ Cancel entry</button>` : ''}
+      ${rebook ? `<button class="ok" onclick="LineSheet.save('rebook')" title="Removes ${esc(t.bookedMove.name || 'its entry')} from Odoo and books the line again with these values">✓ Save &amp; rewrite in Odoo</button>` : '<button onclick="LineSheet.save()">Save</button>'}
+      ${!accepted && !lockAll && !rebook ? `<button class="ok" onclick="LineSheet.save('accept')" title="Accept and book in Odoo in one press">✓ Accept &amp; book</button>` : ''}
+      ${accepted && !lockAll && !rebook ? `<button class="ok" onclick="LineSheet.save('book')">✓ Book in Odoo</button><button class="warn" onclick="LineSheet.hold()">↩ hold</button>` : ''}
+      ${!lockAll && !cancelled && !rebook ? `<button class="warn" onclick="LineSheet.cancelEntry()">✕ Cancel entry</button>` : ''}
       ${cancelled ? `<button onclick="LineSheet.restoreEntry()">↩ Put it back</button>` : ''}
       <button class="ghost" onclick="LineSheet.close()">Close</button></div>
     <div class="err" id="ls-err"></div>`;
@@ -197,8 +200,16 @@
     const err = g('ls-err'); err.textContent = '';
     const btns = [...document.querySelectorAll('.ls-actions button')]; btns.forEach(b => b.disabled = true);
     try {
-      const t = S.t, lock = !!t.bookedMove || t.src === 'odoo';
+      let t = S.t, lock = !!t.bookedMove || t.src === 'odoo';
       const monthLine = !!t.bookedMove && !!t.bookedMove.month && t.src !== 'odoo';
+      if (action === 'rebook') {
+        if (!confirm(`Rewrite this line in Odoo?
+
+${t.bookedMove.name || 'Its entry'} (and the payment made with it) is removed, then the line is booked again with what is on the sheet.`)) { btns.forEach(b => b.disabled = false); return; }
+        await A.api('POST', `/api/accounting/accounts/${S.acc}/tx/${S.txId}/unbook`, {});
+        S.t = t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`);
+        lock = false; action = 'book';
+      }
       const f = await fields();
       if (monthLine) {
         if (!f.debit && !f.credit) throw new Error('an amount is needed');

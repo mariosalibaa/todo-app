@@ -161,6 +161,8 @@
   .pick-list.on{display:block;} .pick-list.empty{pointer-events:none;}
   .pick-list div{padding:5px 8px;cursor:pointer;display:flex;align-items:baseline;gap:8px;font-size:12.5px;font-style:normal;color:var(--text);}
   .pick-list div .g{margin-left:auto;color:var(--muted);font-size:11px;}
+  .cf-wrap{position:relative;display:block;} .cf-list{position:absolute;left:0;right:0;top:100%;z-index:40;background:var(--mantle);border:1px solid var(--line);border-radius:0 0 6px 6px;max-height:260px;overflow:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,.25);min-width:200px;text-transform:none;letter-spacing:0;}
+  .cf-list.on{display:block;} .cf-list div{padding:5px 8px;cursor:pointer;display:flex;gap:8px;font-size:12px;font-weight:400;color:var(--text);} .cf-list div.hi{background:var(--surface1);} .cf-list div .g{margin-left:auto;color:var(--muted);font-size:11px;}
   .pick-list div.grp{cursor:pointer;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:7px 8px 2px;border-top:1px solid var(--line);} .pick-list div.grp:first-child{border-top:0;}
   .pick-list div.hi{background:var(--surface1);} .pick-list div.none{color:var(--muted);cursor:default;}
   .sug-act{display:flex;gap:4px;align-items:center;}
@@ -1322,6 +1324,7 @@ function buildHeader() {
     : `<th class="${c.num ? 'num ' : ''}${c.c || ''}" onclick="setSort('${c.k}')">${c.l}<span class="arr" id="arr-${c.k}"></span></th>`).join('');
   document.getElementById('flt').innerHTML = COLS.map(c => {
     const on = colF[c.k] ? 'on' : '';
+    if (c.f === 'text' && (c.k === 'partner' || c.k === 'proj')) return `<th><span class="cf-wrap"><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="type, ↓ Enter" autocomplete="off" oninput="cfType('${c.k}', this)" onkeydown="cfKey(event, '${c.k}', this)" onfocus="cfType('${c.k}', this)" onblur="setTimeout(cfClose, 150)"><div class="cf-list" id="cf-${c.k}"></div></span></th>`;
     if (c.f === 'text') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="filter" oninput="setFilter('${c.k}', this.value)"></th>`;
     if (c.f === 'amount') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="=, >, <, a-b" title="150  ·  >100  ·  <50  ·  100-200" oninput="setFilter('${c.k}', this.value)"></th>`;
     if (c.f === 'date') return `<th><input type="text" class="${on}" value="${esc(colF[c.k] || '')}" placeholder="day, month, from..to" title="3/9  ·  2026-09-03  ·  09/2026  ·  1/9..9/9  ·  >1/9  ·  <5/9  ·  today  ·  or a ref like BILL/2026/09" oninput="setFilter('${c.k}', this.value)"></th>`;
@@ -1337,11 +1340,36 @@ function buildHeader() {
 }
 function setFilter(k, v) {
   if (v) colF[k] = v; else delete colF[k];
-  const el = document.getElementById('flt').children[COLS.findIndex(c => c.k === k)].firstElementChild;
+  const el = document.getElementById('flt').children[COLS.findIndex(c => c.k === k)].querySelector('input,select');
   el.classList.toggle('on', !!v);
   render();
 }
 function clearFilters() { colF = {}; sugFilter = ''; buildHeader(); render(); }
+// Partner / Project filter (Mario 2026-10-08: "auto update after search and pressing enter"): the grid filters as you
+// type; a list of the names that match comes up under the box — ↓ ↑ to move, Enter takes the highlighted name
+// EXACTLY (so "san" + Enter = SANNINE only, not "awkal / sandwich panels"), Esc closes
+let cfHits = [], cfHi = -1;
+function cfType(k, el) {
+  setFilter(k, el.value);
+  const c = COLS.find(x => x.k === k), q = el.value.trim().toLowerCase().replace(/^=/, '');
+  const pool = found ? found.tx : tx, n = {};
+  for (const t of pool) { const v = String(c.v(t) || '').trim(); if (v && (!q || v.toLowerCase().includes(q))) n[v] = (n[v] || 0) + 1; }
+  cfHits = Object.entries(n).sort((a, b) => { const sa = a[0].toLowerCase().startsWith(q), sb = b[0].toLowerCase().startsWith(q); return (sb - sa) || (b[1] - a[1]); }).slice(0, 14);
+  cfHi = cfHits.length ? 0 : -1; cfPaint(k);
+}
+function cfPaint(k) {
+  const box = document.getElementById('cf-' + k); if (!box) return;
+  box.innerHTML = cfHits.map(([v, c], i) => `<div class="${i === cfHi ? 'hi' : ''}" onmousedown="cfPick('${k}', ${i})">${esc(v)}<span class="g">${c}</span></div>`).join('');
+  box.classList.toggle('on', cfHits.length > 0);
+}
+function cfPick(k, i) { const h = cfHits[i]; if (!h) return; const el = document.querySelector('#cf-' + k).previousElementSibling; el.value = '=' + h[0]; setFilter(k, el.value); cfClose(); el.blur(); }
+function cfClose() { document.querySelectorAll('.cf-list').forEach(b => b.classList.remove('on')); }
+function cfKey(e, k, el) {
+  if (e.key === 'ArrowDown') { e.preventDefault(); cfHi = Math.min(cfHits.length - 1, cfHi + 1); cfPaint(k); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); cfHi = Math.max(0, cfHi - 1); cfPaint(k); }
+  else if (e.key === 'Enter') { e.preventDefault(); if (cfHi >= 0) cfPick(k, cfHi); else { setFilter(k, el.value); cfClose(); } }
+  else if (e.key === 'Escape') { cfClose(); }
+}
 function setSort(k) { sort = sort.k === k ? { k, dir: -sort.dir } : { k, dir: k === 'date' ? -1 : 1 }; render(); }
 
 function amountMatch(v, f) {
@@ -1392,7 +1420,7 @@ function passes(t) {
   for (const c of COLS) {
     const f = colF[c.k]; if (!f) continue;
     const v = c.v(t);
-    if (c.f === 'text') { if (!String(v).toLowerCase().includes(f.toLowerCase())) return false; }
+    if (c.f === 'text') { const lv = String(v).toLowerCase(), lf = f.toLowerCase(); if (lf.startsWith('=') ? lv !== lf.slice(1).trim() : !lv.includes(lf)) return false; }   // "=SANNINE" = exactly that name
     else if (c.f === 'select') { if (f === '__unset' ? !!v : v !== f) return false; }
     else if (c.f === 'odoo') { if (f === 'found' ? v <= 0 : f === 'none' ? v !== 0 : v !== -1) return false; }
     else if (c.f === 'amount') { if (!amountMatch(v, f)) return false; }
