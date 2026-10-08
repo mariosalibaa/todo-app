@@ -161,7 +161,7 @@
   .pick-list.on{display:block;} .pick-list.empty{pointer-events:none;}
   .pick-list div{padding:5px 8px;cursor:pointer;display:flex;align-items:baseline;gap:8px;font-size:12.5px;font-style:normal;color:var(--text);}
   .pick-list div .g{margin-left:auto;color:var(--muted);font-size:11px;}
-  .pick-list div.grp{cursor:default;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:7px 8px 2px;border-top:1px solid var(--line);} .pick-list div.grp:first-child{border-top:0;}
+  .pick-list div.grp{cursor:pointer;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:7px 8px 2px;border-top:1px solid var(--line);} .pick-list div.grp:first-child{border-top:0;}
   .pick-list div.hi{background:var(--surface1);} .pick-list div.none{color:var(--muted);cursor:default;}
   .sug-act{display:flex;gap:4px;align-items:center;}
   .sug-act button{border:1px solid var(--line);background:var(--crust);border-radius:3px;width:22px;height:20px;line-height:1;cursor:pointer;font-size:12px;padding:0;}
@@ -836,6 +836,9 @@ const accLabel = a => a.all ? '🗂 Everything (all accounts)'
   : a.sheet === 'timesheet' ? `🕐 ${a.name} (${a.currency})`
     : `${isPartner(a) ? '👤' : a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
 const accGroup = a => a.all ? '' : a.sheet === 'timesheet' ? 'Timesheets' : isPartner(a) ? 'Partners — their ledgers with us' : 'Cash & bank — our money';
+const accGroupWord = a => a.sheet === 'timesheet' ? 'timesheet' : isPartner(a) ? 'partners' : 'ours';
+// click a group heading in the list = filter on that type; click it again = everyone
+function accGroupPick(word) { const i = document.getElementById('acc-in'); i.value = i.value.trim().toLowerCase() === word ? '' : word; accSearch(); i.focus(); }
 async function loadAccounts() {
   accounts = (await Admin.api('GET', '/api/accounting/accounts')).filter(a => !a.archived);
   const sel = document.getElementById('acc');
@@ -852,7 +855,8 @@ function accShow() {                                   // put the chosen account
 }
 function accMatches(q) {
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return pickList().filter(a => { const h = `${a.name} ${a.currency} ${a.type} ${a.owner || ''}${a.all ? ' all accounts everything' : ''}`.toLowerCase(); return words.every(w => h.includes(w)); });
+  // the type words filter too (Mario 2026-10-08: "allow to filter by type"): partner / partners, ours / cash / bank, timesheet
+  return pickList().filter(a => { const h = `${a.name} ${a.currency} ${a.type} ${a.owner || ''} ${accGroup(a)}${isPartner(a) ? ' partner partners worker' : ''}${isOurs(a) ? ' ours own' : ''}${a.all ? ' all accounts everything' : ''}`.toLowerCase(); return words.every(w => h.includes(w)); });
 }
 function accOpenList(all) {
   const i = document.getElementById('acc-in');
@@ -865,7 +869,7 @@ function accPaint() {
   const box = document.getElementById('acc-list');
   let lastGrp = null;
   box.innerHTML = accHits.length
-    ? accHits.map((a, n) => { const grp = accGroup(a), head = grp && grp !== lastGrp ? `<div class="grp">${esc(grp)}</div>` : ''; lastGrp = grp || lastGrp;
+    ? accHits.map((a, n) => { const grp = accGroup(a), head = grp && grp !== lastGrp ? `<div class="grp" onmousedown="event.preventDefault();accGroupPick('${accGroupWord(a)}')" title="Only this type — click again for everyone">${esc(grp)} <span class="g">filter</span></div>` : ''; lastGrp = grp || lastGrp;
         return head + `<div class="${n === accHi ? 'hi' : ''}" data-id="${esc(a.id)}" onmousedown="accPickBy('${esc(a.id)}')" onmousemove="accHover(${n})">${esc(accLabel(a))}${a.id === acc ? '<span class="g">open</span>' : ''}</div>`; }).join('')
     : '<div class="none">no account matches</div>';
   box.classList.add('on');
