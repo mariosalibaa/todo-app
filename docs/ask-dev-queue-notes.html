@@ -1,0 +1,35 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Session Notes 2026-10-07 - Hub Ask and dev queue</title>
+<style>@page{size:A4;margin:16mm}body{font-family:"Segoe UI",sans-serif;font-size:10.5pt;color:#1a1a1a;line-height:1.45}
+h1{font-size:17pt;margin:0 0 2px}h2{color:#B7791F;font-size:12.5pt;margin:16px 0 6px;border-bottom:1px solid #e5d3b0;padding-bottom:2px}
+.d{color:#666;margin-bottom:10px}table{border-collapse:collapse;width:100%;font-size:9.5pt}td,th{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}th{background:#faf3e6}
+code{font-family:Consolas,monospace;font-size:9pt;background:#f4f4f4;padding:0 3px}ul{margin:4px 0 4px 18px;padding:0}li{margin:2px 0}</style></head><body>
+<h1>Hub ✦ Ask v2 and the dev queue</h1><div class="d">Session notes · Wednesday 7 October 2026 · Shift Hub (hub.shift-group.co)</div>
+<h2>Facts</h2><ul>
+<li>The ✦ Ask button has been on every hub page since 26 Sep 2026. It runs Claude Sonnet 5 on the server, and the key stays on Vercel.</li>
+<li>Workers and partners keep the read-only tools: ledgers, balances and line search, limited to their own ledger.</li>
+<li>Mario also gets: Odoo name lookup, propose a new line, fill the blanks of a waiting line, and queue a code change.</li>
+<li>Every write is a proposal. It waits for Mario's ✓ on the grid. Accepted or booked lines are refused. Nothing is booked in Odoo or sent from the chat.</li>
+<li>The assistant reads SHIFT.md (the bundled copy is <code>shift-context.md</code>) and whatever is open on the page: on the site chat, the chat and the day.</li>
+<li>Tested on Ziad's 19 USD line (7 Oct, phone recharge for Elias): it found the line, filled in the note and company, and left it waiting for the ✓.</li>
+</ul>
+<h2>Decisions (Mario)</h2><table><tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Who may use the assistant for dev requests</td><td>Mario only</td></tr>
+<tr><td>May the chat draft hub proposals (lines)</td><td>Yes, but always behind the ✓</td></tr>
+<tr><td>Split of work</td><td>Hub Ask = questions and proposals, never code. Claude Code in VS Code = the only thing that edits and deploys.</td></tr></table>
+<h2>How the dev queue works</h2><ul>
+<li>When a request needs code, the assistant writes a brief and saves it at <b>/dev</b>. On that page Mario can edit, mark done, drop, or "Copy prompt" (all open requests in one brief).</li>
+<li>On the laptop: in VS Code, say <code>/hub-dev-queue</code>. Claude Code runs <code>node dev-queue.mjs</code>, does each request, verifies, deploys, and then runs <code>--done &lt;id&gt; --commit &lt;hash&gt;</code>.</li>
+</ul>
+<h2>Next actions</h2><ul>
+<li>Try it from the phone: ask ✦ for a balance, dictate a money line, ask for a small hub change, then check /dev.</li>
+<li>The WhatsApp archive viewer (the laptop app) has no ✦ button yet. If you want one there, file it as a dev request.</li>
+<li>When SHIFT.md changes, refresh the bundled copy before the next deploy (the skill does this).</li>
+</ul>
+<h2>Files</h2><table>
+<tr><td><code>D:\vscode\todo\assistant.js</code></td><td>Tools, Mario-only rules, SHIFT.md and page context</td></tr>
+<tr><td><code>D:\vscode\todo\ask.js</code></td><td>The ✦ panel; sends page + <code>window.HubAskContext()</code></td></tr>
+<tr><td><code>D:\vscode\todo\dev-requests.js</code> · <code>dev.html</code></td><td><code>/api/dev-requests</code> + the /dev page (Firestore <code>devRequests</code>)</td></tr>
+<tr><td><code>D:\vscode\todo\dev-queue.mjs</code></td><td>Laptop script; key from <code>~\.whish-watcher.json</code></td></tr>
+<tr><td><code>C:\Users\mario_v04t79i\.claude\skills\hub-dev-queue\SKILL.md</code></td><td>The VS Code recipe</td></tr>
+<tr><td>Commits</td><td>dd5cd24, 6fb616f, 918c517 (deployed 7 Oct 2026)</td></tr></table>
+</body></html>
