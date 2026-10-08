@@ -188,7 +188,7 @@
 // POST .../digest right after a successful post (Vercel can freeze a function right
 // after the reply), and again once at load for any post whose digest never ran.
 const esc = Admin.esc, el = id => document.getElementById(id);
-let threads = [], cur = '', posts = [], me = null;
+let threads = [], cur = '', posts = [], me = null, showChecked = false;
 const hhmm = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Beirut' });
 const dayLabel = ymd => new Date(ymd + 'T12:00:00+03:00').toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -353,7 +353,7 @@ let SECTIONS = [];
 Admin.api('GET', '/api/ajaltoun/sections').then(r => { SECTIONS = (r && r.sections) || r || []; if (posts.length) draw(); }).catch(() => {});
 const sectionName = id => { if (!id) return ''; const x = SECTIONS.find(s => s.id === id); return x ? x.name : id; };
 async function loadBalances(force) {
-  const ids = [...new Set(posts.filter(p => p.line && p.line.accountId).map(p => p.line.accountId))];
+  const ids = [...new Set(posts.flatMap(p => [p.line, ...(p.more || [])]).filter(L => L && L.accountId).map(L => L.accountId))];
   let changed = false;
   await Promise.all(ids.map(async id => {
     if (!force && balances[id] && Date.now() - balances[id].at < 60000) return;
@@ -399,6 +399,20 @@ async function loadPosts() {
   await fetchPosts(); draw();
   // a digest that never ran (e.g. the phone lost signal), or one that hung mid-way, gets one chance to run now
   posts.filter(p => p.by !== 'shift' && !p.agentAsk && !p.error && (!p.digestedAt && !p.digesting || (p.digesting && p.digestingAt && Date.now() - Date.parse(p.digestingAt) > 120e3))).forEach(p => digestOne(cur, p.id));
+  autoSuggest();
+}
+// every waiting line with a blank partner / company / project is completed once by itself — no "suggest" press
+// (Mario 2026-10-08: "auto suggest, I will approve or edit"); the server stamps autoSugAt so it is never asked twice
+let autoBusy = false;
+async function autoSuggest() {
+  if (autoBusy || !me || !me.admin) return; autoBusy = true;
+  try {
+    const todo = [];
+    for (const p of posts) [p.line, ...(p.more || [])].forEach((L, i) => { if (L && L.state === 'waiting' && !L.autoSugAt && (!L.partnerName || !L.company || !L.analyticName)) todo.push({ id: p.id, i }); });
+    let changed = 0;
+    for (const x of todo.slice(0, 8)) { try { const r = await Admin.api('POST', `/api/site/${cur}/posts/${x.id}/resuggest?i=${x.i}`, {}); if (r && r.patched && Object.keys(r.patched).length > 1) changed++; } catch {} }
+    if (todo.length) { const th = cur; const d = await Admin.api('GET', `/api/site/${th}/posts`); if (th === cur && d && d.posts) { posts = d.posts; draw(); } }
+  } finally { autoBusy = false; }
 }
 const isAjaltoun = L => /4193|ajaltoun/i.test(L.analyticName || '');
 function lineTag(p) {
@@ -415,16 +429,21 @@ function lineTag(p) {
       return `<div class="line">${esc((p.parsed && p.parsed.note) || 'no amount read')} · <a href="#" onclick="flip('${esc(p.id)}');return false;">this is a receipt</a></div>`;
     return '';
   }
-  const L = p.line, bal = balances[L.accountId];
+  return [p.line, ...(p.more || [])].map((L, i) => lineBlock(p, L, i)).join('');
+}
+// one ledger line of a message — a several-payment note ("cash 25$ and whish 40$") shows one block per payment
+function lineBlock(p, L, i) {
+  const key = esc(p.id) + (i ? ':' + i : ''), bal = balances[L.accountId];
   const state = L.state === 'booked' ? 'in Odoo ✓✓' : L.state === 'accepted' ? 'accepted ✓ — on the ledger, not in Odoo yet' : L.state === 'dismissed' ? 'dismissed' : 'waiting for your ✓';
-  const cur = (p.parsed && p.parsed.currency) || 'USD';
+  const cur = L.currency || (p.parsed && p.parsed.currency) || 'USD';
   const amount = L.debit ? `${L.debit.toFixed(2)} ${cur} out` : L.credit ? `${L.credit.toFixed(2)} ${cur} in` : (p.parsed && p.parsed.amount ? `${p.parsed.amount.toFixed(2)} ${cur}` : '—');
   // Company, Project and Division are always on the card, empty or not (Mario, 2026-09-24) — a blank
   // one is the thing he needs to see. "set" opens the same edit sheet.
-  const miss = `<a href="#" class="miss" onclick="lineSheet('${esc(p.id)}');return false;">— set</a>`;
+  const miss = `<a href="#" class="miss" onclick="lineSheet('${key}');return false;">— set</a>`;
   const rows = [
     ['Amount', esc(amount)],
     ['Account', esc(accName(L.accountId)) + (bal ? ` <span class="q">balance ${bal.balance.toFixed(2)}</span>` : '')],
+    ...(L.date && L.date !== p.date ? [['Date', esc(L.date)]] : []),
     ['Partner', esc(L.partnerName || '') || miss],
     ['Company', (esc(Admin.coShort(L.company || '')) || miss) + (L.official ? ' <span class="q">official · VAT</span>' : '')],
     ['Project', esc(L.analyticName || '') || miss],
@@ -441,13 +460,15 @@ function lineTag(p) {
   ].filter(r => r[1]);
   const acts = [
     // the ✓ itself, here on the card (Mario 2026-10-08: "allow a check approval in Shift WhatsApp") — same write as the ledger's ✓
-    me.admin && L.state === 'waiting' ? `<a href="#" class="ok" onclick="acceptEntry('${esc(p.id)}');return false;">✓ accept</a>` : '',
-    me.admin && L.state === 'waiting' && (!L.partnerName || !L.company || !L.analyticName) ? `<a href="#" onclick="resuggest('${esc(p.id)}');return false;">✦ suggest</a>` : '',
-    me.admin ? `<a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : '',
-    ((p.kind === 'photo' || p.kind === 'doc') && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
+    me.admin && L.state === 'waiting' ? `<a href="#" class="ok" onclick="acceptEntry('${key}');return false;">✓ accept</a>` : '',
+    me.admin && L.state === 'waiting' && (!L.partnerName || !L.company || !L.analyticName) && L.autoSugAt ? `<a href="#" onclick="resuggest('${key}');return false;">✦ suggest again</a>` : '',
+    me.admin ? `<a href="#" onclick="lineSheet('${key}');return false;">edit ▸</a>` : '',
+    (!i && (p.kind === 'photo' || p.kind === 'doc') && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
     // cancel takes the line off the ledger and out of the balance; the photo and the message stay (Mario, 2026-09-24)
-    me.admin && L.state !== 'booked' && L.state !== 'dismissed' ? `<a href="#" onclick="cancelEntry('${esc(p.id)}');return false;">cancel entry</a>` : '',
-    me.admin && L.state === 'dismissed' ? `<a href="#" onclick="restoreEntry('${esc(p.id)}');return false;">put it back</a>` : '',
+    me.admin && L.state !== 'booked' && L.state !== 'dismissed' ? `<a href="#" onclick="cancelEntry('${key}');return false;">cancel entry</a>` : '',
+    me.admin && L.state === 'dismissed' ? `<a href="#" onclick="restoreEntry('${key}');return false;">put it back</a>` : '',
+    me.admin && !i && !p.checkedAt && [p.line, ...(p.more || [])].every(x => x && (x.state === 'booked' || x.state === 'dismissed')) ? `<a href="#" class="ok" onclick="checkPost('${esc(p.id)}', true);return false;">✓ checked — hide</a>` : '',
+    me.admin && !i && p.checkedAt ? `<a href="#" onclick="checkPost('${esc(p.id)}', false);return false;">unhide</a>` : '',
   ].filter(Boolean).join(' · ');
   return `<div class="line ${esc(L.state || 'waiting')}"><table class="lt">${rows.map(r => `<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</table>${acts ? `<div class="lt-act">${acts}</div>` : ''}</div>`;
 }
@@ -499,7 +520,11 @@ function draw() {
   if (!posts.length) { el('feed').innerHTML = '<div class="empty">Nothing here yet. Write what happened, send a photo, or record.</div>'; return; }
   if (me.admin) loadBalances();
   let lastDay = '';
-  el('feed').innerHTML = posts.map((p, ix) => {
+  // checked messages (✓ done, Mario's own fold) stay out of the way unless "show checked" is on
+  const hiddenN = posts.filter(p => p.checkedAt).length;
+  const shown = showChecked ? posts : posts.filter(p => !p.checkedAt);
+  const fold = me.admin && hiddenN ? `<div class="post sys fold"><a href="#" onclick="showChecked=!showChecked;draw();return false;">${showChecked ? 'hide the ' + hiddenN + ' checked message' + (hiddenN === 1 ? '' : 's') : hiddenN + ' checked message' + (hiddenN === 1 ? '' : 's') + ' hidden · show'}</a></div>` : '';
+  el('feed').innerHTML = fold + shown.map((p, ix) => {
     const dayHdr = p.date !== lastDay ? `<div class="day">${esc(dayLabel(p.date))}</div>` : ''; lastDay = p.date;
     const mine = p.by === me.email;
     if (p.kind === 'sys') return `${dayHdr}<div class="post sys">${esc(p.text)}</div>`;
@@ -572,9 +597,11 @@ function pick(accept, kind, capture) { const f = el('file'); f.accept = accept; 
 // the ＋ sheet, as on WhatsApp: camera, video, or the phone's gallery
 // the line behind a receipt is edited in the shared sheet (/line-sheet.js): note, extra expenses, partner, company,
 // project + division, ✓ accept, ✓ book in Odoo — the same sheet the Ajaltoun page opens
-function lineSheet(postId) {
-  const p = posts.find(x => x.id === postId); if (!p || !p.line) return;
-  LineSheet.open(p.line.accountId, p.line.txId, { onChange: async () => { await loadPosts(); await loadBalances(true); } });
+// "postId" or "postId:i" → the post and that ledger line (i = the payment's place in a several-payment note)
+function lineAt(key) { const [id, n] = String(key).split(':'), i = +(n || 0); const p = posts.find(x => x.id === id); const L = p ? (i ? (p.more || [])[i - 1] : p.line) : null; return { p, L, i, id }; }
+function lineSheet(key) {
+  const { L } = lineAt(key); if (!L) return;
+  LineSheet.open(L.accountId, L.txId, { onChange: async () => { await loadPosts(); await loadBalances(true); } });
 }
 function attachSheet() {
   closeSheet();
@@ -689,35 +716,40 @@ function recLock() { recState = 'locked'; lockedAt = Date.now(); recUI(true); if
 // digest is still running — its `error` explains that, so surface it instead of retrying blind
 // the ledger line behind a card: cancelled (off the balance, paper kept) or put back as a proposal
 // ✓ = accepted AND booked in Odoo in one press (Mario 2026-10-08: "auto book when I accept, no need to make Odoo another step")
-async function acceptEntry(id) {
-  const p = posts.find(x => x.id === id); if (!p || !p.line) return;
-  try { await Admin.api('PATCH', `/api/accounting/accounts/${p.line.accountId}/tx/${p.line.txId}`, { waAccepted: true }); }
+async function acceptEntry(key) {
+  const { L } = lineAt(key); if (!L) return;
+  try { await Admin.api('PATCH', `/api/accounting/accounts/${L.accountId}/tx/${L.txId}`, { waAccepted: true }); }
   catch (e) { return alert(e.data && e.data.error ? e.data.error : e.message); }
   let why = '';
-  try { await LineSheet.bookOne(p.line.txId, '', p.line.accountId); } catch (e) { why = e.message; }
+  try { await LineSheet.bookOne(L.txId, '', L.accountId); } catch (e) { why = e.message; }
   await loadPosts(); await loadBalances(true);
   if (why) alert('Accepted on the ledger, but not in Odoo yet: ' + why + String.fromCharCode(10,10) + 'Open "edit ▸" to fix it, then ✓ Book in Odoo.');
 }
 // ✦ suggest again: fills the blank partner / company / project of a waiting line from history and Claude
-async function resuggest(id) {
-  const p = posts.find(x => x.id === id); if (!p || !p.line) return;
-  try { const r = await Admin.api('POST', `/api/site/${cur}/posts/${id}/resuggest`, {}); await loadPosts();
+async function resuggest(key) {
+  const { L, i, id } = lineAt(key); if (!L) return;
+  try { const r = await Admin.api('POST', `/api/site/${cur}/posts/${id}/resuggest?i=${i}`, {}); await loadPosts();
     const s = r.suggestion || {}; if (!Object.keys(r.patched || {}).length) sysNote('Nothing new to suggest' + (s.partner || s.project ? ` (it thinks: ${[s.partner, s.company, s.project].filter(Boolean).join(' · ')})` : '') + ' — set it with edit ▸'); }
   catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
 }
-async function cancelEntry(id) {
-  const p = posts.find(x => x.id === id); if (!p || !p.line) return;
+// ✓ checked: the message folds away in the chat; its lines stay on the ledger and in Odoo
+async function checkPost(id, on) {
+  try { await Admin.api('POST', `/api/site/${cur}/posts/${id}/check`, { checked: on }); const p = posts.find(x => x.id === id); if (p) p.checkedAt = on ? new Date().toISOString() : null; draw(); }
+  catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
+}
+async function cancelEntry(key) {
+  const { p, L } = lineAt(key); if (!L) return;
   const why = prompt('Cancel this entry? It comes off the ledger and out of the balance; the photo stays in the chat.' + String.fromCharCode(10) + 'Why? (shown on the card)', 'duplicate');
   if (why === null) return;
-  await patchLine(p, { excluded: true, review: false, waAccepted: false, note: why.trim() ? 'cancelled: ' + why.trim() : (p.line.note || '') });
+  await patchLine(L, { excluded: true, review: false, waAccepted: false, note: why.trim() ? 'cancelled: ' + why.trim() : (L.note || '') });
 }
-async function restoreEntry(id) {
-  const p = posts.find(x => x.id === id); if (!p || !p.line) return;
-  await patchLine(p, { review: true });
+async function restoreEntry(key) {
+  const { L } = lineAt(key); if (!L) return;
+  await patchLine(L, { review: true });
 }
-async function patchLine(p, patch) {
+async function patchLine(L, patch) {
   try {
-    await Admin.api('PATCH', `/api/accounting/accounts/${p.line.accountId}/tx/${p.line.txId}`, patch);
+    await Admin.api('PATCH', `/api/accounting/accounts/${L.accountId}/tx/${L.txId}`, patch);
     await loadPosts(); await loadBalances(true);
   } catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
 }

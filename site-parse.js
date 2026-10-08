@@ -45,6 +45,32 @@ ACCOUNTS: ${names(accounts)}`;
   return { amount: +out.amount || null, currency: out.currency || null, partner: out.partner || null, project: out.project || null, paidFrom: out.paidFrom || null, note: String(out.note || '').slice(0, 160) };
 }
 
+// One note can carry several payments (Mario 2026-10-08: "mario cash 25$ and whish 40$ paid yesterday to basket s lb mario personal"
+// came out as ONE line of 65 LBP). Claude splits it: one item per payment, each with its own amount, payer account, date
+// ("yesterday" → the day before the message), company ("s lb", "sarl", "s dev") and project. Every item stays a suggestion.
+async function claudeParseMany(text, { analytics, partners, accounts, companies, today }) {
+  const names = l => (l || []).map(x => x.name).slice(0, 300).join(' | ');
+  const sys = `You read one short note Mario (owner of Shift, Lebanon) wrote about money. Today is ${today}. Return JSON only:
+{"items":[{"amount":number,"currency":"USD"|"LBP","side":"debit"|"credit","paidFrom":string|null,"partner":string|null,"project":string|null,"company":string|null,"date":"yyyy-mm-dd","note":string}]}
+One item per separate amount (e.g. "cash 25$ and whish 40$" = two items: 25 paidFrom the Mario cash account, 40 paidFrom the Whish account).
+currency: USD unless the note says LBP / LL / ل.ل or the number is clearly Lebanese pounds (100,000 and up). "$" = USD.
+side: "debit" = money paid out (default), "credit" = money received.
+paidFrom = one of ACCOUNTS (cash = Mario cash; whish = the Whish account; neo, wise...), null when not said.
+partner = the supplier / person / shop paid, from PARTNERS when one matches, else the name as written.
+company = one of COMPANIES when the note says it ("s lb" / "slb" / "black" = S LB, "sarl" / "official" = SHIFT GROUP SARL (USD), "s dev" / "development" = SHIFT DEVELOPMENT), else null.
+project = one of PROJECTS when the note names it ("mario personal", "ajaltoun", a client name), else null.
+date = the day it was paid: "yesterday" = the day before today, a weekday = the last such day, else today.
+note = what it was for, short, in English.
+PARTNERS: ${names(partners)}
+PROJECTS: ${names(analytics)}
+ACCOUNTS: ${names(accounts)}
+COMPANIES: ${(companies || []).join(' | ')}`;
+  const out = await anthropic({ model: 'claude-sonnet-5-5', max_tokens: 900, system: sys, messages: [{ role: 'user', content: text }] });
+  const items = (Array.isArray(out.items) ? out.items : []).filter(x => +x.amount > 0).slice(0, 8);
+  return items.map(x => ({ amount: +x.amount, currency: x.currency === 'LBP' ? 'LBP' : 'USD', side: x.side === 'credit' ? 'credit' : 'debit', paidFrom: x.paidFrom || null,
+    partner: x.partner || null, project: x.project || null, company: x.company || null, date: /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') ? x.date : today, note: String(x.note || '').slice(0, 160) }));
+}
+
 async function visionRead(buf, mime) {
   const out = await anthropic({ model: 'claude-sonnet-5', max_tokens: 400,
     system: 'Look at the image. If it is a receipt, invoice or payment proof return {"receipt":true,"vendor":string,"amount":number,"currency":"USD"|"LBP","date":"yyyy-mm-dd"|null,"invoiceNo":string|null,"billedTo":string|null,"vat":true|false,"note":string}. billedTo = the customer the paper is made out to, copied as printed (the "Messrs"/"Client" line), null when it is a plain cash receipt with no customer. vat = true only when the paper charges VAT/TVA (a VAT line, ض.ق.م, or 11%). invoiceNo = the invoice number the supplier printed on it. If it is a photo of a construction site or work in progress return {"receipt":false,"note":one line describing the work}. JSON only.',
@@ -97,4 +123,4 @@ async function whisper(buf, mime) {
   return String(j.text || '').trim();
 }
 
-module.exports = { quickParse, matchName, claudeParse, visionRead, pdfRead, fuelRead, whisper, anthropic, officialCompany, SARL };
+module.exports = { quickParse, matchName, claudeParse, claudeParseMany, visionRead, pdfRead, fuelRead, whisper, anthropic, officialCompany, SARL };

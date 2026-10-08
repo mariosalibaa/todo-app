@@ -33,10 +33,12 @@
   .ls .ls-links{font-size:.76rem;margin-top:4px;} .ls .ls-links a{color:#89b4fa;}
   /* a real dropdown, not <datalist>: Safari on the iPhone shows nothing for a datalist (Mario, 2026-09-24) */
   .ls .combo{position:relative;display:block;} .ls .combo input{padding-right:30px;}
+  /* what is filled in reads as an entry, an empty box as empty — the hints looked like values (Mario 2026-10-08: "suggestion and entry look the same") */
+  .ls input,.ls select{font-weight:600;color:var(--text,#cdd6f4);} .ls input::placeholder{font-weight:400;font-style:italic;color:var(--overlay0,#7f849c);opacity:.7;}
   .ls .combo .caret{position:absolute;right:2px;top:3px;bottom:0;width:28px;background:none;border:0;color:var(--sub,#a6adc8);font-size:.8rem;cursor:pointer;}
   .ls .combo .menu{position:absolute;left:0;right:0;top:100%;margin-top:2px;z-index:6;background:var(--crust,#181825);border:1px solid var(--surface0,#45475a);border-radius:8px;max-height:210px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.35);-webkit-overflow-scrolling:touch;}
   .ls .combo .menu div{padding:9px 10px;font-size:.88rem;cursor:pointer;border-bottom:1px solid var(--surface0,#45475a);} .ls .combo .menu div:last-child{border-bottom:0;}
-  .ls .combo .menu div.on,.ls .combo .menu div:hover{background:var(--surface1,#585b70);} .ls .combo .menu .none{color:var(--sub,#a6adc8);cursor:default;}`;
+  .ls .combo .menu div.on,.ls .combo .menu div:hover{background:var(--surface1,#585b70);} .ls .combo .menu div.mk{color:#128c7e;font-weight:600;} .ls .combo .menu .none{color:var(--sub,#a6adc8);cursor:default;}`;
   let S = null;   // { acc, txId, t, extra: [], onChange, bal }
   const g = id => document.getElementById(id);
   function close() { const o = g('ls-overlay'); if (o) o.remove(); S = null; }
@@ -77,11 +79,11 @@
     <label>Description<input id="ls-desc" value="${esc(t.description || '')}" ${lock ? 'disabled' : ''}></label>
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
       <label>Money<select id="ls-side" ${lock ? 'disabled' : ''}><option value="debit" ${side === 'debit' ? 'selected' : ''}>out (paid)</option><option value="credit" ${side === 'credit' ? 'selected' : ''}>in (received)</option></select></label></div>
-    <label>Note<input id="ls-note" value="${esc(t.note || '')}" placeholder="what it was for"></label>
+    <label>Note<input id="ls-note" value="${esc(t.note || '')}" placeholder="none"></label>
     <label>Partner (supplier)<span class="combo"><input id="ls-partner" autocomplete="off" value="${esc(t.partnerName || '')}" placeholder="type to search Odoo partners" ${lockAll ? 'disabled' : ''}>${lockAll ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-partner-menu" hidden></div></span></label>
     <div class="ls-row"><label>Company<select id="ls-co" ${lockAll ? 'disabled' : ''}><option value="">—</option>${(REFS.companies || []).map(c => `<option value="${esc(c.name)}" ${t.company === c.name ? 'selected' : ''}>${esc(A.coShort ? A.coShort(c.name) : c.name)}</option>`).join('')}${t.company && !(REFS.companies || []).some(c => c.name === t.company) ? `<option value="${esc(t.company)}" selected>${esc(A.coShort ? A.coShort(t.company) : t.company)}</option>` : ''}</select></label>
       <label>Project<span class="combo"><input id="ls-proj" autocomplete="off" value="${esc(t.analyticName || '')}" placeholder="type or pick a project" ${lock ? 'disabled' : ''}>${lock ? '' : '<button type="button" class="caret" tabindex="-1">▾</button>'}<div class="menu" id="ls-proj-menu" hidden></div></span></label></div>
-    <label id="ls-div-wrap" ${isAj ? '' : 'hidden'}>Division (Ajaltoun work section — type a new name to create one)<span class="combo"><input id="ls-div" autocomplete="off" value="${esc(secName(t.section))}" placeholder="prefab, excavation, stone walls…"><button type="button" class="caret" tabindex="-1">▾</button><div class="menu" id="ls-div-menu" hidden></div></span></label>
+    <label id="ls-div-wrap" ${isAj ? '' : 'hidden'}>Division (Ajaltoun work section — type a new name to create one)<span class="combo"><input id="ls-div" autocomplete="off" value="${esc(secName(t.section))}" placeholder="none"><button type="button" class="caret" tabindex="-1">▾</button><div class="menu" id="ls-div-menu" hidden></div></span></label>
     ${lockAll ? '' : `<div class="ls-extra"><div class="hint">Additional expenses on the same paper — each becomes its own line on this ledger (one Odoo bill per line)</div>
       ${S.extra.map((x, i) => `<div class="ls-row"><input placeholder="e.g. transport" value="${esc(x.description)}" oninput="LineSheet.S.extra[${i}].description=this.value"><input type="number" step="0.01" inputmode="decimal" placeholder="25" value="${x.amount || ''}" oninput="LineSheet.S.extra[${i}].amount=this.value" style="max-width:110px"><button class="x" onclick="LineSheet.S.extra.splice(${i},1);LineSheet.draw()">✕</button></div>`).join('')}
       <button class="ls-add" onclick="LineSheet.S.extra.push({description:'',amount:''});LineSheet.draw();setTimeout(()=>{const l=document.querySelectorAll('.ls-extra input');l[l.length-2]&&l[l.length-2].focus()},0)">+ add an expense</button></div>`}
@@ -101,17 +103,26 @@
   // works on the iPhone (a <datalist> does not) and the list is readable with one thumb.
   // One combobox, used by Partner, Project and Division: type to filter, tap to choose, ▾ for the whole
   // list, arrows + Enter on a keyboard. Plain divs, because Safari on the iPhone ignores <datalist>.
-  function combo(inputId, items, onPick) {
+  // opts.create(name) → { id, name }: the list offers "+ create …" for what you typed (Mario 2026-10-08: "allow to create from here")
+  function combo(inputId, items, onPick, opts) {
     const inp = g(inputId), menu = g(inputId + '-menu'); if (!inp || !menu || inp.disabled) return;
     const caret = menu.parentNode.querySelector('.caret');
     let hi = -1, shown = [];
     const hide = () => { menu.hidden = true; hi = -1; };
     function show(list) {
       shown = list.slice(0, 60);
-      menu.innerHTML = shown.length
+      const typed = inp.value.trim(), exact = shown.some(x => x.name.toLowerCase() === typed.toLowerCase());
+      const mk = opts && opts.create && typed && !exact ? `<div class="mk" data-mk="1">＋ create “${esc(typed)}” in Odoo</div>` : '';
+      menu.innerHTML = (shown.length
         ? shown.map((x, i) => `<div data-i="${i}" class="${i === hi ? 'on' : ''}">${esc(x.name)}</div>`).join('')
-        : `<div class="none">no match — what you type is kept</div>`;
+        : (mk ? '' : `<div class="none">no match — what you type is kept</div>`)) + mk;
       menu.hidden = false;
+      const mkEl = menu.querySelector('[data-mk]');
+      if (mkEl) { mkEl.onmousedown = e => e.preventDefault(); mkEl.onclick = async () => {
+        mkEl.textContent = 'creating “' + typed + '”…';
+        try { const x = await opts.create(typed); pick(x); }
+        catch (e) { mkEl.textContent = 'could not create: ' + (e.message || e); }
+      }; }
       menu.querySelectorAll('div[data-i]').forEach(d => {
         d.onmousedown = e => e.preventDefault();
         d.onclick = () => pick(shown[+d.dataset.i]);
@@ -133,7 +144,15 @@
     if (caret) caret.onclick = () => { if (menu.hidden) { inp.focus(); filter(); } else hide(); };
   }
   function wireProjCombo() {
-    combo('ls-partner', () => REFS.partners || []);
+    combo('ls-partner', () => REFS.partners || [], null, { create: async name => {
+      // the company on the sheet, else S LB; a supplier, shared across companies (company_id false), the way the hub creates partners
+      const coName = (g('ls-co') && g('ls-co').value) || 'S LB';
+      const co = (REFS.companies || []).find(c => c.name === coName) || (REFS.companies || []).find(c => c.name === 'S LB') || (REFS.companies || [])[0];
+      const r = await A.api('POST', '/api/accounting/partners', { name, companyId: co ? co.id : 7, kind: 'vendor' });
+      const x = { id: r.id, name: r.name };
+      if (!(REFS.partners || []).some(p => p.id === x.id)) (REFS.partners = REFS.partners || []).push(x);
+      return x;
+    } });
     combo('ls-proj', () => REFS.analytic || [], () => projChanged());
     combo('ls-div', () => REFS.sections || []);
   }

@@ -77,8 +77,8 @@ async function refs(ctx) {
 async function writeLine(ctx, ws, post, target, fields) {
   const a = await acc.resolve(ws, target);
   if (!a) throw new Error('no ledger ' + target);
-  const id = 'site-' + post.id;
-  const t = { id, src: fields.src || 'site', postId: post.id, thread: post.thread, date: post.date, ref: String(fields.ref || ''), service: 'Shift WhatsApp', phone: '',
+  const id = 'site-' + post.id + (fields.idSuffix || '');
+  const t = { id, src: fields.src || 'site', postId: post.id, thread: post.thread, date: fields.date || post.date, ref: String(fields.ref || ''), service: 'Shift WhatsApp', phone: '',
     description: String(fields.description || post.text || '').slice(0, 160),
     debit: fields.side === 'debit' ? money(fields.amount) : 0, credit: fields.side === 'credit' ? money(fields.amount) : 0,
     analyticId: fields.analytic ? fields.analytic.id : null, analyticName: fields.analytic ? fields.analytic.name : '', analyticSrc: fields.analytic ? 'site' : '',
@@ -153,6 +153,22 @@ PROJECTS: ${(analytics || []).map(x => x.name).join(' | ')}`,
   return out;
 }
 
+// Fill a waiting line's blank partner / company / project from suggestFor (history → Odoo → Claude); never touches a
+// field that already has a value, never an accepted line. Stamps autoSugAt so the chat does not ask again.
+async function autoFill(ctx, ws, L, parsed, text, partners) {
+  const a = await acc.resolve(ws, L.accountId); if (!a) return {};
+  const tref = acc.txCol(a).doc(L.txId), t = (await tref.get()).data();
+  if (!t || t.waAccepted || t.bookedMove) return {};
+  const sug = await suggestFor(ctx, ws, parsed, text || '', L.accountId, partners || (await refs(ctx)).partners);
+  const patch = { autoSugAt: now() };
+  if (!t.partnerId && sug.partner) Object.assign(patch, { partnerId: sug.partner.id, partnerName: sug.partner.name, partnerSrc: 'site' });
+  if (!t.analyticId && sug.analytic) Object.assign(patch, { analyticId: sug.analytic.id, analyticName: sug.analytic.name, analyticSrc: 'site' });
+  const co = parse.officialCompany(parsed) || sug.company || '';
+  if (!t.company && co) Object.assign(patch, { company: co, companySrc: 'site' });
+  await tref.set(patch, { merge: true });
+  return { patch, sug: { partner: sug.partner && sug.partner.name, project: sug.analytic && sug.analytic.name, company: co } };
+}
+
 // after the post is stored: read it, decide, write the line, record the outcome on the post
 async function digest(ctx, ws, ref, post, buf) {
   const isGeneral = post.thread === 'general';
@@ -190,15 +206,22 @@ async function digest(ctx, ws, ref, post, buf) {
     if (text && !line) {
       const { partners, analytics } = await refs(ctx);
       if (isGeneral) {
-        const c = await parse.claudeParse(text, { analytics, partners, accounts: (await acc.listAccounts(ws)).filter(a => !a.daily && !a.archived) });
-        Object.assign(parsed, c);
-        if (c.amount) {
-          const partner = c.partner ? parse.matchName(c.partner, partners) : null;
-          const analytic = c.project ? parse.matchName(c.project, analytics) : null;
-          const paidFrom = c.paidFrom ? parse.matchName(c.paidFrom, (await acc.listAccounts(ws)).map(a => ({ id: a.id, name: a.name }))) : null;
-          line = await writeLine(ctx, ws, post, paidFrom ? paidFrom.id : MARIO_CASH,
-            { amount: c.amount, side: 'debit', description: [partner ? partner.name : c.partner, c.note].filter(Boolean).join(' · '), partner, analytic, note: '' });   // paid = out of the wallet (2026-09-23: the site lines were landing as money in)
+        const accts = (await acc.listAccounts(ws)).filter(a => !a.daily && !a.archived), accRefs = accts.map(a => ({ id: a.id, name: a.name }));
+        const items = await parse.claudeParseMany(text, { analytics, partners, accounts: accts, companies: ['S LB', 'SHIFT GROUP SARL (USD)', 'SHIFT DEVELOPMENT', 'Personal'], today: post.date });
+        parsed.items = items; if (items[0]) Object.assign(parsed, { amount: items[0].amount, currency: items[0].currency, partner: items[0].partner, project: items[0].project, note: items[0].note });
+        const written = [];
+        for (let i = 0; i < items.length; i++) {
+          const c = items[i];
+          const partner = c.partner ? (parse.matchName(c.partner, partners) || partners.find(x => x.name === c.partner) || null) : null;
+          const analytic = c.project ? (parse.matchName(c.project, analytics) || analytics.find(x => x.name === c.project) || null) : null;
+          const paidFrom = c.paidFrom ? (parse.matchName(c.paidFrom, accRefs) || accRefs.find(a => a.name === c.paidFrom) || null) : null;
+          const L = await writeLine(ctx, ws, post, paidFrom ? paidFrom.id : MARIO_CASH, { amount: c.amount, side: c.side, date: c.date, idSuffix: i ? '-' + i : '', company: c.company || '',
+            description: [partner ? partner.name : c.partner, c.note, c.currency === 'LBP' ? 'LBP ' + c.amount : ''].filter(Boolean).join(' · '), partner, analytic, note: '', nature: c.side === 'debit' ? 'expense' : undefined });
+          // fill what the note left blank from history / Odoo / Claude — no "suggest" press (Mario 2026-10-08: "auto suggest, I will approve or edit")
+          try { await autoFill(ctx, ws, L, { vendor: (partner && partner.name) || c.partner || '', note: c.note, receipt: true, vat: false }, text, partners); } catch (e) { console.error('autofill', post.id, e.message); }
+          written.push({ ...L, currency: c.currency });
         }
+        line = written[0] || null; if (written.length > 1) parsed.more = written.slice(1);
       } else {
         const a = await acc.resolve(ws, post.thread);
         const q = parse.quickParse(text, { fromMe, owner: (a && a.owner) || '', lbpRate: a && a.whatsapp && a.whatsapp.lbpRate });
@@ -216,7 +239,7 @@ async function digest(ctx, ws, ref, post, buf) {
         if (a) await acc.txCol(a).doc('site-' + post.id).delete();
       } catch (e) { console.error('site digest stale-line delete', post.id, e.message); }
     }
-    await ref.set({ parsed, line, error: null, digestedAt: now(), digesting: false }, { merge: true });
+    await ref.set({ parsed, line, more: (parsed.more || []), error: null, digestedAt: now(), digesting: false }, { merge: true });
     if (!isGeneral) { try { await attendance.writeDay(ctx, ws, post.thread, post.date, { who: post.by }); } catch (e) { console.error('site day refresh', post.id, e.message); } }
   } catch (e) {
     console.error('site digest', post.id, e.message);
@@ -263,7 +286,10 @@ async function handle(req, res, url, user, ctx) {
     const out = snap.docs.map(d => d.data()).reverse();
     // the line's fate is decided on the ledger (✓ / ✕ on the Day report or the grid), so the
     // post reads it from there: waiting → accepted / dismissed
-    await Promise.all(out.filter(p => p.line).map(async p => {
+    // every ledger line behind a message: the first (p.line) and, for a several-payment note, the others (p.more)
+    const jobs = []; for (const p of out) { if (p.line) jobs.push({ p, L: p.line }); for (const x of (p.more || [])) jobs.push({ p, L: x }); }
+    await Promise.all(jobs.map(async ({ p: post, L }) => {
+      const p = { line: L };
       const a = await acc.resolve(ws, p.line.accountId); if (!a) return;
       const t = (await acc.txCol(a).doc(p.line.txId).get()).data();
       p.line.state = !t ? 'dismissed' : t.bookedMove ? 'booked' : t.waAccepted ? 'accepted' : t.excluded && !t.review ? 'dismissed' : 'waiting';
@@ -279,7 +305,8 @@ async function handle(req, res, url, user, ctx) {
         p.line.move = bm && bm.name || ''; p.line.billRef = (bm && bm.ref) || t.ref || '';
         p.line.paidBy = (bm && bm.paidBy || []).map(x => ({ name: x.name || '', ref: x.ref || '', amount: x.amount, date: x.date || '' }));
         p.line.paymentState = bm && bm.paymentState || '';
-        p.line.note = t.note || '';   // a cancelled line says why (Mario 2026-10-08: "indicate the reason of the cancel")
+        p.line.note = t.note || '';
+        p.line.autoSugAt = t.autoSugAt || ''; p.line.date = t.date || '';   // a cancelled line says why (Mario 2026-10-08: "indicate the reason of the cancel")
         p.line.bookedKind = bm && bm.kind || '';   // 'payment' = the entry is the payment itself; onBill = the bill it was applied to
         p.line.onBill = bm && bm.bill && bm.bill.name || '';
         p.line.official = !!t.official && !!t.vat;
@@ -328,6 +355,17 @@ async function handle(req, res, url, user, ctx) {
   // delete a message the WhatsApp way (Mario, 2026-09-12): the post stays as "This message was deleted" — text, file
   // and parse are wiped, the file is removed from storage, and a suggested ledger line that was never accepted goes
   // with it. An accepted line is real accounting: the post is refused until Mario undoes it on the ledger.
+  // ✓ checked (Mario 2026-10-08: "allow me to hide after my check, so I only see what still needs me"): the message and its
+  // ledger lines stay exactly as they are — on the ledger and in Odoo — the chat just folds it away. { checked: false } shows it again.
+  if ((m = url.match(/^\/api\/site\/([\w-]+)\/posts\/([\w-]+)\/check$/)) && req.method === 'POST') {
+    if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin' });
+    const ref = ws.collection('site').doc(m[1]).collection('posts').doc(m[2]);
+    const d = await ref.get(); if (!d.exists) return json(res, 404, { error: 'no post' });
+    const b = await readBody(req);
+    const on = b.checked !== false;
+    await ref.set({ checkedAt: on ? now() : null, checkedBy: on ? ((user && user.email) || 'hub') : null }, { merge: true });
+    return json(res, 200, { id: m[2], checkedAt: on ? now() : null });
+  }
   if ((m = url.match(/^\/api\/site\/([\w-]+)\/posts\/([\w-]+)$/)) && req.method === 'DELETE') {
     if (!(await threadsFor(ctx)).some(t => t.id === m[1])) return json(res, 403, { error: 'not your thread' });
     const ref = ws.collection('site').doc(m[1]).collection('posts').doc(m[2]);
@@ -350,24 +388,19 @@ async function handle(req, res, url, user, ctx) {
   // instead of the fire-and-forget the /posts route used to do (Vercel can freeze a function right after the reply)
   // ✦ suggest again (Mario 2026-10-08: "recheck all entries… to suggest partner, company, project"): re-run the receipt
   // suggestion on a WAITING line and fill only what is still empty — never touches an accepted or booked line
+  // auto-suggest (Mario 2026-10-08: "no need to press suggest — auto suggest, I will approve or edit"): the chat calls this
+  // once for every waiting line that still has a blank; ?i= picks a line of a several-payment note (0 = the first)
   if ((m = url.match(/^\/api\/site\/([\w-]+)\/posts\/([\w-]+)\/resuggest$/)) && req.method === 'POST') {
     if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin' });
     const ref = ws.collection('site').doc(m[1]).collection('posts').doc(m[2]);
     const d = await ref.get(); if (!d.exists) return json(res, 404, { error: 'no post' });
-    const post = d.data(); if (!post.line || !post.parsed || !post.parsed.receipt) return json(res, 400, { error: 'no receipt line on this message' });
-    const a = await acc.resolve(ws, post.line.accountId); if (!a) return json(res, 404, { error: 'no ledger' });
-    const tref = acc.txCol(a).doc(post.line.txId), t = (await tref.get()).data();
-    if (!t) return json(res, 404, { error: 'the line is gone' });
-    if (t.waAccepted || t.bookedMove) return json(res, 409, { error: 'already accepted — change it on the ledger' });
-    const { partners } = await refs(ctx);
-    const sug = await suggestFor(ctx, ws, post.parsed, post.text || '', post.line.accountId, partners);
-    const patch = {};
-    if (!t.partnerId && sug.partner) Object.assign(patch, { partnerId: sug.partner.id, partnerName: sug.partner.name, partnerSrc: 'site' });
-    if (!t.analyticId && sug.analytic) Object.assign(patch, { analyticId: sug.analytic.id, analyticName: sug.analytic.name, analyticSrc: 'site' });
-    const co = parse.officialCompany(post.parsed) || sug.company || '';
-    if (!t.company && co) Object.assign(patch, { company: co, companySrc: 'site' });
-    if (Object.keys(patch).length) { patch.updatedAt = now(); patch.updatedBy = (user && user.email) || 'hub'; await tref.set(patch, { merge: true }); }
-    return json(res, 200, { patched: patch, suggestion: { partner: sug.partner && sug.partner.name, project: sug.analytic && sug.analytic.name, company: co } });
+    const post = d.data(), i = +(new URL(req.url, 'http://x').searchParams.get('i') || 0);
+    const L = i ? (post.more || [])[i - 1] : post.line;
+    if (!L) return json(res, 400, { error: 'no ledger line on this message' });
+    const pp = post.parsed || {}, item = (pp.items || [])[i] || null;
+    const parsed = pp.receipt ? pp : { vendor: (item && item.partner) || pp.partner || '', note: (item && item.note) || pp.note || post.text || '', receipt: true, vat: false };
+    const r = await autoFill(ctx, ws, L, parsed, post.text || '', null);
+    return json(res, 200, { patched: r.patch || {}, suggestion: r.sug || {} });
   }
   if ((m = url.match(/^\/api\/site\/([\w-]+)\/posts\/([\w-]+)\/digest$/)) && req.method === 'POST') {
     if (!(await threadsFor(ctx)).some(t => t.id === m[1])) return json(res, 403, { error: 'not your thread' });
