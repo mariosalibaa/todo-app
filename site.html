@@ -548,7 +548,8 @@ function draw() {
 // scroll anchoring moves the view back up — so the pane is pushed to the end on every frame for a few seconds, and
 // only Mario's own gesture (wheel up, a drag, PageUp) unpins it.
 let pinned = true, pinT = null;
-function pinNow() { const pane = el('chatpane'); if (!pane) return; pane.scrollTop = pane.scrollHeight + 2000; if (document.body.scrollHeight > window.innerHeight) window.scrollTo(0, document.body.scrollHeight); }
+// whichever box scrolls — the pane, or the feed itself on the wide layout (it opened at the TOP there: Mario 2026-10-08)
+function pinNow() { for (const box of [el('chatpane'), el('feed')]) if (box && box.scrollHeight > box.clientHeight) box.scrollTop = box.scrollHeight + 2000; if (document.body.scrollHeight > window.innerHeight) window.scrollTo(0, document.body.scrollHeight); }
 function pinFor(ms) {
   pinned = true; pinNow();
   clearInterval(pinT); const until = Date.now() + (ms || 2000);
@@ -560,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const pane = el('chatpane'); if (!pane) return;
   pane.addEventListener('wheel', e => { if (e.deltaY < 0) unpin(); }, { passive: true });
   pane.addEventListener('touchstart', () => { if (pinT) unpin(); }, { passive: true });
-  pane.addEventListener('pointerdown', e => { if (e.target === pane) unpin(); }, { passive: true });   // dragging the scrollbar
+  pane.addEventListener('pointerdown', e => { if (e.target === pane || e.target === el('feed')) unpin(); }, { passive: true });   // dragging the scrollbar
   window.addEventListener('keydown', e => { if (['PageUp', 'Home', 'ArrowUp'].includes(e.key)) unpin(); });
   // back to the end once the reader returns there by hand
   pane.addEventListener('scroll', () => { if (!pinT && pane.scrollHeight - pane.scrollTop - pane.clientHeight < 60) pinned = true; }, { passive: true });
