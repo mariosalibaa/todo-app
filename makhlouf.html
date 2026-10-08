@@ -390,7 +390,13 @@
       const t0 = Date.parse(fullDays[0] + 'T00:00:00+03:00'), slots = Array.from({ length: 1440 }, () => []);
       for (const d of fullDays) { const d0 = Date.parse(d + 'T00:00:00+03:00'); for (const q of byDay[d]) { const m = Math.round((q[0] - d0) / 60000); if (m >= 0 && m < 1440) slots[m].push(q); } }
       const most = a => { const c = {}; let b = null; for (const v of a) { c[v] = (c[v] || 0) + 1; if (b == null || c[v] > c[b]) b = v; } return b; };
-      return slots.map((s, m) => s.length ? [t0 + m * 60000, s.reduce((a, q) => a + q[1], 0) / s.length, s.filter(q => q[2]).length * 2 > s.length, most(s.map(q => q[3])), most(s.map(q => q[4]).filter(Boolean)) || undefined] : null).filter(Boolean);
+      // EDL: a minute-by-minute majority vote loses the EDL hours (they move from day to day, so no minute has most days on
+      // EDL) and the average day ran 24 h on the generator. Keep the real EDL time instead: the average EDL minutes a day,
+      // put on the minutes most often on EDL across the logged days.
+      const fE = slots.map(s => s.length ? s.filter(q => q[3] === 'EDL').length / s.length : 0), nE = Math.round(fE.reduce((a, v) => a + v, 0));
+      const onE = new Set(fE.map((v, m) => [v, m]).filter(([v]) => v > 0).sort((a, b) => b[0] - a[0]).slice(0, nE).map(([, m]) => m));
+      return slots.map((s, m) => { if (!s.length) return null; const kw = s.reduce((a, q) => a + q[1], 0) / s.length, gens = s.filter(q => q[3] !== 'EDL').map(q => q[3]);
+        return onE.has(m) ? [t0 + m * 60000, kw, true, 'EDL', most(s.map(q => q[4]).filter(Boolean)) || 'G1'] : [t0 + m * 60000, kw, false, most(gens.length ? gens : s.map(q => q[4]).filter(Boolean)) || 'G1']; }).filter(Boolean);
     })();
     const gapMap = a => $('solGap').value === 'gen' ? a.map(q => q[3] === 'EDL' ? [q[0], q[1], q[2], q[4] || 'G1'] : q) : a;   // logger gaps on EDL or on the generator
     const MN3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], dmy = k => `${+k.slice(8)} ${MN3[+k.slice(5, 7) - 1]}`;
