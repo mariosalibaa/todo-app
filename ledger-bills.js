@@ -1030,7 +1030,7 @@ async function postOfficialSarl(ctx, account, t, who) {
   const id = await odooCall('account.move', 'create', [{
     move_type: 'in_invoice', company_id: SARL_OFFICIAL.companyId, journal_id: SARL_OFFICIAL.journal,
     partner_id: v.id, invoice_date: t.date, date: t.date, ref,
-    narration: 'Official invoice read on Shift WhatsApp' + (t.postId ? ' (post ' + t.postId + ')' : '') + '. Made by Shift Hub.',
+    narration: 'Official invoice read on Shift WhatsApp' + (t.postId ? ' (post ' + t.postId + ')' : '') + '.' + (t.note ? ' Note: ' + t.note + '.' : '') + ' Made by Shift Hub.',
     invoice_line_ids: [[0, 0, { name: t.date + ' · ' + (t.description || v.name).slice(0, 80), quantity: 1, price_unit: ht,
       account_id: RESALE.test(t.description || '') ? SARL_OFFICIAL.resale : SARL_OFFICIAL.raw,
       tax_ids: [[6, 0, [SARL_OFFICIAL.tax]]], analytic_distribution: distOf(t, an) }]],

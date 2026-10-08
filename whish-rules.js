@@ -337,7 +337,7 @@ async function handle(req, res, url, user, ctx) {
           invoice_date: t.date,
           date: t.date,
           ref,                                          // the idempotency key
-          narration: ((account.provider === 'whish' ? 'Whish ' : account.name + ' ') + t.date + ' · ref ' + (t.ref || '') + ' · ' + (t.description || '')).trim(),
+          narration: ((account.provider === 'whish' ? 'Whish ' : account.name + ' ') + t.date + ' · ref ' + (t.ref || '') + ' · ' + (t.description || '') + (t.note ? ' · Note: ' + t.note : '')).trim(),
           invoice_line_ids: [[0, 0, line]],
         }], { context: octx });
         }
@@ -382,6 +382,11 @@ async function handle(req, res, url, user, ctx) {
       } catch (e) {
         out.push({ id, error: String(e.message || e).slice(0, 300) });
       }
+    }
+    // the line's photos / scans go onto the entries it just made (papers.js), as book-row does; never fails the booking
+    for (const o of out) if (o.id && (o.moveId || o.move) && !o.error) {
+      try { const ref = col.doc(o.id), t2 = (await ref.get()).data(); if (t2) await require('./papers').syncLine({ odooCall, admin: ctx.admin, ws }, { id: o.id, ...t2 }, { ref }); }
+      catch (e) { console.error('rules papers', o.id, e.message); }
     }
     json(res, 200, { results: out, created: out.filter(o => o.moveId && !o.already).length, booked: out.filter(o => o.paymentState === 'paid').length });
     return true;

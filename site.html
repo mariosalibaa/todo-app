@@ -450,6 +450,7 @@ function lineBlock(p, L, i) {
     ['Project', esc(L.analyticName || '') || miss],
     ['Division', esc(sectionName(L.section)) || (isAjaltoun(L) ? miss : '<span class="q">—</span>')],
     ...(L.extras || []).map(x => ['+ ' + esc((x.description || '').split(' · ')[0]), `${Admin.money(Math.abs(x.amount), cur)}${x.booked ? ' <span class="q">in Odoo ✓✓</span>' : ''}`]),
+    ...(L.note && !/^cancelled:/i.test(L.note) ? [['Note', esc(L.note)]] : []),
     ['Status', state + (L.state === 'dismissed' && L.note ? ` <span class="q">— ${esc(L.note)}</span>` : '')],
     // once it is in Odoo: the bill it became, and the entry that paid it
     ...(L.state === 'booked' ? [

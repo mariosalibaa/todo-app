@@ -195,7 +195,7 @@ async function digest(ctx, ws, ref, post, buf) {
         const { partners } = await refs(ctx);
         const { partner, analytic, company: sugCo } = await suggestFor(ctx, ws, parsed, text, isGeneral ? MARIO_CASH : post.thread, partners);
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: 'debit', date: paperDate(parsed, post), description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
+          { amount: parsed.amount, side: 'debit', date: paperDate(parsed, post), description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense', note: String(text || '').slice(0, 300),
             company: parse.officialCompany(parsed) || sugCo || '', official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });
       }
     }
@@ -208,7 +208,7 @@ async function digest(ctx, ws, ref, post, buf) {
         const { partner, analytic, company: sugCo } = await suggestFor(ctx, ws, parsed, text, isGeneral ? MARIO_CASH : post.thread, partners);
         // a caption on a receipt photo rides along on the same line instead of spawning a second one (see below)
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: 'debit', date: paperDate(parsed, post), description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
+          { amount: parsed.amount, side: 'debit', date: paperDate(parsed, post), description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense', note: String(text || '').slice(0, 300),
             // an official paper (SHIFT GROUP SARL + VAT) belongs to the SARL and carries it by itself
             company: parse.officialCompany(parsed) || sugCo || '', official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });   // a receipt is always an expense — bookable right after ✓
       }
@@ -227,7 +227,7 @@ async function digest(ctx, ws, ref, post, buf) {
           const analytic = c.project ? (parse.matchName(c.project, analytics) || analytics.find(x => x.name === c.project) || null) : null;
           const paidFrom = c.paidFrom ? (parse.matchName(c.paidFrom, accRefs) || accRefs.find(a => a.name === c.paidFrom) || null) : null;
           const L = await writeLine(ctx, ws, post, paidFrom ? paidFrom.id : MARIO_CASH, { amount: c.amount, side: c.side, date: c.date, idSuffix: i ? '-' + i : '', company: c.company || '',
-            description: [partner ? partner.name : c.partner, c.note, c.lbpNote].filter(Boolean).join(' · '), partner, analytic, note: '', nature: c.side === 'debit' ? 'expense' : undefined });
+            description: [partner ? partner.name : c.partner, c.note, c.lbpNote].filter(Boolean).join(' · '), partner, analytic, note: String(text).slice(0, 300), nature: c.side === 'debit' ? 'expense' : undefined });
           // fill what the note left blank from history / Odoo / Claude — no "suggest" press (Mario 2026-10-08: "auto suggest, I will approve or edit")
           try { await autoFill(ctx, ws, L, { vendor: (partner && partner.name) || c.partner || '', note: c.note, receipt: true, vat: false }, text, partners); } catch (e) { console.error('autofill', post.id, e.message); }
           written.push({ ...L, currency: c.currency });
