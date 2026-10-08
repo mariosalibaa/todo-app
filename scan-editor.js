@@ -38,6 +38,14 @@ window.ScanEditor = (function () {
   .scanx .top button.go{visibility:hidden;}
   .scanx .fab{position:absolute;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:3;width:60px;height:60px;border-radius:50%;border:0;
     background:#25d366;color:#0b1a10;font-size:1.6rem;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  /* lighter tools (Mario 2026-10-08: "make the tools lighter, less space"): no section titles, slim buttons */
+  .scanx .bar{padding:4px 8px 6px;gap:5px;} .scanx .lbl{display:none;}
+  .scanx .seg{gap:5px;flex-wrap:nowrap;} .scanx .seg button{min-width:0;padding:6px 4px;font-size:.74rem;border-radius:8px;}
+  .scanx .seg button.ic{min-width:38px;font-size:.92rem;}
+  /* the photo never sits under the green button: the stage keeps its bottom strip free (Mario 2026-10-08) */
+  .scanx .stage{padding:6px 6px calc(86px + env(safe-area-inset-bottom));}
+  .scanx #sxView{transform-origin:50% 50%;will-change:transform;}
+  .scanx .zhint{position:absolute;left:12px;bottom:calc(34px + env(safe-area-inset-bottom));font-size:.7rem;color:#8b9298;pointer-events:none;}
   .scanx .busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(16,18,21,.6);font-size:.9rem;}
   `;
 
@@ -64,8 +72,12 @@ window.ScanEditor = (function () {
       // The crop screen draws into a canvas as dense as the screen itself (a phone is 2x or 3x):
       // at 1x the photo looked far worse here than in the camera — Mario, 2026-09-24.
       const DPR = () => Math.min(3, window.devicePixelRatio || 1);
+      // the stage's free area, inside its padding (the bottom strip belongs to the green button)
+      const room = () => { const cs = getComputedStyle(stage);
+        return { width: stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+                 height: stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) }; };
       function layout() {
-        const box = stage.getBoundingClientRect();
+        const box = room(); zoomReset();
         // room around the photo so a handle on its very edge can still be reached with a thumb (Mario 2026-10-07)
         const s = Math.min((box.width - 56) / src.width, (box.height - 56) / src.height);
         fit = { s, w: Math.round(src.width * s), h: Math.round(src.height * s), dpr: DPR() };
@@ -127,11 +139,54 @@ window.ScanEditor = (function () {
       });
       ['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, () => { drag = null; }));
 
+      // ── zoom on the Scan step (Mario 2026-10-08: "allow to zoom in out") ──
+      // pinch with two fingers, drag with one once zoomed, double-tap to zoom in / back out; wheel on a computer
+      const z = { k: 1, x: 0, y: 0 }, pts = new Map(); let pinch = null, pan = null, lastTap = 0;
+      const zClamp = () => {
+        z.k = clamp(z.k, 1, 6);
+        const r = room(), w = parseFloat(view.style.width) || 0, h = parseFloat(view.style.height) || 0;
+        const mx = Math.max(0, (w * z.k - r.width) / 2 + 20), my = Math.max(0, (h * z.k - r.height) / 2 + 20);
+        z.x = z.k === 1 ? 0 : clamp(z.x, -mx, mx); z.y = z.k === 1 ? 0 : clamp(z.y, -my, my);
+      };
+      const zApply = () => { zClamp(); view.style.transform = z.k === 1 ? '' : `translate(${z.x}px,${z.y}px) scale(${z.k})`; };
+      function zoomReset() { z.k = 1; z.x = z.y = 0; pts.clear(); pinch = pan = null; view.style.transform = ''; }
+      // zoom by f around a screen point (cx, cy) so the spot under the fingers stays put
+      const zoomAt = (f, cx, cy) => {
+        const r = view.getBoundingClientRect(), ox = r.left + r.width / 2, oy = r.top + r.height / 2, k0 = z.k;
+        z.k = clamp(k0 * f, 1, 6); const g = z.k / k0;
+        z.x += (cx - ox) * (1 - g); z.y += (cy - oy) * (1 - g); zApply();
+      };
+      stage.addEventListener('pointerdown', e => {
+        if (step !== 2) return;
+        e.preventDefault(); pts.set(e.pointerId, [e.clientX, e.clientY]);
+        try { stage.setPointerCapture(e.pointerId); } catch {}
+        if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] }; pan = null; return; }
+        const now = Date.now();
+        if (now - lastTap < 300) { lastTap = 0; if (z.k > 1) { z.k = 1; zApply(); } else zoomAt(2.5, e.clientX, e.clientY); return; }
+        lastTap = now; pan = { p: [e.clientX, e.clientY] };
+      });
+      stage.addEventListener('pointermove', e => {
+        if (step !== 2 || !pts.has(e.pointerId)) return;
+        pts.set(e.pointerId, [e.clientX, e.clientY]);
+        if (pinch && pts.size >= 2) {
+          const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+          z.x += m[0] - pinch.m[0]; z.y += m[1] - pinch.m[1];
+          if (pinch.d > 0) zoomAt(d / pinch.d, m[0], m[1]); else zApply();
+          pinch = { d, m }; return;
+        }
+        if (pan && z.k > 1) { z.x += e.clientX - pan.p[0]; z.y += e.clientY - pan.p[1]; pan.p = [e.clientX, e.clientY]; zApply(); }
+      });
+      ['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, e => {
+        pts.delete(e.pointerId); if (pts.size < 2) pinch = null;
+        if (pts.size === 1) { pan = { p: [...pts.values()][0] }; } else if (!pts.size) pan = null;
+      }));
+      stage.addEventListener('wheel', e => { if (step !== 2) return; e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); }, { passive: false });
+
       // ── stage 2: the look ──────────────────────────────────────────────
       function preview() {
         const busy = document.createElement('div'); busy.className = 'busy'; busy.textContent = 'Working…'; stage.appendChild(busy);
         setTimeout(() => {
-          const box = stage.getBoundingClientRect();
+          const box = room(); zoomReset();
           const out = outSize(quad, Math.min(2000, Math.round(Math.max(box.width, box.height) * Math.min(3, window.devicePixelRatio || 1))));
           const img = process(warp(src, quad, out.w, out.h, 1), prefs.mode, prefs.enhance);
           const s = Math.min((box.width - 12) / out.w, (box.height - 12) / out.h, 1);
@@ -139,6 +194,7 @@ window.ScanEditor = (function () {
           view.style.width = Math.round(out.w * s) + 'px'; view.style.height = Math.round(out.h * s) + 'px';
           view.getContext('2d').putImageData(img, 0, 0);
           over.width = over.height = 0; over.style.width = over.style.height = '0px';
+          if (!stage.querySelector('.zhint')) { const h = document.createElement('div'); h.className = 'zhint'; h.textContent = 'Pinch or double-tap to zoom'; stage.appendChild(h); }
           busy.remove();
         }, 10);
       }
@@ -180,7 +236,7 @@ window.ScanEditor = (function () {
       function close(val) { window.removeEventListener('resize', onResize); root.remove(); resolve(val); }
       const onResize = () => { if (step === 1) layout(); else preview(); };
       window.addEventListener('resize', onResize);
-      root.querySelector('#sxCancel').onclick = () => { if (step === 2) { step = 1; root.querySelector('#sxTitle').textContent = 'Crop'; root.querySelector('#sxNext').textContent = 'Next ›'; root.querySelector('#sxCancel').textContent = 'Cancel'; fab.textContent = '›'; fab.title = 'Next'; bar(); layout(); } else close(null); };
+      root.querySelector('#sxCancel').onclick = () => { if (step === 2) { step = 1; root.querySelector('#sxTitle').textContent = 'Crop'; root.querySelector('#sxNext').textContent = 'Next ›'; root.querySelector('#sxCancel').textContent = 'Cancel'; fab.textContent = '›'; fab.title = 'Next'; stage.querySelector('.zhint')?.remove(); bar(); layout(); } else close(null); };
       root.querySelector('#sxNext').onclick = async () => {
         if (step === 1) {
           step = 2; root.querySelector('#sxTitle').textContent = 'Scan';

@@ -94,7 +94,10 @@ async function writeLine(ctx, ws, post, target, fields) {
   if (fields.nature) { t.nature = fields.nature; t.natureSrc = 'site'; }
   if (!t.debit && !t.credit) { t.noBook = true; t.ask = 'no amount yet — price this before booking'; }
   await acc.txCol(a).doc(id).set(t);
-  return { accountId: a.id, txId: id, state: 'waiting' };
+  // the card shows the suggestion straight away, not only after a reload (Mario 2026-10-08: the Attal receipt
+  // came back "— set" on partner / company / project although the line carried all three)
+  return { accountId: a.id, txId: id, state: 'waiting', debit: t.debit, credit: t.credit, section: '', partnerName: t.partnerName,
+    company: t.company, analyticName: t.analyticName, official: !!t.official && !!t.vat, billRef: t.ref };
 }
 
 // AI auto-suggest for a receipt (Mario 2026-10-07: "use AI to auto suggest"): who, which project, which company.
@@ -120,6 +123,22 @@ async function suggestFor(ctx, ws, parsed, text, target, partners) {
       }
     }
   } catch (e) { console.error('suggest history:', e.message); }
+  // 1b. the vendor is known but this ledger never bought from him: his latest bills in Odoo, any ledger,
+  //     say which project the purchases usually go to (Mario 2026-10-08: "based on previous behaviour and entries")
+  if (out.partner && out.partner.id && !out.analytic) {
+    try {
+      const since = new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10);
+      const ls = await ctx.odooCall('account.move.line', 'search_read', [[['partner_id', '=', out.partner.id], ['move_id.move_type', '=', 'in_invoice'],
+        ['parent_state', '=', 'posted'], ['date', '>=', since], ['display_type', '=', 'product'], ['analytic_distribution', '!=', false]]],
+        { fields: ['analytic_distribution', 'date', 'company_id'], order: 'date desc', limit: 12, context: CTX });
+      const { analytics } = await refs(ctx), tally = {};
+      for (const l of ls) for (const k of Object.keys(l.analytic_distribution || {})) for (const id of String(k).split(',')) tally[id] = (tally[id] || 0) + 1;
+      const best = Object.entries(tally).sort((x, y) => y[1] - x[1]).map(([id]) => (analytics || []).find(x => String(x.id) === id)).find(Boolean);
+      if (best) out.analytic = { id: best.id, name: best.name };
+    } catch (e) { console.error('suggest odoo history:', e.message); }
+  }
+  // a paper with no VAT is a black ticket: those live in S LB (the official ones get the SARL from officialCompany)
+  if (!out.company && parsed.receipt && !parsed.vat) out.company = 'S LB';
   try {
     const { analytics } = await refs(ctx);
     const pick = await parse.anthropic({ model: 'claude-haiku-4-5-20251001', max_tokens: 200,
