@@ -401,6 +401,7 @@
         .mob-menu[hidden]{display:none;} .mob-menu a,.mob-menu span.u{display:block;padding:12px 12px;border-radius:9px;color:var(--text,#cdd6f4);text-decoration:none;font-size:1rem;}
         .mob-menu a.on{color:var(--amber,#F2A93B);background:rgba(242,169,59,.12);font-weight:600;} .mob-menu .x{align-self:flex-end;font-size:1.3rem;padding:4px 10px;} .mob-menu .u{margin-top:auto;color:var(--sub,#a6adc8);font-size:.85rem;border-top:1px solid var(--surface0,#313244);padding-top:14px;}
         .mob-menu .u a{display:inline;padding:0;margin-left:10px;color:var(--overlay0,#6c7086);} .mob-menu{overflow-y:auto;} .mob-menu .nav-go,.mob-menu .nav-tabs{display:flex;flex-direction:column;gap:2px;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--surface0,#313244);} .mob-menu .nav-go a{padding:10px 12px;} .mob-menu .ai-tog{color:#128c7e !important;}
+        .mob-menu .va-sel{margin:4px 0;padding:10px 12px;border:1px solid rgba(128,128,128,.4);border-radius:9px;background:transparent;color:inherit;font:inherit;font-size:1rem;} .mob-menu .va-sel option{background:var(--mantle,#181825);} .mob-menu .va-leave{color:#f9e2af !important;background:rgba(138,90,0,.35);}
         .mob-back{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;} .mob-back[hidden]{display:none;}
         .fold-txt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;} .fold-txt.open{display:block;-webkit-line-clamp:unset;}
         .fold-more{display:inline-block;color:var(--amber,#F2A93B);font-size:.78rem;cursor:pointer;margin:2px 0 8px;}
@@ -421,9 +422,20 @@
       const navHtml = () => { const me = A.me || {}, apps = me.apps || [], here = location.pathname.replace(/\/+$/, '') || '/';
         const items = NAV.filter(([h, , k]) => !k || (k === 'admin' ? me.admin : (me.admin || apps.includes(k))));
         return items.length > 1 ? '<div class="nav-go">' + items.map(([h, l]) => `<a href="${h}"${h === here ? ' class="on"' : ''}>${l}</a>`).join('') + '</div>' : ''; };
-      const aiItem = () => window.HubAsk ? `<a href="#" class="ai-tog">✦ AI button: ${window.HubAsk.isOn() ? 'on — tap to hide' : 'off — tap to show'}</a>` : '';
-      const fill = () => { menu.innerHTML = '<span class="x">✕</span>' + navHtml() + (tabs ? '<div class="nav-tabs">' + tabs.innerHTML + '</div>' : '') + aiItem() + (who && who.innerHTML.trim() ? `<span class="u">${who.innerHTML}</span>` : ''); menu.querySelector('.x').onclick = close;
-        const t = menu.querySelector('.ai-tog'); if (t) t.onclick = e => { e.preventDefault(); window.HubAsk.set(!window.HubAsk.isOn()); fill(); }; };
+      // on the chat page the ✦ and Install live here, not as floating buttons (Mario 2026-10-08: "put this in the top menu")
+      const aiItem = () => !window.HubAsk ? '' : window.HubAsk.inMenu ? '<a href="#" class="ai-open">✦ Ask the hub</a>' : `<a href="#" class="ai-tog">✦ AI button: ${window.HubAsk.isOn() ? 'on — tap to hide' : 'off — tap to show'}</a>`;
+      const installItem = () => window.HubInstall && window.HubInstall.can() ? '<a href="#" class="inst-go">⬇ Install this page as an app</a>' : '';
+      // View as rides in the menu too (Mario 2026-10-08: "add this in the menu") — the phone has no top bar for it
+      const viewAsItem = () => { const me = A.me || {}, people = (me.people || []).filter(x => x.email !== me.viewedBy);
+        if (me.viewAs) { const n = (people.find(x => x.email === me.viewAs) || {}).name || me.viewAs; return `<a href="#" class="va-leave">👁 Viewing as ${esc(n)} — tap to leave</a>`; }
+        if (!me.admin || !people.length) return '';
+        return '<select class="va-sel"><option value="">👁 View as…</option>' + people.map(x => `<option value="${esc(x.email)}">${esc(x.name || x.email)}${x.account ? ' · ' + esc(x.account) : ''}</option>`).join('') + '</select>'; };
+      const fill = () => { menu.innerHTML = '<span class="x">✕</span>' + navHtml() + (tabs ? '<div class="nav-tabs">' + tabs.innerHTML + '</div>' : '') + viewAsItem() + aiItem() + installItem() + (who && who.innerHTML.trim() ? `<span class="u">${who.innerHTML}</span>` : ''); menu.querySelector('.x').onclick = close;
+        const s = menu.querySelector('.va-sel'); if (s) s.onchange = () => s.value && A.viewAs(s.value);
+        const l = menu.querySelector('.va-leave'); if (l) l.onclick = e => { e.preventDefault(); A.viewAs(''); };
+        const t = menu.querySelector('.ai-tog'); if (t) t.onclick = e => { e.preventDefault(); window.HubAsk.set(!window.HubAsk.isOn()); fill(); };
+        const o = menu.querySelector('.ai-open'); if (o) o.onclick = e => { e.preventDefault(); close(); window.HubAsk.open(); };
+        const g = menu.querySelector('.inst-go'); if (g) g.onclick = e => { e.preventDefault(); close(); window.HubInstall.prompt(); }; };
       const open = () => { fill(); menu.hidden = false; back.hidden = false; }, close = () => { menu.hidden = true; back.hidden = true; };
       btn.onclick = open; back.onclick = close;
       hdr.appendChild(btn); document.body.append(back, menu);

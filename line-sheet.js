@@ -85,7 +85,7 @@
     ${lock ? '' : `<div class="ls-ai"><button type="button" class="ls-sug" onclick="LineSheet.suggest(this)">✦ Suggest</button><span id="ls-dict"></span></div>`}
     <div class="ls-actions">
       <button onclick="LineSheet.save()">Save</button>
-      ${!accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('accept')">✓ Accept</button>` : ''}
+      ${!accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('accept')" title="Accept and book in Odoo in one press">✓ Accept &amp; book</button>` : ''}
       ${accepted && !lockAll ? `<button class="ok" onclick="LineSheet.save('book')">✓ Book in Odoo</button><button class="warn" onclick="LineSheet.hold()">↩ hold</button>` : ''}
       ${!lockAll && !cancelled ? `<button class="warn" onclick="LineSheet.cancelEntry()">✕ Cancel entry</button>` : ''}
       ${cancelled ? `<button onclick="LineSheet.restoreEntry()">↩ Put it back</button>` : ''}
@@ -167,18 +167,19 @@
   // vendor, transfer) goes through book-row — the same entry ✓ accept makes; a line with no type but a partner and
   // a company is paid from this account's cash journal through the rules route. If the first refuses, the other is
   // tried, and both reasons are reported (Mario, 2026-09-24: "book in odoo not working").
-  async function bookOne(txId, section) {
-    const t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${txId}`);
+  async function bookOne(txId, section, accId) {
+    const acc = accId || S.acc;
+    const t = await A.api('GET', `/api/accounting/accounts/${acc}/tx/${txId}`);
     if (t.bookedMove) return t.bookedMove.name || '';
-    const byRow = async () => { const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/book-row`, { txId }); return r.move || ''; };
+    const byRow = async () => { const r = await A.api('POST', `/api/accounting/accounts/${acc}/book-row`, { txId }); return r.move || ''; };
     const byPay = async () => {
       // an official SARL bill that was refused for a missing project must NOT slip out as a plain payment
       if (t.vat && (t.official || t.company === 'SHIFT GROUP SARL (USD)')) throw new Error('official bill — fix what the message above says, it books in the SARL');
       if (!t.partnerId) throw new Error('the partner is not one of Odoo\'s — pick it from the list');
       if (!t.company) throw new Error('the company is missing');
-      const r = await A.api('POST', `/api/accounting/accounts/${S.acc}/book`, { ids: [txId], post: true });
+      const r = await A.api('POST', `/api/accounting/accounts/${acc}/book`, { ids: [txId], post: true });
       const one = (r.results || [])[0] || {}; if (one.error) throw new Error(one.error);
-      A.api('POST', `/api/accounting/accounts/${S.acc}/odoo-check`, { ids: [txId] }).catch(() => {});
+      A.api('POST', `/api/accounting/accounts/${acc}/odoo-check`, { ids: [txId] }).catch(() => {});
       return one.move || '';
     };
     // a worker's ledger (his workbook, or his Odoo partner) books its rows as bills from him; any other wallet pays
@@ -192,6 +193,7 @@
     return move;
   }
   async function save(action) {
+    if (action === 'accept') action = 'book';   // ✓ books in Odoo in the same press — no second step (Mario 2026-10-08)
     const err = g('ls-err'); err.textContent = '';
     const btns = [...document.querySelectorAll('.ls-actions button')]; btns.forEach(b => b.disabled = true);
     try {
@@ -332,5 +334,5 @@
     btn.disabled = false; setTimeout(() => { btn.textContent = was; }, 6000);
   }
 
-  window.LineSheet = { open, close, draw, save, hold, cancelEntry, restoreEntry, projChanged, suggest, get S() { return S; } };
+  window.LineSheet = { open, close, draw, save, hold, cancelEntry, restoreEntry, projChanged, suggest, bookOne, get S() { return S; } };
 })();

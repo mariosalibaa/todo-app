@@ -20,7 +20,8 @@ const devRequests = require('./dev-requests');   // /api/dev-requests — code c
 const aiFill = require('./ai-fill');            // POST /api/ai/fill — Dictate: a voice/typed note → a form's fields (any member; extraction only)
 const ajaltoun = require('./ajaltoun');
 const reports = require('./reports');
-const projectcost = require('./projectcost');   // /api/projectcost/* — one project's cost spread, profit and margin from Odoo's analytic lines
+const projectcost = require('./projectcost');
+const suppliers = require('./suppliers');     // /api/suppliers/* — one supplier across every company: bills, returns, payments, hub lines, statements   // /api/projectcost/* — one project's cost spread, profit and margin from Odoo's analytic lines
 const excavation = require('./excavation');
 const reconcileLine = require('./reconcile-line');   // /api/accounting/accounts/<id>/tx/<txId>/reconcile     // /api/accounting/excavation (Georges EL Hajj collections dashboard)           // /api/reports/* (SARL trial balance + GL in LBP for the accountant)        // /api/ajaltoun/* (the project's accounts, from Odoo)
 const site = require('./site');
@@ -740,6 +741,7 @@ const handler = async (req, res) => {
     'reports.html': path.join(__dirname, 'reports.html'),
     'excavation.html': path.join(__dirname, 'excavation.html'),
     'projectcost.html': path.join(__dirname, 'projectcost.html'),
+    'suppliers.html': path.join(__dirname, 'suppliers.html'),
     'excavation-summary.html': path.join(__dirname, 'excavation-summary.html'),
     'decision.html': path.join(__dirname, 'decision.html'),
     'decisions.html': path.join(__dirname, 'decisions.html'),
@@ -761,7 +763,7 @@ const handler = async (req, res) => {
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
-    '/reports': 'reports.html', '/projectcost': 'projectcost.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
+    '/reports': 'reports.html', '/projectcost': 'projectcost.html', '/suppliers': 'suppliers.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
     '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
     '/crm': 'crm.html',
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
@@ -1456,6 +1458,17 @@ const handler = async (req, res) => {
       console.error('accounting error:', e);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(e && e.message || e) }));
+    }
+    return;
+  }
+  if (url.startsWith('/api/suppliers/')) {
+    if (!access.apps.includes('accounting')) return noApp('accounting');
+    try {
+      const handled = await suppliers.handle(req, res, url, user, { db, admin, TEAM_ID, odooCall, access });
+      if (handled === false) { res.writeHead(404); res.end('not found'); }
+    } catch (e) {
+      console.error('suppliers error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: String(e && e.message || e) }));
     }
     return;
   }

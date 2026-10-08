@@ -104,6 +104,8 @@
   function askOff() { try { return localStorage.getItem(OFF_KEY) === '1'; } catch { return false; } }
   window.HubAsk = {
     isOn: () => !askOff(),
+    open: () => open(true),                      // the ☰ menu on /site opens the panel itself (Mario 2026-10-08)
+    inMenu: /^\/site/.test(location.pathname),   // there the round button is not shown at all
     set(on) { try { if (on) localStorage.removeItem(OFF_KEY); else localStorage.setItem(OFF_KEY, '1'); } catch {} const b = document.getElementById('ask-btn'); if (b) b.hidden = !on; if (!on && panel) open(false); },
     resetPlace() { try { localStorage.removeItem(POS_KEY); } catch {} location.reload(); },
   };
@@ -112,6 +114,7 @@
     const st = document.createElement('style'); st.textContent = CSS; document.head.append(st);
     const b = document.createElement('button');
     b.id = 'ask-btn'; b.title = 'Ask the hub'; b.textContent = '✦';
+    if (window.HubAsk.inMenu) b.hidden = true;
     // a chat page has its send button in that corner — ✦ sits above the message box there (Mario 2026-10-07: "ask ai overlaps send")
     if (/^\/site/.test(location.pathname)) b.style.bottom = (matchMedia('(max-width: 700px)').matches ? 92 : 96) + 'px';
     // moved by hand: press and drag it anywhere; the place is kept (Mario 2026-10-07: "allow to move the AI icon by hand")

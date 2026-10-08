@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Suppliers · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;--mauve:#cba6f7;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:7px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  .hback:hover{background:var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1240px;margin:0 auto;padding:22px 16px 60px;}
+  h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 14px;line-height:1.5;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;} .bar .sp{flex:1;}
+  select,input,button,textarea{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:7px 10px;font-size:.82rem;font-family:inherit;}
+  select{max-width:100%;} #pick{min-width:260px;}
+  button{cursor:pointer;} button:hover{border-color:var(--amber);} button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
+  button.sm{padding:4px 8px;font-size:.74rem;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:12px 14px;overflow-x:auto;margin-bottom:14px;}
+  .card h2{font-size:.95rem;margin:0 0 8px;font-weight:600;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  td{padding:5px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;}
+  td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  tr.row td{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
+  tr.tot td{font-weight:600;background:rgba(242,169,59,.10);color:var(--amber);border-top:2px solid var(--amber);}
+  .pos{color:var(--green);} .neg{color:var(--red);} .muted{color:var(--overlay0);} .small{font-size:.74rem;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;}
+  .kpi .v{font-size:1.15rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.68rem;color:var(--sub);margin-top:2px;}
+  .kpi.open .v{color:var(--amber);} .kpi.ok .v{color:var(--green);} .kpi.bad .v{color:var(--red);}
+  .pill{display:inline-block;font-size:.66rem;padding:1px 7px;border-radius:9px;background:var(--surface0);color:var(--sub);white-space:nowrap;}
+  .pill.paid{background:rgba(166,227,161,.15);color:var(--green);} .pill.open{background:rgba(242,169,59,.18);color:var(--amber);} .pill.draft{background:rgba(137,180,250,.15);color:var(--blue);} .pill.ret{background:rgba(203,166,247,.18);color:var(--mauve);}
+  .pill.booked{background:rgba(166,227,161,.15);color:var(--green);} .pill.waiting{background:rgba(242,169,59,.18);color:var(--amber);} .pill.accepted{background:rgba(137,180,250,.15);color:var(--blue);}
+  a.od{color:var(--blue);text-decoration:none;} a.od:hover{text-decoration:underline;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;} @media (max-width:900px){ .two{grid-template-columns:1fr;} }
+  .stm{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--surface0);} .stm:last-child{border-bottom:0;}
+  .stm .ic{font-size:1.4rem;} .stm .t{flex:1;} .stm .t b{font-weight:600;} .stm .t .small{display:block;margin-top:2px;}
+  .diff{margin-top:8px;padding:8px 10px;border-radius:8px;font-size:.8rem;} .diff.ok{background:rgba(166,227,161,.12);color:var(--green);} .diff.bad{background:rgba(243,139,168,.12);color:var(--red);}
+  .form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;} .form .full{grid-column:1/3;} .form label{font-size:.68rem;color:var(--sub);display:block;margin-bottom:3px;}
+  .form input,.form textarea{width:100%;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
+  #msg{font-size:.8rem;color:var(--sub);margin:8px 0;}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;} .filters button{padding:4px 10px;font-size:.74rem;border-radius:12px;}
+  @media (max-width:640px){ main{padding:14px 12px 50px;} #pick{min-width:0;width:100%;} th,td{padding:5px 6px;} .form{grid-template-columns:1fr;} .form .full{grid-column:1;} }
+  @media print{ header,.bar,.note,#msg,.form,.filters,button{display:none!important;} body{background:#fff;color:#000;} .card{border:0;} td,th{color:#000!important;border-color:#ccc;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft"><a class="hback" href="/accounting">‹ Accounting</a><div class="wordmark">S<span>H</span>IFT<small>HUB · SUPPLIERS</small></div></div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1>Suppliers</h1>
+  <p class="lead">One supplier across every company: his bills and returns in Odoo, the payments that reached him, what is still open per company, the hub lines that name him — whoever paid — and his latest statement of account to check against.</p>
+  <div class="bar">
+    <select id="pick" onchange="openSupplier(+this.value)"><option value="">All suppliers…</option></select>
+    <input type="search" id="find" placeholder="Find a supplier…" oninput="filterPick(this.value)" style="width:180px">
+    <span class="sp"></span>
+    <button onclick="load(true)" title="Pull again from Odoo (the list is cached 5 minutes)">⟳ Refresh</button>
+    <button onclick="window.print()">🖨 Print</button>
+  </div>
+  <div id="msg"></div>
+  <div id="view"></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+const fmt = n => (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// the /web# form on purpose: outside the Odoo app's scope, so Chrome opens a TAB, not the installed Odoo app (Mario, 2026-10-05)
+const ODOO = 'https://shift2.odoo.com/web#cids=2-7-10-8-4-9&view_type=form&model=';
+const odoo = (model, id, label) => id ? `<a class="od" href="${ODOO}${model}&id=${id}" target="_blank" rel="noopener">${esc(label)}</a>` : esc(label);
+let LIST = [], CUR = null, ME = null, F = { kind: 'all', company: '' };
+const say = (t, cls) => { const m = document.getElementById('msg'); m.textContent = t || ''; m.style.color = cls === 'err' ? 'var(--red)' : ''; };
+
+Admin.require('accounting', me => {
+  ME = me;
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  load(false);
+});
+
+async function load(fresh) {
+  say('Reading the suppliers from Odoo…');
+  try {
+    const d = await Admin.api('GET', '/api/suppliers/list' + (fresh ? '?fresh=1' : ''));
+    LIST = d.suppliers;
+    const sel = document.getElementById('pick');
+    sel.innerHTML = '<option value="">All suppliers…</option>' + LIST.map(p => `<option value="${p.id}">${esc(p.name)}${p.open ? ' · open ' + fmt(p.open) : ''}</option>`).join('');
+    const want = +(new URL(location.href).searchParams.get('id') || 0);
+    say('');
+    if (want) { sel.value = String(want); await openSupplier(want, fresh); } else renderList();
+  } catch (e) { say('Could not read Odoo: ' + e.message, 'err'); }
+}
+function filterPick(q) {
+  q = q.trim().toLowerCase();
+  const sel = document.getElementById('pick');
+  for (const o of sel.options) { if (!o.value) continue; o.hidden = q && !o.textContent.toLowerCase().includes(q); }
+  if (!CUR) renderList(q);
+}
+function renderList(q) {
+  q = (q || '').toLowerCase();
+  const rows = LIST.filter(p => !q || p.name.toLowerCase().includes(q));
+  const tot = rows.reduce((s, p) => ({ total: s.total + p.total, open: s.open + p.open }), { total: 0, open: 0 });
+  document.getElementById('view').innerHTML = `
+    <div class="card"><h2>All suppliers <span class="muted small">(${rows.length}, latest bill first — click one)</span></h2>
+    <table><thead><tr><th>Supplier</th><th>Last bill</th><th class="n">Bills</th><th class="n">Billed, all time</th><th class="n">Still open</th><th>Where</th></tr></thead><tbody>
+    ${rows.map(p => `<tr class="row" onclick="pickSupplier(${p.id})"><td>${esc(p.name)}</td><td class="small muted">${esc(p.last)}</td><td class="n muted">${p.bills}</td><td class="n">${fmt(p.total)}</td><td class="n ${p.open ? 'neg' : 'muted'}">${p.open ? fmt(p.open) : '—'}</td><td class="small muted">${p.companies.map(c => esc(Admin.coShort(c.company)) + (c.open ? ' <span class="neg">' + fmt(c.open) + (c.currency === 'LBP' ? ' LBP' : '') + '</span>' : '')).join(' · ')}</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td></td><td></td><td class="n">${fmt(tot.total)}</td><td class="n">${fmt(tot.open)}</td><td></td></tr>
+    </tbody></table></div>
+    <div class="note">"Still open" is Odoo's view: bills posted and not yet paid, in any company. A supplier's own statement may say otherwise — open him, add his statement, and the page shows the difference.</div>`;
+}
+function pickSupplier(id) { document.getElementById('pick').value = String(id); openSupplier(id); }
+async function openSupplier(id, fresh) {
+  if (!id) { CUR = null; history.replaceState(null, '', '/suppliers'); renderList(document.getElementById('find').value); return; }
+  say('Reading…');
+  try {
+    CUR = await Admin.api('GET', `/api/suppliers/one?id=${id}`);
+    history.replaceState(null, '', '/suppliers?id=' + id);
+    F = { kind: 'all', company: '' }; say(''); render();
+  } catch (e) { say('Could not read the supplier: ' + e.message, 'err'); }
+}
+function setF(k, v) { F[k] = F[k] === v ? (k === 'kind' ? 'all' : '') : v; render(); }
+function render() {
+  const d = CUR, p = d.partner;
+  const companies = [...new Set(d.moves.map(m => m.company))];
+  const moves = d.moves.filter(m => (F.kind === 'all' || (F.kind === 'open' ? m.state === 'posted' && m.open > 0 : F.kind === 'draft' ? m.state === 'draft' : m.kind === F.kind)) && (!F.company || m.company === F.company));
+  const openTotal = d.openBy.reduce((s, c) => s + (c.currency === 'LBP' ? 0 : c.open), 0);
+  const stm = d.statements[0];
+  const diff = stm && stm.balance != null ? +(stm.balance - openTotal).toFixed(2) : null;
+  const kpis = `
+    <div class="kpis">
+      <div class="kpi open"><div class="v">${fmt(openTotal)}</div><div class="l">Open in Odoo, USD (every company)</div></div>
+      ${d.openBy.map(c => `<div class="kpi"><div class="v">${fmt(c.open)}${c.currency === 'LBP' ? ' <span class="small muted">LBP</span>' : ''}</div><div class="l">Open · ${esc(Admin.coShort(c.company))} · ${c.n} doc${c.n === 1 ? '' : 's'}</div></div>`).join('')}
+      <div class="kpi ${diff == null ? '' : Math.abs(diff) < 0.01 ? 'ok' : 'bad'}"><div class="v">${stm && stm.balance != null ? fmt(stm.balance) : '—'}</div><div class="l">${stm ? 'His statement says' + (stm.asOf ? ' · ' + esc(stm.asOf) : '') : 'No statement yet'}</div></div>
+    </div>`;
+  const pill = m => m.state === 'draft' ? '<span class="pill draft">draft</span>' : m.kind === 'return' ? '<span class="pill ret">return</span>' : m.payment === 'paid' || m.payment === 'in_payment' ? '<span class="pill paid">paid</span>' : m.payment === 'partial' ? '<span class="pill open">partial</span>' : m.open ? '<span class="pill open">open</span>' : '<span class="pill paid">paid</span>';
+  const moveRows = moves.map(m => `<tr><td class="small">${esc(m.date)}</td><td>${odoo('account.move', m.id, m.name || '(draft)')}${m.scan ? ' <span class="muted" title="has a scan">📎</span>' : ''}</td><td class="small">${esc(m.ref)}</td><td>${pill(m)}</td><td class="small">${esc(Admin.coShort(m.company))}</td><td class="small muted">${esc(m.project)}</td><td class="n ${m.kind === 'return' ? 'pos' : ''}">${m.kind === 'return' ? '−' : ''}${fmt(m.total)}${m.currency === 'LBP' ? ' <span class="muted">LBP</span>' : ''}</td><td class="n ${m.open && m.state === 'posted' ? 'neg' : 'muted'}">${m.state === 'posted' && m.open ? fmt(m.open) : ''}</td></tr>`).join('');
+  const sumT = moves.reduce((s, m) => s + (m.currency === 'LBP' ? 0 : (m.kind === 'return' ? -m.total : m.total)), 0);
+  const payRows = d.payments.filter(x => !F.company || x.company === F.company).map(x => `<tr><td class="small">${esc(x.date)}</td><td>${odoo('account.payment', x.id, x.name || 'payment')}</td><td class="small">${esc(x.journal)}</td><td class="small muted">${esc(x.memo.slice(0, 90))}</td><td class="small">${esc(Admin.coShort(x.company))}</td><td class="small muted">${esc(x.project)}</td><td class="n">${fmt(x.amount)}${x.currency === 'LBP' ? ' <span class="muted">LBP</span>' : ''}</td></tr>`).join('');
+  const hubRows = d.hub.map(t => `<tr><td class="small">${esc(t.date)}</td><td class="small"><a class="od" href="/accounting/accounts#${esc(t.accountId)}">${esc(t.account)}</a></td><td>${esc(t.description)}</td><td class="small">${esc(t.ref)}</td><td class="small">${esc(Admin.coShort(t.company))}</td><td class="small muted">${esc(t.project)}</td><td>${t.state ? `<span class="pill ${t.state}">${t.state}</span>` : ''} ${t.move ? odoo('account.move', t.moveId, t.move) : ''}</td><td class="n">${t.debit ? fmt(t.debit) : ''}</td><td class="n pos">${t.credit ? fmt(t.credit) : ''}</td></tr>`).join('');
+  const stmList = d.statements.map(s => `<div class="stm"><div class="ic">${s.mime === 'application/pdf' ? '📄' : '🖼'}</div><div class="t"><b><a class="od" href="/api/suppliers/${p.id}/statement/${s.id}" onclick="event.preventDefault();HubViewer.open(this.href,{name:${JSON.stringify(s.name)}})">${esc(s.name)}</a></b>
+      <span class="small muted">${s.asOf ? 'as of ' + esc(s.asOf) + ' · ' : ''}${s.balance != null ? 'balance ' + fmt(s.balance) + ' · ' : ''}added ${esc((s.at || '').slice(0, 10))}${s.note ? ' · ' + esc(s.note) : ''}</span></div>
+      ${ME && ME.admin ? `<button class="sm" onclick="delStatement('${s.id}')" title="Remove this statement">✕</button>` : ''}</div>`).join('');
+  const diffBox = diff == null ? '' : Math.abs(diff) < 0.01 ? `<div class="diff ok">His statement and Odoo agree: ${fmt(stm.balance)} open.</div>`
+    : `<div class="diff bad">His statement says <b>${fmt(stm.balance)}</b>, Odoo has <b>${fmt(openTotal)}</b> open — a difference of <b>${fmt(diff)}</b>${diff > 0 ? ' (bills or payments missing in Odoo, or paid on his side and not ours)' : ' (Odoo carries bills he does not, or payments he has not recorded)'}. Open bills above, "open" filter, and his statement side by side.</div>`;
+  const form = ME && ME.admin ? `
+    <div class="form">
+      <div class="full"><label>Statement of account (PDF or photo) — from WhatsApp or e-mail</label><input type="file" id="stmFile" accept="application/pdf,image/*"></div>
+      <div><label>Balance it shows (USD, what we owe him; negative when he owes us)</label><input type="number" step="0.01" id="stmBal" placeholder="688.24"></div>
+      <div><label>As of (its closing date)</label><input type="date" id="stmAsOf"></div>
+      <div class="full"><label>Note</label><input type="text" id="stmNote" placeholder="e.g. covers 1 Jan → 4 Aug, received on WhatsApp 21 Aug"></div>
+      <div class="full"><button onclick="addStatement()">＋ Add statement</button></div>
+    </div>` : '';
+  document.getElementById('view').innerHTML = `
+    <h2 style="margin:0 0 2px;font-size:1.1rem">${esc(p.name)} <span class="muted small">${odoo('res.partner', p.id, 'partner ' + p.id)}${p.phone ? ' · ' + esc(p.phone) : ''}${p.email ? ' · ' + esc(p.email) : ''} · ${d.moves.length} documents · ${d.payments.length} payments · ${d.hub.length} hub lines</span></h2>
+    ${kpis}
+    <div class="card"><h2>In Odoo — bills and returns <span class="muted small">every company, newest first</span></h2>
+      <div class="filters">
+        ${[['all', 'all'], ['open', 'open'], ['bill', 'bills'], ['return', 'returns'], ['draft', 'drafts']].map(([k, l]) => `<button class="${F.kind === k ? 'on' : ''}" onclick="setF('kind','${k}')">${l}</button>`).join('')}
+        <span class="muted small" style="align-self:center">·</span>
+        ${companies.map(c => `<button class="${F.company === c ? 'on' : ''}" onclick="setF('company',${JSON.stringify(c).replace(/"/g, '&quot;')})">${esc(Admin.coShort(c))}</button>`).join('')}
+      </div>
+      <table><thead><tr><th>Date</th><th>Odoo</th><th>Supplier's invoice no.</th><th>State</th><th>Company</th><th>Project</th><th class="n">Amount</th><th class="n">Open</th></tr></thead><tbody>
+      ${moveRows || '<tr><td colspan="8" class="muted">Nothing here.</td></tr>'}
+      <tr class="tot"><td>${moves.length} document${moves.length === 1 ? '' : 's'}</td><td colspan="5"></td><td class="n">${fmt(sumT)}</td><td class="n">${fmt(moves.reduce((s, m) => s + (m.state === 'posted' && m.currency !== 'LBP' ? (m.kind === 'return' ? -m.open : m.open) : 0), 0))}</td></tr>
+      </tbody></table></div>
+    <div class="two">
+      <div class="card"><h2>Payments that reached him <span class="muted small">cash, Whish, bank, or settled by a worker</span></h2>
+        <table><thead><tr><th>Date</th><th>Odoo</th><th>Journal</th><th>Memo</th><th>Co.</th><th>Project</th><th class="n">USD</th></tr></thead><tbody>${payRows || '<tr><td colspan="7" class="muted">No payment recorded.</td></tr>'}</tbody></table></div>
+      <div class="card"><h2>His statement of account</h2>
+        ${stmList || '<div class="muted small">None added yet. Ask him for one on WhatsApp, then drop it here with the balance it shows.</div>'}
+        ${diffBox}${form}</div>
+    </div>
+    <div class="card"><h2>On the hub — lines naming him <span class="muted small">every ledger: the workers' cash, Mario cash, Whish</span></h2>
+      <table><thead><tr><th>Date</th><th>Ledger</th><th>Line</th><th>Ref</th><th>Co.</th><th>Project</th><th>Status</th><th class="n">Out</th><th class="n">Back</th></tr></thead><tbody>${hubRows || '<tr><td colspan="9" class="muted">No hub line names this supplier.</td></tr>'}</tbody></table></div>
+    <div class="note">A hub line "booked" points at the Odoo bill it made; "waiting" is a WhatsApp or chat line still before your ✓. A bill in Odoo with no hub line was booked from a scan or by hand. Pulled from Odoo ${new Date(d.pulledAt).toLocaleString()}.</div>`;
+}
+async function addStatement() {
+  const f = document.getElementById('stmFile').files[0];
+  if (!f) return say('Pick the statement file first', 'err');
+  say('Saving the statement…');
+  try {
+    const dataBase64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
+    const r = await Admin.api('POST', `/api/suppliers/${CUR.partner.id}/statement`, { name: f.name, mime: f.type || 'application/pdf', dataBase64,
+      balance: document.getElementById('stmBal').value, asOf: document.getElementById('stmAsOf').value, note: document.getElementById('stmNote').value });
+    CUR.statements = r.statements; say(''); render();
+  } catch (e) { say('Could not save: ' + e.message, 'err'); }
+}
+async function delStatement(id) {
+  if (!confirm('Remove this statement from the hub?')) return;
+  try { const r = await Admin.api('DELETE', `/api/suppliers/${CUR.partner.id}/statement/${id}`); CUR.statements = r.statements; render(); }
+  catch (e) { say('Could not remove: ' + e.message, 'err'); }
+}
+</script>
+</body>
+</html>

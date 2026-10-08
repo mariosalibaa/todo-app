@@ -26,13 +26,14 @@
   .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
   main{max-width:960px;margin:0 auto;padding:32px 20px 60px;}
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 14px;font-weight:600;}
-  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;}
-  .tile{display:block;background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:22px 20px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
+  /* same small boxes as the hub home page (Mario 2026-10-08) */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+  .tile{display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:start;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
   .tile:hover{border-color:var(--amber);transform:translateY(-2px);}
-  .tile .ico{font-size:1.7rem;margin-bottom:10px;}
-  .tile .name{font-weight:600;font-size:1.02rem;}
-  .tile .desc{font-size:.78rem;color:var(--sub);margin-top:4px;line-height:1.45;}
-  .tile .tag{display:inline-block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--base);background:var(--amber);border-radius:4px;padding:2px 6px;margin-top:10px;}
+  .tile .ico{grid-row:1/3;font-size:1.25rem;line-height:1;margin:2px 0 0;width:34px;text-align:center;}
+  .tile .name{font-weight:600;font-size:.95rem;}
+  .tile .desc{font-size:.74rem;color:var(--sub);margin-top:2px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .tile .tag{display:inline-block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--base);background:var(--amber);border-radius:4px;padding:2px 6px;margin-top:6px;grid-column:2;justify-self:start;}
   .back{font-size:.78rem;color:var(--overlay0);text-decoration:none;display:inline-block;margin-bottom:18px;}
   .back:hover{color:var(--text);}
   /* phone (Mario, 2026-09-14): every section on the first screen, no scrolling — one compact row each */
@@ -72,6 +73,8 @@ const SECTIONS = [
     desc: 'Where each worker stands: the last statement he received, whether his sheet, the hub and Odoo still agree, and what is waiting for your ✓.' },
   { ico: '💵', name: 'Accounts', href: '/accounting/accounts',
     desc: 'Cash and bank accounts: Whish statements, Mario cash, Neo. One grid, the same Odoo logic, one "+" for a new account.' },
+  { ico: '🏭', name: 'Suppliers', href: '/suppliers',
+    desc: 'One supplier across every company: bills, returns, payments, open balance, the hub lines naming him, his statement of account.' },
   { ico: '⇄', name: 'Transfers', href: '/accounting/transfers',
     desc: 'Money moved between your own accounts. Never an expense, never an income.' },
   { ico: '🌍', name: 'Wise', href: '/accounting/wise',

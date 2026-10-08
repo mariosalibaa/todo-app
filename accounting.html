@@ -161,6 +161,7 @@
   .pick-list.on{display:block;} .pick-list.empty{pointer-events:none;}
   .pick-list div{padding:5px 8px;cursor:pointer;display:flex;align-items:baseline;gap:8px;font-size:12.5px;font-style:normal;color:var(--text);}
   .pick-list div .g{margin-left:auto;color:var(--muted);font-size:11px;}
+  .pick-list div.grp{cursor:default;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:7px 8px 2px;border-top:1px solid var(--line);} .pick-list div.grp:first-child{border-top:0;}
   .pick-list div.hi{background:var(--surface1);} .pick-list div.none{color:var(--muted);cursor:default;}
   .sug-act{display:flex;gap:4px;align-items:center;}
   .sug-act button{border:1px solid var(--line);background:var(--crust);border-radius:3px;width:22px;height:20px;line-height:1;cursor:pointer;font-size:12px;padding:0;}
@@ -731,7 +732,11 @@ const tsSheets = () => accounts.filter(a => a.timesheet).map(a => ({
   id: TS_PREFIX + a.id, of: a.id, sheet: 'timesheet', currency: a.currency || 'USD',
   name: String(a.name || '').replace(/\s*cash\s*(\(.*\))?$/i, '').trim() + ' timesheet',
 }));
-const pickList = () => [ALL_ACCOUNT, ...accounts, ...tsSheets()];
+// Odoo keeps cash accounts apart from partners, and so does the picker (Mario 2026-10-08): first OUR money
+// (Mario cash, Neo, Whish), then the people whose ledgers we keep (Abed, Georges, Ziad, Ibrahim… — each an Odoo partner)
+const isOurs = a => !a.all && !a.sheet && (a.type === 'bank' || (a.owner === 'mario' && !a.odooPartner && !a.excel));
+const isPartner = a => !a.all && !a.sheet && !isOurs(a);
+const pickList = () => [ALL_ACCOUNT, ...accounts.filter(isOurs), ...accounts.filter(isPartner), ...tsSheets()];
 // which account a line belongs to — its own in the Everything view, the open one otherwise
 const accOf = t => (t && t._acc) || acc;
 const isCash = () => !!(account && account.type === 'cash');
@@ -829,7 +834,8 @@ Admin.require('accounting', async me => {
 
 const accLabel = a => a.all ? '🗂 Everything (all accounts)'
   : a.sheet === 'timesheet' ? `🕐 ${a.name} (${a.currency})`
-    : `${a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
+    : `${isPartner(a) ? '👤' : a.type === 'cash' ? '💵' : '🏦'} ${a.name} (${a.currency})`;
+const accGroup = a => a.all ? '' : a.sheet === 'timesheet' ? 'Timesheets' : isPartner(a) ? 'Partners — their ledgers with us' : 'Cash & bank — our money';
 async function loadAccounts() {
   accounts = (await Admin.api('GET', '/api/accounting/accounts')).filter(a => !a.archived);
   const sel = document.getElementById('acc');
@@ -857,8 +863,10 @@ function accOpenList(all) {
 }
 function accPaint() {
   const box = document.getElementById('acc-list');
+  let lastGrp = null;
   box.innerHTML = accHits.length
-    ? accHits.map((a, n) => `<div class="${n === accHi ? 'hi' : ''}" data-id="${esc(a.id)}" onmousedown="accPickBy('${esc(a.id)}')" onmousemove="accHover(${n})">${esc(accLabel(a))}${a.id === acc ? '<span class="g">open</span>' : ''}</div>`).join('')
+    ? accHits.map((a, n) => { const grp = accGroup(a), head = grp && grp !== lastGrp ? `<div class="grp">${esc(grp)}</div>` : ''; lastGrp = grp || lastGrp;
+        return head + `<div class="${n === accHi ? 'hi' : ''}" data-id="${esc(a.id)}" onmousedown="accPickBy('${esc(a.id)}')" onmousemove="accHover(${n})">${esc(accLabel(a))}${a.id === acc ? '<span class="g">open</span>' : ''}</div>`; }).join('')
     : '<div class="none">no account matches</div>';
   box.classList.add('on');
   const hi = box.querySelector('.hi'); if (hi) hi.scrollIntoView({ block: 'nearest' });

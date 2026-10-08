@@ -12,9 +12,11 @@
   const KEY = 'hubInstallHidden:' + location.pathname;
   let hidden = false; try { hidden = localStorage.getItem(KEY) === '1'; } catch {}
   let deferred = null;
+  const inMenu = /^\/site/.test(location.pathname);   // the chat page keeps its corners free: Install sits in the ☰ menu (Mario 2026-10-08)
+  window.HubInstall = { can: () => !!deferred, async prompt() { if (!deferred) return; const d = deferred; deferred = null; d.prompt(); try { await d.userChoice; } catch {} const b = document.getElementById('hub-install'); if (b) b.remove(); } };
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault(); deferred = e;
-    if (hidden || document.getElementById('hub-install')) return;
+    if (inMenu || hidden || document.getElementById('hub-install')) return;
     const b = document.createElement('div'); b.id = 'hub-install';
     b.style.cssText = 'position:fixed;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:1460;display:flex;align-items:center;gap:2px;'
       + 'background:#1e1e2e;color:#fff;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.25);font:600 13px system-ui,sans-serif;';
