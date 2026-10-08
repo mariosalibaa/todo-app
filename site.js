@@ -279,6 +279,8 @@ async function handle(req, res, url, user, ctx) {
         p.line.move = bm && bm.name || ''; p.line.billRef = (bm && bm.ref) || t.ref || '';
         p.line.paidBy = (bm && bm.paidBy || []).map(x => ({ name: x.name || '', ref: x.ref || '', amount: x.amount, date: x.date || '' }));
         p.line.paymentState = bm && bm.paymentState || '';
+        p.line.bookedKind = bm && bm.kind || '';   // 'payment' = the entry is the payment itself; onBill = the bill it was applied to
+        p.line.onBill = bm && bm.bill && bm.bill.name || '';
         p.line.official = !!t.official && !!t.vat;
       }
     }));
@@ -345,6 +347,27 @@ async function handle(req, res, url, user, ctx) {
 
   // read the fresh Claude parse for a post again, synchronously — the caller waits for the answer
   // instead of the fire-and-forget the /posts route used to do (Vercel can freeze a function right after the reply)
+  // ✦ suggest again (Mario 2026-10-08: "recheck all entries… to suggest partner, company, project"): re-run the receipt
+  // suggestion on a WAITING line and fill only what is still empty — never touches an accepted or booked line
+  if ((m = url.match(/^\/api\/site\/([\w-]+)\/posts\/([\w-]+)\/resuggest$/)) && req.method === 'POST') {
+    if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin' });
+    const ref = ws.collection('site').doc(m[1]).collection('posts').doc(m[2]);
+    const d = await ref.get(); if (!d.exists) return json(res, 404, { error: 'no post' });
+    const post = d.data(); if (!post.line || !post.parsed || !post.parsed.receipt) return json(res, 400, { error: 'no receipt line on this message' });
+    const a = await acc.resolve(ws, post.line.accountId); if (!a) return json(res, 404, { error: 'no ledger' });
+    const tref = acc.txCol(a).doc(post.line.txId), t = (await tref.get()).data();
+    if (!t) return json(res, 404, { error: 'the line is gone' });
+    if (t.waAccepted || t.bookedMove) return json(res, 409, { error: 'already accepted — change it on the ledger' });
+    const { partners } = await refs(ctx);
+    const sug = await suggestFor(ctx, ws, post.parsed, post.text || '', post.line.accountId, partners);
+    const patch = {};
+    if (!t.partnerId && sug.partner) Object.assign(patch, { partnerId: sug.partner.id, partnerName: sug.partner.name, partnerSrc: 'site' });
+    if (!t.analyticId && sug.analytic) Object.assign(patch, { analyticId: sug.analytic.id, analyticName: sug.analytic.name, analyticSrc: 'site' });
+    const co = parse.officialCompany(post.parsed) || sug.company || '';
+    if (!t.company && co) Object.assign(patch, { company: co, companySrc: 'site' });
+    if (Object.keys(patch).length) { patch.updatedAt = now(); patch.updatedBy = (user && user.email) || 'hub'; await tref.set(patch, { merge: true }); }
+    return json(res, 200, { patched: patch, suggestion: { partner: sug.partner && sug.partner.name, project: sug.analytic && sug.analytic.name, company: co } });
+  }
   if ((m = url.match(/^\/api\/site\/([\w-]+)\/posts\/([\w-]+)\/digest$/)) && req.method === 'POST') {
     if (!(await threadsFor(ctx)).some(t => t.id === m[1])) return json(res, 403, { error: 'not your thread' });
     const ref = ws.collection('site').doc(m[1]).collection('posts').doc(m[2]);

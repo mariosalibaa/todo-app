@@ -89,6 +89,20 @@ async function adHocPaymentRule(odooCall, account, t) {
     if (rows.length === 1) { journalId = rows[0].id; j = { id: rows[0].id, name: rows[0].name }; }
     else return { book: 'payment', partnerId: t.partnerId, companyId: co.id, error: rows.length ? `${rows.length} "${word}" journals in ${co.name} — put the right one on the account (⚙)` : `no "${word}" cash/bank journal in ${co.name} — add it on the account (⚙)` };
   }
+  // an EXPENSE paid out of our own wallet = the supplier's bill AND its payment from this journal, in one go — the cost
+  // lands on the project, the payable closes (Mario 2026-10-08: "directly pay"; a payment alone left Payable open and no cost)
+  const BILL_CO = { 'S LB': { journalId: 85, account: 5978, fuel: 5983 }, 'SHIFT DEVELOPMENT': { journalId: 140, account: 8844, fuel: 8929 } };
+  let bc = (t.nature === 'expense' || !t.nature) && t.debit > 0 ? BILL_CO[co.name] : null;
+  // …unless the supplier already has an open bill in that company that this money can settle (awkal's door prefab
+  // paid against his prefab bill): then the plain payment is right, Odoo applies it on the bill
+  if (bc) {
+    const open = await odooCall('account.move', 'search_read', [[['partner_id', '=', t.partnerId], ['company_id', '=', co.id], ['move_type', '=', 'in_invoice'], ['state', '=', 'posted'], ['payment_state', 'in', ['not_paid', 'partial']]]],
+      { fields: ['id', 'amount_residual'], context: { allowed_company_ids: [co.id] }, limit: 20 });
+    if (open.some(b => b.amount_residual >= money(t.debit) - 0.01)) bc = null;
+  }
+  if (bc) return { id: 'adhoc', book: 'bill', label: 'bill + paid from ' + (j ? j.name : 'cash'), description: t.description || '', partnerId: t.partnerId, partnerName: t.partnerName, companyId: co.id, companyName: co.name,
+    journalId: bc.journalId, accountId: /benzin|fuel|mazout|gasoil|diesel/i.test(t.description || '') ? bc.fuel : bc.account,
+    paymentJournalId: journalId, paymentJournalName: j ? j.name : '', analyticId: t.analyticId || null, analyticName: t.analyticName || '' };
   return { id: 'adhoc', book: 'payment', label: 'payment by partner + company', partnerId: t.partnerId, partnerName: t.partnerName, companyId: co.id, companyName: co.name,
     paymentJournalId: journalId, paymentJournalName: j ? j.name : '', analyticId: t.analyticId || null, analyticName: t.analyticName || '' };
 }

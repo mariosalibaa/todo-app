@@ -70,7 +70,7 @@
   .post .line table.lt{border-collapse:collapse;width:100%;} .post .line table.lt th{text-align:left;font-weight:600;opacity:.65;padding:0 8px 1px 0;white-space:nowrap;vertical-align:top;width:1%;} .post .line table.lt td{padding:0 0 1px;}
   .post .line .q{opacity:.7;} .post .line .lt-act{margin-top:3px;}
   .post .line .miss{color:var(--overlay0);text-decoration:none;border-bottom:1px dotted var(--overlay0);}
-  .post .line.accepted{background:#dcf8c6;color:#0b6b2c;} .post .line.dismissed{background:#fde2e4;color:#b3261e;}
+  .post .line.accepted,.post .line.booked{background:#dcf8c6;color:#0b6b2c;} .post .line.dismissed{background:#fde2e4;color:#b3261e;}   /* green once accepted or in Odoo (Mario 2026-10-08) */
   .post .line a{color:inherit;}
   .post .err{font-size:.72rem;color:var(--red);margin-top:4px;}
   /* "Shift", the agent (site-agent.js): dark avatar with the amber S; bubbles with an amber edge; action cards with ✓ / ✗ */
@@ -436,12 +436,13 @@ function lineTag(p) {
       ['Bill', esc(L.move || '') + (L.billRef ? ` <span class="q">ref ${esc(L.billRef)}</span>` : '')],
       ['Payment', (L.paidBy || []).length
         ? (L.paidBy || []).map(x => esc(x.name) + (x.amount ? ` <span class="q">${Math.abs(+x.amount).toFixed(2)}</span>` : '')).join('<br>')
-        : `<span class="q">${L.paymentState === 'paid' ? 'paid' : 'not paid yet'}</span>`],
+        : `<span class="q">${L.bookedKind === 'payment' ? (L.onBill ? 'paid — applied on ' + esc(L.onBill) : 'paid — this entry is the payment itself, no bill behind it') : L.paymentState === 'paid' || L.paymentState === 'in_payment' ? 'paid' : 'not paid yet'}</span>`],
     ] : []),
   ].filter(r => r[1]);
   const acts = [
     // the ✓ itself, here on the card (Mario 2026-10-08: "allow a check approval in Shift WhatsApp") — same write as the ledger's ✓
     me.admin && L.state === 'waiting' ? `<a href="#" class="ok" onclick="acceptEntry('${esc(p.id)}');return false;">✓ accept</a>` : '',
+    me.admin && L.state === 'waiting' && (!L.partnerName || !L.company || !L.analyticName) ? `<a href="#" onclick="resuggest('${esc(p.id)}');return false;">✦ suggest</a>` : '',
     me.admin ? `<a href="#" onclick="lineSheet('${esc(p.id)}');return false;">edit ▸</a>` : '',
     ((p.kind === 'photo' || p.kind === 'doc') && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
     // cancel takes the line off the ledger and out of the balance; the photo and the message stay (Mario, 2026-09-24)
@@ -696,6 +697,13 @@ async function acceptEntry(id) {
   try { await LineSheet.bookOne(p.line.txId, '', p.line.accountId); } catch (e) { why = e.message; }
   await loadPosts(); await loadBalances(true);
   if (why) alert('Accepted on the ledger, but not in Odoo yet: ' + why + String.fromCharCode(10,10) + 'Open "edit ▸" to fix it, then ✓ Book in Odoo.');
+}
+// ✦ suggest again: fills the blank partner / company / project of a waiting line from history and Claude
+async function resuggest(id) {
+  const p = posts.find(x => x.id === id); if (!p || !p.line) return;
+  try { const r = await Admin.api('POST', `/api/site/${cur}/posts/${id}/resuggest`, {}); await loadPosts();
+    const s = r.suggestion || {}; if (!Object.keys(r.patched || {}).length) sysNote('Nothing new to suggest' + (s.partner || s.project ? ` (it thinks: ${[s.partner, s.company, s.project].filter(Boolean).join(' · ')})` : '') + ' — set it with edit ▸'); }
+  catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
 }
 async function cancelEntry(id) {
   const p = posts.find(x => x.id === id); if (!p || !p.line) return;
