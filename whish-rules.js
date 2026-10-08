@@ -140,7 +140,8 @@ async function bookPayment(odooCall, account, col, t, rule, who, { apply = false
   if (analyticId && !py.x_studio_project) await odooCall('account.payment', 'write', [[payId], { x_studio_project: analyticId }], { context: pctx }).catch(() => {});
   const payment = { id: payId, name: py.name, date: py.date, amount: py.amount };
   const booked = { moveId: py.move_id ? py.move_id[0] : null, move: py.name, ref, kind: 'payment', state: py.state, paymentState: 'paid', payment, at: new Date().toISOString(), by: who, ruleId: rule.id };
-  const data = { booked };
+  // bookedMove too: the hub (chat card, line sheet, unbook) reads THAT to know a line is in Odoo — `booked` alone left the card on "accepted, not in Odoo yet" (Moulin d'Or, 2026-10-08)
+  const data = { booked, bookedMove: { id: booked.moveId, name: py.name, ref, kind: 'payment', state: py.state, paymentState: 'paid', at: booked.at, paidBy: [] } };
   if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
   if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }
   if (t.analyticSrc !== 'manual' && rule.analyticId) { data.analyticId = rule.analyticId; data.analyticName = rule.analyticName || ''; data.analyticSrc = 'odoo'; data.analyticFrom = py.name; }
@@ -369,7 +370,8 @@ async function handle(req, res, url, user, ctx) {
         const [mv] = await odooCall('account.move', 'read', [[moveId], ['name', 'amount_total', 'state', 'payment_state']], { context: octx });
         const booked = { moveId, move: mv.name, ref, state: mv.state, paymentState: mv.payment_state, at: now(), by: who, ruleId: rule.id };
         if (payment) booked.payment = payment;
-        const data = { booked };
+        const data = { booked, bookedMove: { id: moveId, name: mv.name, ref, kind: 'vendor-bill', state: mv.state, paymentState: mv.payment_state, at: booked.at,
+          paidBy: payment ? [{ name: payment.name, amount: payment.amount, date: payment.date, ref }] : [] } };
         // the row inherits the rule's answers, unless you already chose your own
         if (!t.partnerId && rule.partnerId) { data.partnerId = rule.partnerId; data.partnerName = rule.partnerName; data.partnerSrc = 'odoo'; }
         if (!t.company && rule.companyName) { data.company = rule.companyName; data.companySrc = 'odoo'; data.kind = 'work'; data.kindSrc = 'odoo'; }

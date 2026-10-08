@@ -444,7 +444,8 @@ function lineBlock(p, L, i) {
     ['Amount', esc(amount)],
     ['Account', esc(accName(L.accountId)) + (bal ? ` <span class="q">balance ${Admin.money(bal.balance)}</span>` : '')],
     ...(L.date && L.date !== p.date ? [['Date', esc(L.date)]] : []),
-    ['Partner', esc(L.partnerName || '') || miss],
+    ['Partner', (esc(L.partnerName || '') || miss) + (me.admin && L.vendorRead && /^misc/i.test(L.partnerName || '') && L.state !== 'booked'
+      ? ` · <a href="#" onclick="makeVendor('${key}');return false;">＋ make “${esc(L.vendorRead)}” the partner</a>` : '')],
     ['Company', (esc(Admin.coShort(L.company || '')) || miss) + (L.official ? ' <span class="q">official · VAT</span>' : '')],
     ['Project', esc(L.analyticName || '') || miss],
     ['Division', esc(sectionName(L.section)) || (isAjaltoun(L) ? miss : '<span class="q">—</span>')],
@@ -736,6 +737,17 @@ async function resuggest(key) {
 async function checkPost(id, on) {
   try { await Admin.api('POST', `/api/site/${cur}/posts/${id}/check`, { checked: on }); const p = posts.find(x => x.id === id); if (p) p.checkedAt = on ? new Date().toISOString() : null; draw(); }
   catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
+}
+// the paper names a supplier Odoo does not know: create it (a vendor, shared by the companies) and put it on the line
+async function makeVendor(key) {
+  const { L } = lineAt(key); if (!L || !L.vendorRead) return;
+  const name = prompt('Create this supplier in Odoo and put it on the line?', L.vendorRead); if (!name || !name.trim()) return;
+  const CO = { 'S LB': 7, 'SHIFT GROUP SARL (USD)': 2, 'SHIFT DEVELOPMENT': 10 };
+  try {
+    const r = await Admin.api('POST', '/api/accounting/partners', { name: name.trim(), companyId: CO[L.company] || 7, kind: 'vendor' });
+    await Admin.api('PATCH', `/api/accounting/accounts/${L.accountId}/tx/${L.txId}`, { partnerId: r.id, partnerName: r.name, partnerSrc: 'manual', vendorRead: '' });
+    await loadPosts();
+  } catch (e) { alert(e.data && e.data.error ? e.data.error : e.message); }
 }
 async function cancelEntry(key) {
   const { p, L } = lineAt(key); if (!L) return;

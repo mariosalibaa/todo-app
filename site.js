@@ -161,12 +161,23 @@ async function autoFill(ctx, ws, L, parsed, text, partners) {
   if (!t || t.waAccepted || t.bookedMove) return {};
   const sug = await suggestFor(ctx, ws, parsed, text || '', L.accountId, partners || (await refs(ctx)).partners);
   const patch = { autoSugAt: now() };
+  // no supplier found anywhere → Misc, so the line is never left without a partner (Mario 2026-10-08: "if not, choose Misc")
+  if (!t.partnerId && !sug.partner) { const misc = (partners || (await refs(ctx)).partners).find(x => /^misc\b/i.test(x.name)); if (misc) { sug.partner = { id: misc.id, name: misc.name }; if (parsed && parsed.vendor) patch.vendorRead = String(parsed.vendor).slice(0, 80); } }
   if (!t.partnerId && sug.partner) Object.assign(patch, { partnerId: sug.partner.id, partnerName: sug.partner.name, partnerSrc: 'site' });
   if (!t.analyticId && sug.analytic) Object.assign(patch, { analyticId: sug.analytic.id, analyticName: sug.analytic.name, analyticSrc: 'site' });
   const co = parse.officialCompany(parsed) || sug.company || '';
   if (!t.company && co) Object.assign(patch, { company: co, companySrc: 'site' });
   await tref.set(patch, { merge: true });
   return { patch, sug: { partner: sug.partner && sug.partner.name, project: sug.analytic && sug.analytic.name, company: co } };
+}
+
+// the day printed on the paper, when believable — a receipt photographed on 7 Oct for a delivery of 30 Sep is a 30 Sep
+// expense (Mario 2026-10-08, Moulin d'Or); else the message's day
+function paperDate(parsed, post) {
+  const d = parsed && parsed.date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return post.date;
+  const gap = (Date.parse(post.date) - Date.parse(d)) / 864e5;
+  return gap >= 0 && gap <= 90 ? d : post.date;
 }
 
 // after the post is stored: read it, decide, write the line, record the outcome on the post
@@ -184,7 +195,7 @@ async function digest(ctx, ws, ref, post, buf) {
         const { partners } = await refs(ctx);
         const { partner, analytic, company: sugCo } = await suggestFor(ctx, ws, parsed, text, isGeneral ? MARIO_CASH : post.thread, partners);
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
+          { amount: parsed.amount, side: 'debit', date: paperDate(parsed, post), description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
             company: parse.officialCompany(parsed) || sugCo || '', official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });
       }
     }
@@ -197,7 +208,7 @@ async function digest(ctx, ws, ref, post, buf) {
         const { partner, analytic, company: sugCo } = await suggestFor(ctx, ws, parsed, text, isGeneral ? MARIO_CASH : post.thread, partners);
         // a caption on a receipt photo rides along on the same line instead of spawning a second one (see below)
         line = await writeLine(ctx, ws, post, isGeneral ? MARIO_CASH : post.thread,
-          { amount: parsed.amount, side: 'debit', description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
+          { amount: parsed.amount, side: 'debit', date: paperDate(parsed, post), description: [parsed.vendor, parsed.note, parsed.lbpNote, text].filter(Boolean).join(' · '), partner, analytic, nature: 'expense',
             // an official paper (SHIFT GROUP SARL + VAT) belongs to the SARL and carries it by itself
             company: parse.officialCompany(parsed) || sugCo || '', official: !!parse.officialCompany(parsed), vat: !!parsed.vat, ref: parsed.invoiceNo || '' });   // a receipt is always an expense — bookable right after ✓
       }
@@ -306,7 +317,7 @@ async function handle(req, res, url, user, ctx) {
         p.line.paidBy = (bm && bm.paidBy || []).map(x => ({ name: x.name || '', ref: x.ref || '', amount: x.amount, date: x.date || '' }));
         p.line.paymentState = bm && bm.paymentState || '';
         p.line.note = t.note || '';
-        p.line.autoSugAt = t.autoSugAt || ''; p.line.date = t.date || '';   // a cancelled line says why (Mario 2026-10-08: "indicate the reason of the cancel")
+        p.line.autoSugAt = t.autoSugAt || ''; p.line.date = t.date || ''; p.line.vendorRead = t.vendorRead || '';   // a cancelled line says why (Mario 2026-10-08: "indicate the reason of the cancel")
         p.line.bookedKind = bm && bm.kind || '';   // 'payment' = the entry is the payment itself; onBill = the bill it was applied to
         p.line.onBill = bm && bm.bill && bm.bill.name || '';
         p.line.official = !!t.official && !!t.vat;
