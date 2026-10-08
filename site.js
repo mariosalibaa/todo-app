@@ -279,6 +279,7 @@ async function handle(req, res, url, user, ctx) {
         p.line.move = bm && bm.name || ''; p.line.billRef = (bm && bm.ref) || t.ref || '';
         p.line.paidBy = (bm && bm.paidBy || []).map(x => ({ name: x.name || '', ref: x.ref || '', amount: x.amount, date: x.date || '' }));
         p.line.paymentState = bm && bm.paymentState || '';
+        p.line.note = t.note || '';   // a cancelled line says why (Mario 2026-10-08: "indicate the reason of the cancel")
         p.line.bookedKind = bm && bm.kind || '';   // 'payment' = the entry is the payment itself; onBill = the bill it was applied to
         p.line.onBill = bm && bm.bill && bm.bill.name || '';
         p.line.official = !!t.official && !!t.vat;

@@ -430,7 +430,7 @@ function lineTag(p) {
     ['Project', esc(L.analyticName || '') || miss],
     ['Division', esc(sectionName(L.section)) || (isAjaltoun(L) ? miss : '<span class="q">—</span>')],
     ...(L.extras || []).map(x => ['+ ' + esc((x.description || '').split(' · ')[0]), `${Math.abs(x.amount).toFixed(2)} ${cur}${x.booked ? ' <span class="q">in Odoo ✓✓</span>' : ''}`]),
-    ['Status', state],
+    ['Status', state + (L.state === 'dismissed' && L.note ? ` <span class="q">— ${esc(L.note)}</span>` : '')],
     // once it is in Odoo: the bill it became, and the entry that paid it
     ...(L.state === 'booked' ? [
       ['Bill', esc(L.move || '') + (L.billRef ? ` <span class="q">ref ${esc(L.billRef)}</span>` : '')],
@@ -707,8 +707,9 @@ async function resuggest(id) {
 }
 async function cancelEntry(id) {
   const p = posts.find(x => x.id === id); if (!p || !p.line) return;
-  if (!confirm('Cancel this entry? It comes off the ledger and out of the balance. The photo stays in the chat.')) return;
-  await patchLine(p, { excluded: true, review: false, waAccepted: false });
+  const why = prompt('Cancel this entry? It comes off the ledger and out of the balance; the photo stays in the chat.' + String.fromCharCode(10) + 'Why? (shown on the card)', 'duplicate');
+  if (why === null) return;
+  await patchLine(p, { excluded: true, review: false, waAccepted: false, note: why.trim() ? 'cancelled: ' + why.trim() : (p.line.note || '') });
 }
 async function restoreEntry(id) {
   const p = posts.find(x => x.id === id); if (!p || !p.line) return;

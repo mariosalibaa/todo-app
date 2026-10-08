@@ -263,9 +263,10 @@
   async function cancelEntry() {
     if (!S) return;
     if (S.t.bookedMove) { g('ls-err').textContent = 'this one is already in Odoo — delete it there first'; return; }
-    if (!confirm('Cancel this entry? It comes off the ledger and out of the balance. The photo stays.')) return;
+    const why = prompt('Cancel this entry? It comes off the ledger and out of the balance; the photo stays.' + String.fromCharCode(10) + 'Why? (shown on the line)', 'duplicate');
+    if (why === null) return;
     try {
-      await A.api('PATCH', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`, { excluded: true, review: false, waAccepted: false });
+      await A.api('PATCH', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`, { excluded: true, review: false, waAccepted: false, ...(why.trim() ? { note: 'cancelled: ' + why.trim() } : {}) });
       S.t = await A.api('GET', `/api/accounting/accounts/${S.acc}/tx/${S.txId}`);
       if (S.onChange) { try { await S.onChange(); } catch {} }
       draw(); const ok = g('ls-err'); if (ok) { ok.style.color = '#3fb950'; ok.textContent = 'cancelled — off the ledger'; }
