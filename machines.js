@@ -42,7 +42,7 @@ async function handle(req, res, url) {
     res.end(fs.readFileSync(f));
     return true;
   }
-  const fl = p.match(/^\/api\/ajaltoun\/machines\/flag\/(\d{8}_[a-z0-9]{2,4}\.jpg)$/);
+  const fl = p.match(/^\/api\/ajaltoun\/machines\/flag\/(\d{8}_[a-z0-9]{2,10}\.jpg)$/);
   if (fl && req.method === 'GET') {
     const f = path.join(__dirname, 'public', 'excavation', 'flags', fl[1]);
     if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }

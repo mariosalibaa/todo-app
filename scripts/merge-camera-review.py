@@ -26,13 +26,15 @@ for src in sys.argv[1:]:
         d['cams'] = r.get('cameras_used') or d.get('cams')
         d['notes'] = r.get('notes') or d.get('notes')
         d['confidence'] = r.get('confidence') or d.get('confidence')
-        d.pop('range', None)
-        d['est'] = False
+        if any(r.get(k) is not None for k in ('hitachi', 'komatsu')):
+            d.pop('range', None)
+            d['est'] = False
         n = 0
         for s in r.get('suspicious') or []:
             if not s.get('image_path') or not os.path.exists(s['image_path']):
                 continue
-            name = f"{r['date'].replace('-', '')}_c{os.path.basename(os.path.dirname(src))[-1]}{n:02d}.jpg"; n += 1
+            tag = os.path.basename(os.path.dirname(src)).replace('_', '')[-6:]   # e.g. d2upb / d3u3b — unique per review
+            name = f"{r['date'].replace('-', '')}_{tag}{n:02d}.jpg"; n += 1
             im = Image.open(s['image_path']).convert('RGB'); im.thumbnail((1100, 1100)); im.save(os.path.join(FDIR, name), quality=80)
             F = [f for f in F if f.get('photo') != name]
             F.append(dict(date=r['date'], time=s.get('time', ''), camera=s.get('camera', ''), what=s.get('what', ''), photo=name, strong=bool(s.get('strong'))))
