@@ -137,6 +137,14 @@
  },
  {
   "date": "2026-09-02",
+  "time": "09:20-12:00",
+  "camera": "D2 up",
+  "what": "Grey Dodge parked on the upper yard about 30 m from the idle Komatsu for about 2.5 h; no can handling visible at that distance",
+  "photo": "20260902_ca00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-02",
   "time": "15:05",
   "camera": "D2",
   "what": "grey Dodge with a FULL bed of green and blue jerrycans stops beside the working Hitachi",
@@ -153,10 +161,66 @@
  },
  {
   "date": "2026-09-03",
+  "time": "08:07-08:25",
+  "camera": "D2 up",
+  "what": "Dodge with a bed full of jerrycans parked tight against the parked Hitachi; a man on the Hitachi engine deck at 08:09, before it starts work",
+  "photo": "20260903_ca00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-03",
+  "time": "08:10",
+  "camera": "D2 up",
+  "what": "Same scene, wider view (Dodge with cans against the Hitachi)",
+  "photo": "20260903_ca01.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-03",
+  "time": "15:19-15:41",
+  "camera": "D2 up",
+  "what": "Mhanna Petroleum diesel tanker fuels the Komatsu with a hose (official refuel)",
+  "photo": "20260903_ca02.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-03",
   "time": "15:19-15:44",
   "camera": "D2",
   "what": "the diesel tanker leaves at 15:41, and three minutes later (15:44) the Dodge with green and blue jerrycans drives up to the machines",
   "photo": "20260903_01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-03",
+  "time": "15:42",
+  "camera": "D2 up",
+  "what": "Dodge with about 20 jerrycans pulls up against the Komatsu 1 min after the tanker leaves",
+  "photo": "20260903_ca03.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-04",
+  "time": "09:17-09:56",
+  "camera": "D2 up",
+  "what": "Dodge with jerrycans parked against the parked Komatsu; a man handles the cans in the bed",
+  "photo": "20260904_ca00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-04",
+  "time": "09:44-09:51",
+  "camera": "D2 up",
+  "what": "Dodge hood open, person on the Komatsu engine deck, cans in the bed",
+  "photo": "20260904_ca01.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-04",
+  "time": "15:57-16:10",
+  "camera": "D2 up",
+  "what": "Dark sedan parked tight against the parked Hitachi, two men at its side for about 13 min; no can visible",
+  "photo": "20260904_ca02.jpg",
   "strong": false
  },
  {
@@ -165,6 +229,46 @@
   "camera": "D2",
   "what": "grey Dodge on the track at end of day (bed not clearly loaded)",
   "photo": "20260904_00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-05",
+  "time": "08:01-08:22",
+  "camera": "D2 up",
+  "what": "Dodge with jerrycans alongside the parked Komatsu; a man on the Komatsu engine deck at 08:15, before work (Saturday)",
+  "photo": "20260905_ca00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-06",
+  "time": "04:14",
+  "camera": "D2 up + D2 + Entrance",
+  "what": "Gate lamp on, D2 PERSON event, Entrance shows a dog; most likely an animal",
+  "photo": "20260906_ca00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-06",
+  "time": "23:41",
+  "camera": "D2 up",
+  "what": "Sunday night: bright light with a beam at the upper gate for about 90 s (vehicle headlight or the lamp in mist; not identified)",
+  "photo": "20260906_ca01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-07",
+  "time": "01:13-01:20",
+  "camera": "D2 up + Entrance",
+  "what": "Gate lamp on at night, 4 Entrance events with nothing visible (likely an animal)",
+  "photo": "20260907_ca00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-08",
+  "time": "19:17-19:35",
+  "camera": "D2 up + Entrance",
+  "what": "After hours: gate lamp on and upper track lit for about 18 min (vehicle lights or the lamp; no vehicle resolved)",
+  "photo": "20260908_ca00.jpg",
   "strong": false
  },
  {
