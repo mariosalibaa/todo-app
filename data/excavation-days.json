@@ -769,11 +769,13 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "D2 up shows the Hitachi breaking at its left edge from 08:20 and leaving at 15:03-15:06, which matches d1 up. Breaking went on through lunch; that is work, not suspicious.",
+   "notes": "D3 up confirms the hub: breaker motion at the wall from about 08:10, tipper loading at 12:18-12:40 and 13:40-13:58 (2 loads), no work after about 15:05. The night of 13/14 and 14/15 only shows road traffic, town lights and IR noise. No Dodge or can activity seen at the machines.",
    "cams": [
-    "D2 up",
     "d1 up",
-    "Entrance"
+    "D2 up",
+    "Entrance",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 6.3,
@@ -788,12 +790,14 @@
    "komatsu": 1.75,
    "loads": 2,
    "footage": "full day",
-   "confidence": "high",
-   "notes": "D2 up motion 08:20-14:50 matches d1 up. At 20:11:41 the camera was panned away from the wall to the upper yard where the machines park. It keeps that view the next day.",
+   "confidence": "high (hours) / high (events)",
+   "notes": "Hours and loads confirmed on D3 up (Komatsu in the pit 07:50-08:30, trucks loaded 10:00-10:30 and 11:10-11:40, breaker work to about 14:15). NEW after-work events at the parked Hitachi, which stood beside the jerrycan pile at the fence: at 16:29-16:32 an old white Mercedes sedan was parked right against the Hitachi with its boot open and a man between the car and the machine, a yellow jerrycan on the ground beside the Hitachi track. From 16:56 to about 17:22 the Dodge (bed of cans) was parked at the fence pile beside the Hitachi; two men worked at the Hitachi breaker/cans at 17:05, then one at the Dodge bed at 17:11. The Mercedes stayed beside the Hitachi throughout.",
    "cams": [
-    "D2 up",
     "d1 up",
-    "Entrance"
+    "D2 up",
+    "Entrance",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 4.2,
@@ -808,12 +812,14 @@
    "komatsu": 1.0,
    "loads": 1,
    "footage": "full day",
-   "confidence": "medium",
-   "notes": "New D2 up view: the upper yard. Both machines are parked side by side 06:30-08:30. The Hitachi breaker moves at 09:03-09:06, and the Hitachi leaves the yard at about 09:42. The Komatsu is back in the yard by 17:20-17:41. Hours are kept from d1 up, because the machines work in the pit, outside this view. The tipper passes through the yard at 09:33 (it left at 09:33 per the Entrance camera).",
+   "confidence": "high",
+   "notes": "D3 up confirms the hub hours and the single load (loading 09:00-09:40). It also confirms the two known events from a second angle: the Dodge parked against the parked Hitachi with a man between them 08:36-09:00, and the night car at 19:19-19:27 that drove up to the parked Komatsu and stopped by the jerrycan pile.",
    "cams": [
-    "D2 up (upper yard view)",
     "d1 up",
-    "Entrance"
+    "D2 up",
+    "Entrance",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 5.75,
@@ -824,17 +830,19 @@
   },
   {
    "date": "2026-09-17",
-   "hitachi": 1.5,
+   "hitachi": 1.6,
    "komatsu": 0.2,
    "loads": 0,
    "footage": "full day",
-   "confidence": "high (hours) / high (events)",
-   "notes": "Hours as on d1 up; D2 up agrees, with no machine movement after 10:20. A Mhanna tanker stood beside the parked Hitachi 14:47-14:58, so this was a refuel (d1 up had called it a water tanker). About 50 min later the Dodge with cans came, with people on the Hitachi deck 15:50-16:58. The Dodge left at about 17:16.",
+   "confidence": "high",
+   "notes": "Hitachi: d1 up 08:48-10:18, plus a short move 16:55-17:00 that D3 up shows (the Hitachi was turned round beside the parked cars while people were on it) = about 1.6 h. Tanker beside the Hitachi 14:46-14:56 confirmed. At 16:54 two men sit on the Hitachi engine deck, a white pickup alongside, the Dodge with cans parked at the fence pile a few metres behind; at 17:03 two men at the Hitachi breaker. The RAV4 (silver SUV) is in the yard 14:46-14:58.",
    "cams": [
-    "d2 up",
     "d1 up",
+    "D2 up",
     "Entrance",
-    "D2"
+    "D2",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 1.5,
@@ -849,13 +857,15 @@
    "komatsu": 0.2,
    "loads": 0,
    "footage": "full day",
-   "confidence": "medium (rain and fog)",
-   "notes": "Hours as on d1 up. Before the start of work, at 07:37-07:44, D2 up shows a person on the Komatsu, the Hitachi engine hood open and the Dodge with cans beside them. This could be the normal morning check, but it fits the pattern. Rain from about 09:30. At night 20:05-23:10 there are rain streaks and IR flashes, with no vehicle or person. 18 Sep is the first day of the excess-diesel period.",
+   "confidence": "medium (rain, fog, lightning)",
+   "notes": "Hours as hub. D3 up confirms 07:37-07:43: the Hitachi engine hood is open with a man on its deck, the Dodge parked right behind it between the two machines, jerrycans at the fence pile. Night: heavy rain and lightning 19:58-20:15. At 20:09:24-20:09:30 a point light with a reflection on the wet track appears just beyond the parked Komatsu for about 6 s; it may be a torch or a vehicle lamp, or a lightning artefact. No vehicle is seen arriving or leaving. Unresolved.",
    "cams": [
-    "d2 up",
     "d1 up",
+    "D2 up",
     "Entrance",
-    "D2"
+    "D2",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 2.55,
@@ -870,8 +880,8 @@
    "komatsu": 0,
    "loads": 0,
    "footage": "none",
-   "confidence": "high (D2 up is complete 06:30-18:30; d1 up was off)",
-   "notes": "Saturday. D2 up covers the hours d1 up missed (06:30-17:43). The Hitachi is parked at the top-right of the yard in the same pose all day. The Komatsu does not move. Visitors: a silver BMW/sedan at 08:00, the RAV4 at about 10:37 and again at about 13:59. At night there are only IR flashes and lens rain. Nothing diesel-related was seen.",
+   "confidence": "high",
+   "notes": "Saturday. D3 up confirms both machines parked side by side all day (motion 10:50-12:10 is camera sway and changing light). The silver BMW is seen beside the parked Komatsu at 08:01-08:07 then leaves. Nothing at night.",
    "d1up": {
     "hitachi": null,
     "komatsu": null,
@@ -880,9 +890,11 @@
    "est": false,
    "d1off": true,
    "cams": [
-    "d2 up",
+    "D2 up",
     "D2",
-    "Entrance"
+    "Entrance",
+    "D3 up",
+    "U3 up"
    ]
   },
   {
@@ -892,7 +904,7 @@
    "loads": 0,
    "footage": "none",
    "confidence": "high",
-   "notes": "Sunday. The Hitachi is parked at the top-right in an identical pose in every 15-min tile from 06:00 to 18:45. No vehicle or person came to the machines. At 16:27 a short corrupt file was recorded (a camera restart, not an event). The night clusters at 20:31, 20:59, 21:34 and 22:32 are IR switching flashes, with nothing moving. The '04:25 light' that offdays.md reported for D2 is not visible on D2 up.",
+   "notes": "Sunday. Machines parked all day on D3 up. At 01:23-01:25 D3 up restarted and ran its PTZ self-test sweep (frames of the lens housing and bushes), which is a camera event, not a visitor. Night clusters are IR noise and road lights.",
    "d1up": {
     "hitachi": null,
     "komatsu": null,
@@ -901,22 +913,26 @@
    "est": false,
    "d1off": true,
    "cams": [
-    "d2 up",
+    "D2 up",
     "D2",
-    "Entrance"
+    "Entrance",
+    "D3 up",
+    "U3 up"
    ]
   },
   {
    "date": "2026-09-21",
-   "hitachi": 3.0,
-   "komatsu": 1.2,
+   "hitachi": 5.3,
+   "komatsu": 2.6,
    "loads": 0,
    "footage": "from 12:25",
-   "confidence": "medium",
-   "notes": "d1 up was off until 12:25. D2 events fill the morning: the Komatsu works near the entrance 08:56-09:33 and the Hitachi breaks 11:00-12:50. This raises the day from 1.6/0.6 to about 3.0/1.2. The Dodge with jerrycans drives toward the machines at 07:48 (D2). In the afternoon the Dodge with cans is parked beside the parked Hitachi, with a man at its bed 15:20-15:41, and it leaves at 16:03.",
+   "confidence": "medium-high",
+   "notes": "d1 up was off until 12:25. D3 up covers the morning: the Hitachi starts (exhaust smoke) at about 08:00 and breaks at the wall 08:05-09:20, drives down to the lower track 09:20-09:28 and stands beside the Komatsu until about 09:56, then breaks again 10:00-12:51 without a lunch stop, and drives up by 12:54. With d1 up 13:47-14:57: Hitachi 08:05-09:20 + 10:00-12:51 + 13:47-14:57 = about 5.3 h (hub 3.0). The Komatsu works on the lower track by the fence 07:56-09:27, climbs into the pit 09:30-09:51 and is parked again by 10:00; with d1 up 13:03-13:38 = about 2.6 h (hub 1.2). U3 up shows the orange machine at the wall in the same period. No tipper on D3 up (0 loads stands). Before work 07:49-08:01 the Dodge stops beside the Hitachi with a man at its track. Afternoon 15:41-16:03 the Dodge (cans in bed) is parked nose to the parked Komatsu; a man in yellow is up on the Komatsu deck at 15:43 and then at the Dodge bed at 15:47.",
    "cams": [
+    "D3 up",
+    "U3 up",
     "D2",
-    "d2 up",
+    "D2 up",
     "d1 up",
     "Entrance"
    ],
@@ -934,12 +950,14 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Hours and loads as on d1 up and Entrance. D2 up shows the Dodge (cans in the bed) parked in the upper yard next to the parked Komatsu from about 12:30 to 16:47. People were at its bed 15:24-15:45, at about 16:00 and at 16:37, and it drove off at 16:47. At night, 20:25 and 20:29 are IR flashes; at 04:49 a moth or insect crosses the lens. No night visit.",
+   "notes": "Hours as hub; D3 up shows the two tippers loading about 11:20-11:35 and 12:30-12:42. Before work at 07:42-07:46 a man in blue is on the Hitachi engine deck with the hood open, the Dodge parked beside the Komatsu. At 15:29-15:35 two men at the Dodge bed (packed with green jerrycans) parked at the fence can pile, right below the parked Komatsu.",
    "cams": [
-    "d2 up",
     "d1 up",
+    "D2 up",
     "Entrance",
-    "D2"
+    "D2",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 5.3,
@@ -950,15 +968,17 @@
   },
   {
    "date": "2026-09-23",
-   "hitachi": 2.3,
-   "komatsu": 0.4,
+   "hitachi": 6.1,
+   "komatsu": 0.6,
    "loads": 0,
    "footage": "from 14:07",
-   "confidence": "medium (D2 is event-only; range Hitachi 2.0-3.0, Komatsu 0.3-0.6)",
-   "notes": "d1 up was off until 14:07. On D2, the Komatsu leaves its parking spot at 10:02 and works 10:02-10:19. The Hitachi breaks 10:32-10:54 and 12:09-13:11 (no D2 events 10:55-12:03), plus d1 up 15:15-15:59. Before work, the Dodge with cans is beside the parked Hitachi in the pit at 07:43 (D2). It then parks nose-in against the Komatsu with its door open 07:48-07:57 (d2 up), then sits in the yard until 09:47 and again 10:00-~16:20.",
+   "confidence": "medium-high",
+   "notes": "d1 up was off until 14:07, and D2 is event-only. D3 up sees the wall continuously: the Hitachi breaks 07:56-09:44, drives down and stands beside the Komatsu on the lower track 09:44-10:30, then breaks again 10:32-14:02 with the boom pose changing every few minutes and no lunch stop, and is on the lower track by 14:04. With d1 up 15:15-15:59: Hitachi 1.8 + 3.5 + 0.75 = about 6.1 h (hub 2.3). The Komatsu moves 10:02-10:40 then stays parked = about 0.6 h (hub 0.4). No tipper (0 loads). Before work 07:44-07:56 the Dodge drives up to the parked Komatsu and stops nose-in against it.",
    "cams": [
+    "D3 up",
+    "U3 up",
     "D2",
-    "d2 up",
+    "D2 up",
     "d1 up",
     "Entrance"
    ],
@@ -976,12 +996,14 @@
    "loads": 6,
    "footage": "full day",
    "confidence": "medium-high",
-   "notes": "Correction to d1 up: the Hitachi was NOT idle 10:30-15:03. D2 up shows it breaking rock in the upper yard, right in front of the camera, 10:36-12:30. That adds about 1.7 h, so the day is 2.1 -> 3.8 h. The tanker refuelled the Hitachi 11:34-11:49. The Komatsu loads tippers in the upper yard at 12:45-13:05 and 14:10-14:30 (confirming loads 5 and 6; its 14:09-14:30 is now counted). Earlier, the Dodge arrived with a bed full of cans at 07:40, and the Hitachi drove up at 08:10 and parked right beside it until 08:52, with people around at 08:30. No can handling is visible from this angle.",
+   "notes": "Hub figures confirmed (D3 up shows the Hitachi breaking in the yard 10:30-12:10 and the trucks; U3 up has gaps). Before work 07:26-07:40 the Dodge is parked right beside both machines with exhaust smoke from a machine. 08:10-08:56 the Hitachi parks against the Dodge at the fence can pile. Tanker beside the Hitachi 11:34-11:50 while a tipper is loaded at the Komatsu. At 13:40-13:58 the Hitachi stands still with its attachment down at the fence can pile and a man walks there.",
    "cams": [
-    "d2 up",
     "d1 up",
+    "D2 up",
     "Entrance",
-    "D2"
+    "D2",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 2.1,
@@ -997,11 +1019,13 @@
    "loads": 3,
    "footage": "full day",
    "confidence": "high",
-   "notes": "D2 up pointed along the wall and at the lower yard all day, with the machines only at the edge of the frame, so the d1 up figures stand unchanged. After hours, 17:00-17:20, a red car and 3-4 people are in the yard; no machine is involved. The nights of 24/25 and 25/26 show only IR switching and town lights.",
+   "notes": "D3 up (gaps 00:10-06:27 and 12:00-12:30 on the card) confirms the Hitachi breaking 07:36-08:14 and 10:50-12:25 and the 11:45-11:58 loading. After work at 15:48-15:59 the Dodge with cans is parked tight against the Hitachi, with two men standing at the Hitachi.",
    "cams": [
     "d1 up",
     "Entrance",
-    "D2 up"
+    "D2 up",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 5.3,
@@ -1016,12 +1040,14 @@
    "komatsu": 0,
    "loads": 0,
    "footage": "until 07:45 + Entrance",
-   "confidence": "medium",
-   "notes": "Saturday. D2 up covers d1 up's 07:48-18:30 gap, but it stayed on the wall/track preset: no machine, truck, dust or person on the track all day. With Entrance (no workers; one tipper in and out empty at 07:46-07:50), this was not a working day. At 22:52-22:55 the PTZ moved from the wall preset to the yard preset, either on its own or through the app. Both machines are parked and nobody is near them.",
+   "confidence": "high",
+   "notes": "Saturday. D3 up confirms both machines parked side by side 07:44-18:30 (motion is camera sway and fog after 17:00). Night 19:45-23:00 is fog and IR. No visitor at the machines.",
    "cams": [
     "d1 up",
     "Entrance",
-    "D2 up"
+    "D2 up",
+    "D3 up",
+    "U3 up"
    ],
    "d1up": {
     "hitachi": 0,
