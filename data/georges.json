@@ -212,11 +212,15 @@
     {
      "arrive": "08:14",
      "leave": "11:28"
+    },
+    {
+     "arrive": "16:01",
+     "leave": "16:10"
     }
    ],
-   "hours": 3.23,
-   "confidence": "medium",
-   "notes": "08:14 front (Toyota grille) and 11:28 rear spare wheel = RAV4. A 16:01–16:10 pass showed only a roof with bars — could be the BMW, left out.",
+   "hours": 3.38,
+   "confidence": "high",
+   "notes": "08:14 front (Toyota grille), 11:28 rear spare wheel, and the 16:01–16:10 car confirmed RAV4 by Mario.",
    "photo": "20260911.jpg"
   },
   {

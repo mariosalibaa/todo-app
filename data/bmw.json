@@ -1,0 +1,66 @@
+{
+ "updated": "2026-10-10",
+ "pending": "First sightings only — the full BMW review of every camera (3 Aug – 10 Oct) is still running",
+ "days": [
+  {
+   "date": "2026-09-15",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "?",
+     "leave": "10:42"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "notes": "Mario confirmed: silver BMW with roof rack beside the Hitachi at 10:42 (pit view); arrival not seen.",
+   "photo": "20260915.jpg"
+  },
+  {
+   "date": "2026-09-18",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "13:53",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "Silver BMW with roof rack passes the Entrance at 13:53.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-19",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:01",
+     "leave": "08:07"
+    }
+   ],
+   "hours": 0.1,
+   "partial": false,
+   "confidence": "high",
+   "notes": "Silver car with roof rack in at 08:01, out at 08:07 (Entrance).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-25",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "16:42",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "BMW at the Entrance at 16:42.",
+   "photo": ""
+  }
+ ]
+}

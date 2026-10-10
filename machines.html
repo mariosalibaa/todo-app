@@ -75,11 +75,10 @@
   </section>
   <section id="v-loads" hidden>
     <h1>Truck loads — how well each truck was filled</h1>
-    <p class="lead">Every dump truck seen leaving loaded, with the camera photo of its bed: the truck, what it carried and how full it was. Score 5 = heaped and dense, 1 = mostly empty. Tap a photo to see it full size.</p>
+    <p class="lead">Every dump truck seen leaving loaded, with the camera photo of its bed: the truck, what it carried and how full it was. Score 5 = heaped and dense, 1 = mostly empty. Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="lkpis"></div>
-    <h2>Loads</h2>
-    <div class="filters" id="lfilters"></div>
-    <div class="loads" id="loads"></div>
+    <h2>Loads per month <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to see its trucks</span></h2>
+    <div class="card" style="overflow-x:auto"><table id="ltab"><thead><tr><th>Date</th><th>Left at</th><th>Truck</th><th>Material</th><th>Fill</th><th>Score</th><th>Remark</th><th>Camera</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="v-flags" hidden>
     <h1>Suspicious events — all cameras</h1>
@@ -199,16 +198,21 @@ function renderLoads() {
   const sc = L.filter(l => l.score), avg = sc.length ? sc.reduce((s, l) => s + l.score, 0) / sc.length : 0;
   document.getElementById('lkpis').innerHTML = K('t', L.length, 'truck loads') + K('d', by('heaped'), 'heaped') + K('t', by('full'), 'full to the sides') +
     K('k', by('partly'), 'partly full') + K('h', by('light'), 'light / mostly empty') + K('k', avg.toFixed(1) + ' / 5', 'average fill score');
-  const months = [...new Set(L.map(l => l.date.slice(0, 7)))];
-  document.getElementById('lfilters').innerHTML = ['all', ...months].map(m => `<button class="${m === MONTH ? 'on' : ''}" onclick="MONTH='${m}';renderLoads()">${m === 'all' ? 'All' : monthName(m)} (${m === 'all' ? L.length : L.filter(l => l.date.startsWith(m)).length})</button>`).join('');
-  const show = L.filter(l => MONTH === 'all' || l.date.startsWith(MONTH)).slice().reverse();
-  document.getElementById('loads').innerHTML = show.map((l, i) => {
-    const x = dd(l.date), f = FILL(l.fill), u = photoUrl(l.photo);
-    return `<div class="ld"><div class="ph" ${u ? `onclick="openViewer('${u}', '${esc(x.day + ' ' + l.time + ' — ' + (l.truck || ''))}')"` : ''}>${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
-      <div class="bd"><div class="top"><b>${x.wd} ${x.day} · ${esc(l.time || '')}</b><span class="badge f-${f}">${FILL_L[f]}</span></div>
-      <div>${esc(l.truck || '')} · ${esc(l.material || '')}</div><div class="stars">${stars(l.score)}</div>
-      ${l.remark ? `<div class="small muted">${esc(l.remark)}</div>` : ''}<div class="small muted">${esc(l.camera || '')}${l.confidence ? ' · ' + esc(l.confidence) + ' confidence' : ''}</div></div></div>`;
-  }).join('');
+  const months = [...new Set(L.map(l => l.date.slice(0, 7)))].reverse();
+  let html = '';
+  for (const m of months) {
+    const ml = L.filter(l => l.date.startsWith(m)), ms = ml.filter(l => l.score), mavg = ms.length ? ms.reduce((s, l) => s + l.score, 0) / ms.length : 0;
+    const cnt = k => ml.filter(l => FILL(l.fill) === k).length;
+    html += `<tr class="mon" onclick="foldL('${m}')"><td><span class="fold" id="lfold-${m}">▸</span> ${monthName(m)}</td><td colspan="3">${ml.length} truck loads</td><td class="small">${cnt('heaped')} heaped · ${cnt('full')} full${cnt('partly') ? ' · ' + cnt('partly') + ' partly' : ''}${cnt('light') ? ' · ' + cnt('light') + ' light' : ''}${cnt('unk') ? ' · ' + cnt('unk') + " can't tell" : ''}</td><td>${mavg ? mavg.toFixed(1) + ' / 5' : ''}</td><td colspan="3"></td></tr>`;
+    for (const l of ml.slice().reverse()) {
+      const x = dd(l.date), f = FILL(l.fill), u = photoUrl(l.photo);
+      html += `<tr data-lm="${m}" hidden><td style="white-space:nowrap">${x.wd} ${x.day}</td><td>${esc(l.time || '')}</td><td class="small">${esc(l.truck || '')}</td><td class="small">${esc(l.material || '')}</td>
+        <td><span class="badge f-${f}">${FILL_L[f]}</span></td><td class="stars" style="white-space:nowrap">${stars(l.score)}</td><td class="small muted">${esc(l.remark || '')}</td><td class="small muted">${esc(l.camera || '')}</td>
+        <td>${u ? `<img src="${u}" loading="lazy" style="width:96px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' ' + (l.time || ''))}')">` : ''}</td></tr>`;
+    }
+  }
+  html += `<tr class="mon tot"><td>Total</td><td colspan="3">${L.length} truck loads</td><td class="small">${by('heaped')} heaped · ${by('full')} full</td><td>${avg.toFixed(1)} / 5</td><td colspan="3"></td></tr>`;
+  document.querySelector('#ltab tbody').innerHTML = html;
 }
 function renderDiesel() {
   const X = D.diesel || {}, I = X.intervals || [], F = X.fills || [];
@@ -259,6 +263,7 @@ function renderFlags() {
       <div class="bd"><div class="top"><b>${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
   }).join('');
 }
+function foldL(m) { const rows = document.querySelectorAll(`#ltab tr[data-lm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('lfold-' + m).textContent = open ? '▾' : '▸'; }
 function openViewer(url, title) {
   document.getElementById('vtitle').textContent = title; document.getElementById('vbody').innerHTML = `<img src="${url}" alt="">`;
   document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden';
