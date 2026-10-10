@@ -662,78 +662,67 @@
   },
   {
    "date": "2026-09-09",
-   "hitachi": 0,
+   "hitachi": 0.0,
    "komatsu": 4.4,
    "loads": 4,
    "footage": "d1 up: recording stopped 08:44, blind 11:56-14:47",
    "confidence": "medium-high",
-   "notes": "d1 up stopped recording 08:44 (not turned by hand) and was blind 11:56-14:47; it came back pointing a new way. Komatsu loaded 4 tippers (D2 + Entrance). Dodge with jerrycans at the Hitachi 15:26-15:40.",
+   "notes": "D2 up (view: the pit near the entrance pile and the new stone wall) sees the Komatsu working in view 10:14-10:48, at the left edge 10:50-11:15, then 11:18-11:48 and 12:00-12:57 (loading a tipper 12:24-12:36). It is parked 12:59-13:36 (lunch) and works again 13:39-15:18. The Hitachi is never in D2 up view. This confirms the hub 4.4 h. At 14:45:15-14:46:29 D2 up was panned by its motor onto the wall, so after that it sees only the edge of the work area.",
    "d1up": {
     "hitachi": null,
     "komatsu": null,
     "loads": 4
    },
-   "range": {
-    "h": [
-     0,
-     0.3
-    ],
-    "k": [
-     4.3,
-     4.5
-    ]
-   },
-   "est": true,
+   "est": false,
    "d1off": true,
    "cams": [
-    "d1 up (part)",
+    "D2 up",
     "D2",
-    "Entrance"
+    "Entrance",
+    "d1 up (until 08:44, bursts, then from 15:26)"
    ]
   },
   {
    "date": "2026-09-10",
-   "hitachi": 4.5,
-   "komatsu": 0,
+   "hitachi": 6.3,
+   "komatsu": 0.1,
    "loads": 0,
    "footage": "card stops 08:53",
    "confidence": "medium-high",
-   "notes": "The Hitachi breaks 08:06-08:53 (d1 up), then 09:30-14:37 almost continuously on D2 (close to D2 at 12:01-12:11). This matches the Entrance camera at 09:30-14:48. The Komatsu is parked all day. No tippers.",
+   "notes": "D2 up looks down the wall. The Hitachi breaks at its left edge from 08:11 to 11:59, with the pose changing from tile to tile. It is out of view 11:59-12:12, its only stop (a short lunch), then breaks again 12:15-14:48. It is out of view from 14:51, with nothing after. That is about 6.3 h, more than the hub 4.5 h, which came from D2 09:30-14:37. The range is 5.8-6.5 h because part of the boom is cut off at the edge. No tipper.",
    "d1up": {
     "hitachi": null,
     "komatsu": null,
     "loads": null
    },
-   "range": {
-    "h": [
-     4,
-     5.5
-    ],
-    "k": [
-     0,
-     0.3
-    ]
-   },
-   "est": true,
+   "est": false,
    "d1off": true,
    "cams": [
+    "D2 up",
     "D2",
     "Entrance",
-    "d1 up until 08:53"
+    "d1 up (until 08:53)"
    ]
   },
   {
    "date": "2026-09-11",
    "hitachi": 0.8,
    "komatsu": 2.0,
-   "loads": 3,
+   "loads": 4,
    "footage": "from 11:28",
    "confidence": "medium",
-   "notes": "minimum",
+   "notes": "D2 up fills the 06:30-11:28 gap in d1 up. Nothing moves in its view all morning, so there was no breaking in the pit before 11:28. Komatsu work further up cannot be ruled out. The afternoon glimpses match d1 up: Komatsu bucket at 11:51-11:54, 13:00, 13:36 and 15:04-15:05; Hitachi breaking 14:18-14:24. Loads: the d1 up review lists 4 on the Entrance camera; the hub has 3, marked as a minimum. I keep 4.",
    "cams": [
-    "d1 up",
+    "D2 up",
+    "d1 up (from 11:28)",
     "Entrance"
-   ]
+   ],
+   "d1up": {
+    "hitachi": 0.8,
+    "komatsu": 2.0,
+    "loads": 3
+   },
+   "est": false
   },
   {
    "date": "2026-09-12",
@@ -742,24 +731,38 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Saturday",
+   "notes": "Saturday. D2 up motion matches d1 up exactly (08:30-09:00 and 11:30-12:50 at the pit edge). The afternoon is quiet. The 18:30 automatic sweep of D2 up happens every evening.",
    "cams": [
+    "D2 up",
     "d1 up",
     "Entrance"
-   ]
+   ],
+   "d1up": {
+    "hitachi": 2.6,
+    "komatsu": 0.2,
+    "loads": 0
+   },
+   "est": false
   },
   {
    "date": "2026-09-13",
-   "hitachi": 0,
-   "komatsu": 0,
+   "hitachi": 0.0,
+   "komatsu": 0.0,
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Sunday",
+   "notes": "Sunday, no work. D2 up made full pan sweeps at 04:08 (a camera restart: new files tp00134/135 start at 04:08), at 08:00:00 and at 18:30:05. Each time it returned to the same view. The 08:00 and 18:30 sweeps recur on other days at the same minute, so they are automatic, not a person.",
    "cams": [
+    "D2 up",
     "d1 up",
     "Entrance"
-   ]
+   ],
+   "d1up": {
+    "hitachi": 0,
+    "komatsu": 0,
+    "loads": 0
+   },
+   "est": false
   },
   {
    "date": "2026-09-14",
@@ -768,11 +771,18 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "",
+   "notes": "D2 up shows the Hitachi breaking at its left edge from 08:20 and leaving at 15:03-15:06, which matches d1 up. Breaking went on through lunch; that is work, not suspicious.",
    "cams": [
+    "D2 up",
     "d1 up",
     "Entrance"
-   ]
+   ],
+   "d1up": {
+    "hitachi": 6.3,
+    "komatsu": 0.9,
+    "loads": 2
+   },
+   "est": false
   },
   {
    "date": "2026-09-15",
@@ -781,11 +791,18 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "",
+   "notes": "D2 up motion 08:20-14:50 matches d1 up. At 20:11:41 the camera was panned away from the wall to the upper yard where the machines park. It keeps that view the next day.",
    "cams": [
+    "D2 up",
     "d1 up",
     "Entrance"
-   ]
+   ],
+   "d1up": {
+    "hitachi": 4.2,
+    "komatsu": 1.75,
+    "loads": 2
+   },
+   "est": false
   },
   {
    "date": "2026-09-16",
@@ -793,12 +810,19 @@
    "komatsu": 1.0,
    "loads": 1,
    "footage": "full day",
-   "confidence": "high",
-   "notes": "",
+   "confidence": "medium",
+   "notes": "New D2 up view: the upper yard. Both machines are parked side by side 06:30-08:30. The Hitachi breaker moves at 09:03-09:06, and the Hitachi leaves the yard at about 09:42. The Komatsu is back in the yard by 17:20-17:41. Hours are kept from d1 up, because the machines work in the pit, outside this view. The tipper passes through the yard at 09:33 (it left at 09:33 per the Entrance camera).",
    "cams": [
+    "D2 up (upper yard view)",
     "d1 up",
     "Entrance"
-   ]
+   ],
+   "d1up": {
+    "hitachi": 5.75,
+    "komatsu": 1.0,
+    "loads": 1
+   },
+   "est": false
   },
   {
    "date": "2026-09-17",

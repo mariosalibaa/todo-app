@@ -177,11 +177,43 @@
  },
  {
   "date": "2026-09-09",
+  "time": "09:41",
+  "camera": "D2 (turn0909)",
+  "what": "The Dodge comes in with about 20 green/grey jerrycans and a hose/pump coil and goes up to the machines. Not in D2 up view.",
+  "photo": "20260909_cb00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-09",
+  "time": "13:14-13:27",
+  "camera": "D2 up",
+  "what": "Lunch: a mason in a white hat works on the stone wall with a green garden hose. This is water for the masonry and is benign.",
+  "photo": "20260909_cb01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-09",
+  "time": "14:45:15-14:46:29",
+  "camera": "D2 up",
+  "what": "D2 up was panned by its motor (a smooth step pan) from the pit view onto the wall. This is the same 3 minutes as d1 up waking at 14:47:35 and the Entrance remote pan at 14:48:20, so someone in the Tapo app handled three cameras in a row. It happened about 40 min before the Dodge episode at the Hitachi.",
+  "photo": "20260909_cb02.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-09",
   "time": "14:47-14:48",
   "camera": "d1 up + Entrance",
   "what": "d1 up wakes after 3 h without recording, already pointing a new wider way; the Entrance camera is panned by its motor at 14:48 (someone using the Tapo app)",
   "photo": "20260909_93.jpg",
   "strong": false
+ },
+ {
+  "date": "2026-09-09",
+  "time": "15:26-15:40",
+  "camera": "d1 up / D2 (turn0909)",
+  "what": "The Dodge is parked beside the Hitachi, with a person at the Hitachi side at 15:33 and 15:36. The Dodge leaves at 15:40 with the bed full of jerrycans. D2 up had just been panned away and does not see it.",
+  "photo": "20260909_cb03.jpg",
+  "strong": true
  },
  {
   "date": "2026-09-09",
@@ -230,6 +262,46 @@
   "what": "night motion with a bright light at the lower right (a vehicle or a torch; low confidence)",
   "photo": "20260910_02.jpg",
   "strong": false
+ },
+ {
+  "date": "2026-09-13",
+  "time": "04:08 / 08:00 / 18:30",
+  "camera": "D2 up",
+  "what": "Automatic pan sweeps (a restart at 04:08, scheduled at 08:00 and 18:30). No person or vehicle.",
+  "photo": "20260913_cb00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-15",
+  "time": "20:11:41-20:11:51",
+  "camera": "D2 up",
+  "what": "Night remote pan: D2 up swings from the wall view to the upper yard and stays there. It is not a scheduled sweep: the time is odd and the new position was kept. Someone was using the Tapo app at 20:11, possibly the owner. No vehicle seen.",
+  "photo": "20260915_cb00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-16",
+  "time": "08:35:40-09:04",
+  "camera": "D2 up",
+  "what": "The grey Dodge Dakota, its bed full of jerrycans, parks right against the parked Hitachi. A man works between the Dodge and the Hitachi boom 08:36-08:44, with a dark hose-like loop visible at 08:38. A man is at the Dodge tailgate at 08:44, a man climbs onto the Hitachi track by the cab at 08:55-08:56, and two men are at the Dodge at 09:03. Then the Hitachi starts. These are cans at a machine before work; the images cannot show whether diesel went into the machine from the cans or out of it into them.",
+  "photo": "20260916_cb00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-16",
+  "time": "08:36-15:47",
+  "camera": "D2 up",
+  "what": "The Dodge stays parked in the yard with the cans all day. A man walks to it and opens the door at 13:24 (lunch). It leaves at 15:46-15:47.",
+  "photo": "20260916_cb01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-16",
+  "time": "19:19-19:27",
+  "camera": "D2 up + Entrance",
+  "what": "Night visit: a car or SUV comes in (Entrance 19:19:07), drives into the upper yard and stops right beside the parked machine (brake lights 19:19:28 to about 19:22). It repositions with its headlights on at 19:24-19:26 and leaves (Entrance 19:27:02, tail lights). About 8 min in all. D2 up switches to IR at 19:27, and after that the lens haze hides the yard.",
+  "photo": "20260916_cb02.jpg",
+  "strong": true
  },
  {
   "date": "2026-09-20",

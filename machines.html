@@ -60,7 +60,7 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">Georges</a></nav>
+  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -88,8 +88,8 @@
     <div class="loads" id="flags"></div>
   </section>
   <section id="v-georges" hidden>
-    <h1>Georges — silver RAV4 on site</h1>
-    <p class="lead">When Georges' silver RAV4 arrived and left each day, from all cameras combined (mainly the Entrance camera, plate B 483534). Tap a photo to enlarge.</p>
+    <h1>Silver RAV4 on site</h1>
+    <p class="lead">When the silver RAV4 (plate B 483534) arrived and left each day, from all cameras combined. It was Abed's car at first; Abed and Georges later swapped (Georges had the silver BMW — see the BMW tab). Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="gkpis"></div>
     <div class="card" style="overflow-x:auto"><table id="gtab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="gnote"></div>
@@ -226,19 +226,21 @@ function renderGeorges() {
   let html = '';
   for (const m of months) {
     const md = days.filter(d => d.date.startsWith(m)), mp = md.filter(d => d.present), mh = mp.reduce((s, d) => s + (d.hours || 0), 0);
-    html += `<tr class="mon"><td>${monthName(m)}</td><td colspan="2">${mp.length} day${mp.length === 1 ? '' : 's'} on site</td><td class="n">${hm(mh)}</td><td colspan="3"></td></tr>`;
+    html += `<tr class="mon" onclick="foldG('${m}')"><td><span class="fold" id="gfold-${m}">▸</span> ${monthName(m)}</td><td colspan="2">${mp.length} day${mp.length === 1 ? '' : 's'} on site <span class="small muted">of ${md.length}</span></td><td class="n">${hm(mh)}</td><td colspan="3" class="small">${mp.length ? 'average ' + hm(mh / Math.max(1, mp.filter(d => d.hours != null).length)) + ' per day on site' : ''}</td></tr>`;
     for (const d of md.slice().reverse()) {
       const x = dd(d.date), v = d.visits || [], u = d.photo ? '/api/ajaltoun/machines/georges/' + d.photo : '';
       const st = d.present === false ? '<span class="muted">not on site</span>' : d.present == null ? '<span class="muted">unclear</span>' : '';
-      html += `<tr class="${x.sun ? 'sun' : ''} ${d.present === false ? 'none' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
+      html += `<tr data-gm="${m}" hidden class="${x.sun ? 'sun' : ''} ${d.present === false ? 'none' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
         <td style="white-space:nowrap">${v.length ? v.map(a => esc(a.arrive)).join('<br>') : st}</td><td style="white-space:nowrap">${v.map(a => esc(a.leave)).join('<br>')}</td>
         <td class="n"><b>${d.present ? (d.partial && d.hours ? '≥' : '') + hm(d.hours) : ''}</b></td><td class="small">${esc(d.confidence || '')}</td><td class="small muted">${esc(d.notes || '')}</td>
         <td>${u ? `<img src="${u}" loading="lazy" style="width:96px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' — RAV4')}')">` : ''}</td></tr>`;
     }
   }
+  html += `<tr class="mon tot"><td>Total</td><td colspan="2">${pres.length} days on site <span class="small muted">of ${days.length}</span></td><td class="n">${hm(tot)}</td><td colspan="3" class="small">average ${hm(known.length ? tot / known.length : 0)} per day on site</td></tr>`;
   document.querySelector('#gtab tbody').innerHTML = html;
   document.getElementById('gnote').textContent = (G.pending ? G.pending + '. ' : '') + 'Hours = arrival to departure; two visits on one day are added. "?" = arrival or departure not seen.';
 }
+function foldG(m) { const rows = document.querySelectorAll(`#gtab tr[data-gm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('gfold-' + m).textContent = open ? '▾' : '▸'; }
 let FM = 'strong';
 function renderFlags() {
   const L = D.flags || [];
