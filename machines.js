@@ -19,7 +19,8 @@ async function handle(req, res, url) {
     const days = readJson('excavation-days.json', { days: [] });
     const loads = readJson('excavation-loads.json', []);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ ...days, loads }));
+    const diesel = readJson('excavation-diesel.json', null);
+    res.end(JSON.stringify({ ...days, loads, diesel }));
     return true;
   }
   const m = p.match(/^\/api\/ajaltoun\/machines\/photo\/(\d{8}_\d{4}[\w-]*\.jpg)$/);

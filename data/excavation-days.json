@@ -276,7 +276,7 @@
    "date": "2026-09-02",
    "hitachi": null,
    "komatsu": null,
-   "loads": 0,
+   "loads": null,
    "footage": "mostly none",
    "confidence": "",
    "notes": ""
@@ -285,7 +285,7 @@
    "date": "2026-09-03",
    "hitachi": null,
    "komatsu": null,
-   "loads": 0,
+   "loads": null,
    "footage": "mostly none",
    "confidence": "",
    "notes": ""
@@ -294,7 +294,7 @@
    "date": "2026-09-04",
    "hitachi": null,
    "komatsu": null,
-   "loads": 0,
+   "loads": null,
    "footage": "none",
    "confidence": "",
    "notes": "Komatsu seen working ~10:18 on the Entrance camera"
@@ -348,7 +348,7 @@
    "date": "2026-09-10",
    "hitachi": null,
    "komatsu": null,
-   "loads": 0,
+   "loads": null,
    "footage": "card stops 08:53",
    "confidence": "",
    "notes": "Hitachi breaking 09:30-14:48 (~5 h) on the Entrance camera"
@@ -429,7 +429,7 @@
    "date": "2026-09-19",
    "hitachi": null,
    "komatsu": null,
-   "loads": 0,
+   "loads": null,
    "footage": "none",
    "confidence": "",
    "notes": ""
@@ -438,10 +438,10 @@
    "date": "2026-09-20",
    "hitachi": null,
    "komatsu": null,
-   "loads": 0,
+   "loads": null,
    "footage": "none",
    "confidence": "",
-   "notes": "Sunday"
+   "notes": "Sunday (probably no work)"
   },
   {
    "date": "2026-09-21",

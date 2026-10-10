@@ -59,21 +59,21 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a></nav>
+  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
   <div id="status" class="small muted">Loading…</div>
   <section id="v-days" hidden>
     <h1>Machines &amp; trucks — Ajaltoun 4193</h1>
-    <p class="lead">From the site cameras (SD cards): how long the <b style="color:var(--orange)">Hitachi FH330.3</b> and the <b style="color:var(--yellow)">Komatsu PC240</b> were seen working each day, and how many dump trucks left loaded. Hours are counted from camera frames every 3 minutes and were checked against a continuous recording for 6–8 Oct (within about half an hour). Gray days: the camera did not record (its battery ran flat), so real totals are higher.</p>
+    <p class="lead">From the site cameras (SD cards): how long the <b style="color:var(--orange)">Hitachi FH330.3</b> and the <b style="color:var(--yellow)">Komatsu PC240</b> were seen working each day, and how many dump trucks left loaded. Hours are counted from camera frames every 3 minutes and were checked against a continuous recording for 6–8 Oct (within about half an hour). Gray days: the machine camera (d1 up) did not record because its battery ran flat; where the Entrance camera saw work, the note says so. — means unknown.</p>
     <div class="kpis" id="kpis"></div>
     <h2>Per month</h2>
-    <div class="months" id="months"></div>
-    <h2>Per weekday <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">average over the days with footage</span></h2>
-    <div class="card"><table id="wd"><thead><tr><th>Day</th><th class="n">Days</th><th class="n">Hitachi h / day</th><th class="n">Komatsu h / day</th><th class="n">Trucks / day</th><th class="n">Trucks total</th></tr></thead><tbody></tbody></table></div>
+    <div class="card" style="overflow-x:auto"><table id="months"><thead><tr><th></th><th class="n" colspan="4" style="text-align:center">Days</th><th colspan="2" style="text-align:center;color:var(--orange)">Hitachi h</th><th colspan="2" style="text-align:center;color:var(--yellow)">Komatsu h</th><th colspan="2" style="text-align:center">Both machines h</th><th colspan="2" style="text-align:center;color:var(--blue)">Trucks</th></tr>
+<tr><th>Month</th><th class="n">All</th><th class="n">Working</th><th class="n">Off</th><th class="n">Cam off</th><th class="n">Total</th><th class="n">/ work day</th><th class="n">Total</th><th class="n">/ work day</th><th class="n">Total</th><th class="n">/ work day</th><th class="n">Total</th><th class="n">/ work day</th></tr></thead><tbody></tbody></table></div>
+    <div class="small muted" style="margin-top:6px">Working = a machine worked or a truck was loaded. Off = camera recorded, no work. Camera off = battery flat, unknown. Per-working-day hours use only working days the machine camera recorded.</div>
     <h2>Per day <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to fold it</span></h2>
-    <div class="card"><table id="days"><thead><tr><th>Date</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+    <div class="card"><table id="days"><thead><tr><th>Date</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">Both h</th><th class="n">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="src"></div>
   </section>
   <section id="v-loads" hidden>
@@ -83,6 +83,18 @@
     <h2>Loads</h2>
     <div class="filters" id="lfilters"></div>
     <div class="loads" id="loads"></div>
+  </section>
+  <section id="v-diesel" hidden>
+    <h1>Diesel vs machine hours</h1>
+    <div class="note" id="dverdict" style="margin-top:0;color:var(--text)"></div>
+    <div class="kpis" id="dkpis" style="margin-top:14px"></div>
+    <h2>For your decision</h2>
+    <div class="card"><table id="dpend"><tbody></tbody></table></div>
+    <h2>Litres per machine-hour between fills</h2>
+    <div class="card" style="overflow-x:auto"><table id="dint"><thead><tr><th>Fill</th><th class="n">Litres</th><th>Hours since previous fill</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">L / h</th><th class="n">Expected L</th><th class="n">Delivered − expected</th></tr></thead><tbody></tbody></table></div>
+    <div class="note" id="dexp"></div>
+    <h2>Every fill</h2>
+    <div class="card" style="overflow-x:auto"><table id="dfill"><thead><tr><th>Date</th><th class="n">Litres</th><th class="n">$/L</th><th class="n">Total $</th><th>Machine</th><th>Odoo</th><th>Dib paid</th></tr></thead><tbody></tbody></table></div>
   </section>
 </main>
 <div id="viewer">
@@ -95,61 +107,64 @@
 <script src="/phone-preview.js"></script>
 <script>
 const esc = Admin.esc; let D = null, MONTH = 'all';
-const LOADS = /\/loads$/.test(location.pathname);
+const LOADS = /\/loads$/.test(location.pathname), DIESEL = /\/diesel$/.test(location.pathname);
+const VIEW = DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
 const h1 = n => n == null ? '—' : (+n).toFixed(1);
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dd = s => { const d = new Date(s + 'T12:00:00'); return { day: d.getDate() + ' ' + MON[d.getMonth()], wd: d.toLocaleDateString('en-GB', { weekday: 'short' }), m: s.slice(0, 7), sun: d.getDay() === 0 }; };
 const K = (cls, v, l) => `<div class="kpi ${cls}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
 const monthName = m => MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4);
 
+// working / off / unknown (Mario 2026-10-10: "indicate off days number and working days")
+const seenElsewhere = d => /seen working|breaking|work happened|Entrance/i.test(d.notes || '');
+const isWork = d => d.hitachi != null ? (d.hitachi + d.komatsu > 0 || d.loads > 0) : (d.loads > 0 || seenElsewhere(d));
+function dayStats(md) {
+  const work = md.filter(isWork), off = md.filter(d => d.hitachi != null && !isWork(d));
+  return { work: work.length, off: off.length, unk: md.length - work.length - off.length, workSeen: work.filter(d => d.hitachi != null).length, workBlind: work.filter(d => d.hitachi == null).length };
+}
 function renderDays() {
   const days = D.days || [];
   const seen = days.filter(d => d.hitachi != null);
   const sum = (a, k) => a.reduce((s, d) => s + (+d[k] || 0), 0);
   const loads = days.reduce((s, d) => s + (+d.loads || 0), 0);
   document.getElementById('kpis').innerHTML =
-    K('d', `${seen.length} / ${days.length}`, 'days with footage') +
+    (st0 => K('d', `${st0.work} / ${st0.off}`, `working / off days of ${days.length}` + (st0.unk ? ` · ${st0.unk} unknown (camera off)` : '')))(dayStats(days)) +
     K('h', h1(sum(seen, 'hitachi')) + ' h', 'Hitachi seen working') +
     K('k', h1(sum(seen, 'komatsu')) + ' h', 'Komatsu seen working') +
     K('t', loads, 'truck loads out');
   const months = [...new Set(days.map(d => d.date.slice(0, 7)))];
-  document.getElementById('months').innerHTML = months.map(m => {
-    const md = days.filter(d => d.date.startsWith(m)), ms = md.filter(d => d.hitachi != null);
-    const H = sum(ms, 'hitachi'), Kx = sum(ms, 'komatsu'), T = md.reduce((s, d) => s + (+d.loads || 0), 0);
-    return `<div class="mcard"><b>${monthName(m)}</b> <span class="small muted">${md[0].date.slice(8)}–${md[md.length - 1].date.slice(8)}</span>
-      <div class="row"><span>Days with footage</span><span>${ms.length} of ${md.length}</span></div>
-      <div class="row"><span>Hitachi</span><span style="color:var(--orange)">${h1(H)} h · ${h1(ms.length ? H / ms.length : 0)}/day</span></div>
-      <div class="row"><span>Komatsu</span><span style="color:var(--yellow)">${h1(Kx)} h · ${h1(ms.length ? Kx / ms.length : 0)}/day</span></div>
-      <div class="row"><span>Truck loads</span><span style="color:var(--blue)">${T}</span></div></div>`;
-  }).join('');
-  // Mo..Su averages (Mario 2026-10-10: "add mo tu we")
-  const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // months as rows (Mario 2026-10-10: one line per month, variables as columns)
+  const mrow = (label, md, cls) => {
+    const ms = md.filter(d => d.hitachi != null), st = dayStats(md);
+    const H = sum(ms, 'hitachi'), Kx = sum(ms, 'komatsu'), T = md.reduce((s, d) => s + (+d.loads || 0), 0), w = st.workSeen;
+    return `<tr class="${cls || ''}"><td style="white-space:nowrap">${label}</td><td class="n">${md.length}</td><td class="n" style="color:var(--green)">${st.work}</td><td class="n">${st.off}</td><td class="n muted">${st.unk || ''}</td>
+      <td class="n" style="color:var(--orange)">${h1(H)}</td><td class="n" style="color:var(--orange)">${h1(w ? H / w : 0)}</td>
+      <td class="n" style="color:var(--yellow)">${h1(Kx)}</td><td class="n" style="color:var(--yellow)">${h1(w ? Kx / w : 0)}</td>
+      <td class="n"><b>${h1(H + Kx)}</b></td><td class="n"><b>${h1(w ? (H + Kx) / w : 0)}</b></td>
+      <td class="n" style="color:var(--blue)">${T}</td><td class="n" style="color:var(--blue)">${(st.work ? T / st.work : 0).toFixed(1)}</td></tr>`;
+  };
+  document.querySelector('#months tbody').innerHTML = months.map(m => { const md = days.filter(d => d.date.startsWith(m)); return mrow(`${monthName(m)} <span class="small muted">${md[0].date.slice(8)}–${md[md.length - 1].date.slice(8)}</span>`, md); }).join('') + mrow('<b>Total</b>', days, 'mon');
   const wdOf = s => (new Date(s + 'T12:00:00').getDay() + 6) % 7;
-  document.querySelector('#wd tbody').innerHTML = WD.map((w, i) => {
-    const a = seen.filter(d => wdOf(d.date) === i), all = days.filter(d => wdOf(d.date) === i && d.loads != null);
-    const T = all.reduce((s, d) => s + (+d.loads || 0), 0);
-    return `<tr class="${i === 6 ? 'sun' : ''}"><td>${w}</td><td class="n">${a.length}</td><td class="n">${a.length ? h1(sum(a, 'hitachi') / a.length) : '—'}</td><td class="n">${a.length ? h1(sum(a, 'komatsu') / a.length) : '—'}</td><td class="n">${all.length ? (T / all.length).toFixed(1) : '—'}</td><td class="n">${T}</td></tr>`;
-  }).join('');
   const max = Math.max(1, ...seen.map(d => Math.max(d.hitachi, d.komatsu)));
   const tb = document.querySelector('#days tbody'); let html = '';
   for (const m of months.slice().reverse()) {
     const md = days.filter(d => d.date.startsWith(m)), ms = md.filter(d => d.hitachi != null);
-    html += `<tr class="mon" onclick="foldMonth('${m}')"><td>▾ ${monthName(m)}</td><td class="n">${h1(sum(ms, 'hitachi'))}</td><td class="n">${h1(sum(ms, 'komatsu'))}</td><td class="n">${md.reduce((s, d) => s + (+d.loads || 0), 0)}</td><td colspan="2"></td></tr>`;
+    html += `<tr class="mon" onclick="foldMonth('${m}')"><td>▾ ${monthName(m)}</td><td class="n">${h1(sum(ms, 'hitachi'))}</td><td class="n">${h1(sum(ms, 'komatsu'))}</td><td class="n">${h1(sum(ms, 'hitachi') + sum(ms, 'komatsu'))}</td><td class="n">${md.reduce((s, d) => s + (+d.loads || 0), 0)}</td><td colspan="2"></td></tr>`;
     for (const d of md.slice().reverse()) {
       // week subtotal above each Sunday→Monday block (newest first, so print it when we reach the week's last day in the list)
       if (wdOf(d.date) === 6 || d === md[md.length - 1]) {
         const end = new Date(d.date + 'T12:00:00'), wk = md.filter(x => { const t = new Date(x.date + 'T12:00:00'); return t <= end && (end - t) / 864e5 <= wdOf(d.date); }), ws = wk.filter(x => x.hitachi != null);
-        html += `<tr data-m="${m}" class="wk"><td>Week ${dd(wk[0].date).day} – ${dd(wk[wk.length - 1].date).day}</td><td class="n">${h1(sum(ws, 'hitachi'))}</td><td class="n">${h1(sum(ws, 'komatsu'))}</td><td class="n">${wk.reduce((s, x) => s + (+x.loads || 0), 0)}</td><td colspan="2" class="small">${ws.length} of ${wk.length} days with footage</td></tr>`;
+        html += `<tr data-m="${m}" class="wk"><td>Week ${dd(wk[0].date).day} – ${dd(wk[wk.length - 1].date).day}</td><td class="n">${h1(sum(ws, 'hitachi'))}</td><td class="n">${h1(sum(ws, 'komatsu'))}</td><td class="n">${h1(sum(ws, 'hitachi') + sum(ws, 'komatsu'))}</td><td class="n">${wk.reduce((s, x) => s + (+x.loads || 0), 0)}</td><td colspan="2" class="small">${ws.length} of ${wk.length} days recorded</td></tr>`;
       }
       const x = dd(d.date), none = d.hitachi == null, part = /^from|until|mostly|pit camera/.test(d.footage || '');
       html += `<tr data-m="${m}" class="${none ? 'none' : part ? 'part' : ''} ${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
         <td class="n">${none ? '—' : h1(d.hitachi) + `<span class="hb h" style="width:${Math.round(d.hitachi / max * 50)}px"></span>`}</td>
         <td class="n">${none ? '—' : h1(d.komatsu) + `<span class="hb k" style="width:${Math.round(d.komatsu / max * 50)}px"></span>`}</td>
-        <td class="n">${d.loads == null ? '—' : d.loads}</td><td class="small">${esc(none ? 'no footage' : d.footage || '')}</td><td class="small muted">${esc(d.notes || '')}</td></tr>`;
+        <td class="n"><b>${none ? '—' : h1(d.hitachi + d.komatsu)}</b></td><td class="n">${d.loads == null ? '—' : d.loads}</td><td class="small">${none ? (seenElsewhere(d) || d.loads > 0 ? 'machine camera off · <span style="color:var(--green)">work seen on Entrance camera</span>' : 'machine camera off (battery)') : esc(d.footage || '')}</td><td class="small muted">${esc(d.notes || '')}</td></tr>`;
     }
   }
   tb.innerHTML = html;
-  document.getElementById('src').innerHTML = `Source: ${esc(D.source || '')} · reviewed ${esc(D.updated || '')}. “from 10:55” = the morning was not recorded, so that day is a minimum. The Excel is in Dropbox › AJALTOUN 4193 VILLAS › cameras.`;
+  document.getElementById('src').innerHTML = `Source: ${esc(D.source || '')} · reviewed ${esc(D.updated || '')}. “from 10:55” = the morning was not recorded, so that day is a minimum.`;
 }
 function foldMonth(m) { document.querySelectorAll(`#days tr[data-m="${m}"]`).forEach(r => r.hidden = !r.hidden); }
 
@@ -175,6 +190,20 @@ function renderLoads() {
       ${l.remark ? `<div class="small muted">${esc(l.remark)}</div>` : ''}<div class="small muted">${esc(l.camera || '')}${l.confidence ? ' · ' + esc(l.confidence) + ' confidence' : ''}</div></div></div>`;
   }).join('');
 }
+function renderDiesel() {
+  const X = D.diesel || {}, I = X.intervals || [], F = X.fills || [];
+  const n0 = v => v == null ? '—' : Math.round(v).toLocaleString('en-US');
+  const dm = s => { const x = dd(s); return x.wd + ' ' + x.day; };
+  document.getElementById('dverdict').innerHTML = '<b>' + esc((X.verdict || '').split('. ')[0]) + '.</b> ' + esc((X.verdict || '').split('. ').slice(1).join('. '));
+  const L = I.reduce((s, i) => s + i.litres, 0), H = I.reduce((s, i) => s + i.hours, 0), E = I.reduce((s, i) => s + i.expected, 0);
+  document.getElementById('dkpis').innerHTML = K('d', n0(L) + ' L', 'delivered ' + (I[0] ? dd(I[0].start).day : '') + ' – ' + (I.length ? dd(I[I.length - 1].end).day : '')) +
+    K('t', n0(E) + ' L', 'expected for the hours worked') + K('h', (H ? L / H : 0).toFixed(1), 'litres per machine-hour (≈22 expected)') + K('k', '3.66', 'litres per m³, whole job');
+  document.querySelector('#dpend tbody').innerHTML = (X.pending || []).map(p => `<tr><td style="color:var(--amber);font-weight:600;white-space:nowrap">${esc(p[0])}</td><td class="small">${esc(p[1])}</td></tr>`).join('');
+  document.querySelector('#dint tbody').innerHTML = I.slice().reverse().map(i => `<tr><td style="white-space:nowrap">${dm(i.fill)}</td><td class="n">${n0(i.litres)}</td><td class="small" style="white-space:nowrap">${dd(i.start).day} – ${dd(i.end).day} · ${h1(i.hours)} h${i.nofootage ? ` <span class="muted">(${i.nofootage} days estimated)</span>` : ''}</td><td class="n" style="color:var(--orange)">${h1(i.hit)}</td><td class="n" style="color:var(--yellow)">${h1(i.kom)}</td><td class="n" style="${i.lph > 28 || i.lph < 12 ? 'color:var(--amber);font-weight:600' : ''}">${h1(i.lph)}</td><td class="n">${n0(i.expected)}</td><td class="n" style="${i.diff > 100 ? 'color:var(--amber);font-weight:600' : ''}">${i.diff > 0 ? '+' : ''}${n0(i.diff)}</td></tr>`).join('') +
+    `<tr class="mon"><td>Total</td><td class="n">${n0(L)}</td><td class="small">${h1(H)} machine-hours</td><td></td><td></td><td class="n">${h1(H ? L / H : 0)}</td><td class="n">${n0(E)}</td><td class="n">${n0(L - E)}</td></tr>`;
+  document.getElementById('dexp').textContent = (X.expected || '') + ' ' + (X.whole || '');
+  document.querySelector('#dfill tbody').innerHTML = F.slice().reverse().map(f => `<tr><td style="white-space:nowrap">${dm(f.date)}</td><td class="n">${n0(f.litres)}</td><td class="n">${f.perL == null ? '—' : (+f.perL).toFixed(2)}</td><td class="n">${n0(f.total)}</td><td class="small">${esc(f.machine || '')}</td><td class="small" style="${/confirm/.test(f.odoo) ? 'color:var(--amber);font-weight:600' : ''}">${esc(f.odoo)}</td><td class="small muted">${esc(f.paid || '')}</td></tr>`).join('');
+}
 function openViewer(url, title) {
   document.getElementById('vtitle').textContent = title; document.getElementById('vbody').innerHTML = `<img src="${url}" alt="">`;
   document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden';
@@ -185,9 +214,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(
 Admin.require(['ajaltoun', 'excavation'], async me => {
   Admin.crumbs([['Ajaltoun 4193', '/#ajaltoun-4193'], ['Machines & trucks']]);
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
-  document.getElementById(LOADS ? 't-loads' : 't-days').classList.add('on');
-  document.getElementById(LOADS ? 'v-loads' : 'v-days').hidden = false;
-  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; LOADS ? renderLoads() : renderDays(); }
+  document.getElementById('t-' + VIEW).classList.add('on');
+  document.getElementById('v-' + VIEW).hidden = false;
+  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
   catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); }
 });
 </script>

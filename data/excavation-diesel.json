@@ -1,0 +1,437 @@
+{
+ "updated": "2026-10-10",
+ "verdict": "Consumption is normal. From 2 Aug to 9 Oct the machines received 5,771 L; their running hours need about 6,730 L (range 4,585–9,208). That is 19 L per machine-hour against about 22 expected. Diesel delivered to the Komatsu is carried by jerrycan to the Hitachi, so per-machine figures are misleading; the total is the reliable figure. The jerrycans are the weak point.",
+ "expected": "Expected: Hitachi with breaker 24 L/h (20–28), Komatsu 17 L/h (14–20). Days without footage are estimated from the month average. One interval can be off by a whole tank (tanks are not filled to the same level each time).",
+ "whole": "18 Apr – 9 Oct: 16,478 L for 4,500 m³ excavated = 3.66 L/m³ (contract table assumed 3.07).",
+ "pending": [
+  [
+   "9 Oct fill, ~495 L",
+   "Only your meter photo (00495), no price. Confirm litres and price, then it goes on the same Odoo bill."
+  ],
+  [
+   "Whish payments not in Odoo",
+   "Dib $955 (5 Oct, for the 24 Sep fill) and $600 (9 Oct, for the 1 Oct fill); Anthony $50 (5 Oct) and $120 (30 Sep). Need the Whish statement."
+  ],
+  [
+   "24 Sep price $1.55/L",
+   "About 10% above the official price that week (Dib is usually +2–6%): about $75–95 too much. Ask Dib?"
+  ]
+ ],
+ "fills": [
+  {
+   "date": "2026-04-18",
+   "litres": 526,
+   "perL": 1.36,
+   "total": 715,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00002 2026-04-18 $715"
+  },
+  {
+   "date": "2026-04-21",
+   "litres": 535,
+   "perL": 1.35,
+   "total": 722,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00005 2026-04-23 $722"
+  },
+  {
+   "date": "2026-04-26",
+   "litres": 550,
+   "perL": 1.34,
+   "total": 737,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00023 2026-04-28 $737"
+  },
+  {
+   "date": "2026-05-15",
+   "litres": 620,
+   "perL": 1.21,
+   "total": 750,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00008 2026-05-18 $750"
+  },
+  {
+   "date": "2026-05-21",
+   "litres": 460,
+   "perL": 1.2,
+   "total": 552,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00006 2026-05-26 $552"
+  },
+  {
+   "date": "2026-05-28",
+   "litres": 520,
+   "perL": 1.18,
+   "total": 614,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00011 2026-05-30 $613"
+  },
+  {
+   "date": "2026-06-02",
+   "litres": 600,
+   "perL": 1.145,
+   "total": 687,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00009 2026-06-04 $687"
+  },
+  {
+   "date": "2026-06-06",
+   "litres": 449,
+   "perL": 1.135,
+   "total": 510,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00022 2026-06-11 $510"
+  },
+  {
+   "date": "2026-06-11",
+   "litres": 510,
+   "perL": 1.105,
+   "total": 564,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00021 2026-06-15 $563"
+  },
+  {
+   "date": "2026-06-15",
+   "litres": 422,
+   "perL": 1.068,
+   "total": 451,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00020 2026-06-18 $451"
+  },
+  {
+   "date": "2026-06-18",
+   "litres": 607,
+   "perL": 1.065,
+   "total": 646,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00019 2026-06-23 $646"
+  },
+  {
+   "date": "2026-06-23",
+   "litres": 485,
+   "perL": 1.025,
+   "total": 497,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00018 2026-06-23 $497"
+  },
+  {
+   "date": "2026-06-29",
+   "litres": 719,
+   "perL": 0.974,
+   "total": 700,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00015 2026-07-02 $700"
+  },
+  {
+   "date": "2026-07-06",
+   "litres": 600,
+   "perL": 0.95,
+   "total": 570,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00024 2026-07-10 $570"
+  },
+  {
+   "date": "2026-07-10",
+   "litres": 767,
+   "perL": 0.96,
+   "total": 736,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00025 2026-07-10 $736"
+  },
+  {
+   "date": "2026-07-15",
+   "litres": 600,
+   "perL": 1.0,
+   "total": 600,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00026 2026-07-15 $600"
+  },
+  {
+   "date": "2026-07-22",
+   "litres": 640,
+   "perL": 1.17,
+   "total": 749,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00028 2026-07-24 $748"
+  },
+  {
+   "date": "2026-07-27",
+   "litres": 530,
+   "perL": 1.2,
+   "total": 636,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00029 2026-07-27 $636"
+  },
+  {
+   "date": "2026-08-01",
+   "litres": 567,
+   "perL": 1.25,
+   "total": 709,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00030 2026-08-05 $708"
+  },
+  {
+   "date": "2026-08-08",
+   "litres": 732,
+   "perL": 1.3,
+   "total": 952,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00034 2026-08-10 $950"
+  },
+  {
+   "date": "2026-08-17",
+   "litres": 575,
+   "perL": 1.28,
+   "total": 736,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00038 2026-08-17 $736"
+  },
+  {
+   "date": "2026-08-24",
+   "litres": 650,
+   "perL": 1.3,
+   "total": 845,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00041 2026-08-26 $845"
+  },
+  {
+   "date": "2026-09-03",
+   "litres": 600,
+   "perL": 1.33,
+   "total": 798,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00035 2026-09-09 $800"
+  },
+  {
+   "date": "2026-09-11",
+   "litres": 540,
+   "perL": 1.389,
+   "total": 750,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00048 2026-09-17 $750"
+  },
+  {
+   "date": "2026-09-17",
+   "litres": 463,
+   "perL": 1.46,
+   "total": 676,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "PCSH2/2026/00051 2026-10-01 $676"
+  },
+  {
+   "date": "2026-09-24",
+   "litres": 616,
+   "perL": 1.55,
+   "total": 955,
+   "machine": "",
+   "odoo": "in Odoo",
+   "paid": "none in Odoo"
+  },
+  {
+   "date": "2026-10-01",
+   "litres": 400,
+   "perL": 1.5,
+   "total": 600,
+   "machine": "Komatsu (camera)",
+   "odoo": "in Odoo",
+   "paid": "none in Odoo"
+  },
+  {
+   "date": "2026-10-05",
+   "litres": 500,
+   "perL": 1.48,
+   "total": 740,
+   "machine": "Hitachi (camera: tanker 14:37)",
+   "odoo": "in Odoo (added 10 Oct)",
+   "paid": "none (not paid yet)"
+  },
+  {
+   "date": "2026-10-08",
+   "litres": 200,
+   "perL": 1.5,
+   "total": 300,
+   "machine": "Komatsu (camera)",
+   "odoo": "in Odoo",
+   "paid": "paid to IPT Saint Nicolas: PCSH2/2026/00054 2026-10-08 $300"
+  },
+  {
+   "date": "2026-10-09",
+   "litres": 495,
+   "perL": null,
+   "total": null,
+   "machine": "unknown (Komatsu parked all day 9-10)",
+   "odoo": "to confirm",
+   "paid": "none"
+  }
+ ],
+ "intervals": [
+  {
+   "fill": "2026-08-08",
+   "litres": 732,
+   "start": "2026-08-02",
+   "end": "2026-08-08",
+   "hit": 23.7,
+   "kom": 10.9,
+   "hours": 34.6,
+   "lph": 21.1,
+   "expected": 755,
+   "diff": -23,
+   "nofootage": 3
+  },
+  {
+   "fill": "2026-08-17",
+   "litres": 575,
+   "start": "2026-08-09",
+   "end": "2026-08-17",
+   "hit": 25.7,
+   "kom": 8.6,
+   "hours": 34.2,
+   "lph": 16.8,
+   "expected": 762,
+   "diff": -187,
+   "nofootage": 3
+  },
+  {
+   "fill": "2026-08-24",
+   "litres": 650,
+   "start": "2026-08-18",
+   "end": "2026-08-24",
+   "hit": 24.9,
+   "kom": 6.9,
+   "hours": 31.8,
+   "lph": 20.4,
+   "expected": 715,
+   "diff": -65,
+   "nofootage": 2
+  },
+  {
+   "fill": "2026-09-03",
+   "litres": 600,
+   "start": "2026-08-25",
+   "end": "2026-09-03",
+   "hit": 33.7,
+   "kom": 8.7,
+   "hours": 42.5,
+   "lph": 14.1,
+   "expected": 958,
+   "diff": -358,
+   "nofootage": 5
+  },
+  {
+   "fill": "2026-09-11",
+   "litres": 540,
+   "start": "2026-09-04",
+   "end": "2026-09-11",
+   "hit": 23.5,
+   "kom": 12.7,
+   "hours": 36.1,
+   "lph": 14.9,
+   "expected": 779,
+   "diff": -239,
+   "nofootage": 3
+  },
+  {
+   "fill": "2026-09-17",
+   "litres": 463,
+   "start": "2026-09-12",
+   "end": "2026-09-17",
+   "hit": 20.4,
+   "kom": 4.0,
+   "hours": 24.4,
+   "lph": 19.0,
+   "expected": 557,
+   "diff": -94,
+   "nofootage": 0
+  },
+  {
+   "fill": "2026-09-24",
+   "litres": 616,
+   "start": "2026-09-18",
+   "end": "2026-09-24",
+   "hit": 16.6,
+   "kom": 9.1,
+   "hours": 25.7,
+   "lph": 24.0,
+   "expected": 552,
+   "diff": 64,
+   "nofootage": 2
+  },
+  {
+   "fill": "2026-10-01",
+   "litres": 400,
+   "start": "2026-09-25",
+   "end": "2026-09-30",
+   "hit": 18.4,
+   "kom": 5.5,
+   "hours": 23.9,
+   "lph": 16.7,
+   "expected": 536,
+   "diff": -136,
+   "nofootage": 0
+  },
+  {
+   "fill": "2026-10-05",
+   "litres": 500,
+   "start": "2026-10-01",
+   "end": "2026-10-05",
+   "hit": 18.5,
+   "kom": 3.4,
+   "hours": 21.8,
+   "lph": 22.9,
+   "expected": 500,
+   "diff": 0,
+   "nofootage": 0
+  },
+  {
+   "fill": "2026-10-08",
+   "litres": 200,
+   "start": "2026-10-06",
+   "end": "2026-10-07",
+   "hit": 10.5,
+   "kom": 4.3,
+   "hours": 14.8,
+   "lph": 13.5,
+   "expected": 325,
+   "diff": -125,
+   "nofootage": 0
+  },
+  {
+   "fill": "2026-10-09",
+   "litres": 495,
+   "start": "2026-10-08",
+   "end": "2026-10-09",
+   "hit": 10.6,
+   "kom": 2.1,
+   "hours": 12.7,
+   "lph": 39.0,
+   "expected": 290,
+   "diff": 205,
+   "nofootage": 0
+  }
+ ]
+}
