@@ -209,15 +209,15 @@ function renderDiesel() {
   document.getElementById('dexp').textContent = (X.expected || '') + ' ' + (X.whole || '');
   document.querySelector('#dfill tbody').innerHTML = F.slice().reverse().map(f => `<tr><td style="white-space:nowrap">${dm(f.date)}</td><td class="n">${n0(f.litres)}</td><td class="n">${f.perL == null ? '—' : (+f.perL).toFixed(2)}</td><td class="n">${n0(f.total)}</td><td class="small">${esc(f.machine || '')}</td><td class="small" style="${/confirm/.test(f.odoo) ? 'color:var(--amber);font-weight:600' : ''}">${esc(f.odoo)}</td><td class="small muted">${esc(f.paid || '')}</td></tr>`).join('');
 }
-let FM = 'all';
+let FM = 'strong';
 function renderFlags() {
   const L = D.flags || [];
   const months = [...new Set(L.map(l => l.date.slice(0, 7)))];
-  document.getElementById('ffilters').innerHTML = ['all', ...months].map(m => `<button class="${m === FM ? 'on' : ''}" onclick="FM='${m}';renderFlags()">${m === 'all' ? 'All' : monthName(m)} (${m === 'all' ? L.length : L.filter(l => l.date.startsWith(m)).length})</button>`).join('');
-  document.getElementById('flags').innerHTML = L.filter(l => FM === 'all' || l.date.startsWith(FM)).slice().reverse().map(l => {
+  document.getElementById('ffilters').innerHTML = `<button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest (${L.filter(l => l.strong).length})</button>` + ['all', ...months].map(m => `<button class="${m === FM ? 'on' : ''}" onclick="FM='${m}';renderFlags()">${m === 'all' ? 'All' : monthName(m)} (${m === 'all' ? L.length : L.filter(l => l.date.startsWith(m)).length})</button>`).join('');
+  document.getElementById('flags').innerHTML = L.filter(l => FM === 'all' || (FM === 'strong' ? l.strong : l.date.startsWith(FM))).slice().reverse().map(l => {
     const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
     return `<div class="ld"><div class="ph" ${u ? `onclick="openViewer('${u}', '${esc(x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera)}')"` : ''}>${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
-      <div class="bd"><div class="top"><b>${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
+      <div class="bd"><div class="top"><b>${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
   }).join('');
 }
 function openViewer(url, title) {
