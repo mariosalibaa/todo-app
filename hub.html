@@ -236,8 +236,11 @@ function renderTiles(who) {
       <div class="ico">${a.ico}</div><div class="name">${name}</div><div class="desc">${pre}${who.admin && a.adminDesc || a.desc}</div>
     </a>`;
   // a folder (#ajaltoun-4193) shows its own apps; the hub shows the folder tile, and its apps only when a search hits them
-  const open = FOLDERS[location.hash.slice(1)] ? location.hash.slice(1) : '';
-  document.getElementById('folderBack').style.display = open ? '' : 'none';
+  // everything he has sits in one folder (Antoine: Partners, Decisions, Excavation) → open it, no folder tile and no back button (Mario, 2026-10-10)
+  const only = !vis.some(a => !a.in) && [...new Set(vis.map(a => a.in))];
+  const sole = only && only.length === 1 && vis.length > 1 ? only[0] : '';
+  const open = sole || (FOLDERS[location.hash.slice(1)] ? location.hash.slice(1) : '');
+  document.getElementById('folderBack').style.display = open && !sole ? '' : 'none';
   document.querySelector('.apps-head h2').textContent = open ? FOLDERS[open].name : 'Apps';
   document.getElementById('tiles').innerHTML = (open ? vis.filter(a => a.in === open).map(a => tile(a)).join('') : APPS.map(a => {
     if (!a.folder) return !a.in && vis.includes(a) ? tile(a) : '';
