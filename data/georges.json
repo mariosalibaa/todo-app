@@ -1,7 +1,340 @@
 {
  "updated": "2026-10-10",
- "pending": "3 Aug – 27 Aug (before the Entrance camera) still being reviewed from D1 up and D2",
+ "pending": "",
  "days": [
+  {
+   "date": "2026-08-03",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "10:15",
+     "leave": "13:42"
+    }
+   ],
+   "hours": 3.45,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "IN 10:15:21 (rear, spare wheel, clear). 13:42:07 a silver SUV far down the track facing the camera = taken as leaving; not seen again. d1 up (far, hazy) shows a light car parked at the top of the track roughly 10:30-13:00, consistent.",
+   "photo": "20260803.jpg"
+  },
+  {
+   "date": "2026-08-04",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:35",
+     "leave": "16:58"
+    }
+   ],
+   "hours": 9.38,
+   "partial": false,
+   "confidence": "high",
+   "notes": "IN 07:35:41 (rear, spare wheel). 11:17:12 passed the camera toward the exit (roof rails, front view), then 11:26:22 and 12:52:07 back in the pit (far rear, spare wheel); treated as a turnaround/short trip within one visit (if it really left, that gap is only ~9 min). OUT 16:58:17 (clear front, Toyota face).",
+   "photo": "20260804.jpg"
+  },
+  {
+   "date": "2026-08-05",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:59",
+     "leave": "?"
+    },
+    {
+     "arrive": "14:31",
+     "leave": "16:09"
+    }
+   ],
+   "hours": 1.63,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 07:59:19 carrying a long steel beam on the roof; 08:05:38 OUT / 08:08:20 IN again = unloading turnaround. It must have left later in the morning (not captured) because it came IN again at 14:31:23 with more beams (rear, spare wheel). OUT 16:09:43 (front, roof rails). Hours: at least 1.6 h for the second visit plus an unknown first visit (>=0.2 h). Night 21:49-21:52: an unidentifiable car with headlights at the pit (not shown to be the RAV4).",
+   "photo": "20260805.jpg"
+  },
+  {
+   "date": "2026-08-06",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:39",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 07:39:49 with a beam on the roof (rear, spare wheel). 11:23:53 a car far down the track coming back and 11:28:10 RAV4 going IN again (rear, spare wheel) = turnaround. No departure captured; d1 up only from 12:10 and does not show the parking spot. At least 3.8 h.",
+   "photo": "20260806.jpg"
+  },
+  {
+   "date": "2026-08-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 (event-only camera, so a short or unrecorded visit is possible). The Entrance camera did not exist yet. D2 had only a few events. Night 20:39-21:07: a dark car with lights and people with torches near the pit (not the RAV4 as far as can be seen).",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-08",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:47",
+     "leave": "?"
+    },
+    {
+     "arrive": "15:26",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 07:47:44 (rear, spare wheel) and IN again 15:26:37 (rear, spare wheel), so it left at some unrecorded time in between and came back. No departure captured. BMW also on site (08:54).",
+   "photo": "20260808.jpg"
+  },
+  {
+   "date": "2026-08-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Sunday. Only a black SUV on D2 (13:15-13:18). No RAV4.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-10",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:33",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 08:33:08 (rear, spare wheel). After that D2 caught only trucks. d1 up (far) shows a light-coloured car parked at the top of the track 08:40-10:50 and gone by about 11:00; that may be the RAV4 leaving around 10:55, but the car cannot be identified at that distance (low).",
+   "photo": "20260810.jpg"
+  },
+  {
+   "date": "2026-08-11",
+   "present": null,
+   "visits": [],
+   "hours": null,
+   "partial": false,
+   "confidence": "none",
+   "notes": "Unknown: no D2 events at all and no d1 up frames in daytime.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-12",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:17",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 08:17:33 (rear, spare wheel, against the sun). No departure captured (13:51 silver car near the camera = the Dakota pickup, not the RAV4).",
+   "photo": "20260812.jpg"
+  },
+  {
+   "date": "2026-08-13",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "notes": "Not seen. 17:49 and 18:05 = silver BMW sedan (rear window + boot behind the roof rack), not the RAV4; 12:49 = a different silver sedan.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-14",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:16",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 08:16:13 (rear, spare wheel) carrying a long pole with a green marker flag. 16:01:33: a silver car far away facing the camera; earlier work called it probably the BMW. If it was the RAV4, the stay was 08:16-16:01 (7.8 h).",
+   "photo": "20260814.jpg"
+  },
+  {
+   "date": "2026-08-15",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 (event-only camera, so a short or unrecorded visit is possible). The Entrance camera did not exist yet. Saturday; only a black SUV on D2.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-16",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "notes": "Not seen on D2 (event-only camera, so a short or unrecorded visit is possible). The Entrance camera did not exist yet. Sunday; D2 had only 3 events.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-17",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "?",
+     "leave": "13:42"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "Arrival not captured. 13:42:45 silver SUV with roof rails passing the camera toward the exit: the rack runs to a squared SUV tail with a rear spoiler and no rear window/boot behind it, which matches the RAV4 (compare 4 Aug 11:17) and not the BMW sedan (rear window + boot behind the rack, see 13 Aug 18:05). Spare wheel/plate not visible, so not certain. The BMW came at 07:33 and 17:02 is the BMW.",
+   "photo": "20260817.jpg"
+  },
+  {
+   "date": "2026-08-18",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:36",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "notes": "IN 07:36:54 (rear, spare wheel). BMW followed at 07:46. No RAV4 departure captured (16:48 roof at the bottom edge shows a rear window behind the rack = BMW-like, not counted).",
+   "photo": "20260818.jpg"
+  },
+  {
+   "date": "2026-08-19",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "?",
+     "leave": "13:37"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "Arrival not captured (07:41 was the Dakota). 13:37:01 silver SUV with roof rails passing the camera toward the exit, same SUV tail/spoiler shape as the RAV4 (see 17 Aug). No spare wheel/plate visible.",
+   "photo": "20260819.jpg"
+  },
+  {
+   "date": "2026-08-20",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 (event-only camera, so a short or unrecorded visit is possible). The Entrance camera did not exist yet. Komatsu loading trucks right beside the camera all day.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-21",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:25",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 07:25:24 (rear, spare wheel). No departure on D2. d1 up (far) shows a light car parked at the top of the track from about 07:30 to at least 14:30; after 14:45 the camera view drifts and the spot is lost (low).",
+   "photo": "20260821.jpg"
+  },
+  {
+   "date": "2026-08-22",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:26",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "IN 07:26:01 (rear, spare wheel). No departure captured. Night 23:18-23:23: a vehicle with bright lights at the pit (not identifiable).",
+   "photo": "20260822.jpg"
+  },
+  {
+   "date": "2026-08-23",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Sunday. Only the Dakota and people on D2.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-24",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:57",
+     "leave": "13:56"
+    }
+   ],
+   "hours": 5.98,
+   "partial": false,
+   "confidence": "high",
+   "notes": "IN 07:57:48 (rear, spare wheel); OUT 13:56:17 (clear front, Toyota face). d1 up confirms a silver SUV parked at the top of the track 08:00-13:30 and gone at 14:00.",
+   "photo": "20260824.jpg"
+  },
+  {
+   "date": "2026-08-25",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 (event-only camera, so a short or unrecorded visit is possible). The Entrance camera did not exist yet. (white sedan, Dakota, trucks only).",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-26",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 (event-only camera, so a short or unrecorded visit is possible). The Entrance camera did not exist yet. D2 busy all day (Komatsu, people), no RAV4.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-27",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:36",
+     "leave": "13:10"
+    }
+   ],
+   "hours": 5.57,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "IN 07:36:41 (rear, spare wheel). 13:10:02 the RAV4 rear with its round spare wheel right under the camera (manoeuvring/reversing out). d1 up shows a light SUV parked at the top of the track 11:00-13:00 and gone at 13:30, so taken as leaving ~13:10.",
+   "photo": "20260827.jpg"
+  },
   {
    "date": "2026-08-28",
    "present": null,
