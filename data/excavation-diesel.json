@@ -1,6 +1,6 @@
 {
  "updated": "2026-10-10 (all cameras incl. D2 up)",
- "verdict": "Consumption is normal. With the hours from every camera combined (d1 up, Entrance, D2, D2 up, D3 up, D2-D3), from 2 Aug to 9 Oct the machines received 5,771 L; their running hours (about 266 machine-hours) need about 5,863 L — delivered is 92 L (1.6%) below expected, well within the margin of error. That is 21.7 L per machine-hour against about 22 expected. The week of 18–24 Sep, which looked high before, is explained by work D2 up saw and d1 up missed (now +65 L, 24 L/h). Only 18–24 Aug stays high (+152 L, 28.8 L/h), and its hours are estimates from the pit camera. So the litres match the work. But the cameras show the Dodge with jerrycans parked against a machine, with someone on its deck, on many mornings (3, 4, 5, 16, 17, 18, 21, 23, 28 Sep, 1 and 2 Oct) — diesel is being moved by can, and the cameras cannot show in which direction.",
+ "verdict": "Consumption is normal. With the hours from every camera combined (d1 up, Entrance, D2, D2 up, D3 up, U3 up, D2-D3), from 2 Aug to 9 Oct the machines received 5,771 L; their running hours (about 277 machine-hours) need about 6,099 L — delivered is 328 L (5%) below expected. That is 20.8 L per machine-hour against about 22 expected. No week is clearly abnormal once all cameras are counted; only 18–24 Aug stays above (+152 L), and its hours are pit-camera estimates. So the litres delivered match the work. But the cameras show the Dodge with jerrycans parked against a machine, often with someone on its deck, on most working days in September and October (before work, at lunch and after work) — diesel is moved by can, and the cameras cannot show in which direction.",
  "expected": "Expected: Hitachi with breaker 24 L/h (20–28), Komatsu 17 L/h (14–20). Hours from all cameras combined; days with no camera at all (11 Aug) use the month average. One interval can be off by a whole tank (tanks are not filled to the same level each time). 8 Oct (200 L) and 9 Oct (495 L) together: 695 L for about 633 L expected.",
  "whole": "18 Apr – 9 Oct: 16,478 L for 4,500 m³ excavated = 3.66 L/m³ (contract table assumed 3.07).",
  "pending": [
@@ -347,12 +347,12 @@
    "litres": 540,
    "start": "2026-09-04",
    "end": "2026-09-11",
-   "hit": 18.5,
-   "kom": 10.8,
-   "hours": 29.2,
-   "lph": 18.5,
-   "expected": 626,
-   "diff": -86,
+   "hit": 20.2,
+   "kom": 11.8,
+   "hours": 32.0,
+   "lph": 16.9,
+   "expected": 685,
+   "diff": -145,
    "nofootage": 0
   },
   {

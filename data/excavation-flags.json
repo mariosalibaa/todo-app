@@ -145,11 +145,27 @@
  },
  {
   "date": "2026-09-02",
+  "time": "09:23-12:05",
+  "camera": "D3 up",
+  "what": "Dodge parked tight against the rear of the idle Hitachi for 2 h 40 min, door open at 10:20; Hitachi does not work until 12:12",
+  "photo": "20260902_d3u3a00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-02",
   "time": "15:05",
   "camera": "D2",
   "what": "grey Dodge with a FULL bed of green and blue jerrycans stops beside the working Hitachi",
   "photo": "20260902_00.jpg",
   "strong": false
+ },
+ {
+  "date": "2026-09-03",
+  "time": "08:06-08:20",
+  "camera": "D3 up",
+  "what": "Dodge parks against the Hitachi; man walks over and stands on the Hitachi engine deck at 08:09, before the day's work",
+  "photo": "20260903_d3u3a00.jpg",
+  "strong": true
  },
  {
   "date": "2026-09-03",
@@ -193,10 +209,26 @@
  },
  {
   "date": "2026-09-03",
+  "time": "15:31-15:41",
+  "camera": "D3 up",
+  "what": "Mhanna diesel tanker parked between the machines, fuelling the Komatsu (arrived ~15:19 on D2 up, left 15:41)",
+  "photo": "20260903_d3u3a01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-03",
   "time": "15:42",
   "camera": "D2 up",
   "what": "Dodge with about 20 jerrycans pulls up against the Komatsu 1 min after the tanker leaves",
   "photo": "20260903_d2upa03.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-03",
+  "time": "15:44",
+  "camera": "D3 up",
+  "what": "Dodge pulls up against the Komatsu 3 min after the tanker leaves",
+  "photo": "20260903_d3u3a02.jpg",
   "strong": true
  },
  {
@@ -209,11 +241,35 @@
  },
  {
   "date": "2026-09-04",
+  "time": "09:17-09:56",
+  "camera": "D3 up",
+  "what": "Dodge with cans alongside the parked Komatsu; a person on the Komatsu engine deck at 09:22",
+  "photo": "20260904_d3u3a00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-04",
   "time": "09:44-09:51",
   "camera": "D2 up",
   "what": "Dodge hood open, person on the Komatsu engine deck, cans in the bed",
   "photo": "20260904_d2upa01.jpg",
   "strong": true
+ },
+ {
+  "date": "2026-09-04",
+  "time": "09:44-09:51",
+  "camera": "D3 up",
+  "what": "Dodge turned nose-in against the Komatsu with its hood open",
+  "photo": "20260904_d3u3a01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-04",
+  "time": "09:56-10:25",
+  "camera": "D3 up",
+  "what": "Dodge with a bed of jerrycans reversed to the jerrycan pile by the fence, next to the parked Hitachi, ~30 min",
+  "photo": "20260904_d3u3a02.jpg",
+  "strong": false
  },
  {
   "date": "2026-09-04",
@@ -240,6 +296,22 @@
   "strong": true
  },
  {
+  "date": "2026-09-05",
+  "time": "08:01-08:22",
+  "camera": "D3 up",
+  "what": "Saturday: Dodge against the parked Komatsu, man at its tracks/deck (deck seen on D2 up 08:15)",
+  "photo": "20260905_d3u3a00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-05",
+  "time": "11:58-12:11",
+  "camera": "D3 up",
+  "what": "Saturday lunch: Dodge backed against the Komatsu, hood open, man between the Dodge and the machine",
+  "photo": "20260905_d3u3a01.jpg",
+  "strong": false
+ },
+ {
   "date": "2026-09-06",
   "time": "04:14",
   "camera": "D2 up + D2 + Entrance",
@@ -261,6 +333,30 @@
   "camera": "D2 up + Entrance",
   "what": "Gate lamp on at night, 4 Entrance events with nothing visible (likely an animal)",
   "photo": "20260907_d2upa00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-07",
+  "time": "08:01-08:13",
+  "camera": "D3 up",
+  "what": "Dodge with jerrycans backed against the parked Komatsu before work, person at the Komatsu side",
+  "photo": "20260907_d3u3a00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-08",
+  "time": "13:45-16:10",
+  "camera": "D3 up",
+  "what": "Dodge parked beside the Hitachi, later beside the Komatsu, during the afternoon (matches d1 up)",
+  "photo": "20260908_d3u3a00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-08",
+  "time": "16:40-17:03",
+  "camera": "D3 up",
+  "what": "After work: Dodge at the Komatsu, then at the jerrycan pile right behind the Hitachi with a man at the machine, then back at the Komatsu",
+  "photo": "20260908_d3u3a01.jpg",
   "strong": false
  },
  {
@@ -293,6 +389,14 @@
   "camera": "D2 up",
   "what": "Lunch: a mason in a white hat works on the stone wall with a green garden hose. This is water for the masonry and is benign.",
   "photo": "20260909_d2upb01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-09",
+  "time": "14:44",
+  "camera": "D3 up",
+  "what": "D3 up panned by its motor from the yard to the wall (remote app), same minutes as D2 up and d1 up; Dodge parked by the Hitachi just before",
+  "photo": "20260909_d3u3a00.jpg",
   "strong": false
  },
  {
@@ -366,6 +470,30 @@
   "what": "night motion with a bright light at the lower right (a vehicle or a torch; low confidence)",
   "photo": "20260910_02.jpg",
   "strong": false
+ },
+ {
+  "date": "2026-09-11",
+  "time": "15:04-15:22",
+  "camera": "D3 up",
+  "what": "White diesel tanker at the parked Komatsu and Hitachi, hose on the ground, two men (fuelling). RAV4 pulls up beside the Komatsu 15:18 and stays with two men after the tanker leaves",
+  "photo": "20260911_d3u3a00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-12",
+  "time": "07:53-08:12",
+  "camera": "D3 up",
+  "what": "Saturday: Dodge parked beside the parked Komatsu, man at the Dodge",
+  "photo": "20260912_d3u3a00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-12",
+  "time": "10:38-11:30",
+  "camera": "D3 up",
+  "what": "Saturday: Dodge parked alongside the parked Hitachi, door open; a man on the Hitachi engine deck 10:42-11:12. Hitachi starts work 11:32",
+  "photo": "20260912_d3u3a01.jpg",
+  "strong": true
  },
  {
   "date": "2026-09-13",
