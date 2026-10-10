@@ -169,6 +169,38 @@
  },
  {
   "date": "2026-09-09",
+  "time": "09:41",
+  "camera": "D2",
+  "what": "Dodge comes in with about 20 jerrycans, water bottles and a coil of hose/pump, and drives up to the machines",
+  "photo": "20260909_90.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-09",
+  "time": "14:47-14:48",
+  "camera": "d1 up + Entrance",
+  "what": "d1 up wakes after 3 h without recording, already pointing a new wider way; the Entrance camera is panned by its motor at 14:48 (someone using the Tapo app)",
+  "photo": "20260909_93.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-09",
+  "time": "15:32-15:36",
+  "camera": "d1 up",
+  "what": "One person stands at the Hitachi side next to the Dodge twice (15:32:58-15:33:24 and 15:35:52-15:36:11), both machines parked",
+  "photo": "20260909_91.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-09",
+  "time": "15:39-15:40",
+  "camera": "D2",
+  "what": "The Dodge drives away from the Hitachi and leaves past D2 with the bed full of jerrycans",
+  "photo": "20260909_92.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-09",
   "time": "15:40",
   "camera": "D2",
   "what": "grey Dodge with jerrycans drives up to the machines 20 min after the Komatsu stops",
