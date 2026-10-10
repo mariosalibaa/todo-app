@@ -1,6 +1,6 @@
 {
  "updated": "2026-10-10",
- "source": "SD cards: d1 up (machines), D1 Entrance (trucks), D2 pit camera",
+ "source": "All site cameras combined: d1 up, D1 Entrance, D2 (pit), D2 up, D3 up, D2-D3, Pergola",
  "days": [
   {
    "date": "2026-08-03",
@@ -9,7 +9,10 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "medium",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-04",
@@ -18,16 +21,39 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "low",
-   "notes": "loads 0-2; Hitachi parked all day"
+   "notes": "loads 0-2; Hitachi parked all day",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-05",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 1.5,
+   "komatsu": 2.5,
+   "loads": 3,
    "footage": "none",
-   "confidence": "",
-   "notes": "camera did not record the working day"
+   "confidence": "low",
+   "notes": "Three loads left: about 10:25 (a yellow tipper loaded at the near pile 09:08-10:25), 13:31 (the green El Hajj Mercedes) and 15:25 (the yellow \"M.P.\" tipper, which came in at 14:55). The orange Hitachi boom shows at the far end at 13:31 and 14:23. Loading proves a machine worked, but D2 cannot see which one or for how long.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0.5,
+     3
+    ],
+    "k": [
+     1.5,
+     4
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2"
+   ]
   },
   {
    "date": "2026-08-06",
@@ -36,7 +62,10 @@
    "loads": 1,
    "footage": "from 12:10",
    "confidence": "medium",
-   "notes": "minimum (no morning footage)"
+   "notes": "minimum (no morning footage)",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-07",
@@ -45,16 +74,39 @@
    "loads": 1,
    "footage": "full day",
    "confidence": "medium",
-   "notes": "Hitachi ~7.3 if there was a lunch stop"
+   "notes": "Hitachi ~7.3 if there was a lunch stop",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-08",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 1,
+   "komatsu": 3,
+   "loads": 3,
    "footage": "none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "low",
+   "notes": "Saturday. Three yellow tippers came in empty and went out loaded: in 08:24 / out 08:48, in 10:32 / out 10:57, in 13:24 / out 13:50. That is roughly 3 x 25 min of Komatsu loading plus work on the pile. The Hitachi cannot be resolved. A white diesel tanker was on site 15:21-15:36.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0,
+     3
+    ],
+    "k": [
+     2,
+     4.5
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2"
+   ]
   },
   {
    "date": "2026-08-09",
@@ -63,7 +115,10 @@
    "loads": 0,
    "footage": "from 11:50",
    "confidence": "medium",
-   "notes": "Sunday"
+   "notes": "Sunday",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-10",
@@ -72,7 +127,10 @@
    "loads": 3,
    "footage": "full day",
    "confidence": "medium-high",
-   "notes": "Hitachi parked from 11:03"
+   "notes": "Hitachi parked from 11:03",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-11",
@@ -81,7 +139,8 @@
    "loads": null,
    "footage": "none",
    "confidence": "",
-   "notes": ""
+   "notes": "no camera recorded this day",
+   "cams": []
   },
   {
    "date": "2026-08-12",
@@ -90,7 +149,10 @@
    "loads": 1,
    "footage": "from 10:47",
    "confidence": "medium",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-13",
@@ -99,16 +161,39 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "medium-high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-14",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 1,
+   "komatsu": 1.5,
+   "loads": 2,
    "footage": "none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "low",
+   "notes": "Two loads: a yellow tipper in 07:52 / out loaded 08:15, and the green El Hajj truck in 08:44 / out loaded 09:05. There are only 13 events and none from 09:28 to 15:12, so machine time after 09:30 is unknown. A motion event at 02:27 at night (a light on the track).",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0,
+     3
+    ],
+    "k": [
+     1,
+     3
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2"
+   ]
   },
   {
    "date": "2026-08-15",
@@ -117,7 +202,10 @@
    "loads": 0,
    "footage": "from 12:30",
    "confidence": "medium",
-   "notes": "15 Aug holiday"
+   "notes": "15 Aug holiday",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-16",
@@ -126,16 +214,39 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Sunday"
+   "notes": "Sunday",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-17",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 1,
+   "komatsu": 3,
+   "loads": 3,
    "footage": "none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "low",
+   "notes": "Three loads: a yellow tipper in 14:17 / out loaded 14:41; a yellow tipper in 15:44 / out loaded 16:05; a tipper in at 17:11, then a white MHANNA Mercedes tipper out at 17:36, which is after normal hours. A silver diesel tanker was at the camera 16:07-16:25. The morning shows people only, so the work was probably afternoon only.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0,
+     3
+    ],
+    "k": [
+     2,
+     4.5
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2"
+   ]
   },
   {
    "date": "2026-08-18",
@@ -144,16 +255,39 @@
    "loads": 0,
    "footage": "from 14:39",
    "confidence": "low",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-19",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 0.3,
+   "komatsu": 2.5,
+   "loads": 0,
    "footage": "none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "medium",
+   "notes": "The Komatsu (bucket, KOMATSU on the counterweight) works close to D2 from 09:43 to 12:18, with a dense burst from 11:58 to 12:18. It is parked from 13:37. No tippers came. The machine at the far end is not seen working.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0,
+     1.5
+    ],
+    "k": [
+     1.5,
+     3.5
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2"
+   ]
   },
   {
    "date": "2026-08-20",
@@ -162,7 +296,10 @@
    "loads": 3,
    "footage": "from 10:55",
    "confidence": "medium",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-21",
@@ -171,16 +308,39 @@
    "loads": 3,
    "footage": "full day",
    "confidence": "medium-high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-22",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 2,
+   "komatsu": 0.3,
+   "loads": 0,
    "footage": "none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "low",
+   "notes": "Saturday. The orange Hitachi breaks at the far end from 07:26 to about 09:29 (heavy dust at 08:23). It stays parked in one spot from 12:21 to 17:06. No tippers.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     1.5,
+     3
+    ],
+    "k": [
+     0,
+     2
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2"
+   ]
   },
   {
    "date": "2026-08-23",
@@ -189,7 +349,10 @@
    "loads": 0,
    "footage": "from 10:05",
    "confidence": "high",
-   "notes": "Sunday"
+   "notes": "Sunday",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-24",
@@ -198,7 +361,10 @@
    "loads": 1,
    "footage": "full day",
    "confidence": "medium",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-25",
@@ -207,16 +373,39 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "medium",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-26",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 1,
+   "komatsu": 2,
+   "loads": 0,
    "footage": "none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "medium",
+   "notes": "The Komatsu works close to D2 almost continuously from 12:15 to after 13:13, through the lunch hour (69 events in the 13:00 hour). A machine works at the far end 14:19-15:40. No tippers. This is the busiest D2 day in the set (135 events).",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0.5,
+     2
+    ],
+    "k": [
+     1.5,
+     3
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2"
+   ]
   },
   {
    "date": "2026-08-27",
@@ -225,7 +414,10 @@
    "loads": 0,
    "footage": "from 10:52",
    "confidence": "medium",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up"
+   ]
   },
   {
    "date": "2026-08-28",
@@ -234,16 +426,41 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "low",
-   "notes": "loads 0-3, camera view moved"
+   "notes": "loads 0-3, camera view moved",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-08-29",
-   "hitachi": null,
-   "komatsu": null,
+   "hitachi": 2,
+   "komatsu": 0.5,
    "loads": 1,
    "footage": "none (Entrance only)",
-   "confidence": "",
-   "notes": "work happened but d1 up did not record"
+   "confidence": "low",
+   "notes": "Saturday. The orange Hitachi works at the far end 06:17-10:18; its position changes between tiles. One load: a yellow-bed tipper on D2 at 08:10, which reverses out at 08:22 (Entrance). After that, cars only. It rained from about 16:24 and again around 22:00. The night events on both cameras are rain streaks and a dog. Not suspicious.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": 1
+   },
+   "range": {
+    "h": [
+     1,
+     3.5
+    ],
+    "k": [
+     0.25,
+     1.5
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-08-30",
@@ -252,7 +469,11 @@
    "loads": 0,
    "footage": "from 15:53",
    "confidence": "medium",
-   "notes": "Sunday"
+   "notes": "Sunday",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-08-31",
@@ -261,43 +482,131 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": "machine swap on a lowboy 08:15-08:51 via the top road"
+   "notes": "machine swap on a lowboy 08:15-08:51 via the top road",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-01",
-   "hitachi": null,
-   "komatsu": null,
+   "hitachi": 0.1,
+   "komatsu": 3.5,
    "loads": 3,
    "footage": "mostly none",
-   "confidence": "",
-   "notes": "loads from the Entrance camera"
+   "confidence": "medium",
+   "notes": "The Komatsu works 09:16-13:37 and loads the green El Hajj truck beside D2 at 12:12-12:20. Three loads by the green El Hajj Mercedes, out at about 09:35, 10:46 and 12:22 (Entrance shows it loaded each time). The Hitachi stays parked at the far end.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": 3
+   },
+   "range": {
+    "h": [
+     0,
+     0.5
+    ],
+    "k": [
+     2.5,
+     4.5
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-02",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 3,
+   "komatsu": 1.25,
+   "loads": 0,
    "footage": "mostly none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "medium",
+   "notes": "The Komatsu works 10:28-11:25, then drives past D2 toward the entrance at 11:28-11:29, where the Entrance camera shows it. The orange Hitachi breaks continuously 12:36-15:38 (about 70 events). No tippers.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     2.5,
+     3.5
+    ],
+    "k": [
+     1,
+     2
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-03",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 2,
+   "komatsu": 0,
+   "loads": 0,
    "footage": "mostly none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "medium",
+   "notes": "The Hitachi breaks 08:44-09:50 and 14:20-15:19. Nothing was recorded 09:50-13:59; the high estimate allows for work in that gap. The Komatsu is parked at the far end. No tippers. A Mhanna diesel tanker is on site 15:19-15:41.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     1.5,
+     3.5
+    ],
+    "k": [
+     0,
+     0.5
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-04",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 1.75,
+   "komatsu": 0.5,
+   "loads": 0,
    "footage": "none",
-   "confidence": "",
-   "notes": "Komatsu seen working ~10:18 on the Entrance camera"
+   "confidence": "medium",
+   "notes": "The Komatsu works 09:58-10:21 and drives up past D2 to the entrance at 10:18-10:21 (also on Entrance). The Hitachi breaks 10:33-11:54, and again around 14:06 and 15:26. A bucket machine moves at 15:39-15:44. No tippers. One Entrance event at 01:00 was not inspected.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     1.3,
+     3
+    ],
+    "k": [
+     0.3,
+     1
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-05",
@@ -306,7 +615,11 @@
    "loads": 0,
    "footage": "from 09:34",
    "confidence": "medium",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-06",
@@ -315,7 +628,11 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Sunday"
+   "notes": "Sunday",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-07",
@@ -324,7 +641,11 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "medium-high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-08",
@@ -333,25 +654,72 @@
    "loads": 1,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Hitachi idle all day"
+   "notes": "Hitachi idle all day",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-09",
-   "hitachi": null,
-   "komatsu": null,
+   "hitachi": 0.1,
+   "komatsu": 4,
    "loads": 4,
    "footage": "camera turned to the wall 08:36-15:24",
-   "confidence": "",
-   "notes": "Komatsu ~3.5-4 h seen on the Entrance camera"
+   "confidence": "medium-high",
+   "notes": "The Komatsu works almost continuously 10:13-15:20 (about 108 motion events). Four loads by white Mhanna tippers at about 10:31, 11:31, 11:55 and 12:34. D2 shows two of them (in 10:14 / out loaded 10:31, in 12:22 / out loaded 12:34); Entrance shows all four. A CIFA concrete pump came 08:01-08:03. The Hitachi is not seen working. The Entrance events from 19:00 to 22:00 are lights and dogs at the gate.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": 4
+   },
+   "range": {
+    "h": [
+     0,
+     0.5
+    ],
+    "k": [
+     3.5,
+     4.5
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-10",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 4.5,
+   "komatsu": 0,
+   "loads": 0,
    "footage": "card stops 08:53",
-   "confidence": "",
-   "notes": "Hitachi breaking 09:30-14:48 (~5 h) on the Entrance camera"
+   "confidence": "medium-high",
+   "notes": "The Hitachi breaks 08:06-08:53 (d1 up), then 09:30-14:37 almost continuously on D2 (close to D2 at 12:01-12:11). This matches the Entrance camera at 09:30-14:48. The Komatsu is parked all day. No tippers.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     4,
+     5.5
+    ],
+    "k": [
+     0,
+     0.3
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance",
+    "d1 up until 08:53"
+   ]
   },
   {
    "date": "2026-09-11",
@@ -360,7 +728,11 @@
    "loads": 3,
    "footage": "from 11:28",
    "confidence": "medium",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-12",
@@ -369,7 +741,11 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Saturday"
+   "notes": "Saturday",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-13",
@@ -378,7 +754,11 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Sunday"
+   "notes": "Sunday",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-14",
@@ -387,7 +767,11 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-15",
@@ -396,7 +780,11 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-16",
@@ -405,7 +793,11 @@
    "loads": 1,
    "footage": "full day",
    "confidence": "high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-17",
@@ -414,7 +806,11 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-18",
@@ -423,25 +819,71 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "medium",
-   "notes": "rain"
+   "notes": "rain",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-19",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 0,
+   "komatsu": 0,
+   "loads": 0,
    "footage": "none",
-   "confidence": "",
-   "notes": ""
+   "confidence": "medium",
+   "notes": "Saturday. D2 recorded only 5 events: a dog, two sedans at 08:01 and 08:07, and the RAV4 at 10:37 and 13:59. Both machines are parked at the far end in every tile. Entrance shows cars only, plus people carrying branches at about 16:00. Its 150+ events from 17:00 to 23:00 are light changes and dogs.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0,
+     0.5
+    ],
+    "k": [
+     0,
+     0.3
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-20",
-   "hitachi": null,
-   "komatsu": null,
-   "loads": null,
+   "hitachi": 0,
+   "komatsu": 0,
+   "loads": 0,
    "footage": "none",
-   "confidence": "",
-   "notes": "Sunday (probably no work)"
+   "confidence": "medium",
+   "notes": "Sunday. D2 recorded 2 events, both at night. Entrance (317 events) shows one person walking at 13:42, smoke at 17:55, a person in red at 18:20, then dogs and lights from 18:47 to 22:40. No work, no vehicles at the machines.",
+   "d1up": {
+    "hitachi": null,
+    "komatsu": null,
+    "loads": null
+   },
+   "range": {
+    "h": [
+     0,
+     0.3
+    ],
+    "k": [
+     0,
+     0.3
+    ]
+   },
+   "est": true,
+   "d1off": true,
+   "cams": [
+    "D2",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-21",
@@ -450,7 +892,11 @@
    "loads": 0,
    "footage": "from 12:25",
    "confidence": "medium",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-22",
@@ -459,7 +905,11 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-23",
@@ -468,7 +918,11 @@
    "loads": 0,
    "footage": "from 14:07",
    "confidence": "medium",
-   "notes": "minimum"
+   "notes": "minimum",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-24",
@@ -477,7 +931,11 @@
    "loads": 6,
    "footage": "full day",
    "confidence": "medium",
-   "notes": "Komatsu maybe 4.2 h; loads maybe 7"
+   "notes": "Komatsu maybe 4.2 h; loads maybe 7",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-25",
@@ -486,7 +944,11 @@
    "loads": 3,
    "footage": "full day",
    "confidence": "high",
-   "notes": ""
+   "notes": "",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-26",
@@ -495,7 +957,11 @@
    "loads": 0,
    "footage": "until 07:45 + Entrance",
    "confidence": "medium",
-   "notes": "Saturday, no work seen"
+   "notes": "Saturday, no work seen",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-27",
@@ -504,7 +970,11 @@
    "loads": 0,
    "footage": "from 11:33",
    "confidence": "high",
-   "notes": "Sunday"
+   "notes": "Sunday",
+   "cams": [
+    "d1 up",
+    "Entrance"
+   ]
   },
   {
    "date": "2026-09-28",
@@ -513,34 +983,79 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "rain 11:29-12:32; oil service"
+   "notes": "d1 up was complete and D2_Up agrees (Hitachi breaking in the pit 11:25-15:53, rain stop visible; Komatsu loading at 09:16-09:34 and 10:37). 2 Scania loads (entrance out 09:34 and 10:53). D2's higher figures include the rain stop and the Komatsu's idle hour. No change.",
+   "d1up": {
+    "hitachi": 3.75,
+    "komatsu": 1.0,
+    "loads": 2
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up"
+   ]
   },
   {
    "date": "2026-09-29",
-   "hitachi": 5.0,
-   "komatsu": 1.0,
+   "hitachi": 5.5,
+   "komatsu": 0.5,
    "loads": 0,
    "footage": "pit camera only",
    "confidence": "low",
-   "notes": ""
+   "notes": "d1 up has no footage 07:47-16:25. D2_Up shows the Komatsu working in the pit at 08:34 (one event only) and the Hitachi breaking at 09:23, 10:07, 11:06-11:49, 13:03, 13:56 and 15:53, then parked by 15:57; D2 sees it 11:03-15:53. Estimate: Hitachi about 09:00-15:55 less about 1 h lunch (range 4.5-6.5 h); Komatsu one short session (range 0.2-1.0 h). No trucks on any camera.",
+   "d1up": {
+    "hitachi": 5.0,
+    "komatsu": 1.0,
+    "loads": 0
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up"
+   ]
   },
   {
    "date": "2026-09-30",
-   "hitachi": 3.5,
-   "komatsu": 1.5,
+   "hitachi": 4.0,
+   "komatsu": 1.6,
    "loads": 2,
    "footage": "pit camera only",
-   "confidence": "low",
-   "notes": ""
+   "confidence": "low-medium",
+   "notes": "d1 up stops at 07:19. D2_Up + D2: Hitachi breaking from about 09:30 (09:50, 10:26-10:58) to 12:47, 13:34-13:51 and 15:21-15:58; idle in the rain 13:50-15:00 (the Dodge against it 14:45-14:58). Komatsu: 08:00-08:15, 10:26-10:50 and 12:20-12:43 (loading), and 14:33-15:06 moving rock. Ranges: Hitachi 3.5-4.8 h, Komatsu 1.2-2.0 h. 2 Astra loads (entrance out 10:46 and 12:42; D2_Up shows both being loaded).",
+   "d1up": {
+    "hitachi": 3.5,
+    "komatsu": 1.5,
+    "loads": 2
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up"
+   ]
   },
   {
    "date": "2026-10-01",
-   "hitachi": 3.1,
-   "komatsu": 0,
+   "hitachi": 5.5,
+   "komatsu": 0.0,
    "loads": 0,
    "footage": "from 11:09",
    "confidence": "medium",
-   "notes": "Komatsu filled 400 L by tanker 07:17, then not used"
+   "notes": "d1 up has no footage before 11:09. D2_Up shows the Hitachi starting at about 08:44 and breaking at 09:22-09:26; D2 sees it in the pit 09:26-11:56. Adds about 08:45-11:09 = 2.4 h to d1 up's 3.1 h (range 4.9-5.8 h). Komatsu parked all day: D2's 'loading 09:20-09:24' is wrong, because the Renault tipper left empty (entrance) and D2_Up shows the Komatsu in the same pose 09:22-09:26.",
+   "d1up": {
+    "hitachi": 3.1,
+    "komatsu": 0,
+    "loads": 0
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up"
+   ]
   },
   {
    "date": "2026-10-02",
@@ -549,7 +1064,19 @@
    "loads": 0,
    "footage": "full day",
    "confidence": "medium",
-   "notes": "Hitachi may be 10-20% high"
+   "notes": "d1 up was complete; D2_Up agrees (Komatsu in the pit 11:57-12:14, Hitachi breaking at 11:35 and 15:54). No change. d1 up's 3-min slot method may overstate this long breaking day by 10-20 %.",
+   "d1up": {
+    "hitachi": 7.1,
+    "komatsu": 0.85,
+    "loads": 0
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up"
+   ]
   },
   {
    "date": "2026-10-03",
@@ -558,16 +1085,39 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "Saturday half day"
+   "notes": "Saturday half day. All cameras agree: Komatsu loads at 10:52-11:06 and 12:03-12:18, Hitachi breaking 07:45-12:05. 2 loads (out 11:07 and 12:18).",
+   "d1up": {
+    "hitachi": 3.6,
+    "komatsu": 1.2,
+    "loads": 2
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up"
+   ]
   },
   {
    "date": "2026-10-04",
-   "hitachi": 0,
-   "komatsu": 0,
+   "hitachi": 0.0,
+   "komatsu": 0.0,
    "loads": 0,
    "footage": "afternoon + pit",
    "confidence": "high",
-   "notes": "Sunday"
+   "notes": "Sunday. d1 up has no footage before 12:03, but D2 (06:20-18:31) and D2_Up (05:31 and the night events) show both machines in the same pose all day. No work, no trucks.",
+   "d1up": {
+    "hitachi": 0,
+    "komatsu": 0,
+    "loads": 0
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up"
+   ]
   },
   {
    "date": "2026-10-05",
@@ -576,43 +1126,110 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "tanker into the Hitachi 14:37 (litres?)"
+   "notes": "No change. D2's claim that the Hitachi was breaking from 14:03 is not supported: the D2 originals 14:03-14:38 show its boom in the same pose, which matches d1 up (idle 11:15-14:48, tanker 14:37-14:48). D2's '3 loads' are the same 2 trips (14:03 is truck 2 being filled). The D2-D3 continuous card starts at 19:46.",
+   "d1up": {
+    "hitachi": 4.65,
+    "komatsu": 1.05,
+    "loads": 2
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up",
+    "D2-D3 (night only)"
+   ]
   },
   {
    "date": "2026-10-06",
-   "hitachi": 5.1,
-   "komatsu": 2.5,
+   "hitachi": 5.3,
+   "komatsu": 2.7,
    "loads": 4,
    "footage": "full day",
-   "confidence": "high",
-   "notes": "continuous card"
+   "confidence": "medium-high",
+   "notes": "D2-D3 (continuous) shows the Komatsu making small moves near the camera 08:10-08:50, so part of d1 up's 07:57-08:51 Komatsu block was real; I took the middle of d1 up's 2.5-2.9 range. Hitachi unchanged (calibration 5.1 / 2.5). 4 loads: D2's 5th 'load' at 10:38 is truck 1 being loaded (D2_Up 10:40-10:44; out 10:56).",
+   "d1up": {
+    "hitachi": 5.1,
+    "komatsu": 2.5,
+    "loads": 4
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up",
+    "D2-D3",
+    "Pergola"
+   ]
   },
   {
    "date": "2026-10-07",
-   "hitachi": 5.4,
-   "komatsu": 1.8,
+   "hitachi": 5.5,
+   "komatsu": 2.1,
    "loads": 4,
    "footage": "full day",
-   "confidence": "high",
-   "notes": "continuous card"
+   "confidence": "medium-high",
+   "notes": "d1 up recorded only from 14:23. D2-D3 (continuous, close to the pit) gives the morning: Hitachi started 07:50 and broke rock continuously 08:00-11:12; it stood aside at the camera 11:20-11:40, broke 11:45-12:18, stood aside 12:20-12:34, broke 12:35-13:20, and was parked by D2-D3 13:25-15:05 (can episode, operator sitting in the cab), then broke 15:05-15:54. The 16:00-16:57 'breaking' on D2 is not real: D2-D3 and D2_Up show the boom in one pose with surveyors walking around. Komatsu: 07:45-08:05, the 4 loadings (11:13-11:35, 12:17-12:35, 13:20-13:44, 14:23-15:06). Calibration 5.4 / 1.8. 4 loads (entrance out 11:31, 12:35, 13:38, 14:45; D2_Up shows all 4 being loaded).",
+   "d1up": {
+    "hitachi": 5.4,
+    "komatsu": 1.8,
+    "loads": 4
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up",
+    "D2-D3"
+   ]
   },
   {
    "date": "2026-10-08",
-   "hitachi": 5.5,
-   "komatsu": 2.1,
+   "hitachi": 5.75,
+   "komatsu": 1.9,
    "loads": 3,
    "footage": "full day",
    "confidence": "high",
-   "notes": "200 L from cans into the Komatsu 08:00"
+   "notes": "D2-D3 shows the Komatsu parked beside the camera, in the same pose, 12:10-12:30 and from 14:00 onwards, so d1 up's uncertain Komatsu stretches (12:08-12:34 and 14:00-14:30) were idle and are removed (calibration 2.1). Hitachi unchanged; D2-D3 shows it breaking 08:30-11:20 and 12:20-15:50 and standing aside at the camera 11:30-12:00. 3 loads.",
+   "d1up": {
+    "hitachi": 5.5,
+    "komatsu": 2.1,
+    "loads": 3
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up",
+    "D2-D3",
+    "Pergola"
+   ]
   },
   {
    "date": "2026-10-09",
    "hitachi": 5.1,
-   "komatsu": 0,
+   "komatsu": 0.0,
    "loads": 0,
    "footage": "full day",
    "confidence": "medium-high",
-   "notes": "Komatsu parked all day"
+   "notes": "No change. D2_Up shows the Hitachi parked in one pose 14:57-18:30, which covers d1 up's 17:00-18:30 gap; D2's 'probably still working 14:28-16:07' is not supported. Komatsu parked all day on every camera. No tipper on any camera; the only heavy vehicle is the tanker at 17:08 (D3 up).",
+   "d1up": {
+    "hitachi": 5.1,
+    "komatsu": 0,
+    "loads": 0
+   },
+   "cams": [
+    "d1 up",
+    "Entrance",
+    "D2",
+    "D2_Up",
+    "D3 up",
+    "Pergola"
+   ]
   }
  ]
 }

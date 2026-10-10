@@ -766,7 +766,7 @@ const handler = async (req, res) => {
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
     '/reports': 'reports.html', '/projectcost': 'projectcost.html', '/suppliers': 'suppliers.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
-    '/ajaltoun/machines': 'machines.html', '/ajaltoun/machines/loads': 'machines.html', '/ajaltoun/machines/diesel': 'machines.html',   // machine hours + truck loads from the cameras (Mario 2026-10-10)
+    '/ajaltoun/machines': 'machines.html', '/ajaltoun/machines/loads': 'machines.html', '/ajaltoun/machines/diesel': 'machines.html', '/ajaltoun/machines/flags': 'machines.html',   // machine hours + truck loads from the cameras (Mario 2026-10-10)
     '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
     '/crm': 'crm.html',
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)

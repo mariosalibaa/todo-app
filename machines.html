@@ -60,17 +60,17 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a></nav>
+  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
   <div id="status" class="small muted">Loading…</div>
   <section id="v-days" hidden>
     <h1>Machines &amp; trucks — Ajaltoun 4193</h1>
-    <p class="lead">From the site cameras (SD cards): how long the <b style="color:var(--orange)">Hitachi FH330.3</b> and the <b style="color:var(--yellow)">Komatsu PC240</b> were seen working each day, and how many dump trucks left loaded. Hours are counted from camera frames every 3 minutes and were checked against a continuous recording for 6–8 Oct (within about half an hour). Gray days: the machine camera (d1 up) did not record because its battery ran flat; where the Entrance camera saw work, the note says so. — means unknown.</p>
+    <p class="lead">From the site cameras (SD cards): how long the <b style="color:var(--orange)">Hitachi FH330.3</b> and the <b style="color:var(--yellow)">Komatsu PC240</b> were seen working each day, and how many dump trucks left loaded. Hours are counted from camera frames every 3 minutes and were checked against a continuous recording for 6–8 Oct (within about half an hour). Every camera is combined: d1 up, Entrance, D2 (pit), D2 up, D3 up, D2-D3 and Pergola. When D1 up was off (battery flat) the day is filled from the other cameras; those hours start with ~ and are estimates. The Footage column lists the cameras used.</p>
     <div class="kpis" id="kpis"></div>
     <h2>Per month <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to see its days · small figures = per working day</span></h2>
-    <div class="card" style="overflow-x:auto"><table id="days"><thead><tr><th>Month / date</th><th class="n" style="color:var(--green)">Working days</th><th class="n">Off days</th><th class="n">of which Sundays</th><th class="n">Camera off</th><th class="n" style="color:var(--orange)">Hitachi h</th><th class="n" style="color:var(--yellow)">Komatsu h</th><th class="n">Both h</th><th class="n" style="color:var(--blue)">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
+    <div class="card" style="overflow-x:auto"><table id="days"><thead><tr><th>Month / date</th><th class="n" style="color:var(--green)">Working days</th><th class="n">Off days</th><th class="n">of which Sundays</th><th class="n">No footage</th><th class="n" style="color:var(--orange)">Hitachi h</th><th class="n" style="color:var(--yellow)">Komatsu h</th><th class="n">Both h</th><th class="n" style="color:var(--blue)">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
     <div class="note" id="src"></div>
   </section>
   <section id="v-loads" hidden>
@@ -80,6 +80,12 @@
     <h2>Loads</h2>
     <div class="filters" id="lfilters"></div>
     <div class="loads" id="loads"></div>
+  </section>
+  <section id="v-flags" hidden>
+    <h1>Suspicious events — all cameras</h1>
+    <p class="lead">Everything outside normal work or touching diesel: jerrycans, the Dodge at a machine, the tanker, people on a machine, night / Sunday / lunch activity. Newest first. Tap a photo to see it full size.</p>
+    <div class="filters" id="ffilters"></div>
+    <div class="loads" id="flags"></div>
   </section>
   <section id="v-diesel" hidden>
     <h1>Diesel vs machine hours</h1>
@@ -105,7 +111,8 @@
 <script>
 const esc = Admin.esc; let D = null, MONTH = 'all';
 const LOADS = /\/loads$/.test(location.pathname), DIESEL = /\/diesel$/.test(location.pathname);
-const VIEW = DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
+const FLAGS = /\/flags$/.test(location.pathname);
+const VIEW = FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
 const h1 = n => n == null ? '—' : (+n).toFixed(1);
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dd = s => { const d = new Date(s + 'T12:00:00'); return { day: d.getDate() + ' ' + MON[d.getMonth()], wd: d.toLocaleDateString('en-GB', { weekday: 'short' }), m: s.slice(0, 7), sun: d.getDay() === 0 }; };
@@ -125,21 +132,21 @@ function renderDays() {
   const sum = (a, k) => a.reduce((s, d) => s + (+d[k] || 0), 0);
   const loads = days.reduce((s, d) => s + (+d.loads || 0), 0);
   document.getElementById('kpis').innerHTML =
-    (st0 => K('d', `${st0.work} / ${st0.off}`, `working / off days of ${days.length}` + (st0.unk ? ` · ${st0.unk} unknown (camera off)` : '')))(dayStats(days)) +
+    (st0 => K('d', `${st0.work} / ${st0.off}`, `working / off days of ${days.length}` + (st0.unk ? ` · ${st0.unk} day with no footage on any camera` : '')))(dayStats(days)) +
     K('h', h1(sum(seen, 'hitachi')) + ' h', 'Hitachi seen working') +
     K('k', h1(sum(seen, 'komatsu')) + ' h', 'Komatsu seen working') +
     K('t', loads, 'truck loads out');
   const months = [...new Set(days.map(d => d.date.slice(0, 7)))];
   const wdOf = s => (new Date(s + 'T12:00:00').getDay() + 6) % 7;
   const max = Math.max(1, ...seen.map(d => Math.max(d.hitachi, d.komatsu)));
-  const per = (v, n) => n ? `<div class="small muted">${h1(v / n)}/day</div>` : '';
+  const _x = 0; const per = (v, n) => n ? `<div class="small muted">${h1(v / n)}/day</div>` : '';
   // one summary row for a month, a week or the total (Mario 2026-10-10: working / off / Sundays per month, collapsed by default, sums at the bottom)
   const grp = (label, md, cls, attrs) => {
     const ms = md.filter(d => d.hitachi != null), st = dayStats(md), w = st.workSeen;
     const H = sum(ms, 'hitachi'), Kx = sum(ms, 'komatsu'), T = md.reduce((s, d) => s + (+d.loads || 0), 0);
     const sun = md.filter(d => dd(d.date).sun).length;
     return `<tr class="${cls}" ${attrs || ''}><td style="white-space:nowrap">${label}</td><td class="n" style="color:var(--green)">${st.work}</td><td class="n">${st.off}</td><td class="n">${sun}</td><td class="n muted">${st.unk || ''}</td>
-      <td class="n">${h1(H)}${per(H, w)}</td><td class="n">${h1(Kx)}${per(Kx, w)}</td><td class="n"><b>${h1(H + Kx)}</b>${per(H + Kx, w)}</td><td class="n">${T}${per(T, st.work)}</td><td colspan="2" class="small">${st.unk ? st.unk + ' day' + (st.unk > 1 ? 's' : '') + ' camera off (battery): real totals are higher' : ''}</td></tr>`;
+      <td class="n">${h1(H)}${per(H, w)}</td><td class="n">${h1(Kx)}${per(Kx, w)}</td><td class="n"><b>${h1(H + Kx)}</b>${per(H + Kx, w)}</td><td class="n">${T}${per(T, st.work)}</td><td colspan="2" class="small">${(n => n ? n + ' day' + (n > 1 ? 's' : '') + ' D1 up off (battery): filled from the other cameras, estimates' : '')(md.filter(d => d.d1off).length)}${st.unk ? ` · ${st.unk} day${st.unk > 1 ? 's' : ''} no camera at all` : ''}</td></tr>`;
   };
   const tick = '<span style="color:var(--green)">●</span>';
   const tb = document.querySelector('#days tbody'); let html = '';
@@ -155,9 +162,9 @@ function renderDays() {
       const x = dd(d.date), none = d.hitachi == null, part = /^from|until|mostly|pit camera/.test(d.footage || ''), work = isWork(d);
       html += `<tr data-m="${m}" hidden class="${none ? 'none' : part ? 'part' : ''} ${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
         <td class="n">${work ? tick : ''}</td><td class="n">${!none && !work ? '●' : ''}</td><td class="n">${x.sun ? '●' : ''}</td><td class="n muted">${none && !work ? '●' : ''}</td>
-        <td class="n">${none ? '—' : h1(d.hitachi) + `<span class="hb h" style="width:${Math.round(d.hitachi / max * 50)}px"></span>`}</td>
-        <td class="n">${none ? '—' : h1(d.komatsu) + `<span class="hb k" style="width:${Math.round(d.komatsu / max * 50)}px"></span>`}</td>
-        <td class="n"><b>${none ? '—' : h1(d.hitachi + d.komatsu)}</b></td><td class="n">${d.loads == null ? '—' : d.loads}</td><td class="small">${none ? (seenElsewhere(d) || d.loads > 0 ? 'machine camera off · <span style="color:var(--green)">work seen on Entrance camera</span>' : 'machine camera off (battery)') : esc(d.footage || '')}</td><td class="small muted">${esc(d.notes || '')}</td></tr>`;
+        <td class="n">${none ? '—' : (d.est ? '~' : '') + h1(d.hitachi) + `<span class="hb h" style="width:${Math.round(d.hitachi / max * 50)}px"></span>`}</td>
+        <td class="n">${none ? '—' : (d.est ? '~' : '') + h1(d.komatsu) + `<span class="hb k" style="width:${Math.round(d.komatsu / max * 50)}px"></span>`}</td>
+        <td class="n"><b>${none ? '—' : h1(d.hitachi + d.komatsu)}</b></td><td class="n">${d.loads == null ? '—' : d.loads}</td><td class="small">${d.d1off ? '<span style="color:var(--amber)">D1 up off (battery)</span> · ' : ''}${none ? 'no camera recorded' : esc((d.cams || []).join(' + '))}${d.d1up && !d.d1off && (d.d1up.hitachi !== d.hitachi || d.d1up.komatsu !== d.komatsu || d.d1up.loads !== d.loads) ? `<div class="muted">d1 up alone: ${h1(d.d1up.hitachi)} / ${h1(d.d1up.komatsu)} h · ${d.d1up.loads ?? '—'} trucks</div>` : ''}${d.range ? `<div class="muted">range H ${d.range.h[0]}–${d.range.h[1]} · K ${d.range.k[0]}–${d.range.k[1]} h</div>` : ''}</td><td class="small muted">${esc(d.notes || '')}</td></tr>`;
     }
   }
   tb.innerHTML = html;
@@ -202,6 +209,17 @@ function renderDiesel() {
   document.getElementById('dexp').textContent = (X.expected || '') + ' ' + (X.whole || '');
   document.querySelector('#dfill tbody').innerHTML = F.slice().reverse().map(f => `<tr><td style="white-space:nowrap">${dm(f.date)}</td><td class="n">${n0(f.litres)}</td><td class="n">${f.perL == null ? '—' : (+f.perL).toFixed(2)}</td><td class="n">${n0(f.total)}</td><td class="small">${esc(f.machine || '')}</td><td class="small" style="${/confirm/.test(f.odoo) ? 'color:var(--amber);font-weight:600' : ''}">${esc(f.odoo)}</td><td class="small muted">${esc(f.paid || '')}</td></tr>`).join('');
 }
+let FM = 'all';
+function renderFlags() {
+  const L = D.flags || [];
+  const months = [...new Set(L.map(l => l.date.slice(0, 7)))];
+  document.getElementById('ffilters').innerHTML = ['all', ...months].map(m => `<button class="${m === FM ? 'on' : ''}" onclick="FM='${m}';renderFlags()">${m === 'all' ? 'All' : monthName(m)} (${m === 'all' ? L.length : L.filter(l => l.date.startsWith(m)).length})</button>`).join('');
+  document.getElementById('flags').innerHTML = L.filter(l => FM === 'all' || l.date.startsWith(FM)).slice().reverse().map(l => {
+    const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
+    return `<div class="ld"><div class="ph" ${u ? `onclick="openViewer('${u}', '${esc(x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera)}')"` : ''}>${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
+      <div class="bd"><div class="top"><b>${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
+  }).join('');
+}
 function openViewer(url, title) {
   document.getElementById('vtitle').textContent = title; document.getElementById('vbody').innerHTML = `<img src="${url}" alt="">`;
   document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden';
@@ -214,7 +232,7 @@ Admin.require(['ajaltoun', 'excavation'], async me => {
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   document.getElementById('t-' + VIEW).classList.add('on');
   document.getElementById('v-' + VIEW).hidden = false;
-  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
+  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
   catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); }
 });
 </script>
