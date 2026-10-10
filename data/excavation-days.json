@@ -15,7 +15,7 @@
    "date": "2026-08-04",
    "hitachi": 0.3,
    "komatsu": 1.5,
-   "loads": 1,
+   "loads": 0,
    "footage": "full day",
    "confidence": "low",
    "notes": "loads 0-2; Hitachi parked all day"
@@ -330,7 +330,7 @@
    "date": "2026-09-08",
    "hitachi": 0.3,
    "komatsu": 1.8,
-   "loads": 2,
+   "loads": 1,
    "footage": "full day",
    "confidence": "high",
    "notes": "Hitachi idle all day"
@@ -357,7 +357,7 @@
    "date": "2026-09-11",
    "hitachi": 0.8,
    "komatsu": 2.0,
-   "loads": 4,
+   "loads": 3,
    "footage": "from 11:28",
    "confidence": "medium",
    "notes": "minimum"
