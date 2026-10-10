@@ -32,6 +32,7 @@
   table{width:100%;border-collapse:collapse;font-size:.82rem;} th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
   td{padding:6px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;} td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   tr.none td{color:var(--overlay0);} tr.part td.n{color:var(--sub);} tr.sun td:first-child,tr.sun td:nth-child(2){color:var(--green);}
+  tr.wk td{background:rgba(137,180,250,.07);color:var(--blue);font-size:.76rem;}
   tr.mon td{background:rgba(242,169,59,.10);color:var(--amber);font-weight:600;cursor:pointer;}
   .hb{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px;} .hb.h{background:var(--orange);} .hb.k{background:var(--yellow);}
   .muted{color:var(--overlay0);} .small{font-size:.74rem;}
@@ -69,6 +70,8 @@
     <div class="kpis" id="kpis"></div>
     <h2>Per month</h2>
     <div class="months" id="months"></div>
+    <h2>Per weekday <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">average over the days with footage</span></h2>
+    <div class="card"><table id="wd"><thead><tr><th>Day</th><th class="n">Days</th><th class="n">Hitachi h / day</th><th class="n">Komatsu h / day</th><th class="n">Trucks / day</th><th class="n">Trucks total</th></tr></thead><tbody></tbody></table></div>
     <h2>Per day <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to fold it</span></h2>
     <div class="card"><table id="days"><thead><tr><th>Date</th><th>Day</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="src"></div>
@@ -119,12 +122,25 @@ function renderDays() {
       <div class="row"><span>Komatsu</span><span style="color:var(--yellow)">${h1(Kx)} h · ${h1(ms.length ? Kx / ms.length : 0)}/day</span></div>
       <div class="row"><span>Truck loads</span><span style="color:var(--blue)">${T}</span></div></div>`;
   }).join('');
+  // Mo..Su averages (Mario 2026-10-10: "add mo tu we")
+  const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const wdOf = s => (new Date(s + 'T12:00:00').getDay() + 6) % 7;
+  document.querySelector('#wd tbody').innerHTML = WD.map((w, i) => {
+    const a = seen.filter(d => wdOf(d.date) === i), all = days.filter(d => wdOf(d.date) === i && d.loads != null);
+    const T = all.reduce((s, d) => s + (+d.loads || 0), 0);
+    return `<tr class="${i === 6 ? 'sun' : ''}"><td>${w}</td><td class="n">${a.length}</td><td class="n">${a.length ? h1(sum(a, 'hitachi') / a.length) : '—'}</td><td class="n">${a.length ? h1(sum(a, 'komatsu') / a.length) : '—'}</td><td class="n">${all.length ? (T / all.length).toFixed(1) : '—'}</td><td class="n">${T}</td></tr>`;
+  }).join('');
   const max = Math.max(1, ...seen.map(d => Math.max(d.hitachi, d.komatsu)));
   const tb = document.querySelector('#days tbody'); let html = '';
   for (const m of months.slice().reverse()) {
     const md = days.filter(d => d.date.startsWith(m)), ms = md.filter(d => d.hitachi != null);
     html += `<tr class="mon" onclick="foldMonth('${m}')"><td colspan="2">▾ ${monthName(m)}</td><td class="n">${h1(sum(ms, 'hitachi'))}</td><td class="n">${h1(sum(ms, 'komatsu'))}</td><td class="n">${md.reduce((s, d) => s + (+d.loads || 0), 0)}</td><td colspan="2"></td></tr>`;
     for (const d of md.slice().reverse()) {
+      // week subtotal above each Sunday→Monday block (newest first, so print it when we reach the week's last day in the list)
+      if (wdOf(d.date) === 6 || d === md[md.length - 1]) {
+        const end = new Date(d.date + 'T12:00:00'), wk = md.filter(x => { const t = new Date(x.date + 'T12:00:00'); return t <= end && (end - t) / 864e5 <= wdOf(d.date); }), ws = wk.filter(x => x.hitachi != null);
+        html += `<tr data-m="${m}" class="wk"><td colspan="2">Week ${dd(wk[0].date).day} – ${dd(wk[wk.length - 1].date).day}</td><td class="n">${h1(sum(ws, 'hitachi'))}</td><td class="n">${h1(sum(ws, 'komatsu'))}</td><td class="n">${wk.reduce((s, x) => s + (+x.loads || 0), 0)}</td><td colspan="2" class="small">${ws.length} of ${wk.length} days with footage</td></tr>`;
+      }
       const x = dd(d.date), none = d.hitachi == null, part = /^from|until|mostly|pit camera/.test(d.footage || '');
       html += `<tr data-m="${m}" class="${none ? 'none' : part ? 'part' : ''} ${x.sun ? 'sun' : ''}"><td>${x.day}</td><td>${x.wd}</td>
         <td class="n">${none ? '—' : h1(d.hitachi) + `<span class="hb h" style="width:${Math.round(d.hitachi / max * 50)}px"></span>`}</td>
