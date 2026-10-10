@@ -212,15 +212,11 @@
     {
      "arrive": "08:14",
      "leave": "11:28"
-    },
-    {
-     "arrive": "16:01",
-     "leave": "16:10"
     }
    ],
-   "hours": 3.38,
+   "hours": 3.23,
    "confidence": "medium",
-   "notes": "Pit view: direction inferred. A low-confidence pass at 15:14 too.",
+   "notes": "08:14 front (Toyota grille) and 11:28 rear spare wheel = RAV4. A 16:01–16:10 pass showed only a roof with bars — could be the BMW, left out.",
    "photo": "20260911.jpg"
   },
   {
@@ -252,17 +248,13 @@
   },
   {
    "date": "2026-09-15",
-   "present": true,
-   "visits": [
-    {
-     "arrive": "?",
-     "leave": "10:42"
-    }
-   ],
-   "hours": null,
-   "confidence": "low",
-   "notes": "Only a pass at 10:42 (probably leaving); arrival not seen.",
-   "photo": "20260915.jpg"
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "high",
+   "notes": "The 10:42 car (roof rack, pit view) is the silver BMW, not the RAV4 — Mario checked. No RAV4 seen.",
+   "photo": "",
+   "partial": false
   },
   {
    "date": "2026-09-16",
