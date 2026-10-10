@@ -232,7 +232,7 @@ function renderGeorges() {
       const st = d.present === false ? '<span class="muted">not on site</span>' : d.present == null ? '<span class="muted">unclear</span>' : '';
       html += `<tr class="${x.sun ? 'sun' : ''} ${d.present === false ? 'none' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
         <td style="white-space:nowrap">${v.length ? v.map(a => esc(a.arrive)).join('<br>') : st}</td><td style="white-space:nowrap">${v.map(a => esc(a.leave)).join('<br>')}</td>
-        <td class="n"><b>${d.present ? hm(d.hours) : ''}</b></td><td class="small">${esc(d.confidence || '')}</td><td class="small muted">${esc(d.notes || '')}</td>
+        <td class="n"><b>${d.present ? (d.partial && d.hours ? '≥' : '') + hm(d.hours) : ''}</b></td><td class="small">${esc(d.confidence || '')}</td><td class="small muted">${esc(d.notes || '')}</td>
         <td>${u ? `<img src="${u}" loading="lazy" style="width:96px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' — RAV4')}')">` : ''}</td></tr>`;
     }
   }

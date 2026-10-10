@@ -1,7 +1,187 @@
 {
  "updated": "2026-10-10",
- "pending": "3 Aug – 8 Sep still being reviewed",
+ "pending": "3 Aug – 27 Aug (before the Entrance camera) still being reviewed from D1 up and D2",
  "days": [
+  {
+   "date": "2026-08-28",
+   "present": null,
+   "visits": [],
+   "hours": null,
+   "partial": false,
+   "confidence": "",
+   "notes": "Entrance camera has no events before 15:30 (installed that day); not seen 15:30–16:49.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-29",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:40",
+     "leave": "14:27"
+    }
+   ],
+   "hours": 6.78,
+   "partial": false,
+   "confidence": "high",
+   "notes": "",
+   "photo": "20260829.jpg"
+  },
+  {
+   "date": "2026-08-30",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "",
+   "notes": "Not seen (Sunday, camera on the road all day).",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-31",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:35",
+     "leave": "11:12"
+    },
+    {
+     "arrive": "11:22",
+     "leave": "11:24"
+    },
+    {
+     "arrive": "13:32",
+     "leave": "13:46"
+    }
+   ],
+   "hours": 1.88,
+   "partial": false,
+   "confidence": "high",
+   "notes": "Three visits; plate visible at 11:22.",
+   "photo": "20260831.jpg"
+  },
+  {
+   "date": "2026-09-01",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:09",
+     "leave": "08:12"
+    },
+    {
+     "arrive": "13:34",
+     "leave": "13:35"
+    },
+    {
+     "arrive": "17:37",
+     "leave": "?"
+    }
+   ],
+   "hours": 0.07,
+   "partial": true,
+   "confidence": "high",
+   "notes": "Came back at 17:37 in the evening; leaving not seen before dark.",
+   "photo": "20260901.jpg"
+  },
+  {
+   "date": "2026-09-02",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "?",
+     "leave": "15:49"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "notes": "Only seen leaving at 15:49 (stopped beside the grey Dodge up the road); arrival not seen.",
+   "photo": "20260902.jpg"
+  },
+  {
+   "date": "2026-09-03",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:06",
+     "leave": "07:19"
+    },
+    {
+     "arrive": "08:30",
+     "leave": "08:34"
+    }
+   ],
+   "hours": 0.28,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Two short visits; first one carrying long bars on the roof.",
+   "photo": "20260903.jpg"
+  },
+  {
+   "date": "2026-09-04",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "15:47",
+     "leave": "15:50"
+    }
+   ],
+   "hours": 0.05,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Short visit.",
+   "photo": "20260904.jpg"
+  },
+  {
+   "date": "2026-09-05",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "?",
+     "leave": "14:17"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "low",
+   "notes": "Entrance camera pointed mostly at the pile; only seen leaving at 14:17.",
+   "photo": "20260905.jpg"
+  },
+  {
+   "date": "2026-09-06",
+   "present": null,
+   "visits": [],
+   "hours": null,
+   "partial": false,
+   "confidence": "",
+   "notes": "Entrance pointed at the pile all day: cannot tell (Sunday).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-07",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:44",
+     "leave": "07:50"
+    }
+   ],
+   "hours": 0.1,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Pile view: seen at the edge of the frame.",
+   "photo": "20260907.jpg"
+  },
+  {
+   "date": "2026-09-08",
+   "present": null,
+   "visits": [],
+   "hours": null,
+   "partial": false,
+   "confidence": "",
+   "notes": "Entrance pointed into the pit all day: cannot tell.",
+   "photo": ""
+  },
   {
    "date": "2026-09-09",
    "present": false,
