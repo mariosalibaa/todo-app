@@ -28,7 +28,7 @@
   .apps-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;} .apps-head h2{margin:0;}
   #viewAs{margin-left:auto;background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--sub);font:inherit;font-size:.85rem;max-width:260px;} #viewAs.on{color:var(--amber);border-color:var(--amber);}
   #tileSearch{width:min(260px,100%);background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:.85rem;} #tileSearch:focus{outline:none;border-color:var(--amber);}
-  .tile.hide{display:none;}
+  .tile.hide,.tile.sub{display:none;} .tiles.q .tile.sub:not(.hide){display:grid;}
   .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:28px;}
   .tile{display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:start;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;}
   .tile:hover{border-color:var(--amber);transform:translateY(-2px);}
@@ -76,6 +76,7 @@
   <div class="who" id="who"></div>
 </header>
 <main>
+  <a class="hback" id="folderBack" href="#" style="display:none">‹ Back to the hub</a>
   <div class="apps-head"><h2>Apps</h2><select id="viewAs" title="See the hub the way a member sees it (preview only — nothing changes)" style="display:none" onchange="viewAs(this.value)"><option value="">View as…</option></select><input type="search" id="tileSearch" placeholder="Search apps…" autocomplete="off" oninput="filterTiles(this.value)"></div>
   <div id="viewAsNote" class="note" style="display:none;margin:-4px 0 12px"></div>
   <div class="tiles" id="tiles"></div>
@@ -130,12 +131,14 @@
 const APPS = [
   { id: 'todo', ico: '✓', name: 'To-Do', desc: 'Team tasks, projects and follow-ups', href: '/todo' },
   { id: 'accounting', ico: '🧾', name: 'Accounting', desc: 'Whish · Wise · Budget — statements, accounts, expenses and income', href: '/accounting' },
-  { id: 'partners', ico: '🤝', name: 'Partners', desc: 'Agreements, fee frameworks and proposals shared with a partner', href: '/partners' },
-  { id: 'ajaltoun', ico: '🏗️', name: 'Ajaltoun 4193', desc: 'Project accounts from Odoo — cash flow, costs by section and villa, each partner share', href: '/ajaltoun' },
-  { id: 'excavation', ico: '⛏️', name: 'Excavation', desc: 'Ajaltoun 4193 excavation — Georges, Anthony and the diesel, cycle by cycle, with the one-page summary', href: '/ajaltoun/excavation', only: true },
+  // the Ajaltoun 4193 folder (Mario, 2026-10-10): its apps carry in: 'ajaltoun-4193' and open from the folder tile
+  { folder: 'ajaltoun-4193' },
+  { id: 'ajaltoun', in: 'ajaltoun-4193', ico: '🏗️', name: 'Accounting', desc: 'Project accounts from Odoo — cash flow, costs by section and villa, each partner share', href: '/ajaltoun' },
+  { id: 'partners', in: 'ajaltoun-4193', ico: '🤝', name: 'Partners', desc: 'Agreements, fee frameworks and proposals shared with a partner', href: '/partners' },
+  { id: 'excavation', in: 'ajaltoun-4193', ico: '⛏️', name: 'Excavation', desc: 'Ajaltoun 4193 excavation — Georges, Anthony and the diesel, cycle by cycle, with the one-page summary', href: '/ajaltoun/excavation', only: true },
   { id: 'crm', ico: '🤝', name: 'Clients', desc: 'Every client conversation — WhatsApp (Shift Development line), Instagram, Messenger — with stage, owner, next action and the Odoo lead', href: '/crm' },
   // one tile for both sides (Mario, 2026-09-20 "combine into one"): a partner opens his list (/decide), Mario his desk (/ask)
-  { id: 'decisions', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide', adminHref: '/ask', adminDesc: 'Put a question to a partner from its own link — approve or hold, you get a Telegram when he answers' },
+  { id: 'decisions', in: 'ajaltoun-4193', ico: '✅', name: 'Decisions', desc: 'Questions Mario put to you — approve or hold from here, he gets it on Telegram', href: '/decide', adminHref: '/ask', adminDesc: 'Put a question to a partner from its own link — approve or hold, you get a Telegram when he answers' },
   { id: 'suppliers', key: ['accounting'], ico: '🏭', name: 'Suppliers', desc: 'One supplier across every company — bills, returns, payments, what is still open, the hub lines naming him and his latest statement of account', href: '/suppliers' },
   { id: 'projectcost', key: ['accounting', 'reports'], ico: '📐', name: 'Project cost', desc: 'One project (Odoo analytic): invoiced, cost by nature — labour per person, materials, VAT, fuel, transport — profit and margin', href: '/projectcost' },
   { id: 'reports', ico: '📊', name: 'Reports', desc: 'SHIFT GROUP SARL trial balance and general ledger in LBP at historical rates — for the accountant', href: '/reports' },
@@ -145,20 +148,22 @@ const APPS = [
   { id: 'bonvin', ico: '🏪', name: 'Bonvin', desc: 'Sin El Fil 2292/A5 — deeds, every lease and rent since 2006, plans, photos; the renter\'s page is /bonvin/shop (public)', href: '/bonvin', admin: true },
   { id: 'rent-law', ico: '⚖️', name: 'Rent law', desc: 'Law 24/2025 on pre-1992 non-residential leases — extension ladder, fair rent, yearly increases — plus the State-rent circular and CAS inflation letter', href: '/rent-law', admin: true },
   { id: 'procurement', ico: '🏷️', name: 'Procurement', desc: 'The price book — what each supplier quoted for an item, when and from where; search by supplier or item', href: '/procurement', admin: true },
-  { id: 'cpr', ico: '⚡', name: 'CPR', desc: 'Energy per month — School, Church, Kamal (Liqaa + Hotel), solar, EDL, the generators and diesel; meters against Deye. Public link, no sign-in', href: '/cpr', admin: true },
-  { id: 'mahab', ico: '☀', name: 'Mahab', desc: 'Taan / Machmouchi 25 kWp plant — kWh per month from solar, EDL and the generators (DeyeCloud)', href: '/mahab', admin: true },
-  { id: 'plants', ico: '🔆', name: 'Plants', desc: 'Every DeyeCloud and Solarman plant — online / offline, power now, kWh today, month and year', href: '/plants', admin: true },
-  { id: 'makhlouf', ico: '⚡', name: 'Makhlouf', desc: 'Maison M Naccache generator — load, peak demand and kWh from the power logger', href: '/makhlouf', admin: true },
+  { folder: 'energy' },
+  { id: 'cpr', in: 'energy', ico: '⚡', name: 'CPR', desc: 'Energy per month — School, Church, Kamal (Liqaa + Hotel), solar, EDL, the generators and diesel; meters against Deye. Public link, no sign-in', href: '/cpr', admin: true },
+  { id: 'mahab', in: 'energy', ico: '☀', name: 'Mahab', desc: 'Taan / Machmouchi 25 kWp plant — kWh per month from solar, EDL and the generators (DeyeCloud)', href: '/mahab', admin: true },
+  { id: 'plants', in: 'energy', ico: '🔆', name: 'Plants', desc: 'Every DeyeCloud and Solarman plant — online / offline, power now, kWh today, month and year', href: '/plants', admin: true },
+  { id: 'makhlouf', in: 'energy', ico: '⚡', name: 'Makhlouf', desc: 'Maison M Naccache generator — load, peak demand and kWh from the power logger', href: '/makhlouf', admin: true },
   { id: 'dev', ico: '🛠️', name: 'Dev requests', desc: 'What the ✦ assistant could not do because it needs code — queued for Claude Code, drained from VS Code with /hub-dev-queue', href: '/dev', admin: true },
   { id: 'mechanical', ico: '🔧', name: 'Mechanical', desc: 'MEP reference — how to read the drainage drawings (CB, MH, FD, WCO, SP/UG…), pipe sizes and slopes, plus a dated notes log', href: '/mechanical', admin: true },
   // laptop apps through the gateway (Mario 2026-09-22) — they wake the app on the laptop if it is asleep
   { id: 'photo-map', ico: '🗺️', name: 'Photo Map', desc: '12,000+ geotagged photos on a map — faces, satellite view (runs on the laptop)', href: '/app/photo-map', admin: true },
   { id: 'lead-hub', ico: '🎯', name: 'Lead Hub', desc: 'Solar & steel-structure prospecting — big roofs found by satellite footprint, scored by $/yr saved (laptop)', href: '/app/lead-hub', admin: true },
   { id: 'invoice-renamer', ico: '📄', name: 'Invoice Renamer', desc: 'AI reads scanned invoices and receipts, pairs and merges them, renames to the Shift standard (laptop)', href: '/app/invoice-renamer', admin: true },
-  { id: 'power-analyzer', ico: '⚡', name: 'Power Analyzer', desc: 'Electrical logger visualisation — Metrel / logger CSV and Excel charts (laptop)', href: '/app/power-analyzer', admin: true },
+  { id: 'power-analyzer', in: 'energy', ico: '⚡', name: 'Power Analyzer', desc: 'Electrical logger visualisation — Metrel / logger CSV and Excel charts (laptop)', href: '/app/power-analyzer', admin: true },
   { id: 'whatsapp-archive', ico: '🗄️', name: 'WhatsApp', desc: 'Every line in one page — 03 165 168, 70 165 168 and the hub chats as the internal line; tick any of them; every chat since 2013 with photos and voice notes, read and reply', href: '/whatsapp', admin: true },
   { id: 'site', ico: `<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#25D366"/><path fill="#fff" d="M12 4.6a7.3 7.3 0 0 0-6.3 11l-1 3.7 3.8-1a7.3 7.3 0 1 0 3.5-13.7zm0 1.3a6 6 0 1 1-3.1 11.2l-.2-.1-2.2.6.6-2.1-.2-.3A6 6 0 0 1 12 5.9zm-2.4 2.6c-.2 0-.5.1-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 5 4.3 2.5 1 3 .8 3.5.7.5 0 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.4-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2 0-.4 0-.5L10.4 9c-.2-.5-.4-.5-.6-.5h-.2z"/></svg>`, name: 'Shift WhatsApp', desc: 'The site chat: text, photos, a voice note — receipts become ledger lines. Start and Finish with your location.', href: '/site' },
 ];
+const FOLDERS = { 'ajaltoun-4193': { ico: '📁', name: 'Ajaltoun 4193' }, energy: { ico: '📁', name: 'Energy' } };
 const esc = Admin.esc;
 // Mario, 2026-09-12: an app id isn't always its own URL (daily lives under /accounting/daily) —
 // the one-app redirect used to just prepend '/', which sent a daily-only member to the wrong page
@@ -214,21 +219,36 @@ Admin.require(null, me => {
 // search the tiles by name or description; Enter opens the first hit (Mario, 2026-09-20)
 function filterTiles(q) {
   q = q.trim().toLowerCase();
+  document.getElementById('tiles').classList.toggle('q', !!q);
   document.querySelectorAll('#tiles .tile').forEach(t => t.classList.toggle('hide', !!q && !t.textContent.toLowerCase().includes(q)));
 }
-document.getElementById('tileSearch').addEventListener('keydown', e => { if (e.key === 'Enter') { const t = document.querySelector('#tiles .tile:not(.hide)'); if (t) location.href = t.getAttribute('href'); } });
+document.getElementById('tileSearch').addEventListener('keydown', e => { if (e.key === 'Enter') { const t = [...document.querySelectorAll('#tiles .tile')].find(t => t.offsetParent); if (t) location.href = t.getAttribute('href'); } });
 document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') { e.preventDefault(); document.getElementById('tileSearch').focus(); } });
 
-let ME = null;
+let ME = null, WHO = null;
 function renderTiles(who) {
+  WHO = who;
   const on = a => a.everyone || a.admin || who.apps.includes(a.id) || (a.key || []).some(k => who.apps.includes(k));   // 'key': shown to whoever holds one of these apps   // 'admin' tiles: Mario-only hand-out pages, not an app key
   // a member sees only the tiles he may open — no faded ones (Mario, 2026-09-20)
-  document.getElementById('tiles').innerHTML = APPS.filter(a => on(a) && (!a.admin || who.admin) && (!a.only || (who.apps.includes(a.id) && !who.apps.includes('ajaltoun')))).map(a => `
-    <a class="tile" href="${who.admin && a.adminHref || a.href}">
-      <div class="ico">${a.ico}</div><div class="name">${a.name}</div><div class="desc">${who.admin && a.adminDesc || a.desc}</div>
-    </a>`).join('') || '<div class="note">Nothing — this member sees an empty hub.</div>';
+  const vis = APPS.filter(a => !a.folder && on(a) && (!a.admin || who.admin) && (!a.only || (who.apps.includes(a.id) && !who.apps.includes('ajaltoun'))));
+  const tile = (a, cls = '', name = a.name, pre = '') => `
+    <a class="tile ${cls}" href="${who.admin && a.adminHref || a.href}">
+      <div class="ico">${a.ico}</div><div class="name">${name}</div><div class="desc">${pre}${who.admin && a.adminDesc || a.desc}</div>
+    </a>`;
+  // a folder (#ajaltoun-4193) shows its own apps; the hub shows the folder tile, and its apps only when a search hits them
+  const open = FOLDERS[location.hash.slice(1)] ? location.hash.slice(1) : '';
+  document.getElementById('folderBack').style.display = open ? '' : 'none';
+  document.querySelector('.apps-head h2').textContent = open ? FOLDERS[open].name : 'Apps';
+  document.getElementById('tiles').innerHTML = (open ? vis.filter(a => a.in === open).map(a => tile(a)).join('') : APPS.map(a => {
+    if (!a.folder) return !a.in && vis.includes(a) ? tile(a) : '';
+    const f = FOLDERS[a.folder], kids = vis.filter(k => k.in === a.folder);
+    if (kids.length < 2) return kids.map(k => tile(k, '', f.name + ' · ' + k.name)).join('');   // one app inside → no folder in the way
+    return `<a class="tile folder" href="#${a.folder}"><div class="ico">${f.ico}</div><div class="name">${f.name}</div><div class="desc">${kids.map(k => k.name).join(' · ')}</div></a>`
+      + kids.map(k => tile(k, 'sub', k.name, f.name + ' — ')).join('');
+  }).join('')) || '<div class="note">Nothing — this member sees an empty hub.</div>';
   filterTiles(document.getElementById('tileSearch').value);
 }
+window.addEventListener('hashchange', () => { if (WHO) renderTiles(WHO); });
 function viewAs(email) {
   const sel = document.getElementById('viewAs'), note = document.getElementById('viewAsNote');
   const m = email && JSON.parse(sel.dataset.members || '[]').find(x => x.email === email);
