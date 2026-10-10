@@ -481,6 +481,14 @@
  },
  {
   "date": "2026-09-29",
+  "time": "08:05-08:25",
+  "camera": "D3 up",
+  "what": "Dodge parked against both machines before work; man on the Hitachi deck (08:07), then on the Komatsu deck (08:12); yellow can carried at the Dodge 08:16-08:25; Hitachi starts 08:25.",
+  "photo": "20260929_cc00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-29",
   "time": "15:57-16:17",
   "camera": "D2 (+Entrance)",
   "what": "Hose/pipe; unknown vehicle at machines: An unknown silver Tacoma-type pickup with a long white pipe in the bed drives to the far end, where the Hitachi is, and stays about 20 min.",
@@ -501,6 +509,30 @@
   "camera": "D2 up",
   "what": "A camera reboot with a pan/tilt calibration sweep (also 27 Sep 02:29, 1 Oct 01:15 and 2 Oct 01:16). These are power events; no person is seen.",
   "photo": "20260930_cd01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-30",
+  "time": "07:48-07:53",
+  "camera": "D3 up",
+  "what": "Dodge parked against the Hitachi before work; man goes from the Dodge door onto the Hitachi rear deck and lifts the engine hood.",
+  "photo": "20260930_cc00.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-30",
+  "time": "13:55-14:02",
+  "camera": "D3 up",
+  "what": "Hitachi leaves the face and parks at the jerrycan pile by the fence; Dodge parks against it, man on the Hitachi deck by the cab then at the Dodge bed.",
+  "photo": "20260930_cc01.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-09-30",
+  "time": "14:02-15:13",
+  "camera": "D3 up",
+  "what": "Hitachi idle at the jerrycan pile in the rain for 1 h 18 min; Dodge parked beside the Komatsu / near the Hitachi.",
+  "photo": "20260930_cc02.jpg",
   "strong": false
  },
  {
@@ -837,6 +869,22 @@
   "camera": "D2_Up",
   "what": "After hours: At dusk a dark SUV and 2 people are beside the parked Hitachi. No other camera was recording.",
   "photo": "20261009_04.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-10-10",
+  "time": "07:07-07:16",
+  "camera": "D2 up",
+  "what": "Man on the Hitachi rear deck with the engine hood raised; 07:27-07:59 the Komatsu is parked against the Hitachi with a man on the deck between them.",
+  "photo": "20261010_cc00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-10-10",
+  "time": "08:07-09:48",
+  "camera": "D3 up",
+  "what": "Hitachi leaves the pit and parks right beside the Dodge (bed loaded, covered) and the jerrycan pile at the back fence for 1 h 40 min; man in yellow vest at the Dodge door/bed 08:44-08:50, climbs onto the Hitachi by the cab 08:57, boom moved 08:58-09:04; Hitachi drives back to the pit 09:48.",
+  "photo": "20261010_cc01.jpg",
   "strong": true
  }
 ]
