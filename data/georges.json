@@ -1,0 +1,356 @@
+{
+ "updated": "2026-10-10",
+ "pending": "3 Aug – 8 Sep still being reviewed",
+ "days": [
+  {
+   "date": "2026-09-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (Entrance pointed into the pit; Dodge and silver Tacoma-type pickup seen, no RAV4).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-10",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:40",
+     "leave": "08:59"
+    }
+   ],
+   "hours": 0.32,
+   "confidence": "medium",
+   "notes": "Entrance pointed into the pit: direction inferred.",
+   "photo": "20260910.jpg"
+  },
+  {
+   "date": "2026-09-11",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:14",
+     "leave": "11:28"
+    },
+    {
+     "arrive": "16:01",
+     "leave": "16:10"
+    }
+   ],
+   "hours": 3.38,
+   "confidence": "medium",
+   "notes": "Pit view: direction inferred. A low-confidence pass at 15:14 too.",
+   "photo": "20260911.jpg"
+  },
+  {
+   "date": "2026-09-12",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-13",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (Sunday-quiet, 2 events).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-14",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-15",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "?",
+     "leave": "10:42"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "Only a pass at 10:42 (probably leaving); arrival not seen.",
+   "photo": "20260915.jpg"
+  },
+  {
+   "date": "2026-09-16",
+   "present": null,
+   "visits": [],
+   "hours": null,
+   "confidence": "",
+   "notes": "No RAV4 in daylight; a boxy SUV with roof rails came in at 19:19 at night — cannot confirm it is the RAV4.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-17",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "14:09",
+     "leave": "14:10"
+    },
+    {
+     "arrive": "14:26",
+     "leave": "14:58"
+    }
+   ],
+   "hours": 0.55,
+   "confidence": "high",
+   "notes": "Plate visible. Second visit: stops at the water tank, a man gets out.",
+   "photo": "20260917.jpg"
+  },
+  {
+   "date": "2026-09-18",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (13:53 is a silver BMW).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-19",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "10:37",
+     "leave": "13:59"
+    }
+   ],
+   "hours": 3.37,
+   "confidence": "high",
+   "notes": "Plate visible.",
+   "photo": "20260919.jpg"
+  },
+  {
+   "date": "2026-09-20",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (Sunday).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-21",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-22",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-23",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "14:53",
+     "leave": "16:12"
+    }
+   ],
+   "hours": 1.32,
+   "confidence": "high",
+   "notes": "Plate B 483534.",
+   "photo": "20260923.jpg"
+  },
+  {
+   "date": "2026-09-24",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "10:09",
+     "leave": "12:08"
+    }
+   ],
+   "hours": 1.98,
+   "confidence": "high",
+   "notes": "",
+   "photo": "20260924.jpg"
+  },
+  {
+   "date": "2026-09-25",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "10:24",
+     "leave": "11:51"
+    },
+    {
+     "arrive": "12:04",
+     "leave": "15:04"
+    }
+   ],
+   "hours": 4.45,
+   "confidence": "high",
+   "notes": "Second visit with a wheelbarrow on the roof; stops at the water tank.",
+   "photo": "20260925.jpg"
+  },
+  {
+   "date": "2026-09-26",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen, but the Entrance camera had no events 09:20–18:01.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-27",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (Sunday).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-28",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-29",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (16:17 is the silver Tacoma-type pickup).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-30",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-01",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-02",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-03",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (Entrance rebooted 03:31 and 10:18).",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-04",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (Sunday).",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-05",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:17",
+     "leave": "15:20"
+    }
+   ],
+   "hours": 7.05,
+   "confidence": "high",
+   "notes": "Entrance + D3 up.",
+   "photo": "20261005.jpg"
+  },
+  {
+   "date": "2026-10-06",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "06:58",
+     "leave": "07:17"
+    },
+    {
+     "arrive": "07:27",
+     "leave": "12:39"
+    }
+   ],
+   "hours": 5.52,
+   "confidence": "high",
+   "notes": "Entrance + D3 up + D2-D3.",
+   "photo": "20261006.jpg"
+  },
+  {
+   "date": "2026-10-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-08",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:37",
+     "leave": "13:35"
+    }
+   ],
+   "hours": 5.97,
+   "confidence": "high",
+   "notes": "Entrance + D2 up + D3 up + D2-D3.",
+   "photo": "20261008.jpg"
+  },
+  {
+   "date": "2026-10-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "",
+   "notes": "Not seen (Entrance recording ends ~16:08).",
+   "photo": ""
+  }
+ ]
+}

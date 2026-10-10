@@ -21,12 +21,21 @@ async function handle(req, res, url) {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     const diesel = readJson('excavation-diesel.json', null);
     const flags = readJson('excavation-flags.json', []);
-    res.end(JSON.stringify({ ...days, loads, diesel, flags }));
+    const georges = readJson('georges.json', null);
+    res.end(JSON.stringify({ ...days, loads, diesel, flags, georges }));
     return true;
   }
   const m = p.match(/^\/api\/ajaltoun\/machines\/photo\/(\d{8}_\d{4}[\w-]*\.jpg)$/);
   if (m && req.method === 'GET') {
     const f = path.join(PHOTOS, m[1]);
+    if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
+    res.end(fs.readFileSync(f));
+    return true;
+  }
+  const gp = p.match(/^\/api\/ajaltoun\/machines\/georges\/(\d{8}\.jpg)$/);
+  if (gp && req.method === 'GET') {
+    const f = path.join(__dirname, 'public', 'excavation', 'georges', gp[1]);
     if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
     res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
     res.end(fs.readFileSync(f));
