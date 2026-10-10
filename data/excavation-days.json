@@ -969,11 +969,18 @@
    "loads": 3,
    "footage": "full day",
    "confidence": "high",
-   "notes": "",
+   "notes": "D2 up pointed along the wall and at the lower yard all day, with the machines only at the edge of the frame, so the d1 up figures stand unchanged. After hours, 17:00-17:20, a red car and 3-4 people are in the yard; no machine is involved. The nights of 24/25 and 25/26 show only IR switching and town lights.",
    "cams": [
     "d1 up",
-    "Entrance"
-   ]
+    "Entrance",
+    "D2 up"
+   ],
+   "d1up": {
+    "hitachi": 5.3,
+    "komatsu": 1.7,
+    "loads": 3
+   },
+   "est": false
   },
   {
    "date": "2026-09-26",
@@ -982,11 +989,18 @@
    "loads": 0,
    "footage": "until 07:45 + Entrance",
    "confidence": "medium",
-   "notes": "Saturday, no work seen",
+   "notes": "Saturday. D2 up covers d1 up's 07:48-18:30 gap, but it stayed on the wall/track preset: no machine, truck, dust or person on the track all day. With Entrance (no workers; one tipper in and out empty at 07:46-07:50), this was not a working day. At 22:52-22:55 the PTZ moved from the wall preset to the yard preset, either on its own or through the app. Both machines are parked and nobody is near them.",
    "cams": [
     "d1 up",
-    "Entrance"
-   ]
+    "Entrance",
+    "D2 up"
+   ],
+   "d1up": {
+    "hitachi": 0,
+    "komatsu": 0,
+    "loads": 0
+   },
+   "est": false
   },
   {
    "date": "2026-09-27",
@@ -995,11 +1009,18 @@
    "loads": 0,
    "footage": "from 11:33",
    "confidence": "high",
-   "notes": "Sunday",
+   "notes": "Sunday. D2 up fills d1 up's 06:30-11:33 gap: both machines are parked side by side in the upper yard in the same pose 06:30-18:30, and only the shadows move. At 02:29-02:31 the camera rebooted (a new file starts and it does a pan/tilt calibration sweep). Evening, 19:10-21:38: headlights and lights beyond the fence on the road; the machines do not change.",
    "cams": [
     "d1 up",
-    "Entrance"
-   ]
+    "Entrance",
+    "D2 up"
+   ],
+   "d1up": {
+    "hitachi": 0,
+    "komatsu": 0,
+    "loads": 0
+   },
+   "est": false
   },
   {
    "date": "2026-09-28",
@@ -1008,7 +1029,7 @@
    "loads": 2,
    "footage": "full day",
    "confidence": "high",
-   "notes": "d1 up was complete and D2_Up agrees (Hitachi breaking in the pit 11:25-15:53, rain stop visible; Komatsu loading at 09:16-09:34 and 10:37). 2 Scania loads (entrance out 09:34 and 10:53). D2's higher figures include the rain stop and the Komatsu's idle hour. No change.",
+   "notes": "No change to the hours. D2 up shows the Scania being loaded in the yard at 09:18-09:33 and 10:38-10:51. Before work, from 09:02, the Dodge (bed full of green and blue jerrycans) is parked against the Hitachi. At 09:06 a man is on the Hitachi's rear deck with a yellow can and the hood open. At 09:12 the hood is still up, the man is at the Dodge's bed and a yellow can sits on the Hitachi's track. Lunch, 12:30-13:33: the Dodge is parked alone in the yard by the Komatsu's bucket.",
    "d1up": {
     "hitachi": 3.75,
     "komatsu": 1.0,
@@ -1018,17 +1039,18 @@
     "d1 up",
     "Entrance",
     "D2",
-    "D2_Up"
-   ]
+    "D2 up"
+   ],
+   "est": false
   },
   {
    "date": "2026-09-29",
-   "hitachi": 5.5,
-   "komatsu": 0.5,
+   "hitachi": 6.5,
+   "komatsu": 0.25,
    "loads": 0,
    "footage": "pit camera only",
-   "confidence": "low",
-   "notes": "d1 up has no footage 07:47-16:25. D2_Up shows the Komatsu working in the pit at 08:34 (one event only) and the Hitachi breaking at 09:23, 10:07, 11:06-11:49, 13:03, 13:56 and 15:53, then parked by 15:57; D2 sees it 11:03-15:53. Estimate: Hitachi about 09:00-15:55 less about 1 h lunch (range 4.5-6.5 h); Komatsu one short session (range 0.2-1.0 h). No trucks on any camera.",
+   "confidence": "medium",
+   "notes": "D2 up stayed on the pit preset all day and fills d1 up's 07:47-16:25 gap. The Komatsu is in the pit only at 08:32-08:42. The yard is out of view, so a short job there cannot be ruled out. The Hitachi drives in at 08:45 and breaks rock, with its pose changing and dust in nearly every 1-3 min tile, until 15:57. That includes 11:50-13:10 (no visible lunch stop). It is gone by 16:00. The raw span is 7.2 h. I took 6.5 h to allow for short pauses this zoom can't resolve (range 6.0-7.2). This raises the combined figure from 5.5. No truck on any camera. Night of 29/30: at 19:01 a light on the road beyond the fence; at 01:14 a camera reboot sweep.",
    "d1up": {
     "hitachi": 5.0,
     "komatsu": 1.0,
@@ -1038,17 +1060,18 @@
     "d1 up",
     "Entrance",
     "D2",
-    "D2_Up"
-   ]
+    "D2 up"
+   ],
+   "est": false
   },
   {
    "date": "2026-09-30",
-   "hitachi": 4.0,
-   "komatsu": 1.6,
+   "hitachi": 5.5,
+   "komatsu": 1.65,
    "loads": 2,
    "footage": "pit camera only",
-   "confidence": "low-medium",
-   "notes": "d1 up stops at 07:19. D2_Up + D2: Hitachi breaking from about 09:30 (09:50, 10:26-10:58) to 12:47, 13:34-13:51 and 15:21-15:58; idle in the rain 13:50-15:00 (the Dodge against it 14:45-14:58). Komatsu: 08:00-08:15, 10:26-10:50 and 12:20-12:43 (loading), and 14:33-15:06 moving rock. Ranges: Hitachi 3.5-4.8 h, Komatsu 1.2-2.0 h. 2 Astra loads (entrance out 10:46 and 12:42; D2_Up shows both being loaded).",
+   "confidence": "medium-high",
+   "notes": "D2 up stayed on the pit preset all day and covers d1 up's gap after 07:19. The Komatsu works the pit at 08:00-08:13, then the Hitachi breaks from 08:15; the combined figure had it starting at about 09:30. Loads: an Astra in the pit at 10:33-10:48 and 12:20-12:41, both loaded by the Komatsu. The Hitachi leaves the view at 13:52 (rain) and is back breaking at 15:17-16:03. The Komatsu moves rock at 14:28-15:08. Hitachi raised from 4.0 to 5.5. At 17:04-17:35 two men with a survey pole are in the pit and the Dodge is parked at the top; the Hitachi is not in this view.",
    "d1up": {
     "hitachi": 3.5,
     "komatsu": 1.5,
@@ -1058,18 +1081,19 @@
     "d1 up",
     "Entrance",
     "D2",
-    "D2_Up",
+    "D2 up",
     "D3 up"
-   ]
+   ],
+   "est": false
   },
   {
    "date": "2026-10-01",
-   "hitachi": 5.5,
-   "komatsu": 0.0,
+   "hitachi": 5.4,
+   "komatsu": 0,
    "loads": 0,
    "footage": "from 11:09",
    "confidence": "medium",
-   "notes": "d1 up has no footage before 11:09. D2_Up shows the Hitachi starting at about 08:44 and breaking at 09:22-09:26; D2 sees it in the pit 09:26-11:56. Adds about 08:45-11:09 = 2.4 h to d1 up's 3.1 h (range 4.9-5.8 h). Komatsu parked all day: D2's 'loading 09:20-09:24' is wrong, because the Renault tipper left empty (entrance) and D2_Up shows the Komatsu in the same pose 09:22-09:26.",
+   "notes": "D2 up is on the yard preset from 07:21. CORRECTION: the tanker filled the HITACHI at 07:22-07:29, not the Komatsu. The tanker pulls up to the Hitachi, and at 07:25:30 its hose runs to the Hitachi's tank. The Hitachi leaves the yard at 08:44 and is parked again at 11:57; d1 up covers the afternoon. The Komatsu stays parked in one pose all day.",
    "d1up": {
     "hitachi": 3.1,
     "komatsu": 0,
@@ -1079,17 +1103,18 @@
     "d1 up",
     "Entrance",
     "D2",
-    "D2_Up"
-   ]
+    "D2 up"
+   ],
+   "est": false
   },
   {
    "date": "2026-10-02",
    "hitachi": 7.1,
-   "komatsu": 0.85,
+   "komatsu": 0.7,
    "loads": 0,
    "footage": "full day",
    "confidence": "medium",
-   "notes": "d1 up was complete; D2_Up agrees (Komatsu in the pit 11:57-12:14, Hitachi breaking at 11:35 and 15:54). No change. d1 up's 3-min slot method may overstate this long breaking day by 10-20 %.",
+   "notes": "D2 up is on the yard preset most of the day. The Komatsu comes down and moves rock at 11:45-12:20, then parks again further left (0.6-0.85 h; I took 0.7). The Hitachi leaves the yard at about 07:42 and is parked again at about 16:03. Its hours come from d1 up and may be 10-20 % high. Before work, the Dodge with green jerrycans is parked against the Hitachi. At 07:31 a man stands on the Hitachi's rear deck with the engine hood raised. At 07:36 a man at the Dodge's bed handles a white container among the cans. Night of 2/3: rain, insects and a light on the road at 21:31; the machines do not change.",
    "d1up": {
     "hitachi": 7.1,
     "komatsu": 0.85,
@@ -1100,8 +1125,10 @@
     "Entrance",
     "D2",
     "D2_Up",
-    "D3 up"
-   ]
+    "D3 up",
+    "D2 up"
+   ],
+   "est": false
   },
   {
    "date": "2026-10-03",

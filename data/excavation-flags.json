@@ -312,6 +312,30 @@
   "strong": false
  },
  {
+  "date": "2026-09-26",
+  "time": "22:52-22:55",
+  "camera": "D2 up",
+  "what": "Night: the camera swings from the wall view to the machine yard (a preset change at night). Both machines are parked in the same pose, with no person or light at them. This is odd camera behaviour, not a visit.",
+  "photo": "20260926_cd00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-27",
+  "time": "19:10-21:38",
+  "camera": "D2 up",
+  "what": "Sunday night: lights flare beyond the yard fence (vehicle headlights on the road above). The machines are parked and unchanged, and nobody is at them.",
+  "photo": "20260927_cd00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-28",
+  "time": "09:02-09:20",
+  "camera": "D2 up",
+  "what": "The Dodge, with about 15 green and blue jerrycans, is parked against the Hitachi. At 09:06 a man on the Hitachi's rear deck holds a yellow can with the engine hood raised. At 09:12 the man is at the Dodge's bed, the hood is still up and a yellow can sits on the track. Anthony says this was an oil change.",
+  "photo": "20260928_cd00.jpg",
+  "strong": true
+ },
+ {
   "date": "2026-09-28",
   "time": "09:08-09:18",
   "camera": "D2_Up (+D2)",
@@ -344,6 +368,14 @@
   "strong": false
  },
  {
+  "date": "2026-09-28",
+  "time": "12:30-13:33",
+  "camera": "D2 up",
+  "what": "Lunch: the Dodge is parked in the machine yard next to the Komatsu's bucket, in the rain, with cans in the bed.",
+  "photo": "20260928_cd01.jpg",
+  "strong": false
+ },
+ {
   "date": "2026-09-29",
   "time": "15:57-16:17",
   "camera": "D2 (+Entrance)",
@@ -357,6 +389,14 @@
   "camera": "D2",
   "what": "Dodge at machine: At the end of the day the Dodge (bed packed with green and blue jerrycans at 16:12) is parked nose-in against the parked Hitachi.",
   "photo": "20260929_01.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-09-30",
+  "time": "01:14 (night 29/30)",
+  "camera": "D2 up",
+  "what": "A camera reboot with a pan/tilt calibration sweep (also 27 Sep 02:29, 1 Oct 01:15 and 2 Oct 01:16). These are power events; no person is seen.",
+  "photo": "20260930_cd01.jpg",
   "strong": false
  },
  {
@@ -376,12 +416,36 @@
   "strong": false
  },
  {
+  "date": "2026-09-30",
+  "time": "17:04-17:35",
+  "camera": "D2 up",
+  "what": "After hours: the Dodge is parked at the top of the pit, and two men in the pit hold a survey/GPS pole (surveying). D3 up shows the Dodge beside the Hitachi at 17:02-17:21, outside this view.",
+  "photo": "20260930_cd00.jpg",
+  "strong": false
+ },
+ {
   "date": "2026-10-01",
   "time": "07:17-07:28",
   "camera": "D2_Up (+D2, Entrance)",
   "what": "Tanker: The Mhanna diesel tanker is parked beside the Komatsu in the upper yard for about 11 min (400 L billed, Komatsu).",
   "photo": "20261001_00.jpg",
   "strong": false
+ },
+ {
+  "date": "2026-10-01",
+  "time": "07:22-07:29",
+  "camera": "D2 up",
+  "what": "The tanker parks against the Hitachi, with its hose running to the Hitachi's tank. The bill says 400 L for the Komatsu, so check it.",
+  "photo": "20261001_cd00.jpg",
+  "strong": false
+ },
+ {
+  "date": "2026-10-01",
+  "time": "08:12-08:31",
+  "camera": "D2 up",
+  "what": "About 50 min after the fill, the Dodge with a full bed of jerrycans is parked nose-in at the Hitachi. At 08:22 a man stands on the Hitachi's rear deck by the open tank/engine hatch. The Hitachi only starts at 08:44.",
+  "photo": "20261001_cd01.jpg",
+  "strong": true
  },
  {
   "date": "2026-10-01",
@@ -409,11 +473,27 @@
  },
  {
   "date": "2026-10-01",
+  "time": "12:31-12:53",
+  "camera": "D2 up",
+  "what": "Lunch: the Dodge, with a bed of green jerrycans, is reversed against the parked Hitachi. The driver stands at the Hitachi's left side by the track for about 20 min, and the machine never starts.",
+  "photo": "20261001_cd02.jpg",
+  "strong": true
+ },
+ {
+  "date": "2026-10-01",
   "time": "13:18",
   "camera": "D2_Up (+Entrance)",
   "what": "Lunch end; jerrycans: The Dodge returns from its second short trip off site (out 12:53, back 13:18) with a new yellow can on the bed and drives up to the machines.",
   "photo": "20261001_04.jpg",
   "strong": false
+ },
+ {
+  "date": "2026-10-02",
+  "time": "07:27-07:42",
+  "camera": "D2 up",
+  "what": "The Dodge, with a bed of green jerrycans, is parked against the Hitachi. At 07:31 a man stands on the Hitachi's deck with the engine hood up. At 07:36 a man at the Dodge's bed holds a white container. The engine smokes as it starts.",
+  "photo": "20261002_cd00.jpg",
+  "strong": true
  },
  {
   "date": "2026-10-02",
