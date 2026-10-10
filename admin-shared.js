@@ -199,21 +199,12 @@
   };
   A.viewAsBar = function () {
     const me = A.me || {};
-    const apps = me.apps || [];
-    const here = location.pathname.replace(/\/+$/, '') || '/';
-    // WhatsApp within reach of every page (Mario, 2026-09-26: "allow to launch whatsapp from here"):
-    // the hub's own chats, and the phone archive (admin only — the relay refuses anyone else).
-    // WhatsApp is one door now: the archive shows 03, 70 and the hub's own chats as its "internal" line,
-    // so an admin goes there; whoever only has the hub chats goes to /site (Mario, 2026-09-26: "let us simply say WhatsApp")
-    const waHref = me.admin ? '/whatsapp' : '/site';
-    const waLauncher = [
-      { href: '/accounting/accounts', label: '▦ Accounts', title: 'The cash and bank ledgers', ok: apps.includes('accounting') },
-      { href: waHref, label: '💬 WhatsApp', title: me.admin ? 'Every line in one page: 03 165 168, 70 165 168 and the hub chats' : 'The hub chats', ok: apps.includes('site') || me.admin },
-    ].filter(x => x.ok && !here.startsWith(x.href));
-    if (!me.admin && !me.viewAs && !waLauncher.length) return;
+    // the ▦ Accounts / 💬 WhatsApp pills are gone from every page (Mario 2026-10-10: "hide these everywhere") — the ☰ menu still has them,
+    // and View as is the admin's alone (Mario 2026-10-10: "only view to admin"); someone already viewed-as keeps the Leave button
+    if (!me.admin && !me.viewAs) return;
     const old = document.getElementById('view-as-bar'); if (old) old.remove();
     const people = (me.people || []).filter(x => x.email !== me.viewedBy);
-    if (!me.viewAs && !people.length && !waLauncher.length) return;
+    if (!me.viewAs && !people.length) return;
     const bar = document.createElement('div');
     bar.id = 'view-as-bar';
     // at the TOP now, in the page's own header next to the name (Mario, 2026-10-05: "put this on top, not bottom");
@@ -241,13 +232,6 @@
       sel.innerHTML = '<option value="">👁 View as…</option>' + people.map(x => `<option value="${esc(x.email)}">${esc(x.name || x.email)}${x.account ? ' · ' + esc(x.account) : ''}</option>`).join('');
       sel.onchange = () => sel.value && A.viewAs(sel.value);
       box.append(sel);
-    }
-    // the launchers sit next to the view-as control, in the same pill row
-    for (const x of waLauncher) {
-      const a = document.createElement('a');
-      a.href = x.href; a.title = x.title; a.textContent = x.label;
-      a.style.cssText = 'pointer-events:auto;text-decoration:none;font-size:.78rem;padding:4px 10px;border-radius:999px;background:' + (me.viewAs ? 'rgba(255,255,255,.18)' : 'rgba(0,0,0,.06)') + ';color:inherit;';
-      bar.append(a);
     }
     if (people.length || me.viewAs) bar.append(box);
     if (slot) { slot.parentNode.insertBefore(bar, slot); return; }
