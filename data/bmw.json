@@ -1,21 +1,502 @@
 {
  "updated": "2026-10-10",
- "pending": "First sightings only — the full BMW review of every camera (3 Aug – 10 Oct) is still running",
+ "pending": "",
+ "plate": "B 310944",
  "days": [
   {
-   "date": "2026-09-15",
+   "date": "2026-08-03",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-04",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-05",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-06",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-08",
    "present": true,
    "visits": [
     {
-     "arrive": "?",
-     "leave": "10:42"
+     "arrive": "08:54",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "notes": "D2 08:54:56 rear view, roof rack, heading into the pit. Leaving not captured (D2 records events only). RAV4 also on site (D2 07:47 and 15:26 IN).",
+   "photo": "20260808.jpg"
+  },
+  {
+   "date": "2026-08-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-10",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-11",
+   "present": null,
+   "visits": [],
+   "hours": null,
+   "partial": false,
+   "confidence": "none",
+   "notes": "Unknown: no D2 events and the Entrance camera was not yet installed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-12",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-13",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "17:49",
+     "leave": "18:06"
+    }
+   ],
+   "hours": 0.3,
+   "partial": false,
+   "confidence": "high",
+   "notes": "D2 17:49:23 rear view (plate + roof rack), 18:05:57 side view leaving. An earlier review called the 18:05 one the RAV4; it is the BMW. No RAV4 seen.",
+   "photo": "20260813.jpg"
+  },
+  {
+   "date": "2026-08-14",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "16:01",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "low",
+   "notes": "D2 16:01:33: a silver sedan far away, front view. Probably the BMW; too far to see the roof rack. RAV4 IN 08:16 (D2).",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-15",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-16",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "notes": "Not seen on D2 vehicle snapshots. D2 had almost no events (Sunday or day off). D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-17",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:33",
+     "leave": "?"
     }
    ],
    "hours": null,
    "partial": true,
    "confidence": "high",
-   "notes": "Mario confirmed: silver BMW with roof rack beside the Hitachi at 10:42 (pit view); arrival not seen.",
+   "notes": "D2 07:33:36 rear view with roof rack, heading into the pit. Leaving not captured.",
+   "photo": "20260817.jpg"
+  },
+  {
+   "date": "2026-08-18",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:46",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "notes": "D2 07:46:50 rear view with roof rack. BOTH cars: the RAV4 came in 10 min earlier (D2 07:36:54, spare wheel).",
+   "photo": "20260818.jpg"
+  },
+  {
+   "date": "2026-08-19",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-20",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-21",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-22",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-23",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-24",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-25",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-26",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-27",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on D2 vehicle snapshots. D2 records events only and the Entrance camera started on 28 Aug, so a short visit could be missed.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-28",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-29",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-30",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-08-31",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-01",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-02",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. RAV4 on site (OUT 15:49).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-03",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:06",
+     "leave": "07:19"
+    }
+   ],
+   "hours": 0.2,
+   "partial": false,
+   "confidence": "high",
+   "notes": "Entrance 07:06:41 (roof rack, close-up) + D2 07:06:56 rear view; out at about 07:19 (D2 07:19:06, Entrance 07:19:07). BOTH cars: RAV4 08:30-08:33 (D2). Abed sheet: \"bmw repair\" this day.",
+   "photo": "20260903.jpg"
+  },
+  {
+   "date": "2026-09-04",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-05",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-06",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. 07:44-07:50 = RAV4 (round rear spare wheel in D2 07:44:36).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-08",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-10",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial. 08:39-08:58 = RAV4 (rear spare wheel in D2 08:39:50).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-11",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial. RAV4 08:13; 15:13-15:33 and 16:01-16:10 (Mario confirmed the 16:01 car is the RAV4; spare wheel visible at 15:13 and 15:33).",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-12",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-13",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-14",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-15",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:49",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "notes": "D2 07:49:33 rear view with roof rack, into the pit. Mario-confirmed BMW parked in the pit at 10:42:06 (Entrance pit view, Hitachi breaking behind). Leaving not captured (Entrance was pointed at the pit until about 17:30). No RAV4 seen.",
    "photo": "20260915.jpg"
+  },
+  {
+   "date": "2026-09-16",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-17",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
   },
   {
    "date": "2026-09-18",
@@ -23,14 +504,14 @@
    "visits": [
     {
      "arrive": "13:53",
-     "leave": "?"
+     "leave": "13:59"
     }
    ],
-   "hours": null,
-   "partial": true,
-   "confidence": "medium",
-   "notes": "Silver BMW with roof rack passes the Entrance at 13:53.",
-   "photo": ""
+   "hours": 0.1,
+   "partial": false,
+   "confidence": "high",
+   "notes": "Entrance 13:53:27 (person at the bonnet), D2 13:54:09 rear and 13:56:15 front view. Gone by about 13:59. No RAV4 seen.",
+   "photo": "20260918.jpg"
   },
   {
    "date": "2026-09-19",
@@ -38,28 +519,233 @@
    "visits": [
     {
      "arrive": "08:01",
-     "leave": "08:07"
+     "leave": "08:08"
     }
    ],
    "hours": 0.1,
    "partial": false,
    "confidence": "high",
-   "notes": "Silver car with roof rack in at 08:01, out at 08:07 (Entrance).",
+   "notes": "Entrance 08:01:47 IN and 08:07:45 (front plate B 310944 readable); D2 08:01:50 / 08:07:36. BOTH cars: RAV4 10:37-13:59.",
+   "photo": "20260919.jpg"
+  },
+  {
+   "date": "2026-09-20",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial.",
    "photo": ""
+  },
+  {
+   "date": "2026-09-21",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras. The Entrance camera was pointed into the pit for part of the day, so its road view was partial.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-22",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-23",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-24",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:22",
+     "leave": "17:02"
+    }
+   ],
+   "hours": 8.7,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Entrance 08:21:58: sedan with roof rack beside the pillar. Last seen 17:02:01-17:02:07 (D2 front view + Entrance; plate crop saved). The Entrance road view was working all day and showed no BMW in between, so it was probably parked on site the whole time. BOTH cars: RAV4 10:09-12:08.",
+   "photo": "20260924.jpg"
   },
   {
    "date": "2026-09-25",
    "present": true,
    "visits": [
     {
-     "arrive": "16:42",
-     "leave": "?"
+     "arrive": "09:58",
+     "leave": "16:43"
     }
    ],
-   "hours": null,
-   "partial": true,
+   "hours": 6.7,
+   "partial": false,
    "confidence": "medium",
-   "notes": "BMW at the Entrance at 16:42.",
+   "notes": "Entrance 09:58:38 + D2 09:58:40 (rear, roof rack). Seen again 16:27 (Entrance), 16:38:24 (D2 rear) and 16:42:50-54 (D2 front + Entrance front plate). It is unclear whether it stayed all day or left and came back at 16:27; only one span is listed. BOTH cars: RAV4 10:24-11:51, 12:04-15:04 (driver at the tank 12:04).",
+   "photo": "20260925.jpg"
+  },
+  {
+   "date": "2026-09-26",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-27",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-28",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-29",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-09-30",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-01",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-02",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-03",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-04",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-05",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-06",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-08",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "notes": "Not seen on the Entrance or D2 cameras.",
+   "photo": ""
+  },
+  {
+   "date": "2026-10-10",
+   "present": null,
+   "visits": [],
+   "hours": null,
+   "partial": false,
+   "confidence": "none",
+   "notes": "No footage for this day.",
    "photo": ""
   }
  ]
