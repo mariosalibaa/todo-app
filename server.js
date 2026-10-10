@@ -23,6 +23,7 @@ const reports = require('./reports');
 const projectcost = require('./projectcost');
 const suppliers = require('./suppliers');     // /api/suppliers/* — one supplier across every company: bills, returns, payments, hub lines, statements   // /api/projectcost/* — one project's cost spread, profit and margin from Odoo's analytic lines
 const excavation = require('./excavation');
+const machines = require('./machines');   // /api/ajaltoun/machines — machine hours + truck loads from the site cameras
 const reconcileLine = require('./reconcile-line');   // /api/accounting/accounts/<id>/tx/<txId>/reconcile     // /api/accounting/excavation (Georges EL Hajj collections dashboard)           // /api/reports/* (SARL trial balance + GL in LBP for the accountant)        // /api/ajaltoun/* (the project's accounts, from Odoo)
 const site = require('./site');
 // Web push (Mario 2026-09-23: "push notifications … do it"): VAPID keys in the env on Vercel, from
@@ -743,6 +744,7 @@ const handler = async (req, res) => {
     'projectcost.html': path.join(__dirname, 'projectcost.html'),
     'suppliers.html': path.join(__dirname, 'suppliers.html'),
     'excavation-summary.html': path.join(__dirname, 'excavation-summary.html'),
+    'machines.html': path.join(__dirname, 'machines.html'),
     'decision.html': path.join(__dirname, 'decision.html'),
     'decisions.html': path.join(__dirname, 'decisions.html'),
     'crm.html': path.join(__dirname, 'crm.html'),
@@ -764,6 +766,7 @@ const handler = async (req, res) => {
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
     '/reports': 'reports.html', '/projectcost': 'projectcost.html', '/suppliers': 'suppliers.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
+    '/ajaltoun/machines': 'machines.html', '/ajaltoun/machines/loads': 'machines.html',   // machine hours + truck loads from the cameras (Mario 2026-10-10)
     '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
     '/crm': 'crm.html',
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
@@ -1495,11 +1498,12 @@ const handler = async (req, res) => {
     return;
   }
   if (url.startsWith('/api/ajaltoun/')) {
-    const excavOnly = url.split('?')[0] === '/api/ajaltoun/excavation' && access.apps.includes('excavation');
+    const excavOnly = (url.split('?')[0] === '/api/ajaltoun/excavation' || url.startsWith('/api/ajaltoun/machines')) && access.apps.includes('excavation');
     const sectionsList = url.split('?')[0] === '/api/ajaltoun/sections' && req.method === 'GET';   // the divisions list: any member (the grid and the Site chat offer it)
     if (!access.apps.includes('ajaltoun') && !excavOnly && !sectionsList) return noApp('ajaltoun');
     try {
-      const handled = await excavation.handle(req, res, url, user, { db, TEAM_ID, odooCall, access })
+      const handled = await machines.handle(req, res, url)
+        || await excavation.handle(req, res, url, user, { db, TEAM_ID, odooCall, access })
         || await ajaltoun.handle(req, res, url, user, { db, TEAM_ID, odooCall, access });
       if (handled === false) { res.writeHead(404); res.end('not found'); }
     } catch (e) {

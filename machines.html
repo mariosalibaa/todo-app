@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Machines &amp; trucks · Ajaltoun 4193 · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;--orange:#fab387;--yellow:#f9e2af;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);gap:12px;flex-wrap:wrap;}
+  .hleft{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;}
+  .tabs{display:flex;gap:2px;margin:0 auto 0 28px;} .tabs a{padding:8px 14px;color:var(--sub);text-decoration:none;font-size:.88rem;border-radius:8px;white-space:nowrap;}
+  .tabs a.on{color:var(--amber);background:rgba(242,169,59,.1);font-weight:600;} .tabs a:hover{color:var(--text);} @media (max-width:700px){.tabs{margin:0;} .tabs a{padding:6px 9px;font-size:.8rem;}}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;} .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;} .who a{color:var(--overlay0);text-decoration:none;}
+  main{max-width:1180px;margin:0 auto;padding:22px 16px 60px;}
+  h1{font-size:1.3rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.84rem;margin:0 0 18px;line-height:1.5;}
+  h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:26px 0 10px;font-weight:600;display:flex;align-items:center;gap:10px;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px;} .kpi .v{font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;}
+  .kpi.h .v{color:var(--orange);} .kpi.k .v{color:var(--yellow);} .kpi.t .v{color:var(--blue);} .kpi.d .v{color:var(--green);}
+  .months{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;}
+  .mcard{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px;} .mcard b{font-size:.95rem;} .mcard .row{display:flex;justify-content:space-between;font-size:.82rem;margin-top:6px;font-variant-numeric:tabular-nums;} .mcard .row span:first-child{color:var(--sub);}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:6px 10px;overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;} th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  td{padding:6px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;} td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  tr.none td{color:var(--overlay0);} tr.part td.n{color:var(--sub);} tr.sun td:first-child,tr.sun td:nth-child(2){color:var(--green);}
+  tr.mon td{background:rgba(242,169,59,.10);color:var(--amber);font-weight:600;cursor:pointer;}
+  .hb{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px;} .hb.h{background:var(--orange);} .hb.k{background:var(--yellow);}
+  .muted{color:var(--overlay0);} .small{font-size:.74rem;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;} .filters button{background:var(--mantle);color:var(--sub);border:1px solid var(--surface0);border-radius:16px;padding:5px 12px;font-size:.78rem;cursor:pointer;} .filters button.on{color:var(--amber);border-color:var(--amber);}
+  .loads{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
+  .ld{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
+  .ld .ph{aspect-ratio:3/2;background:#11111b;cursor:zoom-in;display:flex;align-items:center;justify-content:center;color:var(--overlay0);font-size:.75rem;} .ld .ph img{width:100%;height:100%;object-fit:cover;display:block;}
+  .ld .bd{padding:10px 12px;font-size:.8rem;line-height:1.45;} .ld .top{display:flex;justify-content:space-between;align-items:center;gap:6px;} .ld .top b{font-size:.86rem;}
+  .badge{display:inline-block;border-radius:10px;padding:1px 8px;font-size:.7rem;font-weight:600;}
+  .f-heaped{background:rgba(166,227,161,.15);color:var(--green);} .f-full{background:rgba(137,180,250,.15);color:var(--blue);} .f-partly{background:rgba(249,226,175,.15);color:var(--yellow);} .f-light{background:rgba(243,139,168,.15);color:var(--red);} .f-unk{background:var(--surface0);color:var(--sub);}
+  .stars{color:var(--amber);letter-spacing:1px;} .stars i{color:var(--surface1);font-style:normal;}
+  #viewer{position:fixed;inset:0;background:#0f0f17;z-index:600;display:none;flex-direction:column;} #viewer.on{display:flex;}
+  .vbar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--mantle);border-bottom:1px solid var(--surface0);flex:none;}
+  .vbar .vback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:6px 8px;border-radius:8px;}
+  .vbar .vtitle{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .vbody{flex:1;overflow:auto;padding:12px;} .vbody img{display:block;margin:0 auto;max-width:100%;height:auto;}
+  a{color:var(--amber);}
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft">
+    <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
+    <span id="crumbs"></span>
+  </div>
+  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a></nav>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <div id="status" class="small muted">Loading…</div>
+  <section id="v-days" hidden>
+    <h1>Machines &amp; trucks — Ajaltoun 4193</h1>
+    <p class="lead">From the site cameras (SD cards): how long the <b style="color:var(--orange)">Hitachi FH330.3</b> and the <b style="color:var(--yellow)">Komatsu PC240</b> were seen working each day, and how many dump trucks left loaded. Hours are counted from camera frames every 3 minutes and were checked against a continuous recording for 6–8 Oct (within about half an hour). Gray days: the camera did not record (its battery ran flat), so real totals are higher.</p>
+    <div class="kpis" id="kpis"></div>
+    <h2>Per month</h2>
+    <div class="months" id="months"></div>
+    <h2>Per day <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to fold it</span></h2>
+    <div class="card"><table id="days"><thead><tr><th>Date</th><th>Day</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+    <div class="note" id="src"></div>
+  </section>
+  <section id="v-loads" hidden>
+    <h1>Truck loads — how well each truck was filled</h1>
+    <p class="lead">Every dump truck seen leaving loaded, with the camera photo of its bed: the truck, what it carried and how full it was. Score 5 = heaped and dense, 1 = mostly empty. Tap a photo to see it full size.</p>
+    <div class="kpis" id="lkpis"></div>
+    <h2>Loads</h2>
+    <div class="filters" id="lfilters"></div>
+    <div class="loads" id="loads"></div>
+  </section>
+</main>
+<div id="viewer">
+  <div class="vbar"><a class="vback" href="#" onclick="closeViewer();return false;">&lsaquo; Back</a><div class="vtitle" id="vtitle"></div></div>
+  <div class="vbody" id="vbody"></div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc; let D = null, MONTH = 'all';
+const LOADS = /\/loads$/.test(location.pathname);
+const h1 = n => n == null ? '—' : (+n).toFixed(1);
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dd = s => { const d = new Date(s + 'T12:00:00'); return { day: d.getDate() + ' ' + MON[d.getMonth()], wd: d.toLocaleDateString('en-GB', { weekday: 'short' }), m: s.slice(0, 7), sun: d.getDay() === 0 }; };
+const K = (cls, v, l) => `<div class="kpi ${cls}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+const monthName = m => MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4);
+
+function renderDays() {
+  const days = D.days || [];
+  const seen = days.filter(d => d.hitachi != null);
+  const sum = (a, k) => a.reduce((s, d) => s + (+d[k] || 0), 0);
+  const loads = days.reduce((s, d) => s + (+d.loads || 0), 0);
+  document.getElementById('kpis').innerHTML =
+    K('d', `${seen.length} / ${days.length}`, 'days with footage') +
+    K('h', h1(sum(seen, 'hitachi')) + ' h', 'Hitachi seen working') +
+    K('k', h1(sum(seen, 'komatsu')) + ' h', 'Komatsu seen working') +
+    K('t', loads, 'truck loads out');
+  const months = [...new Set(days.map(d => d.date.slice(0, 7)))];
+  document.getElementById('months').innerHTML = months.map(m => {
+    const md = days.filter(d => d.date.startsWith(m)), ms = md.filter(d => d.hitachi != null);
+    const H = sum(ms, 'hitachi'), Kx = sum(ms, 'komatsu'), T = md.reduce((s, d) => s + (+d.loads || 0), 0);
+    return `<div class="mcard"><b>${monthName(m)}</b> <span class="small muted">${md[0].date.slice(8)}–${md[md.length - 1].date.slice(8)}</span>
+      <div class="row"><span>Days with footage</span><span>${ms.length} of ${md.length}</span></div>
+      <div class="row"><span>Hitachi</span><span style="color:var(--orange)">${h1(H)} h · ${h1(ms.length ? H / ms.length : 0)}/day</span></div>
+      <div class="row"><span>Komatsu</span><span style="color:var(--yellow)">${h1(Kx)} h · ${h1(ms.length ? Kx / ms.length : 0)}/day</span></div>
+      <div class="row"><span>Truck loads</span><span style="color:var(--blue)">${T}</span></div></div>`;
+  }).join('');
+  const max = Math.max(1, ...seen.map(d => Math.max(d.hitachi, d.komatsu)));
+  const tb = document.querySelector('#days tbody'); let html = '';
+  for (const m of months.slice().reverse()) {
+    const md = days.filter(d => d.date.startsWith(m)), ms = md.filter(d => d.hitachi != null);
+    html += `<tr class="mon" onclick="foldMonth('${m}')"><td colspan="2">▾ ${monthName(m)}</td><td class="n">${h1(sum(ms, 'hitachi'))}</td><td class="n">${h1(sum(ms, 'komatsu'))}</td><td class="n">${md.reduce((s, d) => s + (+d.loads || 0), 0)}</td><td colspan="2"></td></tr>`;
+    for (const d of md.slice().reverse()) {
+      const x = dd(d.date), none = d.hitachi == null, part = /^from|until|mostly|pit camera/.test(d.footage || '');
+      html += `<tr data-m="${m}" class="${none ? 'none' : part ? 'part' : ''} ${x.sun ? 'sun' : ''}"><td>${x.day}</td><td>${x.wd}</td>
+        <td class="n">${none ? '—' : h1(d.hitachi) + `<span class="hb h" style="width:${Math.round(d.hitachi / max * 50)}px"></span>`}</td>
+        <td class="n">${none ? '—' : h1(d.komatsu) + `<span class="hb k" style="width:${Math.round(d.komatsu / max * 50)}px"></span>`}</td>
+        <td class="n">${d.loads == null ? '—' : d.loads}</td><td class="small">${esc(none ? 'no footage' : d.footage || '')}</td><td class="small muted">${esc(d.notes || '')}</td></tr>`;
+    }
+  }
+  tb.innerHTML = html;
+  document.getElementById('src').innerHTML = `Source: ${esc(D.source || '')} · reviewed ${esc(D.updated || '')}. “from 10:55” = the morning was not recorded, so that day is a minimum. The Excel is in Dropbox › AJALTOUN 4193 VILLAS › cameras.`;
+}
+function foldMonth(m) { document.querySelectorAll(`#days tr[data-m="${m}"]`).forEach(r => r.hidden = !r.hidden); }
+
+const FILL = f => /heap/i.test(f) ? 'heaped' : /full/i.test(f) ? 'full' : /part/i.test(f) ? 'partly' : /light|empty/i.test(f) ? 'light' : 'unk';
+const FILL_L = { heaped: 'Heaped', full: 'Full', partly: 'Partly full', light: 'Light', unk: "Can't tell" };
+const stars = n => n ? '★'.repeat(n) + `<i>${'★'.repeat(5 - n)}</i>` : '<span class="muted small">—</span>';
+const photoUrl = p => p ? '/api/ajaltoun/machines/photo/' + p.split('/').pop() : '';
+function renderLoads() {
+  const L = D.loads || [];
+  if (!L.length) { document.getElementById('loads').innerHTML = '<div class="muted">The truck-load photos are still being prepared.</div>'; return; }
+  const by = k => L.filter(l => FILL(l.fill) === k).length;
+  const sc = L.filter(l => l.score), avg = sc.length ? sc.reduce((s, l) => s + l.score, 0) / sc.length : 0;
+  document.getElementById('lkpis').innerHTML = K('t', L.length, 'truck loads') + K('d', by('heaped'), 'heaped') + K('t', by('full'), 'full to the sides') +
+    K('k', by('partly'), 'partly full') + K('h', by('light'), 'light / mostly empty') + K('k', avg.toFixed(1) + ' / 5', 'average fill score');
+  const months = [...new Set(L.map(l => l.date.slice(0, 7)))];
+  document.getElementById('lfilters').innerHTML = ['all', ...months].map(m => `<button class="${m === MONTH ? 'on' : ''}" onclick="MONTH='${m}';renderLoads()">${m === 'all' ? 'All' : monthName(m)} (${m === 'all' ? L.length : L.filter(l => l.date.startsWith(m)).length})</button>`).join('');
+  const show = L.filter(l => MONTH === 'all' || l.date.startsWith(MONTH)).slice().reverse();
+  document.getElementById('loads').innerHTML = show.map((l, i) => {
+    const x = dd(l.date), f = FILL(l.fill), u = photoUrl(l.photo);
+    return `<div class="ld"><div class="ph" ${u ? `onclick="openViewer('${u}', '${esc(x.day + ' ' + l.time + ' — ' + (l.truck || ''))}')"` : ''}>${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
+      <div class="bd"><div class="top"><b>${x.wd} ${x.day} · ${esc(l.time || '')}</b><span class="badge f-${f}">${FILL_L[f]}</span></div>
+      <div>${esc(l.truck || '')} · ${esc(l.material || '')}</div><div class="stars">${stars(l.score)}</div>
+      ${l.remark ? `<div class="small muted">${esc(l.remark)}</div>` : ''}<div class="small muted">${esc(l.camera || '')}${l.confidence ? ' · ' + esc(l.confidence) + ' confidence' : ''}</div></div></div>`;
+  }).join('');
+}
+function openViewer(url, title) {
+  document.getElementById('vtitle').textContent = title; document.getElementById('vbody').innerHTML = `<img src="${url}" alt="">`;
+  document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden';
+}
+function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); });
+
+Admin.require(['ajaltoun', 'excavation'], async me => {
+  Admin.crumbs([['Ajaltoun 4193', '/#ajaltoun-4193'], ['Machines & trucks']]);
+  document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
+  document.getElementById(LOADS ? 't-loads' : 't-days').classList.add('on');
+  document.getElementById(LOADS ? 'v-loads' : 'v-days').hidden = false;
+  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; LOADS ? renderLoads() : renderDays(); }
+  catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); }
+});
+</script>
+</body>
+</html>
