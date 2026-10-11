@@ -1138,6 +1138,26 @@ const handler = async (req, res) => {
     catch (e) { console.error('plants check error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
+  // /api/wa-link — the WhatsApp daemon's link state, shared with the Telegram agent bot (ACCOUNTING_API_KEY both sides).
+  // Daemon: { need: true } when the 03 line is unlinked, { need: false } once linked. Bot: { want: true } when Mario
+  // replies on Telegram; the daemon sees it within 30 s, gets the phone link code and sends it (Mario, 2026-10-11).
+  if (url.split('?')[0] === '/api/wa-link') {
+    const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!(given.length >= 16 && given === process.env.ACCOUNTING_API_KEY)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return; }
+    const ref = db.collection('workspaces').doc(TEAM_ID).collection('system').doc('waLink');
+    try {
+      if (req.method === 'POST') {
+        const b = await new Promise((ok, no) => { let s = ''; req.on('data', d => s += d).on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { no(e); } }).on('error', no); });
+        const set = { at: new Date().toISOString() };
+        if (typeof b.need === 'boolean') { set.need = b.need; if (!b.need) set.want = false; }
+        if (typeof b.want === 'boolean') set.want = b.want;
+        await ref.set(set, { merge: true });
+      }
+      const d = (await ref.get()).data() || {};
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ need: !!d.need, want: !!d.want, at: d.at || null }));
+    } catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
   // /api/makhlouf — the generator logger's SD card, rebuilt by makhlouf-build.js into makhlouf-data.json. Hub admins only.
   if (url.split('?')[0] === '/api/makhlouf' && req.method === 'GET') {
     const acc = await cprAccess();
