@@ -33,6 +33,9 @@
   td{padding:6px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;} td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   tr.none td{color:var(--overlay0);} tr.part td.n{color:var(--sub);} tr.sun td:first-child,tr.sun td:nth-child(2){color:var(--green);}
   tr.wk td{background:rgba(137,180,250,.07);color:var(--blue);font-size:.76rem;}
+  /* table headers stay visible while scrolling (Mario 2026-10-11) */
+  .tcard{overflow:visible;} thead th{position:sticky;top:var(--hdr,64px);z-index:5;background:var(--mantle);box-shadow:0 1px 0 var(--surface0);}
+  @media (max-width:900px){.tcard{overflow-x:auto;} thead th{top:0;}}
   tr.tot td{cursor:default;border-top:2px solid var(--amber);} .fold{display:inline-block;width:1em;}
   tr.mon td{background:rgba(242,169,59,.10);color:var(--amber);font-weight:600;cursor:pointer;}
   .hb{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px;} .hb.h{background:var(--orange);} .hb.k{background:var(--yellow);}
@@ -70,7 +73,7 @@
     <p class="lead">From the site cameras (SD cards): how long the <b style="color:var(--orange)">Hitachi FH330.3</b> and the <b style="color:var(--yellow)">Komatsu PC240</b> were seen working each day, and how many dump trucks left loaded. Hours are counted from camera frames every 3 minutes and were checked against a continuous recording for 6–8 Oct (within about half an hour). Every camera is combined: d1 up, Entrance, D2 (pit), D2 up, D3 up, D2-D3 and Pergola. When D1 up was off (battery flat) the day is filled from the other cameras; those hours start with ~ and are estimates. The Footage column lists the cameras used.</p>
     <div class="kpis" id="kpis"></div>
     <h2>Per month <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to see its days · small figures = per working day</span></h2>
-    <div class="card" style="overflow-x:auto"><table id="days"><thead><tr><th>Month / date</th><th class="n" style="color:var(--green)">Working days</th><th class="n">Off days</th><th class="n">of which Sundays</th><th class="n">No footage</th><th class="n" style="color:var(--orange)">Hitachi h</th><th class="n" style="color:var(--yellow)">Komatsu h</th><th class="n">Both h</th><th class="n" style="color:var(--blue)">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
+    <div class="card tcard"><table id="days"><thead><tr><th>Month / date</th><th class="n" style="color:var(--green)">Working days</th><th class="n">Off days</th><th class="n">of which Sundays</th><th class="n">No footage</th><th class="n" style="color:var(--orange)">Hitachi h</th><th class="n" style="color:var(--yellow)">Komatsu h</th><th class="n">Both h</th><th class="n" style="color:var(--blue)">Trucks</th><th>Footage</th><th>Notes</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
     <div class="note" id="src"></div>
   </section>
   <section id="v-loads" hidden>
@@ -78,7 +81,7 @@
     <p class="lead">Every dump truck seen leaving loaded, with the camera photo of its bed: the truck, what it carried and how full it was. Score 5 = heaped and dense, 1 = mostly empty. Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="lkpis"></div>
     <h2>Loads per month <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to see its trucks</span></h2>
-    <div class="card" style="overflow-x:auto"><table id="ltab"><thead><tr><th>Date</th><th>Left at</th><th>Truck</th><th>Material</th><th>Fill</th><th>Score</th><th>Remark</th><th>Camera</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+    <div class="card tcard"><table id="ltab"><thead><tr><th>Date</th><th>Left at</th><th>Truck</th><th>Material</th><th>Fill</th><th>Score</th><th>Remark</th><th>Camera</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="v-flags" hidden>
     <h1>Suspicious events — all cameras</h1>
@@ -90,21 +93,21 @@
     <h1>Silver RAV4 on site</h1>
     <p class="lead">When the silver RAV4 (plate B 483534) arrived and left each day, from all cameras combined. It was Abed's car at first; Abed and Georges later swapped (Georges had the silver BMW — see the BMW tab). Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="gkpis"></div>
-    <div class="card" style="overflow-x:auto"><table id="gtab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+    <div class="card tcard"><table id="gtab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="gnote"></div>
   </section>
   <section id="v-bmw" hidden>
     <h1>Silver BMW on site</h1>
     <p class="lead">When the silver BMW 3-series (plate B 310944, roof rack; Georges' car at first — by 3 Sep Abed had it, per his cash sheet) arrived and left each day, from all cameras combined. Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="bkpis"></div>
-    <div class="card" style="overflow-x:auto"><table id="btab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+    <div class="card tcard"><table id="btab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="bnote"></div>
   </section>
   <section id="v-tacoma" hidden>
     <h1>Silver Tacoma pickup on site</h1>
     <p class="lead">When the silver Toyota Tacoma-type pickup arrived and left each day, what it carried and where it went, from all cameras combined. Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="tkpis"></div>
-    <div class="card" style="overflow-x:auto"><table id="ttab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+    <div class="card tcard"><table id="ttab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="tnote"></div>
   </section>
   <section id="v-diesel" hidden>
@@ -112,12 +115,12 @@
     <div class="note" id="dverdict" style="margin-top:0;color:var(--text)"></div>
     <div class="kpis" id="dkpis" style="margin-top:14px"></div>
     <h2>For your decision</h2>
-    <div class="card"><table id="dpend"><tbody></tbody></table></div>
+    <div class="card tcard"><table id="dpend"><tbody></tbody></table></div>
     <h2>Litres per machine-hour between fills</h2>
-    <div class="card" style="overflow-x:auto"><table id="dint"><thead><tr><th>Fill</th><th class="n">Litres</th><th>Hours since previous fill</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">L / h</th><th class="n">Expected L</th><th class="n">Delivered − expected</th></tr></thead><tbody></tbody></table></div>
+    <div class="card tcard"><table id="dint"><thead><tr><th>Fill</th><th class="n">Litres</th><th>Hours since previous fill</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">L / h</th><th class="n">Expected L</th><th class="n">Delivered − expected</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="dexp"></div>
     <h2>Every fill</h2>
-    <div class="card" style="overflow-x:auto"><table id="dfill"><thead><tr><th>Date</th><th class="n">Litres</th><th class="n">$/L</th><th class="n">Total $</th><th>Machine</th><th>Odoo</th><th>Dib paid</th></tr></thead><tbody></tbody></table></div>
+    <div class="card tcard"><table id="dfill"><thead><tr><th>Date</th><th class="n">Litres</th><th class="n">$/L</th><th class="n">Total $</th><th>Machine</th><th>Odoo</th><th>Dib paid</th></tr></thead><tbody></tbody></table></div>
   </section>
 </main>
 <div id="viewer">
@@ -278,7 +281,10 @@ function openViewer(url, title) {
 function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); });
 
+const setHdr = () => document.documentElement.style.setProperty('--hdr', (document.querySelector('header')?.offsetHeight || 64) + 'px');
+addEventListener('resize', setHdr);
 Admin.require(['ajaltoun', 'excavation'], async me => {
+  setTimeout(setHdr, 0);
   Admin.crumbs([['Ajaltoun 4193', '/#ajaltoun-4193'], ['Machines & trucks']]);
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   document.getElementById('t-' + VIEW).classList.add('on');
