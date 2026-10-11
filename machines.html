@@ -85,9 +85,9 @@
   </section>
   <section id="v-flags" hidden>
     <h1>Suspicious events — all cameras</h1>
-    <p class="lead">Everything outside normal work or touching diesel: jerrycans, the Dodge at a machine, the tanker, people on a machine, night / Sunday / lunch activity. Newest first. Tap a photo to see it full size.</p>
+    <p class="lead">Everything outside normal work or touching diesel: jerrycans, the Dodge at a machine, the tanker, people on a machine, night / Sunday / lunch activity. Newest first. Tap a month to open it, a photo to enlarge. ★ = strongest.</p>
     <div class="filters" id="ffilters"></div>
-    <div class="loads" id="flags"></div>
+    <div class="card tcard"><table id="ftab"><thead><tr><th>Date</th><th>Time</th><th>Camera</th><th>What was seen</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="v-georges" hidden>
     <h1>Silver RAV4 on site</h1>
@@ -262,17 +262,25 @@ function renderGeorges(G, P, api) {
   document.getElementById(P + 'note').textContent = (G.pending ? G.pending + '. ' : '') + 'Hours = arrival to departure; two visits on one day are added. "?" = arrival or departure not seen.';
 }
 function foldG(P, m) { const rows = document.querySelectorAll(`#${P}tab tr[data-gm="${P}${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById(P + 'fold-' + m).textContent = open ? '▾' : '▸'; }
-let FM = 'strong';
+let FM = 'all';
 function renderFlags() {
-  const L = D.flags || [];
-  const months = [...new Set(L.map(l => l.date.slice(0, 7)))];
-  document.getElementById('ffilters').innerHTML = `<button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest (${L.filter(l => l.strong).length})</button>` + ['all', ...months].map(m => `<button class="${m === FM ? 'on' : ''}" onclick="FM='${m}';renderFlags()">${m === 'all' ? 'All' : monthName(m)} (${m === 'all' ? L.length : L.filter(l => l.date.startsWith(m)).length})</button>`).join('');
-  document.getElementById('flags').innerHTML = L.filter(l => FM === 'all' || (FM === 'strong' ? l.strong : l.date.startsWith(FM))).slice().reverse().map(l => {
-    const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
-    return `<div class="ld"><div class="ph" ${u ? `onclick="openViewer('${u}', '${esc(x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera)}')"` : ''}>${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
-      <div class="bd"><div class="top"><b>${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
-  }).join('');
+  const ALL = D.flags || [], L = FM === 'strong' ? ALL.filter(l => l.strong) : ALL;
+  document.getElementById('ffilters').innerHTML = `<button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest only (${ALL.filter(l => l.strong).length})</button><button class="${FM === 'all' ? 'on' : ''}" onclick="FM='all';renderFlags()">All events (${ALL.length})</button>`;
+  const months = [...new Set(L.map(l => l.date.slice(0, 7)))].sort().reverse();
+  let html = '';
+  for (const m of months) {
+    const ml = L.filter(l => l.date.startsWith(m)), days = new Set(ml.map(l => l.date)).size, st = ml.filter(l => l.strong).length;
+    html += `<tr class="mon" onclick="foldF('${m}')"><td><span class="fold" id="ffold-${m}">▸</span> ${monthName(m)}</td><td colspan="2">${ml.length} event${ml.length === 1 ? '' : 's'}</td><td class="small">${st} strongest · on ${days} day${days === 1 ? '' : 's'}</td><td></td></tr>`;
+    for (const l of ml.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))) {
+      const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
+      html += `<tr data-fm="${m}" hidden class="${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day}</td><td style="white-space:nowrap">${esc(l.time)}</td><td class="small">${esc(l.camera)}</td><td class="small">${esc(l.what)}</td>
+        <td>${u ? `<img src="${u}" loading="lazy" style="width:120px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera)}')">` : ''}</td></tr>`;
+    }
+  }
+  html += `<tr class="mon tot"><td>Total</td><td colspan="2">${L.length} events</td><td class="small">${L.filter(l => l.strong).length} strongest · on ${new Set(L.map(l => l.date)).size} days</td><td></td></tr>`;
+  document.querySelector('#ftab tbody').innerHTML = html;
 }
+function foldF(m) { const rows = document.querySelectorAll(`#ftab tr[data-fm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('ffold-' + m).textContent = open ? '▾' : '▸'; }
 function foldL(m) { const rows = document.querySelectorAll(`#ltab tr[data-lm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('lfold-' + m).textContent = open ? '▾' : '▸'; }
 function openViewer(url, title) {
   document.getElementById('vtitle').textContent = title; document.getElementById('vbody').innerHTML = `<img src="${url}" alt="">`;
