@@ -54,6 +54,11 @@
   .vbar .vback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:6px 8px;border-radius:8px;}
   .vbar .vtitle{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .vbody{flex:1;overflow:auto;padding:12px;} .vbody img{display:block;margin:0 auto;max-width:100%;height:auto;}
+  .rv{display:flex;flex-direction:column;gap:5px;min-width:190px;} .rv .b{display:flex;gap:4px;flex-wrap:wrap;}
+  .rv button{border:1px solid var(--surface1);background:transparent;color:var(--sub);border-radius:12px;padding:2px 8px;font-size:.7rem;cursor:pointer;}
+  .rv button.on.s{background:rgba(243,139,168,.18);color:var(--red);border-color:var(--red);} .rv button.on.n{background:rgba(166,227,161,.15);color:var(--green);border-color:var(--green);} .rv button.on.i{background:rgba(249,226,175,.15);color:var(--yellow);border-color:var(--yellow);}
+  .rv textarea{width:100%;min-height:34px;background:var(--base);color:var(--text);border:1px solid var(--surface0);border-radius:8px;font:inherit;font-size:.74rem;padding:4px 6px;resize:vertical;}
+  .rv .meta{font-size:.65rem;color:var(--overlay0);}
   [hidden]{display:none !important;}
   a{color:var(--amber);}
   .varrow{position:fixed;top:50%;left:12px;transform:translateY(-50%);z-index:610;width:52px;height:72px;border:0;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:44px;cursor:pointer;line-height:1;} .varrow.r{left:auto;right:12px;} .varrow:hover{background:rgba(242,169,59,.7);}
@@ -93,7 +98,7 @@
     <p class="lead">Everything outside normal work or touching diesel: jerrycans, the Dodge at a machine, the tanker, people on a machine, night / Sunday / lunch activity. Newest first. Tap a month to open it, a photo to enlarge. ★ = strongest.</p>
     <div class="filters" id="ffilters"></div>
     <div class="loads" id="flags" hidden></div>
-    <div class="card tcard" id="ftabwrap"><table id="ftab"><thead><tr><th>Date</th><th>Time</th><th>Camera</th><th>What was seen</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+    <div class="card tcard" id="ftabwrap"><table id="ftab"><thead><tr><th>Date</th><th>Time</th><th>Camera</th><th>What was seen</th><th>Photo</th><th>Your review</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="v-georges" hidden>
     <h1>Silver RAV4 on site</h1>
@@ -271,23 +276,45 @@ function renderGeorges(G, P, api) {
 }
 function foldG(P, m) { const rows = document.querySelectorAll(`#${P}tab tr[data-gm="${P}${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById(P + 'fold-' + m).textContent = open ? '▾' : '▸'; }
 let FM = 'all';
+const RVS = { suspicious: ['s', 'Suspicious'], investigate: ['i', 'Needs investigation'], not: ['n', 'Not suspicious'] };
+function rv(l) { const r = (D.reviews || {})[l.id]; return r || (l.explained ? { status: 'not', note: '', auto: true } : { status: '', note: '' }); }
+function reviewHtml(l) {
+  const r = rv(l);
+  return `<div class="rv" data-id="${l.id}"><div class="b">${Object.entries(RVS).map(([k, [c, t]]) => `<button class="${c} ${r.status === k ? 'on' : ''}" onclick="saveReview('${l.id}', { status: '${k}' }, this)">${t}</button>`).join('')}</div>
+    <textarea placeholder="Your note…" onchange="saveReview('${l.id}', { note: this.value }, this)">${esc(r.note || '')}</textarea>
+    <div class="meta">${r.by ? esc(r.by) + ' · ' + esc((r.at || '').slice(0, 16).replace('T', ' ')) : r.auto ? 'explained by Mario' : ''}</div></div>`;
+}
+async function saveReview(id, patch, el) {
+  const cur = { status: '', note: '', ...((D.reviews || {})[id] || {}) };
+  if (patch.status && patch.status === cur.status) patch.status = '';          // tap again to clear
+  const body = { id, status: patch.status !== undefined ? patch.status : cur.status, note: patch.note !== undefined ? patch.note : cur.note };
+  try {
+    const r = await Admin.api('POST', '/api/ajaltoun/machines/review', body);
+    D.reviews = D.reviews || {}; D.reviews[id] = r;
+    document.querySelectorAll(`.rv[data-id="${id}"]`).forEach(box => {
+      box.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.textContent === (RVS[r.status] || [])[1]));
+      box.querySelector('.meta').textContent = (r.by || '') + ' · ' + (r.at || '').slice(0, 16).replace('T', ' ') + ' · saved';
+      const ta = box.querySelector('textarea'); if (ta !== document.activeElement) ta.value = r.note || '';
+    });
+  } catch (e) { alert('Could not save: ' + (e.message || e)); }
+}
 let FV = (() => { try { return localStorage.getItem('flagsView') || 'table'; } catch { return 'table'; } })();
 function setFV(v) { FV = v; try { localStorage.setItem('flagsView', v); } catch {} renderFlags(); }
 function renderFlags() {
   const ALL = D.flags || [];
   const months0 = [...new Set(ALL.map(l => l.date.slice(0, 7)))].sort();
-  if (FV === 'table' && !['all', 'strong', 'theft'].includes(FM)) FM = 'all';
-  const L = FM === 'theft' ? ALL.filter(l => l.theft) : FM === 'strong' ? ALL.filter(l => l.strong) : FM === 'all' ? ALL : ALL.filter(l => l.date.startsWith(FM));
+  if (FV === 'table' && !['all', 'strong', 'theft', 'tor'].includes(FM) && !FM.startsWith('rv:')) FM = 'all';
+  const L = FM === 'tor' ? ALL.filter(l => !rv(l).status) : FM.startsWith('rv:') ? ALL.filter(l => rv(l).status === FM.slice(3)) : FM === 'theft' ? ALL.filter(l => l.theft) : FM === 'strong' ? ALL.filter(l => l.strong) : FM === 'all' ? ALL : ALL.filter(l => l.date.startsWith(FM));
   document.getElementById('ffilters').innerHTML =
     `<button class="${FV === 'table' ? 'on' : ''}" onclick="setFV('table')">☰ Table</button><button class="${FV === 'cards' ? 'on' : ''}" onclick="setFV('cards')">▦ Photos</button><span style="width:14px"></span>` +
-    `<button class="${FM === 'theft' ? 'on' : ''}" onclick="FM='theft';renderFlags()" style="border-color:var(--red);color:var(--red)">⚠ Possible theft (${ALL.filter(l => l.theft).length})</button><button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest (${ALL.filter(l => l.strong).length})</button><button class="${FM === 'all' ? 'on' : ''}" onclick="FM='all';renderFlags()">All (${ALL.length})</button>` +
+    `<span style="width:14px"></span><button class="${FM === 'tor' ? 'on' : ''}" onclick="FM='tor';renderFlags()">To review (${ALL.filter(l => !rv(l).status).length})</button>` + Object.entries(RVS).map(([k, [c, t]]) => `<button class="${FM === 'rv:' + k ? 'on' : ''}" onclick="FM='rv:${k}';renderFlags()">${t} (${ALL.filter(l => rv(l).status === k).length})</button>`).join('') + `<span style="width:14px"></span><button class="${FM === 'theft' ? 'on' : ''}" onclick="FM='theft';renderFlags()" style="border-color:var(--red);color:var(--red)">⚠ Possible theft (${ALL.filter(l => l.theft).length})</button><button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest (${ALL.filter(l => l.strong).length})</button><button class="${FM === 'all' ? 'on' : ''}" onclick="FM='all';renderFlags()">All (${ALL.length})</button>` +
     (FV === 'cards' ? months0.map(m => `<button class="${FM === m ? 'on' : ''}" onclick="FM='${m}';renderFlags()">${monthName(m)} (${ALL.filter(l => l.date.startsWith(m)).length})</button>`).join('') : '');
   document.getElementById('flags').hidden = FV !== 'cards'; document.getElementById('ftabwrap').hidden = FV !== 'table';
   if (FV === 'cards') {
     document.getElementById('flags').innerHTML = L.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).map(l => {
       const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
       return `<div class="ld"><div class="ph" ${u ? `onclick="openFlag(${ALL.indexOf(l)})"` : ''} style="position:relative">${(l.series || []).length ? `<span class="badge" style="position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff">${(l.series || []).length + 1} photos</span>` : ''}${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
-        <div class="bd"><div class="top"><b>${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
+        <div class="bd"><div class="top"><b>${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div><div style="margin-top:8px">${reviewHtml(l)}</div></div></div>`;
     }).join('');
     return;
   }
@@ -295,14 +322,14 @@ function renderFlags() {
   let html = '';
   for (const m of months) {
     const ml = L.filter(l => l.date.startsWith(m)), days = new Set(ml.map(l => l.date)).size, st = ml.filter(l => l.strong).length;
-    html += `<tr class="mon" onclick="foldF('${m}')"><td><span class="fold" id="ffold-${m}">▸</span> ${monthName(m)}</td><td colspan="2">${ml.length} event${ml.length === 1 ? '' : 's'}</td><td class="small">${st} strongest · on ${days} day${days === 1 ? '' : 's'}</td><td></td></tr>`;
+    html += `<tr class="mon" onclick="foldF('${m}')"><td><span class="fold" id="ffold-${m}">▸</span> ${monthName(m)}</td><td colspan="2">${ml.length} event${ml.length === 1 ? '' : 's'}</td><td class="small">${st} strongest · on ${days} day${days === 1 ? '' : 's'} · ${ml.filter(l => !rv(l).status).length} to review</td><td></td><td></td></tr>`;
     for (const l of ml.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))) {
       const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
       html += `<tr data-fm="${m}" hidden class="${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day}</td><td style="white-space:nowrap">${esc(l.time)}</td><td class="small">${esc(l.camera)}</td><td class="small">${esc(l.what)}</td>
-        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:180px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openFlag(${ALL.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted">${(l.series || []).length + 1} photos ›</div>` : ''}</td></tr>`;
+        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:180px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openFlag(${ALL.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted">${(l.series || []).length + 1} photos ›</div>` : ''}</td><td>${reviewHtml(l)}</td></tr>`;
     }
   }
-  html += `<tr class="mon tot"><td>Total</td><td colspan="2">${L.length} events</td><td class="small">${L.filter(l => l.strong).length} strongest · on ${new Set(L.map(l => l.date)).size} days</td><td></td></tr>`;
+  html += `<tr class="mon tot"><td>Total</td><td colspan="2">${L.length} events</td><td class="small">${L.filter(l => l.strong).length} strongest · on ${new Set(L.map(l => l.date)).size} days · ${L.filter(l => !rv(l).status).length} to review</td><td></td><td></td></tr>`;
   document.querySelector('#ftab tbody').innerHTML = html;
 }
 function foldF(m) { const rows = document.querySelectorAll(`#ftab tr[data-fm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('ffold-' + m).textContent = open ? '▾' : '▸'; }

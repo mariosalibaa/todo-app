@@ -13,7 +13,15 @@ function readJson(name, fallback) {
   try { return JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8')); } catch { return fallback; }
 }
 
-async function handle(req, res, url) {
+const readBody = req => new Promise((ok, no) => { let s = ''; req.on('data', d => s += d).on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { no(e); } }).on('error', no); });
+// Mario's review of each suspicious event: status (suspicious / not / investigate) + note — Firestore workspaces/<team>/excavationReviews/<event id>
+const reviewsCol = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('excavationReviews');
+async function readReviews(ctx) {
+  if (!ctx || !ctx.db) return {};
+  try { const snap = await reviewsCol(ctx).get(); const o = {}; snap.forEach(d => { o[d.id] = d.data(); }); return o; } catch { return {}; }
+}
+
+async function handle(req, res, url, user, ctx) {
   const p = url.split('?')[0];
   if (p === '/api/ajaltoun/machines' && req.method === 'GET') {
     const days = readJson('excavation-days.json', { days: [] });
@@ -24,7 +32,8 @@ async function handle(req, res, url) {
     const georges = readJson('georges.json', null);
     const bmw = readJson('bmw.json', null);
     const tacoma = readJson('tacoma.json', null);
-    res.end(JSON.stringify({ ...days, loads, diesel, flags, georges, bmw, tacoma }));
+    const reviews = await readReviews(ctx);
+    res.end(JSON.stringify({ ...days, loads, diesel, flags, georges, bmw, tacoma, reviews }));
     return true;
   }
   const m = p.match(/^\/api\/ajaltoun\/machines\/photo\/(\d{8}_\d{4}[\w-]*\.jpg)$/);
@@ -33,6 +42,16 @@ async function handle(req, res, url) {
     if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
     res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
     res.end(fs.readFileSync(f));
+    return true;
+  }
+  if (p === '/api/ajaltoun/machines/review' && req.method === 'POST') {
+    const b = await readBody(req);
+    const id = String(b.id || '').replace(/[^\w-]/g, '').slice(0, 60);
+    const status = ['suspicious', 'not', 'investigate', ''].includes(b.status) ? b.status : null;
+    if (!id || status === null || !ctx || !ctx.db) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"bad review"}'); return true; }
+    const doc = { status, note: String(b.note || '').slice(0, 2000), by: (user && (user.name || user.email)) || '', at: new Date().toISOString() };
+    await reviewsCol(ctx).doc(id).set(doc, { merge: true });
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, id, ...doc }));
     return true;
   }
   const gp = p.match(/^\/api\/ajaltoun\/machines\/(georges|bmw|tacoma)\/(\d{8}\.jpg)$/);
