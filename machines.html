@@ -56,6 +56,8 @@
   .vbody{flex:1;overflow:auto;padding:12px;} .vbody img{display:block;margin:0 auto;max-width:100%;height:auto;}
   a{color:var(--amber);}
   .varrow{position:fixed;top:50%;left:12px;transform:translateY(-50%);z-index:610;width:52px;height:72px;border:0;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:44px;cursor:pointer;line-height:1;} .varrow.r{left:auto;right:12px;} .varrow:hover{background:rgba(242,169,59,.7);}
+  .vstrip{flex:none;display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:var(--mantle);border-top:1px solid var(--surface0);} .vstrip img{height:64px;border-radius:5px;opacity:.55;cursor:pointer;border:2px solid transparent;flex:none;} .vstrip img.on{opacity:1;border-color:var(--amber);}
+  .vbody img{max-height:calc(100vh - 150px);object-fit:contain;}
   .vcount{color:var(--sub);font-size:.8rem;margin-left:8px;}
 </style>
 </head>
@@ -129,6 +131,7 @@
 <div id="viewer">
   <div class="vbar"><a class="vback" href="#" onclick="closeViewer();return false;">&lsaquo; Back</a><div class="vtitle" id="vtitle"></div></div>
   <div class="vbody" id="vbody"></div>
+  <div class="vstrip" id="vstrip" hidden></div>
   <button class="varrow" id="vprev" onclick="stepViewer(-1)" hidden>&lsaquo;</button><button class="varrow r" id="vnext" onclick="stepViewer(1)" hidden>&rsaquo;</button>
 </div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -295,7 +298,7 @@ function renderFlags() {
     for (const l of ml.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))) {
       const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
       html += `<tr data-fm="${m}" hidden class="${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day}</td><td style="white-space:nowrap">${esc(l.time)}</td><td class="small">${esc(l.camera)}</td><td class="small">${esc(l.what)}</td>
-        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:120px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openFlag(${ALL.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted">${(l.series || []).length + 1} photos ›</div>` : ''}</td></tr>`;
+        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:180px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openFlag(${ALL.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted">${(l.series || []).length + 1} photos ›</div>` : ''}</td></tr>`;
     }
   }
   html += `<tr class="mon tot"><td>Total</td><td colspan="2">${L.length} events</td><td class="small">${L.filter(l => l.strong).length} strongest · on ${new Set(L.map(l => l.date)).size} days</td><td></td></tr>`;
@@ -308,6 +311,12 @@ function showViewer() {
   document.getElementById('vtitle').innerHTML = esc(VT) + (VS.length > 1 ? `<span class="vcount">${VI + 1} / ${VS.length}</span>` : '');
   document.getElementById('vbody').innerHTML = `<img src="${VS[VI]}" alt="">`;
   document.getElementById('vprev').hidden = document.getElementById('vnext').hidden = VS.length < 2;
+  const st = document.getElementById('vstrip'); st.hidden = VS.length < 2;
+  if (VS.length > 1) {
+    if (st.dataset.k !== VS.join('|')) { st.dataset.k = VS.join('|'); st.innerHTML = VS.map((u, i) => `<img src="${u}" loading="lazy" onclick="VI=${i};showViewer()">`).join(''); }
+    [...st.children].forEach((im, i) => im.classList.toggle('on', i === VI));
+    st.children[VI]?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
 }
 (() => { let x0 = null; const v = () => document.getElementById('viewer');
   addEventListener('touchstart', e => { if (v()?.classList.contains('on')) x0 = e.touches[0].clientX; }, { passive: true });

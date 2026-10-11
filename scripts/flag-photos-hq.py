@@ -25,9 +25,26 @@ def locate(cam, t):
     return (fs[i], (t - starts[i]).total_seconds()) if i >= 0 else (None, None)
 
 
+SD = 'C:/Users/MARIO_~1/AppData/Local/Temp/claude/d--vscode/8b29d3d7-102e-453d-a28b-5e07fe369946/scratchpad/sd'
+ENTP = {}
+for e in json.load(open(SD + '/d1 entrance_idx.json'))['events']:
+    for tt, pth in e['frames']: ENTP[e['start'][:10] + 'T' + tt] = pth
+RATE = {}
+
+
+def locate_ent(t):
+    pth = ENTP.get(t.isoformat())
+    if not pth: return None, None
+    stem = os.path.basename(os.path.dirname(pth)); f = f'D:/camera/d1 entrance/{stem}.mp4'
+    if f not in RATE:
+        r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'csv=p=0', f], capture_output=True, text=True).stdout.strip()
+        a, b = (r.split('/') + ['1'])[:2]; RATE[f] = float(a) / float(b)
+    return f, int(os.path.basename(pth)[:-4]) / RATE[f]
+
+
 def cut(job):
     name, cam, t = job
-    f, off = locate(cam, t)
+    f, off = locate_ent(t) if cam == 'Entrance' else locate(cam, t)
     if not f or off > 12 * 3600: return name, False
     tmp = os.path.join(OUT, name + '.tmp.jpg')
     r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{off:.1f}', '-i', f, '-frames:v', '1', '-vf', f'scale={W}:-2', '-q:v', '4', tmp], capture_output=True)
@@ -44,14 +61,14 @@ jobs = []
 for f in F:
     meta = f.get('series_meta') or []
     for n, cam, iso in meta:
-        if cam in SRC: jobs.append((n, cam, dt.datetime.fromisoformat(iso)))
+        if cam in SRC or cam == 'Entrance': jobs.append((n, cam, dt.datetime.fromisoformat(iso)))
 print(len(jobs), 'frames to re-cut')
 ok = 0
 with ThreadPoolExecutor(4) as ex:
     for name, good in ex.map(cut, jobs): ok += good
 print(ok, 'done')
 for f in F:
-    meta = [m for m in (f.get('series_meta') or []) if m[1] in SRC]
+    meta = [m for m in (f.get('series_meta') or []) if m[1] in SRC or m[1] == 'Entrance']
     p = os.path.join(OUT, f.get('photo') or '')
     if meta and f.get('photo') and os.path.exists(p):
         with Image.open(p) as im: small = im.width < 1000
