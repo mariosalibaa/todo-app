@@ -54,6 +54,7 @@
   .vbar .vback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:6px 8px;border-radius:8px;}
   .vbar .vtitle{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .vbody{flex:1;overflow:auto;padding:12px;} .vbody img{display:block;margin:0 auto;max-width:100%;height:auto;}
+  [hidden]{display:none !important;}
   a{color:var(--amber);}
   .varrow{position:fixed;top:50%;left:12px;transform:translateY(-50%);z-index:610;width:52px;height:72px;border:0;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:44px;cursor:pointer;line-height:1;} .varrow.r{left:auto;right:12px;} .varrow:hover{background:rgba(242,169,59,.7);}
   .vstrip{flex:none;display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:var(--mantle);border-top:1px solid var(--surface0);} .vstrip img{height:64px;border-radius:5px;opacity:.55;cursor:pointer;border:2px solid transparent;flex:none;} .vstrip img.on{opacity:1;border-color:var(--amber);}
@@ -225,7 +226,7 @@ function renderLoads() {
       const x = dd(l.date), f = FILL(l.fill), u = photoUrl(l.photo);
       html += `<tr data-lm="${m}" hidden><td style="white-space:nowrap">${x.wd} ${x.day}</td><td>${esc(l.time || '')}</td><td class="small">${esc(l.truck || '')}</td><td class="small">${esc(l.material || '')}</td>
         <td><span class="badge f-${f}">${FILL_L[f]}</span></td><td class="stars" style="white-space:nowrap">${stars(l.score)}</td><td class="small muted">${esc(l.remark || '')}</td><td class="small muted">${esc(l.camera || '')}</td>
-        <td>${u ? `<img src="${u}" loading="lazy" style="width:96px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' ' + (l.time || ''))}')">` : ''}</td></tr>`;
+        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:150px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openLoad(${L.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted" style="cursor:pointer" onclick="openLoad(${L.indexOf(l)})">${(l.series || []).length + 1} photos: 0–80 % + leaving ›</div>` : ''}</td></tr>`;
     }
   }
   html += `<tr class="mon tot"><td>Total</td><td colspan="3">${L.length} truck loads</td><td class="small">${by('heaped')} heaped · ${by('full')} full</td><td>${avg.toFixed(1)} / 5</td><td colspan="3"></td></tr>`;
@@ -305,6 +306,11 @@ function renderFlags() {
   document.querySelector('#ftab tbody').innerHTML = html;
 }
 function foldF(m) { const rows = document.querySelectorAll(`#ftab tr[data-fm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('ffold-' + m).textContent = open ? '▾' : '▸'; }
+function openLoad(k) {
+  const l = (D.loads || [])[k]; if (!l) return; const x = dd(l.date);
+  const S = (l.series || []).map(n => '/api/ajaltoun/machines/photo/' + n);
+  openSeries([...S, photoUrl(l.photo)].filter(Boolean), 0, x.wd + ' ' + x.day + ' · truck left ' + (l.time || '') + ' · ' + (l.truck || ''));
+}
 function foldL(m) { const rows = document.querySelectorAll(`#ltab tr[data-lm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('lfold-' + m).textContent = open ? '▾' : '▸'; }
 let VS = [], VI = 0, VT = '';
 function showViewer() {
