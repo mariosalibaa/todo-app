@@ -74,13 +74,13 @@ for f in F:
         frames += [(c, t, p) for t, p in pick(idx, *w, MAX_PER_CAM)]
     frames = sorted(frames, key=lambda x: x[1])[:MAX_TOTAL]
     stem = (f.get('photo') or f"{f['date'].replace('-', '')}_{abs(hash(f['what'])) % 10**6}.jpg")[:-4]
-    names = []
+    names, meta = [], []
     for k, (c, t, p) in enumerate(frames):
         try: im = Image.open(p).convert('RGB')
         except Exception: continue
         im.thumbnail((W, W)); d = ImageDraw.Draw(im)
         d.rectangle((0, 0, im.width, 28), fill=(0, 0, 0)); d.text((6, 3), f'{c}  {t.replace("T", " ")}', fill=(255, 220, 60), font=FONT)
-        name = f'{stem}_s{k:02d}.jpg'; im.save(os.path.join(OUT, name), quality=70); names.append(name)
-    f['series'] = names; done += bool(names)
+        name = f'{stem}_s{k:02d}.jpg'; im.save(os.path.join(OUT, name), quality=70); names.append(name); meta.append([name, c, t])
+    f['series'] = names; f['series_meta'] = meta; done += bool(names)
 json.dump(F, open(FL, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 print(done, 'events with a series of', sum(len(f.get('series', [])) for f in F), 'frames')
