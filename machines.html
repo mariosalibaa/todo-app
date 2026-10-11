@@ -87,7 +87,8 @@
     <h1>Suspicious events — all cameras</h1>
     <p class="lead">Everything outside normal work or touching diesel: jerrycans, the Dodge at a machine, the tanker, people on a machine, night / Sunday / lunch activity. Newest first. Tap a month to open it, a photo to enlarge. ★ = strongest.</p>
     <div class="filters" id="ffilters"></div>
-    <div class="card tcard"><table id="ftab"><thead><tr><th>Date</th><th>Time</th><th>Camera</th><th>What was seen</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+    <div class="loads" id="flags" hidden></div>
+    <div class="card tcard" id="ftabwrap"><table id="ftab"><thead><tr><th>Date</th><th>Time</th><th>Camera</th><th>What was seen</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="v-georges" hidden>
     <h1>Silver RAV4 on site</h1>
@@ -263,9 +264,26 @@ function renderGeorges(G, P, api) {
 }
 function foldG(P, m) { const rows = document.querySelectorAll(`#${P}tab tr[data-gm="${P}${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById(P + 'fold-' + m).textContent = open ? '▾' : '▸'; }
 let FM = 'all';
+let FV = (() => { try { return localStorage.getItem('flagsView') || 'table'; } catch { return 'table'; } })();
+function setFV(v) { FV = v; try { localStorage.setItem('flagsView', v); } catch {} renderFlags(); }
 function renderFlags() {
-  const ALL = D.flags || [], L = FM === 'strong' ? ALL.filter(l => l.strong) : ALL;
-  document.getElementById('ffilters').innerHTML = `<button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest only (${ALL.filter(l => l.strong).length})</button><button class="${FM === 'all' ? 'on' : ''}" onclick="FM='all';renderFlags()">All events (${ALL.length})</button>`;
+  const ALL = D.flags || [];
+  const months0 = [...new Set(ALL.map(l => l.date.slice(0, 7)))].sort();
+  if (FV === 'table' && !['all', 'strong'].includes(FM)) FM = 'all';
+  const L = FM === 'strong' ? ALL.filter(l => l.strong) : FM === 'all' ? ALL : ALL.filter(l => l.date.startsWith(FM));
+  document.getElementById('ffilters').innerHTML =
+    `<button class="${FV === 'table' ? 'on' : ''}" onclick="setFV('table')">☰ Table</button><button class="${FV === 'cards' ? 'on' : ''}" onclick="setFV('cards')">▦ Photos</button><span style="width:14px"></span>` +
+    `<button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest (${ALL.filter(l => l.strong).length})</button><button class="${FM === 'all' ? 'on' : ''}" onclick="FM='all';renderFlags()">All (${ALL.length})</button>` +
+    (FV === 'cards' ? months0.map(m => `<button class="${FM === m ? 'on' : ''}" onclick="FM='${m}';renderFlags()">${monthName(m)} (${ALL.filter(l => l.date.startsWith(m)).length})</button>`).join('') : '');
+  document.getElementById('flags').hidden = FV !== 'cards'; document.getElementById('ftabwrap').hidden = FV !== 'table';
+  if (FV === 'cards') {
+    document.getElementById('flags').innerHTML = L.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).map(l => {
+      const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
+      return `<div class="ld"><div class="ph" ${u ? `onclick="openViewer('${u}', '${esc(x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera)}')"` : ''}>${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
+        <div class="bd"><div class="top"><b>${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
+    }).join('');
+    return;
+  }
   const months = [...new Set(L.map(l => l.date.slice(0, 7)))].sort().reverse();
   let html = '';
   for (const m of months) {
