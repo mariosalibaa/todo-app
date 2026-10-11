@@ -35,6 +35,7 @@
   tr.wk td{background:rgba(137,180,250,.07);color:var(--blue);font-size:.76rem;}
   /* table headers stay visible while scrolling (Mario 2026-10-11) */
   .tcard{overflow:visible;} thead th{position:sticky;top:var(--hdr,64px);z-index:5;background:var(--mantle);box-shadow:0 1px 0 var(--surface0);}
+  .dtab thead th{position:static;} /* day report: small tables inside a sideways-scroll box, sticky would float mid-table */
   tr.wk td{position:sticky;top:calc(var(--hdr,64px) + var(--thh,40px));z-index:4;background:var(--mantle);box-shadow:inset 0 0 0 999px rgba(137,180,250,.07),0 1px 0 var(--surface0);}
   @media (max-width:900px){.tcard{overflow-x:auto;} thead th{top:0;} tr.wk td{position:static;}}
   tr.tot td{cursor:default;border-top:2px solid var(--amber);} .fold{display:inline-block;width:1em;}
@@ -83,11 +84,17 @@ td.foot{min-width:150px}
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a><a id="t-cars" href="/ajaltoun/machines/cars">All cars</a><a id="t-plates" href="/ajaltoun/machines/plates">Plates</a></nav>
+  <nav class="tabs"><a id="t-daily" href="/ajaltoun/machines/daily">Day report</a><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a><a id="t-cars" href="/ajaltoun/machines/cars">All cars</a><a id="t-plates" href="/ajaltoun/machines/plates">Plates</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
   <div id="status" class="small muted">Loading…</div>
+  <section id="v-daily" hidden>
+    <h1>Day report — Ajaltoun cameras</h1>
+    <p class="lead">Every time the Samsung is plugged into the laptop, the Tapo app is read on a hidden screen: each camera's detected events (vehicle, person, motion) per day, from the day the SD cards were collected. Night = 19:00–06:00. Photos are frames from the downloaded event clips (night first, then vehicles, then people). Tap a day to open it, a photo to enlarge.</p>
+    <div class="kpis" id="dkpis"></div>
+    <div id="dlist"></div>
+  </section>
   <section id="v-days" hidden>
     <h1>Machines &amp; trucks — Ajaltoun 4193</h1>
     <p class="lead">From the site cameras (SD cards): how long the <b style="color:var(--orange)">Hitachi FH330.3</b> and the <b style="color:var(--yellow)">Komatsu PC240</b> were seen working each day, and how many dump trucks left loaded. Hours are counted from camera frames every 3 minutes and were checked against a continuous recording for 6–8 Oct (within about half an hour). Every camera is combined: d1 up, Entrance, D2 (pit), D2 up, D3 up, D2-D3 and Pergola. When D1 up was off (battery flat) the day is filled from the other cameras; those hours start with ~ and are estimates. The Footage column lists the cameras used.</p>
@@ -173,8 +180,8 @@ const esc = Admin.esc; let D = null, MONTH = 'all';
 const LOADS = /\/loads$/.test(location.pathname), DIESEL = /\/diesel$/.test(location.pathname);
 const FLAGS = /\/flags$/.test(location.pathname);
 const GEORGES = /\/georges$/.test(location.pathname), BMW = /\/bmw$/.test(location.pathname), TACOMA = /\/tacoma$/.test(location.pathname), CARS = /\/cars$/.test(location.pathname);
-const PLATES = /\/plates$/.test(location.pathname);
-const VIEW = PLATES ? 'plates' : CARS ? 'cars' : TACOMA ? 'tacoma' : BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
+const PLATES = /\/plates$/.test(location.pathname), DAILY = /\/daily$/.test(location.pathname);
+const VIEW = DAILY ? 'daily' : PLATES ? 'plates' : CARS ? 'cars' : TACOMA ? 'tacoma' : BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
 const h1 = n => n == null ? '—' : (+n).toFixed(1);
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dd = s => { const d = new Date(s + 'T12:00:00'); return { day: d.getDate() + ' ' + MON[d.getMonth()], wd: d.toLocaleDateString('en-GB', { weekday: 'short' }), m: s.slice(0, 7), sun: d.getDay() === 0 }; };
@@ -481,6 +488,31 @@ function setVcam(k) { VCAM = k; VS = VALL.filter(x => k === 'all' || x[1] === k)
 function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeViewer(); closeNote(); } if (document.getElementById('viewer').classList.contains('on')) { if (e.key === 'ArrowLeft') stepViewer(-1); if (e.key === 'ArrowRight') stepViewer(1); } });
 
+// Day report (Tapo event lists, Mario 2026-10-12)
+let DD = [];
+const camShort = c => c.replace(/ C\d{3}$/, '').replace(/^Tapo C630 /, '').replace(/_/g, ' ');
+async function renderDaily() {
+  DD = (await Admin.api('GET', '/api/ajaltoun/machines/daily')).days || [];
+  if (!DD.length) { document.getElementById('dlist').innerHTML = '<p class="muted">No day yet — plug the Samsung into the laptop.</p>'; return; }
+  const last = DD.find(d => !d.partial) || DD[0], sum = (d, k) => d.cameras.reduce((a, c) => a + Math.max(c[k] || 0, 0), 0);
+  const x0 = dd(last.date);
+  document.getElementById('dkpis').innerHTML = K('', x0.wd + ' ' + x0.day, 'last full day' + (last.partial ? ' (so far)' : '')) + K('', sum(last, 'vehicle'), 'vehicle events') + K('', sum(last, 'person'), 'person events') +
+    K('', last.cameras.reduce((a, c) => a + (c.night || []).length, 0), 'night events (19–06)') + K('', DD.length, 'days in the report');
+  document.getElementById('dlist').innerHTML = DD.map((d, i) => {
+    const x = dd(d.date), night = d.cameras.reduce((a, c) => a + (c.night || []).length, 0);
+    const rows = d.cameras.map(c => c.total < 0 ? `<tr><td>${esc(camShort(c.cam))}</td><td colspan="6" class="muted">no events</td></tr>` :
+      `<tr><td>${esc(camShort(c.cam))}</td><td class="n">${c.total}</td><td class="n">${c.vehicle}</td><td class="n">${c.person}</td><td class="n">${c.motion}</td><td>${c.first ? esc(c.first + '–' + c.last) : ''}</td><td class="small" style="color:${(c.night || []).length ? 'var(--red)' : 'var(--sub)'}">${esc((c.night || []).join(', '))}</td></tr>`).join('');
+    const ph = d.cameras.flatMap(c => (c.events || []).filter(e => e.photo).map(e => [e, c.cam]));
+    const strip = ph.length ? `<div style="display:flex;gap:6px;overflow-x:auto;padding:8px 0">${ph.map(([e, cam], k) => `<figure style="margin:0;flex:0 0 auto;text-align:center"><img src="/api/ajaltoun/machines/camday/${esc(e.photo)}" loading="lazy" style="width:150px;border-radius:6px;cursor:zoom-in" onclick="openDayPhotos(${i},${k})"><figcaption class="small muted">${esc(e.time.slice(0, 5))} ${esc(e.kind[0])} · ${esc(camShort(cam))}</figcaption></figure>`).join('')}</div>` : '';
+    return `<div class="card tcard" style="margin-bottom:12px"><h2 style="cursor:pointer;margin:0;padding:10px 4px" onclick="const b=this.nextElementSibling;b.hidden=!b.hidden">${esc(x.wd + ' ' + x.day)}${d.partial ? ' <span class="small muted">(so far)</span>' : ''} <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">${sum(d, 'vehicle')} vehicle · ${sum(d, 'person')} person · ${night} night</span></h2>` +
+      `<div ${i && d !== last ? 'hidden' : ''}><div style="overflow-x:auto"><table class="dtab"><thead><tr><th>Camera</th><th class="n">Events</th><th class="n">Vehicle</th><th class="n">Person</th><th class="n">Motion</th><th>First–last</th><th>Night (19–06)</th></tr></thead><tbody>${rows}</tbody></table></div>${strip}</div></div>`;
+  }).join('');
+}
+function openDayPhotos(i, k) {
+  const d = DD[i], ph = d.cameras.flatMap(c => (c.events || []).filter(e => e.photo).map(e => ['/api/ajaltoun/machines/camday/' + e.photo, camShort(c.cam)]));
+  const x = dd(d.date); openSeries(ph.map(p => p[0]), k, x.wd + ' ' + x.day + ' — event photos', ph.map(p => p[1]));
+}
+
 const setHdr = () => document.documentElement.style.setProperty('--hdr', (document.querySelector('header')?.offsetHeight || 64) + 'px');
 addEventListener('resize', setHdr);
 const setThh = () => { const t = [...document.querySelectorAll('thead')].find(h => h.offsetHeight); if (t) document.documentElement.style.setProperty('--thh', t.offsetHeight + 'px'); };
@@ -491,6 +523,7 @@ Admin.require(['ajaltoun', 'excavation'], async me => {
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   document.getElementById('t-' + VIEW).classList.add('on');
   document.getElementById('v-' + VIEW).hidden = false;
+  if (DAILY) { try { await renderDaily(); document.getElementById('status').textContent = ''; } catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); } return; }
   try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; PLATES ? renderPlates() : CARS ? renderCars() : TACOMA ? renderGeorges(D.tacoma || { days: [], pending: 'The Tacoma review is running' }, 't', 'tacoma') : BMW ? renderGeorges(D.bmw || { days: [], pending: 'The BMW review is running' }, 'b', 'bmw') : GEORGES ? renderGeorges(D.georges, 'g', 'georges') : FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
   catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); }
 });

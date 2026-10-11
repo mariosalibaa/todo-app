@@ -75,6 +75,26 @@ async function handle(req, res, url, user, ctx) {
     await sendPhoto(res, gp[1], gp[2]);
     return true;
   }
+  // Day report from the Tapo app (Mario 2026-10-12): every plug-in of the Samsung scrapes each camera's event list
+  // and pushes one doc per day (D:\vscode\phone-sync\tapo_sync.py -> scripts/push-camera-days.js)
+  if (p === '/api/ajaltoun/machines/daily' && req.method === 'GET') {
+    let days = [];
+    if (ctx && ctx.db) {
+      try {
+        const snap = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('cameraDays').get();
+        snap.forEach(d => days.push(d.data()));
+      } catch { days = []; }
+    }
+    days.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ days }));
+    return true;
+  }
+  const cd = p.match(/^\/api\/ajaltoun\/machines\/camday\/([a-z0-9-]{2,30}_\d{8}_\d{6}\.jpg)$/);
+  if (cd && req.method === 'GET') {
+    await sendPhoto(res, 'camdays', cd[1]);
+    return true;
+  }
   const fl = p.match(/^\/api\/ajaltoun\/machines\/flag\/(\d{8}_[a-z0-9_]{2,24}\.jpg)$/);
   if (fl && req.method === 'GET') {
     await sendPhoto(res, 'flags', fl[1]);
