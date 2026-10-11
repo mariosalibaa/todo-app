@@ -2419,72 +2419,78 @@
  {
   "date": "2026-09-16",
   "time": "19:19-19:27",
-  "camera": "D2 up + Entrance",
-  "what": "Night visit: a car or SUV comes in (Entrance 19:19:07), drives into the upper yard and stops right beside the parked machine (brake lights 19:19:28 to about 19:22). It repositions with its headlights on at 19:24-19:26 and leaves (Entrance 19:27:02, tail lights). About 8 min in all. D2 up switches to IR at 19:27, and after that the lens haze hides the yard.",
-  "photo": "20260916_d2upb02_s05.jpg",
+  "camera": "Entrance + D3 up + D2 up + U3 up + d1 up + D2",
+  "what": "A sedan with a roof rack, almost certainly the silver BMW 318i (B 310944; the plate is unreadable tonight), comes in at 19:19 and drives past both parked machines without stopping. It parks at the far end of the yard with its headlights on the prefab/pergola until 19:24, and someone gets out and moves around the car and the prefab (19:20-19:21 and 19:23:40-19:24:10). At 19:24:30 it turns round and sits for 2 minutes with its headlights on the fence, the jerrycan pile and the Komatsu, but nobody walks into the beam. It leaves at 19:27. No camera shows anyone at a machine, the jerrycans or the tanker, nothing is seen being carried, and nobody comes back before 21:00.",
+  "photo": "20260916_n1916_01.jpg",
   "strong": true,
   "series": [
-   "20260916_d2upb02_s00.jpg",
-   "20260916_d2upb02_s01.jpg",
-   "20260916_d2upb02_s02.jpg",
-   "20260916_d2upb02_s03.jpg",
-   "20260916_d2upb02_s04.jpg",
-   "20260916_d2upb02_s06.jpg",
-   "20260916_d2upb02_s07.jpg",
-   "20260916_d2upb02_s08.jpg",
-   "20260916_d2upb02_s09.jpg",
-   "20260916_d2upb02.jpg"
+   "20260916_n1916_02.jpg",
+   "20260916_n1916_03.jpg",
+   "20260916_n1916_04.jpg",
+   "20260916_n1916_05.jpg",
+   "20260916_n1916_06.jpg",
+   "20260916_n1916_07.jpg",
+   "20260916_n1916_08.jpg",
+   "20260916_n1916_09.jpg",
+   "20260916_n1916_10.jpg",
+   "20260916_n1916_11.jpg",
+   "20260916_n1916_12.jpg"
   ],
   "series_meta": [
    [
-    "20260916_d2upb02_s00.jpg",
+    "20260916_n1916_02.jpg",
+    "D3 up",
+    "2026-09-16T19:19:08"
+   ],
+   [
+    "20260916_n1916_03.jpg",
+    "D2 up",
+    "2026-09-16T19:19:20"
+   ],
+   [
+    "20260916_n1916_04.jpg",
+    "D2 up",
+    "2026-09-16T19:20:40"
+   ],
+   [
+    "20260916_n1916_05.jpg",
+    "d1 up",
+    "2026-09-16T19:20:00"
+   ],
+   [
+    "20260916_n1916_06.jpg",
+    "D2 up",
+    "2026-09-16T19:24:36"
+   ],
+   [
+    "20260916_n1916_07.jpg",
+    "D3 up",
+    "2026-09-16T19:25:00"
+   ],
+   [
+    "20260916_n1916_08.jpg",
+    "U3 up",
+    "2026-09-16T19:25:00"
+   ],
+   [
+    "20260916_n1916_09.jpg",
+    "D3 up",
+    "2026-09-16T19:26:51"
+   ],
+   [
+    "20260916_n1916_10.jpg",
     "Entrance",
+    "2026-09-16T19:27:04"
+   ],
+   [
+    "20260916_n1916_11.jpg",
+    "D2",
     "2026-09-16T19:19:07"
    ],
    [
-    "20260916_d2upb02_s01.jpg",
-    "Entrance",
-    "2026-09-16T19:19:09"
-   ],
-   [
-    "20260916_d2upb02_s02.jpg",
-    "Entrance",
-    "2026-09-16T19:19:11"
-   ],
-   [
-    "20260916_d2upb02_s03.jpg",
-    "Entrance",
-    "2026-09-16T19:19:15"
-   ],
-   [
-    "20260916_d2upb02_s04.jpg",
-    "D2 up",
-    "2026-09-16T19:19:17"
-   ],
-   [
-    "20260916_d2upb02_s05.jpg",
-    "Entrance",
-    "2026-09-16T19:19:17"
-   ],
-   [
-    "20260916_d2upb02_s06.jpg",
-    "Entrance",
-    "2026-09-16T19:19:19"
-   ],
-   [
-    "20260916_d2upb02_s07.jpg",
-    "D2 up",
-    "2026-09-16T19:20:07"
-   ],
-   [
-    "20260916_d2upb02_s08.jpg",
-    "D2 up",
-    "2026-09-16T19:20:34"
-   ],
-   [
-    "20260916_d2upb02_s09.jpg",
-    "D2 up",
-    "2026-09-16T19:20:54"
+    "20260916_n1916_12.jpg",
+    "D2",
+    "2026-09-16T19:26:58"
    ]
   ],
   "theft": false,
