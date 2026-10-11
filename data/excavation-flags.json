@@ -995,9 +995,10 @@
   "date": "2026-10-09",
   "time": "18:20-18:30",
   "camera": "D2_Up",
-  "what": "After hours: At dusk a dark SUV and 2 people are beside the parked Hitachi. No other camera was recording.",
+  "what": "Explained — Mario identified it: Mario Laredo (dark SUV and 2 people beside the parked Hitachi at dusk). After hours: At dusk a dark SUV and 2 people are beside the parked Hitachi. No other camera was recording.",
   "photo": "20261009_04.jpg",
-  "strong": true
+  "strong": false,
+  "explained": true
  },
  {
   "date": "2026-10-10",
