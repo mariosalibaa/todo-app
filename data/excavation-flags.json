@@ -240,17 +240,97 @@
   "photo": "20260822_02.jpg",
   "strong": true,
   "series": [
-   "20260822_02_s00.jpg"
+   "20260822_02_s00.jpg",
+   "20260822_d2pit231827.jpg",
+   "20260822_d2pit231831.jpg",
+   "20260822_d2pit232311.jpg",
+   "20260822_d2pit232315.jpg"
   ],
   "series_meta": [
    [
     "20260822_02_s00.jpg",
     "D2",
     "2026-08-22T23:18:20"
+   ],
+   [
+    "20260822_d2pit231827.jpg",
+    "D2",
+    "2026-08-22T23:18:27"
+   ],
+   [
+    "20260822_d2pit231831.jpg",
+    "D2",
+    "2026-08-22T23:18:31"
+   ],
+   [
+    "20260822_d2pit232311.jpg",
+    "D2",
+    "2026-08-22T23:23:11"
+   ],
+   [
+    "20260822_d2pit232315.jpg",
+    "D2",
+    "2026-08-22T23:23:15"
    ]
   ],
   "theft": false,
   "id": "2026-08-22_2318"
+ },
+ {
+  "date": "2026-08-23",
+  "time": "09:45-18:32",
+  "camera": "D2 + d1 up",
+  "id": "2026-08-23_0945",
+  "strong": true,
+  "theft": true,
+  "what": "SUNDAY (no work, both machines idle all day). 09:45 a dark car drives up the track to the parked machines. 10:16 the grey Dodge comes in with its bed packed with full jerrycans and goes to the machines; its exit is not recorded (D2 records events only; d1 up has no footage before 10:05 and shows the machines idle after). 17:56 a man in a red shirt walks up to the machines; 18:31-18:32 a man on a motorbike rides in towards the Hitachi. No frame shows diesel being moved.",
+  "photo": "20260823_d2pit101654.jpg",
+  "series": [
+   "20260823_d2pit094547.jpg",
+   "20260823_d2pit094555.jpg",
+   "20260823_d2pit101703.jpg",
+   "20260823_d2pit175627.jpg",
+   "20260823_d2pit175634.jpg",
+   "20260823_d2pit183120.jpg",
+   "20260823_d2pit183208.jpg"
+  ],
+  "series_meta": [
+   [
+    "20260823_d2pit094547.jpg",
+    "D2",
+    "2026-08-23T09:45:47"
+   ],
+   [
+    "20260823_d2pit094555.jpg",
+    "D2",
+    "2026-08-23T09:45:55"
+   ],
+   [
+    "20260823_d2pit101703.jpg",
+    "D2",
+    "2026-08-23T10:17:03"
+   ],
+   [
+    "20260823_d2pit175627.jpg",
+    "D2",
+    "2026-08-23T17:56:27"
+   ],
+   [
+    "20260823_d2pit175634.jpg",
+    "D2",
+    "2026-08-23T17:56:34"
+   ],
+   [
+    "20260823_d2pit183120.jpg",
+    "D2",
+    "2026-08-23T18:31:20"
+   ],
+   [
+    "20260823_d2pit183208.jpg",
+    "D2",
+    "2026-08-23T18:32:08"
+   ]
+  ]
  },
  {
   "date": "2026-08-26",

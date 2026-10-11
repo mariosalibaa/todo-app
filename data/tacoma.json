@@ -1,0 +1,1890 @@
+{
+ "updated": "2026-10-11",
+ "pending": "",
+ "plate": "M 293450 — Toyota Tacoma 2007, silver, registered to Shift Group SARL (Sin el Fil) since 6 Feb 2024 (car register May 2026)",
+ "days": [
+  {
+   "date": "2026-08-03",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "15:34",
+     "leave": "16:41"
+    }
+   ],
+   "hours": 1.12,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Steel deliveries, shuttling in and out. D2: 15:34 in with a long brown steel beam over the cab; 15:45 front view (out); 15:53 in with blue steel tubes; 15:59 in with red items; 16:13 side view with the beam; 16:18 and 16:26 in again; 16:40:53 roof right under D2 going out (last sighting). d1 up: a silver pickup stopped at the far end of the pit (machines area) at 15:54, 16:14, 16:18 and 16:27 - unloading steel. No jerrycan or tanker contact. Leave = last D2 sighting; d1 up shows nothing after 16:41.",
+   "photo": "20260803.jpg",
+   "series": [
+    "20260803_a1534u1.jpg",
+    "20260803_a1534d2.jpg",
+    "20260803_e18.jpg",
+    "20260803_l1641d2.jpg",
+    "20260803_l1641u1.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260803_a1534u1.jpg",
+     "d1 up",
+     "2026-08-03T15:34:00"
+    ],
+    [
+     "20260803_a1534d2.jpg",
+     "D2",
+     "2026-08-03T15:34:02"
+    ],
+    [
+     "20260803_e18.jpg",
+     "D2",
+     "2026-08-03T15:53:13"
+    ],
+    [
+     "20260803_l1641d2.jpg",
+     "D2",
+     "2026-08-03T16:40:53"
+    ],
+    [
+     "20260803_l1641u1.jpg",
+     "d1 up",
+     "2026-08-03T16:41:00"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-04",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "13:50",
+     "leave": null
+    },
+    {
+     "arrive": "15:10",
+     "leave": "16:05"
+    },
+    {
+     "arrive": "16:19",
+     "leave": null
+    }
+   ],
+   "hours": 0.92,
+   "partial": true,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "D2: 13:50 in with a long white board strapped on; 15:10:51 rear view in with red items (motion-only event, missed in the first review); 15:28/15:30 a silver pickup far down the track; 16:05 roof under D2 (going out); 16:19 in again with red items. d1 up (hazy) shows a light vehicle at the far end at 13:58 and 15:32. Deliveries; no machine-side fuel activity seen. Departures after 13:50 and 16:19 not captured (d1 up too hazy at that distance).",
+   "photo": "20260804.jpg",
+   "series": [
+    "20260804_a1350u1.jpg",
+    "20260804_a1350d2.jpg",
+    "20260804_e19.jpg",
+    "20260804_a1510u1.jpg",
+    "20260804_a1510d2.jpg",
+    "20260804_l1605u1.jpg",
+    "20260804_l1605d2.jpg",
+    "20260804_a1619u1.jpg",
+    "20260804_a1619d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260804_a1350u1.jpg",
+     "d1 up",
+     "2026-08-04T13:50:00"
+    ],
+    [
+     "20260804_a1350d2.jpg",
+     "D2",
+     "2026-08-04T13:50:57"
+    ],
+    [
+     "20260804_e19.jpg",
+     "D2",
+     "2026-08-04T13:50:57"
+    ],
+    [
+     "20260804_a1510u1.jpg",
+     "d1 up",
+     "2026-08-04T15:10:00"
+    ],
+    [
+     "20260804_a1510d2.jpg",
+     "D2",
+     "2026-08-04T15:10:51"
+    ],
+    [
+     "20260804_l1605u1.jpg",
+     "d1 up",
+     "2026-08-04T16:05:00"
+    ],
+    [
+     "20260804_l1605d2.jpg",
+     "D2",
+     "2026-08-04T16:05:26"
+    ],
+    [
+     "20260804_a1619u1.jpg",
+     "d1 up",
+     "2026-08-04T16:19:00"
+    ],
+    [
+     "20260804_a1619d2.jpg",
+     "D2",
+     "2026-08-04T16:19:16"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-05",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2). d1 up was off (flat battery), so only D2 events cover it; a short visit could be missed.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-06",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "14:54",
+     "leave": "18:52"
+    }
+   ],
+   "hours": 3.97,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "New detail from D2 motion/PERSON events: 14:54:01 the silver pickup is stopped beside D2 while workers unload long steel beams/boards from it; 15:43:16 rear view in with timber in the bed; 16:31:29 rear view in; 18:52:37 front view leaving. Treated as one long delivery day 14:54-18:52 (it may have gone out between trips; not captured). d1 up was recording from 12:10 but the far end is too small to identify it. No jerrycan or tanker contact seen.",
+   "photo": "20260806.jpg",
+   "series": [
+    "20260806_a1454u1.jpg",
+    "20260806_a1454d2.jpg",
+    "20260806_e20.jpg",
+    "20260806_l1852u1.jpg",
+    "20260806_l1852d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260806_a1454u1.jpg",
+     "d1 up",
+     "2026-08-06T14:54:00"
+    ],
+    [
+     "20260806_a1454d2.jpg",
+     "D2",
+     "2026-08-06T14:54:01"
+    ],
+    [
+     "20260806_e20.jpg",
+     "D2",
+     "2026-08-06T16:31:29"
+    ],
+    [
+     "20260806_l1852u1.jpg",
+     "d1 up",
+     "2026-08-06T18:52:00"
+    ],
+    [
+     "20260806_l1852d2.jpg",
+     "D2",
+     "2026-08-06T18:52:37"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-08",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2). d1 up was off (flat battery), so only D2 events cover it; a short visit could be missed.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-10",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-11",
+   "present": null,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "none",
+   "cameras": [],
+   "notes": "Only D2 recorded nothing (no events) and d1 up was off: no footage, unknown.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-12",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:48",
+     "leave": "13:51"
+    },
+    {
+     "arrive": "13:59",
+     "leave": null
+    }
+   ],
+   "hours": 4.05,
+   "partial": true,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "D2: 09:48 rear view in; parked up the track at 10:11 and 10:48; 13:51:46 roof under D2 (out); 13:59:28 in again with an empty bed; 14:15 far down the track. d1 up: 13:51:45 and 13:59:45 a light pickup moving on the track; 14:06-14:15 a light vehicle mid-pit. Second departure not captured (d1 up too small after 14:15).",
+   "photo": "20260812.jpg",
+   "series": [
+    "20260812_a0948d2.jpg",
+    "20260812_l1351u1.jpg",
+    "20260812_l1351d2.jpg",
+    "20260812_a1359u1.jpg",
+    "20260812_a1359d2.jpg",
+    "20260812_e21.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260812_a0948d2.jpg",
+     "D2",
+     "2026-08-12T09:48:14"
+    ],
+    [
+     "20260812_l1351u1.jpg",
+     "d1 up",
+     "2026-08-12T13:51:00"
+    ],
+    [
+     "20260812_l1351d2.jpg",
+     "D2",
+     "2026-08-12T13:51:46"
+    ],
+    [
+     "20260812_a1359u1.jpg",
+     "d1 up",
+     "2026-08-12T13:59:00"
+    ],
+    [
+     "20260812_a1359d2.jpg",
+     "D2",
+     "2026-08-12T13:59:28"
+    ],
+    [
+     "20260812_e21.jpg",
+     "D2",
+     "2026-08-12T13:59:28"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-13",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-14",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:15",
+     "leave": null
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "D2: 09:15:59 rear view in with boxes/crates. d1 up had no footage this day (flat battery), so no departure.",
+   "photo": "20260814.jpg",
+   "series": [
+    "20260814_a0915d2.jpg",
+    "20260814_e22.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260814_a0915d2.jpg",
+     "D2",
+     "2026-08-14T09:15:59"
+    ],
+    [
+     "20260814_e22.jpg",
+     "D2",
+     "2026-08-14T09:15:59"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-15",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-16",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-17",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2). d1 up was off (flat battery), so only D2 events cover it; a short visit could be missed.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-18",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "11:41",
+     "leave": null
+    },
+    {
+     "arrive": "13:26",
+     "leave": null
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "D2: 11:41:20 and 13:26:47 clear rear views heading in with small items. d1 up only recorded from 14:39, after the visits. Departures not captured.",
+   "photo": "20260818.jpg",
+   "series": [
+    "20260818_a1141d2.jpg",
+    "20260818_e23.jpg",
+    "20260818_a1326d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260818_a1141d2.jpg",
+     "D2",
+     "2026-08-18T11:41:20"
+    ],
+    [
+     "20260818_e23.jpg",
+     "D2",
+     "2026-08-18T11:41:20"
+    ],
+    [
+     "20260818_a1326d2.jpg",
+     "D2",
+     "2026-08-18T13:26:47"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-19",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2). d1 up was off (flat battery), so only D2 events cover it; a short visit could be missed.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-20",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-21",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-22",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2). d1 up was off (flat battery), so only D2 events cover it; a short visit could be missed.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-23",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-24",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-25",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-26",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2). d1 up was off (flat battery), so only D2 events cover it; a short visit could be missed.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-27",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "17:26",
+     "leave": null
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "medium",
+   "cameras": [
+    "D2"
+   ],
+   "notes": "D2: 17:26:32 silver access cab with the black rack bar right under the camera, after work. Single sighting; d1 up (from 10:51) shows no clear light pickup at the far end around 17:00-18:20.",
+   "photo": "20260827.jpg",
+   "series": [
+    "20260827_a1726u1.jpg",
+    "20260827_a1726d2.jpg",
+    "20260827_e24.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260827_a1726u1.jpg",
+     "d1 up",
+     "2026-08-27T17:26:00"
+    ],
+    [
+     "20260827_a1726d2.jpg",
+     "D2",
+     "2026-08-27T17:26:32"
+    ],
+    [
+     "20260827_e24.jpg",
+     "D2",
+     "2026-08-27T17:26:32"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-28",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-29",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "D1 Entrance"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, D1 Entrance).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-30",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-31",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-01",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "12:35",
+     "leave": "13:24"
+    },
+    {
+     "arrive": "13:37",
+     "leave": "14:01"
+    },
+    {
+     "arrive": "15:51",
+     "leave": "15:53"
+    }
+   ],
+   "hours": 1.25,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D1 Entrance",
+    "D2"
+   ],
+   "notes": "Unchanged from the first review (already complete from Entrance + D2): three short visits, last one with a young man in the bed beside a box and floor tiles. Plate read ~M 2934x0 (consistent with M 293450). d1 up was off for 13:00-15:04 gaps; U3/D2 up started only after 16:33.",
+   "photo": "20260901.jpg",
+   "plate": "M 293450",
+   "series": [
+    "20260901_a1235en.jpg",
+    "20260901_a1235d2.jpg",
+    "20260901_l1324en.jpg",
+    "20260901_l1324d2.jpg",
+    "20260901_a1337en.jpg",
+    "20260901_a1337d2.jpg",
+    "20260901_l1401d2.jpg",
+    "20260901_l1401en.jpg",
+    "20260901_a1551u1.jpg",
+    "20260901_a1551en.jpg",
+    "20260901_a1551d2.jpg",
+    "20260901_l1553d2.jpg",
+    "20260901_l1553u1.jpg",
+    "20260901_l1553en.jpg",
+    "20260901_e25.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260901_a1235en.jpg",
+     "Entrance",
+     "2026-09-01T12:35:33"
+    ],
+    [
+     "20260901_a1235d2.jpg",
+     "D2",
+     "2026-09-01T12:35:35"
+    ],
+    [
+     "20260901_l1324en.jpg",
+     "Entrance",
+     "2026-09-01T13:24:32"
+    ],
+    [
+     "20260901_l1324d2.jpg",
+     "D2",
+     "2026-09-01T13:24:32"
+    ],
+    [
+     "20260901_a1337en.jpg",
+     "Entrance",
+     "2026-09-01T13:37:05"
+    ],
+    [
+     "20260901_a1337d2.jpg",
+     "D2",
+     "2026-09-01T13:37:06"
+    ],
+    [
+     "20260901_l1401d2.jpg",
+     "D2",
+     "2026-09-01T14:01:39"
+    ],
+    [
+     "20260901_l1401en.jpg",
+     "Entrance",
+     "2026-09-01T14:01:41"
+    ],
+    [
+     "20260901_a1551u1.jpg",
+     "d1 up",
+     "2026-09-01T15:51:00"
+    ],
+    [
+     "20260901_a1551en.jpg",
+     "Entrance",
+     "2026-09-01T15:51:28"
+    ],
+    [
+     "20260901_a1551d2.jpg",
+     "D2",
+     "2026-09-01T15:51:28"
+    ],
+    [
+     "20260901_l1553d2.jpg",
+     "D2",
+     "2026-09-01T15:52:56"
+    ],
+    [
+     "20260901_l1553u1.jpg",
+     "d1 up",
+     "2026-09-01T15:53:00"
+    ],
+    [
+     "20260901_l1553en.jpg",
+     "Entrance",
+     "2026-09-01T15:53:00"
+    ],
+    [
+     "20260901_e25.jpg",
+     "Entrance",
+     "2026-09-01T15:53:00"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-02",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-03",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-04",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-05",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-06",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up). D3 up card gap these two days.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up). D3 up card gap these two days.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-08",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-09",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "11:47",
+     "leave": null
+    },
+    {
+     "arrive": "13:59",
+     "leave": null
+    },
+    {
+     "arrive": "14:25",
+     "leave": null
+    },
+    {
+     "arrive": "15:37",
+     "leave": "16:38"
+    }
+   ],
+   "hours": 1.02,
+   "partial": true,
+   "confidence": "medium",
+   "cameras": [
+    "D2",
+    "D3 up",
+    "d1 up",
+    "D2 up",
+    "U3 up"
+   ],
+   "notes": "D2 11:47 in with a box. D3 up 13:59:00-14:00:10: the Tacoma drives down the access track and passes right beside the Dodge (cans in its bed) and a black SUV parked at the jerrycan pile by the fence; a man walks from it toward the Dodge at 14:00:10; it does not stop there - by 14:01 it is gone toward the machines (D2 14:00:39 rear view, D2 up 14:00:44 in the upper yard by the IBC tank). D3 up 14:25:30: it is parked next to the Hitachi at the far end (D2 14:25:39 rear view with the box). D2 15:37:50 in; d1 up 15:37:52 it pulls up at the machines (beside the Komatsu/Hitachi) while the Dodge was there (Dodge left 15:40 with ~20 jerrycans per the turn0909 review); d1 up 16:37:40 it is mid-yard heading out, D2 16:37:47 under the camera leaving with the box and a black coil/hose in the bed. Departures between visits not captured (D3 up patrols and turned to the wall at 14:43).",
+   "photo": "20260909.jpg",
+   "series": [
+    "20260909_a1147u2.jpg",
+    "20260909_a1147u3.jpg",
+    "20260909_a1147o3.jpg",
+    "20260909_a1147en.jpg",
+    "20260909_a1147d2.jpg",
+    "20260909_a1359en.jpg",
+    "20260909_a1359u2.jpg",
+    "20260909_a1359u3.jpg",
+    "20260909_a1359o3.jpg",
+    "20260909_e26.jpg",
+    "20260909_a1359d2.jpg",
+    "20260909_a1425u2.jpg",
+    "20260909_a1425u3.jpg",
+    "20260909_a1425o3.jpg",
+    "20260909_e27.jpg",
+    "20260909_a1425d2.jpg",
+    "20260909_a1425en.jpg",
+    "20260909_a1537u1.jpg",
+    "20260909_a1537u2.jpg",
+    "20260909_a1537u3.jpg",
+    "20260909_a1537o3.jpg",
+    "20260909_a1537en.jpg",
+    "20260909_a1537d2.jpg",
+    "20260909_l1638d2.jpg",
+    "20260909_l1638en.jpg",
+    "20260909_l1638u1.jpg",
+    "20260909_l1638u2.jpg",
+    "20260909_l1638u3.jpg",
+    "20260909_l1638o3.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260909_a1147u2.jpg",
+     "D2 up",
+     "2026-09-09T11:47:00"
+    ],
+    [
+     "20260909_a1147u3.jpg",
+     "D3 up",
+     "2026-09-09T11:47:00"
+    ],
+    [
+     "20260909_a1147o3.jpg",
+     "U3 up",
+     "2026-09-09T11:47:00"
+    ],
+    [
+     "20260909_a1147en.jpg",
+     "Entrance",
+     "2026-09-09T11:47:03"
+    ],
+    [
+     "20260909_a1147d2.jpg",
+     "D2",
+     "2026-09-09T11:47:11"
+    ],
+    [
+     "20260909_a1359en.jpg",
+     "Entrance",
+     "2026-09-09T13:57:38"
+    ],
+    [
+     "20260909_a1359u2.jpg",
+     "D2 up",
+     "2026-09-09T13:59:00"
+    ],
+    [
+     "20260909_a1359u3.jpg",
+     "D3 up",
+     "2026-09-09T13:59:00"
+    ],
+    [
+     "20260909_a1359o3.jpg",
+     "U3 up",
+     "2026-09-09T13:59:00"
+    ],
+    [
+     "20260909_e26.jpg",
+     "D3 up",
+     "2026-09-09T13:59:00"
+    ],
+    [
+     "20260909_a1359d2.jpg",
+     "D2",
+     "2026-09-09T13:59:34"
+    ],
+    [
+     "20260909_a1425u2.jpg",
+     "D2 up",
+     "2026-09-09T14:25:00"
+    ],
+    [
+     "20260909_a1425u3.jpg",
+     "D3 up",
+     "2026-09-09T14:25:00"
+    ],
+    [
+     "20260909_a1425o3.jpg",
+     "U3 up",
+     "2026-09-09T14:25:00"
+    ],
+    [
+     "20260909_e27.jpg",
+     "D3 up",
+     "2026-09-09T14:25:30"
+    ],
+    [
+     "20260909_a1425d2.jpg",
+     "D2",
+     "2026-09-09T14:25:39"
+    ],
+    [
+     "20260909_a1425en.jpg",
+     "Entrance",
+     "2026-09-09T14:25:42"
+    ],
+    [
+     "20260909_a1537u1.jpg",
+     "d1 up",
+     "2026-09-09T15:37:00"
+    ],
+    [
+     "20260909_a1537u2.jpg",
+     "D2 up",
+     "2026-09-09T15:37:00"
+    ],
+    [
+     "20260909_a1537u3.jpg",
+     "D3 up",
+     "2026-09-09T15:37:00"
+    ],
+    [
+     "20260909_a1537o3.jpg",
+     "U3 up",
+     "2026-09-09T15:37:00"
+    ],
+    [
+     "20260909_a1537en.jpg",
+     "Entrance",
+     "2026-09-09T15:37:41"
+    ],
+    [
+     "20260909_a1537d2.jpg",
+     "D2",
+     "2026-09-09T15:37:50"
+    ],
+    [
+     "20260909_l1638d2.jpg",
+     "D2",
+     "2026-09-09T16:37:47"
+    ],
+    [
+     "20260909_l1638en.jpg",
+     "Entrance",
+     "2026-09-09T16:37:59"
+    ],
+    [
+     "20260909_l1638u1.jpg",
+     "d1 up",
+     "2026-09-09T16:38:00"
+    ],
+    [
+     "20260909_l1638u2.jpg",
+     "D2 up",
+     "2026-09-09T16:38:00"
+    ],
+    [
+     "20260909_l1638u3.jpg",
+     "D3 up",
+     "2026-09-09T16:38:00"
+    ],
+    [
+     "20260909_l1638o3.jpg",
+     "U3 up",
+     "2026-09-09T16:38:00"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-10",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-11",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-12",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-13",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-14",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-15",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-16",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-17",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-18",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-19",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-20",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-21",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-22",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-23",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-24",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-25",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-26",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-27",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-28",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-29",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "15:57",
+     "leave": "16:23"
+    }
+   ],
+   "hours": 0.43,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Entrance 15:57:19 in with a long white pipe; D2 15:57:22 heading to the far end where the Hitachi and the Dodge were parked; U3 up ~15:58 shows it beside the Dodge in the upper yard. Dodge passes D2 16:12. D3 up 16:17:40 a light pickup at the far end by the machines; 16:18:05 the Tacoma drives back up the track past the jerrycan/Dodge spot with an empty bed (pipe left at the machines); Entrance 16:17:29 / 16:22:18 driver out by the IBC tank; out up the road 16:22:50.",
+   "photo": "20260929.jpg",
+   "series": [
+    "20260929_a1557u2.jpg",
+    "20260929_a1557u3.jpg",
+    "20260929_a1557o3.jpg",
+    "20260929_a1557en.jpg",
+    "20260929_a1557d2.jpg",
+    "20260929_e28.jpg",
+    "20260929_e29.jpg",
+    "20260929_l1623d2.jpg",
+    "20260929_l1623u2.jpg",
+    "20260929_l1623u3.jpg",
+    "20260929_l1623o3.jpg",
+    "20260929_l1623en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260929_a1557u2.jpg",
+     "D2 up",
+     "2026-09-29T15:57:00"
+    ],
+    [
+     "20260929_a1557u3.jpg",
+     "D3 up",
+     "2026-09-29T15:57:00"
+    ],
+    [
+     "20260929_a1557o3.jpg",
+     "U3 up",
+     "2026-09-29T15:57:00"
+    ],
+    [
+     "20260929_a1557en.jpg",
+     "Entrance",
+     "2026-09-29T15:57:12"
+    ],
+    [
+     "20260929_a1557d2.jpg",
+     "D2",
+     "2026-09-29T15:57:22"
+    ],
+    [
+     "20260929_e28.jpg",
+     "D2",
+     "2026-09-29T15:57:22"
+    ],
+    [
+     "20260929_e29.jpg",
+     "D3 up",
+     "2026-09-29T16:18:05"
+    ],
+    [
+     "20260929_l1623d2.jpg",
+     "D2",
+     "2026-09-29T16:22:04"
+    ],
+    [
+     "20260929_l1623u2.jpg",
+     "D2 up",
+     "2026-09-29T16:23:00"
+    ],
+    [
+     "20260929_l1623u3.jpg",
+     "D3 up",
+     "2026-09-29T16:23:00"
+    ],
+    [
+     "20260929_l1623o3.jpg",
+     "U3 up",
+     "2026-09-29T16:23:00"
+    ],
+    [
+     "20260929_l1623en.jpg",
+     "Entrance",
+     "2026-09-29T16:23:01"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-30",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-01",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-02",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-03",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-04",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-05",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-06",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up",
+    "Pergola"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up, Pergola).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-07",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-08",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up",
+    "Pergola"
+   ],
+   "notes": "Not seen on any camera that recorded this day (D2, d1 up, D1 Entrance, D2 up, U3 up, D3 up, Pergola).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "d1 up",
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "Not seen on any camera that recorded this day (d1 up, D1 Entrance, D2 up, U3 up, D3 up).",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-10",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "partial": false,
+   "confidence": "low",
+   "cameras": [
+    "D1 Entrance",
+    "D2 up",
+    "U3 up",
+    "D3 up"
+   ],
+   "notes": "D2 stopped 08 Oct; D2 up/D3 up/U3 up and a short Entrance segment exist for 10 Oct and show no silver pickup, but d1 up and most of Entrance are missing - recorded as not seen with low confidence.",
+   "photo": "",
+   "series": [],
+   "series_meta": []
+  }
+ ]
+}

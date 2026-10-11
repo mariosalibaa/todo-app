@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1e1e2e">
-<title>Machines &amp; trucks · Ajaltoun 4193 · Shift Hub</title>
+<title>Cameras · Ajaltoun 4193 · Shift Hub</title>
 <link rel="icon" href="/icons/hub-192.png">
 <link rel="manifest" href="/hub-manifest.json">
 <link rel="apple-touch-icon" href="/icons/hub-apple.png">
@@ -35,7 +35,8 @@
   tr.wk td{background:rgba(137,180,250,.07);color:var(--blue);font-size:.76rem;}
   /* table headers stay visible while scrolling (Mario 2026-10-11) */
   .tcard{overflow:visible;} thead th{position:sticky;top:var(--hdr,64px);z-index:5;background:var(--mantle);box-shadow:0 1px 0 var(--surface0);}
-  @media (max-width:900px){.tcard{overflow-x:auto;} thead th{top:0;}}
+  tr.wk td{position:sticky;top:calc(var(--hdr,64px) + var(--thh,40px));z-index:4;background:var(--mantle);box-shadow:inset 0 0 0 999px rgba(137,180,250,.07),0 1px 0 var(--surface0);}
+  @media (max-width:900px){.tcard{overflow-x:auto;} thead th{top:0;} tr.wk td{position:static;}}
   tr.tot td{cursor:default;border-top:2px solid var(--amber);} .fold{display:inline-block;width:1em;}
   tr.mon td{background:rgba(242,169,59,.10);color:var(--amber);font-weight:600;cursor:pointer;}
   .hb{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px;} .hb.h{background:var(--orange);} .hb.k{background:var(--yellow);}
@@ -62,9 +63,18 @@
   [hidden]{display:none !important;}
   a{color:var(--amber);}
   .varrow{position:fixed;top:50%;left:12px;transform:translateY(-50%);z-index:610;width:52px;height:72px;border:0;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:44px;cursor:pointer;line-height:1;} .varrow.r{left:auto;right:12px;} .varrow:hover{background:rgba(242,169,59,.7);}
+  .vcams{flex:none;display:flex;flex-wrap:wrap;gap:6px;padding:6px 14px;background:var(--mantle);border-bottom:1px solid var(--surface0);} .vcams button{border:1px solid var(--surface1,#555);background:transparent;color:inherit;border-radius:14px;padding:3px 10px;font-size:.75rem;cursor:pointer;} .vcams button.on{border-color:var(--amber);color:var(--amber);background:rgba(242,169,59,.12);}
   .vstrip{flex:none;display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:var(--mantle);border-top:1px solid var(--surface0);} .vstrip img{height:64px;border-radius:5px;opacity:.55;cursor:pointer;border:2px solid transparent;flex:none;} .vstrip img.on{opacity:1;border-color:var(--amber);}
   .vbody img{max-height:calc(100vh - 150px);object-fit:contain;}
   .vcount{color:var(--sub);font-size:.8rem;margin-left:8px;}
+.clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+td.notes{min-width:200px}
+td.foot{min-width:150px}
+.more{background:none;border:0;color:var(--amber);font-size:.75rem;padding:2px 0;cursor:pointer}
+#npop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+#npop.on{display:flex}
+#npop .box{background:var(--card,#1e1e2e);border:1px solid var(--line,#444);border-radius:12px;max-width:640px;width:100%;max-height:80vh;overflow:auto;padding:18px 20px;line-height:1.55}
+#npop .box h3{margin:0 0 10px;font-size:1rem}
 </style>
 </head>
 <body>
@@ -73,7 +83,7 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a><a id="t-cars" href="/ajaltoun/machines/cars">All cars</a></nav>
+  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a><a id="t-cars" href="/ajaltoun/machines/cars">All cars</a><a id="t-plates" href="/ajaltoun/machines/plates">Plates</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -90,6 +100,7 @@
     <h1>Truck loads — how well each truck was filled</h1>
     <p class="lead">Every dump truck seen leaving loaded, with the camera photo of its bed: the truck, what it carried and how full it was. Score 5 = heaped and dense, 1 = mostly empty. Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="lkpis"></div>
+    <div id="lfilters" style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px"></div>
     <h2>Loads per month <span class="small" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">tap a month to see its trucks</span></h2>
     <div class="card tcard"><table id="ltab"><thead><tr><th>Date</th><th>Left at</th><th>Truck</th><th>Material</th><th>Fill</th><th>Score</th><th>Remark</th><th>Camera</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
   </section>
@@ -116,7 +127,7 @@
   </section>
   <section id="v-tacoma" hidden>
     <h1>Silver Tacoma pickup on site</h1>
-    <p class="lead">When the silver Toyota Tacoma-type pickup arrived and left each day, what it carried and where it went, from all cameras combined. Tap a month to open it, a photo to enlarge.</p>
+    <p class="lead">When the silver Toyota Tacoma (M 293450, Shift Group) arrived and left each day, what it carried and where it went, from all cameras combined. Tap a month to open it, a photo to enlarge.</p>
     <div class="kpis" id="tkpis"></div>
     <div class="card tcard"><table id="ttab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="tnote"></div>
@@ -126,6 +137,11 @@
     <p class="lead">Every tracked car in one table: tick the cars to show, tap a month to open it, a photo to enlarge. Each car's own tab stays as well.</p>
     <div class="filters" id="cfilters"></div>
     <div class="card tcard"><table id="ctab"><thead><tr><th>Date</th><th>Car</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section id="v-plates" hidden>
+    <h1>Plates read on the cameras</h1>
+    <p class="lead">Every vehicle whose plate a camera could read, with the owner from the car register (CARS NUMBER, May 2026 — an owner may have changed since). "Match" = the register's make and colour agree with the camera. Tap a photo to see every camera.</p>
+    <div class="card tcard"><table id="ptab"><thead><tr><th>Plate</th><th>Car</th><th>Owner (register)</th><th>Match</th><th>Days seen</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="v-diesel" hidden>
     <h1>Diesel vs machine hours</h1>
@@ -140,8 +156,10 @@
     <div class="card tcard"><table id="dfill"><thead><tr><th>Date</th><th class="n">Litres</th><th class="n">$/L</th><th class="n">Total $</th><th>Machine</th><th>Odoo</th><th>Dib paid</th></tr></thead><tbody></tbody></table></div>
   </section>
 </main>
+<div id="npop" onclick="if(event.target===this)closeNote()"><div class="box"><h3 id="nptitle"></h3><div id="nptext" class="small"></div><div style="text-align:right;margin-top:12px"><button class="more" onclick="closeNote()">Close</button></div></div></div>
 <div id="viewer">
   <div class="vbar"><a class="vback" href="#" onclick="closeViewer();return false;">&lsaquo; Back</a><div class="vtitle" id="vtitle"></div></div>
+  <div class="vcams" id="vcams" hidden></div>
   <div class="vbody" id="vbody"></div>
   <div class="vstrip" id="vstrip" hidden></div>
   <button class="varrow" id="vprev" onclick="stepViewer(-1)" hidden>&lsaquo;</button><button class="varrow r" id="vnext" onclick="stepViewer(1)" hidden>&rsaquo;</button>
@@ -155,7 +173,8 @@ const esc = Admin.esc; let D = null, MONTH = 'all';
 const LOADS = /\/loads$/.test(location.pathname), DIESEL = /\/diesel$/.test(location.pathname);
 const FLAGS = /\/flags$/.test(location.pathname);
 const GEORGES = /\/georges$/.test(location.pathname), BMW = /\/bmw$/.test(location.pathname), TACOMA = /\/tacoma$/.test(location.pathname), CARS = /\/cars$/.test(location.pathname);
-const VIEW = CARS ? 'cars' : TACOMA ? 'tacoma' : BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
+const PLATES = /\/plates$/.test(location.pathname);
+const VIEW = PLATES ? 'plates' : CARS ? 'cars' : TACOMA ? 'tacoma' : BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
 const h1 = n => n == null ? '—' : (+n).toFixed(1);
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dd = s => { const d = new Date(s + 'T12:00:00'); return { day: d.getDate() + ' ' + MON[d.getMonth()], wd: d.toLocaleDateString('en-GB', { weekday: 'short' }), m: s.slice(0, 7), sun: d.getDay() === 0 }; };
@@ -207,7 +226,7 @@ function renderDays() {
         <td class="n">${work ? tick : ''}</td><td class="n">${!none && !work ? '●' : ''}</td><td class="n">${x.sun ? '●' : ''}</td><td class="n muted">${none && !work ? '●' : ''}</td>
         <td class="n">${none ? '—' : (d.est ? '~' : '') + h1(d.hitachi) + `<span class="hb h" style="width:${Math.round(d.hitachi / max * 50)}px"></span>`}</td>
         <td class="n">${none ? '—' : (d.est ? '~' : '') + h1(d.komatsu) + `<span class="hb k" style="width:${Math.round(d.komatsu / max * 50)}px"></span>`}</td>
-        <td class="n"><b>${none ? '—' : h1(d.hitachi + d.komatsu)}</b></td><td class="n">${d.loads == null ? '—' : d.loads}</td><td class="small">${d.d1off ? '<span style="color:var(--amber)">D1 up off (battery)</span> · ' : ''}${none ? 'no camera recorded' : esc((d.cams || []).join(' + '))}${d.d1up && !d.d1off && (d.d1up.hitachi !== d.hitachi || d.d1up.komatsu !== d.komatsu || d.d1up.loads !== d.loads) ? `<div class="muted">d1 up alone: ${h1(d.d1up.hitachi)} / ${h1(d.d1up.komatsu)} h · ${d.d1up.loads ?? '—'} trucks</div>` : ''}${d.range ? `<div class="muted">range H ${d.range.h[0]}–${d.range.h[1]} · K ${d.range.k[0]}–${d.range.k[1]} h</div>` : ''}</td><td class="small muted">${esc(d.notes || '')}</td></tr>`;
+        <td class="n"><b>${none ? '—' : h1(d.hitachi + d.komatsu)}</b></td><td class="n">${d.loads == null ? '—' : d.loads}</td><td class="small foot">${d.d1off ? '<span style="color:var(--amber)">D1 up off (battery)</span> · ' : ''}${none ? 'no camera recorded' : esc((d.cams || []).join(' + '))}${d.d1up && !d.d1off && (d.d1up.hitachi !== d.hitachi || d.d1up.komatsu !== d.komatsu || d.d1up.loads !== d.loads) ? `<div class="muted">d1 up alone: ${h1(d.d1up.hitachi)} / ${h1(d.d1up.komatsu)} h · ${d.d1up.loads ?? '—'} trucks</div>` : ''}${d.range ? `<div class="muted">range H ${d.range.h[0]}–${d.range.h[1]} · K ${d.range.k[0]}–${d.range.k[1]} h</div>` : ''}</td>${noteCell(d.notes, x.wd + ' ' + x.day)}</tr>`;
     }
   }
   tb.innerHTML = html;
@@ -220,9 +239,17 @@ const FILL = f => /heap/i.test(f) ? 'heaped' : /full/i.test(f) ? 'full' : /part/
 const FILL_L = { heaped: 'Heaped', full: 'Full', partly: 'Partly full', light: 'Light', unk: "Can't tell" };
 const stars = n => n ? '★'.repeat(n) + `<i>${'★'.repeat(5 - n)}</i>` : '<span class="muted small">—</span>';
 const photoUrl = p => p ? '/api/ajaltoun/machines/photo/' + p.split('/').pop() : '';
+const TTYPES = [['astra', 'Astra 8x4 (Mhanna)', /astra|mhanna 8x4/i], ['iveco', 'Iveco 8x4 (Mhanna)', /iveco/i], ['scania', 'Scania 8x4', /scania/i], ['actros', 'Actros (Raymond Hajj)', /actros/i], ['merc', 'Mercedes-cab tipper (orange beacon)', /mercedes/i], ['other', 'Other tippers', /./]];
+const truckType = l => TTYPES.find(t => t[2].test(l.truck || ''))[0];
+let TF = (() => { try { return localStorage.getItem('loadsTruck') || 'all'; } catch { return 'all'; } })();
+function setTF(k) { TF = k; try { localStorage.setItem('loadsTruck', k); } catch {} renderLoads(); }
 function renderLoads() {
-  const L = D.loads || [];
-  if (!L.length) { document.getElementById('loads').innerHTML = '<div class="muted">The truck-load photos are still being prepared.</div>'; return; }
+  const ALL = D.loads || [];
+  if (!TTYPES.some(t => t[0] === TF)) TF = 'all';
+  const L = TF === 'all' ? ALL : ALL.filter(l => truckType(l) === TF);
+  const chip = (k, t, n) => `<button onclick="setTF('${k}')" style="border:1px solid ${TF === k ? 'var(--amber)' : 'var(--line, #444)'};background:${TF === k ? 'rgba(242,169,59,.15)' : 'transparent'};color:${TF === k ? 'var(--amber)' : 'inherit'};border-radius:16px;padding:4px 12px;font-size:.8rem;cursor:pointer">${t} <span class="muted">${n}</span></button>`;
+  document.getElementById('lfilters').innerHTML = chip('all', 'All trucks', ALL.length) + TTYPES.map(([k, t]) => chip(k, t, ALL.filter(l => truckType(l) === k).length)).join('');
+  if (!ALL.length) { document.getElementById('loads').innerHTML = '<div class="muted">The truck-load photos are still being prepared.</div>'; return; }
   const by = k => L.filter(l => FILL(l.fill) === k).length;
   const sc = L.filter(l => l.score), avg = sc.length ? sc.reduce((s, l) => s + l.score, 0) / sc.length : 0;
   document.getElementById('lkpis').innerHTML = K('t', L.length, 'truck loads') + K('d', by('heaped'), 'heaped') + K('t', by('full'), 'full to the sides') +
@@ -234,10 +261,10 @@ function renderLoads() {
     const cnt = k => ml.filter(l => FILL(l.fill) === k).length;
     html += `<tr class="mon" onclick="foldL('${m}')"><td><span class="fold" id="lfold-${m}">▸</span> ${monthName(m)}</td><td colspan="3">${ml.length} truck loads</td><td class="small">${cnt('heaped')} heaped · ${cnt('full')} full${cnt('partly') ? ' · ' + cnt('partly') + ' partly' : ''}${cnt('light') ? ' · ' + cnt('light') + ' light' : ''}${cnt('unk') ? ' · ' + cnt('unk') + " can't tell" : ''}</td><td>${mavg ? mavg.toFixed(1) + ' / 5' : ''}</td><td colspan="3"></td></tr>`;
     for (const l of ml.slice().reverse()) {
-      const x = dd(l.date), f = FILL(l.fill), u = photoUrl(l.photo);
+      const x = dd(l.date), f = FILL(l.fill), u = l.clear ? '/api/ajaltoun/machines/photo/' + l.clear : photoUrl(l.photo);
       html += `<tr data-lm="${m}" hidden><td style="white-space:nowrap">${x.wd} ${x.day}</td><td>${esc(l.time || '')}</td><td class="small">${esc(l.truck || '')}</td><td class="small">${esc(l.material || '')}</td>
         <td><span class="badge f-${f}">${FILL_L[f]}</span></td><td class="stars" style="white-space:nowrap">${stars(l.score)}</td><td class="small muted">${esc(l.remark || '')}</td><td class="small muted">${esc(l.camera || '')}</td>
-        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:150px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openLoad(${L.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted" style="cursor:pointer" onclick="openLoad(${L.indexOf(l)})">${(l.series || []).length + 1} photos: 0–80 % + leaving ›</div>` : ''}</td></tr>`;
+        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:150px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openLoad(${ALL.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted" style="cursor:pointer" onclick="openLoad(${ALL.indexOf(l)})">${(l.series || []).length + 1 + (l.clear ? 1 : 0)} photos · ${new Set((l.series_meta || []).map(m => m[1])).size} cameras ›</div>` : ''}</td></tr>`;
     }
   }
   html += `<tr class="mon tot"><td>Total</td><td colspan="3">${L.length} truck loads</td><td class="small">${by('heaped')} heaped · ${by('full')} full</td><td>${avg.toFixed(1)} / 5</td><td colspan="3"></td></tr>`;
@@ -272,16 +299,26 @@ function renderGeorges(G, P, api) {
       const st = d.present === false ? '<span class="muted">not on site</span>' : d.present == null ? '<span class="muted">unclear</span>' : '';
       html += `<tr data-gm="${P}${m}" hidden class="${x.sun ? 'sun' : ''} ${d.present === false ? 'none' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
         <td style="white-space:nowrap">${v.length ? v.map(a => esc(a.arrive)).join('<br>') : st}</td><td style="white-space:nowrap">${v.map(a => esc(a.leave)).join('<br>')}</td>
-        <td class="n"><b>${d.present ? (d.partial && d.hours ? '≥' : '') + hm(d.hours) : ''}</b></td><td class="small">${esc(d.confidence || '')}</td><td class="small muted">${esc(d.notes || '')}</td>
-        <td>${u ? `<img src="${u}" loading="lazy" style="width:96px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day)}')">` : ''}</td></tr>`;
+        <td class="n"><b>${d.present ? (d.partial && d.hours ? '≥' : '') + hm(d.hours) : ''}</b></td><td class="small">${esc(d.confidence || '')}${(d.cameras || []).length ? `<div class="muted">${esc(d.cameras.join(' + '))}</div>` : ''}</td>${noteCell(d.notes, x.wd + ' ' + x.day)}
+        <td>${carPhotos(d, api, x.wd + ' ' + x.day, 96)}</td></tr>`;
     }
   }
   html += `<tr class="mon tot"><td>Total</td><td colspan="2">${pres.length} days on site <span class="small muted">of ${days.length}</span></td><td class="n">${hm(tot)}</td><td colspan="3" class="small">average ${hm(known.length ? tot / known.length : 0)} per day on site</td></tr>`;
   document.querySelector('#' + P + 'tab tbody').innerHTML = html;
-  document.getElementById(P + 'note').textContent = (G.pending ? G.pending + '. ' : '') + 'Hours = arrival to departure; two visits on one day are added. "?" = arrival or departure not seen.';
+  document.getElementById(P + 'note').textContent = (G.pending ? G.pending + '. ' : '') + (G.plate ? 'Plate ' + G.plate + '. ' : '') + 'Hours = arrival to departure; two visits on one day are added. "?" = arrival or departure not seen.';
 }
+const CARSER = [];
+function carPhotos(d, api, title, w) {
+  const u = d.photo ? '/api/ajaltoun/machines/' + api + '/' + d.photo : '';
+  const S = (d.series || []).map((n, i) => ['/api/ajaltoun/machines/' + api + '/' + n, ((d.series_meta || [])[i] || [])[1] || 'camera']);
+  const all = [...(u ? [[u, 'review photo']] : []), ...S];
+  if (!all.length) return '';
+  const k = CARSER.push([all, title]) - 1, cams = new Set(S.map(x => x[1])).size;
+  return `<img src="${all[0][0]}" loading="lazy" style="width:${w}px;border-radius:6px;cursor:zoom-in" onclick="openCar(${k})">${all.length > 1 ? `<div class="small muted" style="cursor:pointer" onclick="openCar(${k})">${all.length} photos · ${cams} camera${cams === 1 ? '' : 's'} ›</div>` : ''}`;
+}
+function openCar(k) { const [all, t] = CARSER[k]; openSeries(all.map(x => x[0]), 0, t, all.map(x => x[1])); }
 function foldG(P, m) { const rows = document.querySelectorAll(`#${P}tab tr[data-gm="${P}${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById(P + 'fold-' + m).textContent = open ? '▾' : '▸'; }
-const CARDEF = [['dodge', 'Grey Dodge (Anthony)', '#f38ba8'], ['georges', 'Silver RAV4', '#89b4fa'], ['bmw', 'Silver BMW', '#cba6f7'], ['tacoma', 'Silver Tacoma', '#fab387'], ['visitors', 'Other cars', '#a6e3a1']];
+const CARDEF = [['dodge', 'Grey Dodge (Anthony)', '#f38ba8'], ['georges', 'Silver RAV4', '#89b4fa'], ['bmw', 'Silver BMW', '#cba6f7'], ['tacoma', 'Silver Tacoma', '#fab387'], ['visitors', 'Other cars (plates read)', '#a6e3a1']];
 let CSEL = (() => { try { return JSON.parse(localStorage.getItem('carsSel')) || null; } catch { return null; } })() || CARDEF.map(c => c[0]);
 const COPEN = new Set();
 function renderCars() {
@@ -303,11 +340,34 @@ function renderCars() {
       const x = dd(r.date), v = r.visits || [], u = r.photo ? '/api/ajaltoun/machines/' + r.car + '/' + r.photo : '';
       html += `<tr data-cm="${m}" ${COPEN.has(m) ? '' : 'hidden'} class="${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td><td style="white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.col};margin-right:6px"></span>${esc(r.carName)}${r.plate ? `<div class="small muted">${esc(r.plate)}</div>` : ''}</td>
         <td style="white-space:nowrap">${v.map(a => esc(a.arrive)).join('<br>')}</td><td style="white-space:nowrap">${v.map(a => esc(a.leave)).join('<br>')}</td><td class="n"><b>${(r.partial && r.hours ? '≥' : '') + hm(r.hours)}</b></td>
-        <td class="small">${esc(r.confidence || '')}</td><td class="small muted">${esc(r.notes || '')}</td>
-        <td>${u ? `<img src="${u}" loading="lazy" style="width:120px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' — ' + r.carName)}')">` : ''}</td></tr>`;
+        <td class="small">${esc(r.confidence || '')}${(r.cameras || []).length ? `<div class="muted">${esc(r.cameras.join(' + '))}</div>` : ''}</td>${noteCell(r.notes, x.wd + ' ' + x.day + ' — ' + r.carName)}
+        <td>${carPhotos(r, r.car, x.wd + ' ' + x.day + ' — ' + r.carName, 120)}</td></tr>`;
     }
   }
   document.querySelector('#ctab tbody').innerHTML = html || '<tr><td colspan="8" class="muted">No car selected.</td></tr>';
+}
+function renderPlates() {
+  const V = D.visitors || {}, P = V.plates || [], KIND = [['yours', 'Your cars'], ['team', 'Team on site'], ['supplier', 'Suppliers'], ['visitor', 'Visitors and unknown']];
+  const MC = { yes: 'color:var(--green)', no: 'color:var(--red)', unsure: 'color:var(--amber)' };
+  let html = '';
+  for (const [k, t] of KIND) {
+    const seenOf = p => p.tab ? ((D[p.tab] || {}).days || []).filter(d => d.present).map(d => d.date) : (p.seen || []);
+    const last = p => seenOf(p).slice().sort().pop() || '';
+    const rows = P.filter(p => p.kind === k).sort((a, b) => last(b).localeCompare(last(a))); if (!rows.length) continue;
+    html += `<tr class="mon"><td colspan="6">${t} <span class="small muted">${rows.length}</span></td></tr>`;
+    for (const p of rows) {
+      let days = p.seen || [], ph = '';
+      if (p.tab) { const g = (D[p.tab] || {}).days || []; days = g.filter(d => d.present).map(d => d.date); const d = g.find(d => d.present && d.photo); ph = d ? carPhotos(d, p.tab, p.car + ' · ' + p.plate, 110) : ''; }
+      else if (p.flagphoto) { const u = '/api/ajaltoun/machines/flag/' + p.flagphoto; ph = `<img src="${u}" loading="lazy" style="width:110px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(p.car + ' · ' + p.plate)}')">`; }
+      else { const rs = ((V.days) || []).filter(r => r.plate && r.plate.replace(/\?/g, '').trim().slice(-6) === p.plate.replace(/\?/g, '').trim().slice(-6));
+        const all = { photo: (rs.find(r => r.photo) || {}).photo, series: rs.flatMap(r => r.series || []), series_meta: rs.flatMap(r => r.series_meta || []) };
+        ph = carPhotos(all, 'visitors', p.car + ' · ' + p.plate, 110); }
+      const dl = days.slice().sort().reverse().map(d => { const x = dd(d); return x.wd + ' ' + x.day; });
+      html += `<tr><td style="white-space:nowrap"><b>${esc(p.plate)}</b></td><td>${esc(p.car)}</td><td class="small">${esc(p.owner)}</td><td class="small" style="${MC[p.match] || ''}">${esc(p.match)}</td>
+        <td class="small">${days.length ? `<b>${days.length} day${days.length === 1 ? '' : 's'}</b><div class="muted">${esc(dl.slice(0, 8).join(', '))}${dl.length > 8 ? ' …' : ''}</div>` : '—'}</td><td>${ph}</td></tr>`;
+    }
+  }
+  document.querySelector('#ptab tbody').innerHTML = html;
 }
 function toggleCar(k, on) { CSEL = on ? [...new Set([...CSEL, k])] : CSEL.filter(x => x !== k); saveCsel(); }
 function saveCsel() { try { localStorage.setItem('carsSel', JSON.stringify(CSEL)); } catch {} renderCars(); }
@@ -373,7 +433,9 @@ function foldF(m) { const rows = document.querySelectorAll(`#ftab tr[data-fm="${
 function openLoad(k) {
   const l = (D.loads || [])[k]; if (!l) return; const x = dd(l.date);
   const S = (l.series || []).map(n => '/api/ajaltoun/machines/photo/' + n);
-  openSeries([...S, photoUrl(l.photo)].filter(Boolean), 0, x.wd + ' ' + x.day + ' · truck left ' + (l.time || '') + ' · ' + (l.truck || ''));
+  const M = l.series_meta || [], C = (l.series || []).map((n, i) => (M[i] && M[i][1]) || 'camera');
+  const extra = [l.clear ? ['/api/ajaltoun/machines/photo/' + l.clear, (l.clear_cam || 'close-up') + ' · close-up'] : null, l.photo ? [photoUrl(l.photo), (l.camera || '') + ' · leaving'] : null].filter(Boolean);
+  openSeries([...S, ...extra.map(e => e[0])], 0, x.wd + ' ' + x.day + ' · truck left ' + (l.time || '') + ' · ' + (l.truck || ''), [...C, ...extra.map(e => e[1])]);
 }
 function foldL(m) { const rows = document.querySelectorAll(`#ltab tr[data-lm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('lfold-' + m).textContent = open ? '▾' : '▸'; }
 let VS = [], VI = 0, VT = '';
@@ -392,24 +454,44 @@ function showViewer() {
   addEventListener('touchstart', e => { if (v()?.classList.contains('on')) x0 = e.touches[0].clientX; }, { passive: true });
   addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) stepViewer(dx < 0 ? 1 : -1); }, { passive: true }); })();
 function stepViewer(d) { if (VS.length < 2) return; VI = (VI + d + VS.length) % VS.length; showViewer(); }
-function openSeries(list, i, title) { VS = list; VI = i || 0; VT = title; showViewer(); document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden'; }
+let VALL = null, VCAM = 'all';
+function openSeries(list, i, title, cams) {
+  const vc = document.getElementById('vcams'); VALL = null; vc.hidden = true;
+  if (cams && new Set(cams).size > 1) { VALL = list.map((u, k) => [u, cams[k]]); VCAM = 'all'; renderCams(); }
+  VS = list; VI = i || 0; VT = title; showViewer(); document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden'; }
 function openFlag(k) { const l = (D.flags || [])[k]; if (!l) return; const x = dd(l.date); const P = '/api/ajaltoun/machines/flag/'; openSeries([l.photo, ...(l.series || [])].filter(Boolean).map(n => P + n), 0, x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera); }
+const NOTES = [];
+function noteCell(t, title) {
+  t = t || ''; if (t.length < 230) return `<td class="small muted notes">${esc(t)}</td>`;
+  const k = NOTES.push([title || 'Notes', t]) - 1;
+  return `<td class="small muted notes"><div class="clamp">${esc(t)}</div><button class="more" onclick="openNote(${k})">more ›</button></td>`;
+}
+function openNote(k) { const [h, t] = NOTES[k]; document.getElementById('nptitle').textContent = h; document.getElementById('nptext').textContent = t; document.getElementById('npop').classList.add('on'); }
+function closeNote() { document.getElementById('npop').classList.remove('on'); }
 function openViewer(url, title) {
   VS = [url]; VI = 0; VT = title; showViewer();
   document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden';
 }
+function renderCams() {
+  const vc = document.getElementById('vcams'), cs = [...new Set(VALL.map(x => x[1]))];
+  vc.hidden = false;
+  vc.innerHTML = [['all', 'All cameras', VALL.length], ...cs.map(c => [c, c, VALL.filter(x => x[1] === c).length])].map(([k, t, n]) => `<button class="${VCAM === k ? 'on' : ''}" onclick="setVcam('${esc(k)}')">${esc(t)} ${n}</button>`).join('');
+}
+function setVcam(k) { VCAM = k; VS = VALL.filter(x => k === 'all' || x[1] === k).map(x => x[0]); VI = 0; renderCams(); showViewer(); }
 function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); if (document.getElementById('viewer').classList.contains('on')) { if (e.key === 'ArrowLeft') stepViewer(-1); if (e.key === 'ArrowRight') stepViewer(1); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeViewer(); closeNote(); } if (document.getElementById('viewer').classList.contains('on')) { if (e.key === 'ArrowLeft') stepViewer(-1); if (e.key === 'ArrowRight') stepViewer(1); } });
 
 const setHdr = () => document.documentElement.style.setProperty('--hdr', (document.querySelector('header')?.offsetHeight || 64) + 'px');
 addEventListener('resize', setHdr);
+const setThh = () => { const t = [...document.querySelectorAll('thead')].find(h => h.offsetHeight); if (t) document.documentElement.style.setProperty('--thh', t.offsetHeight + 'px'); };
+addEventListener('scroll', setThh, { passive: true });
 Admin.require(['ajaltoun', 'excavation'], async me => {
   setTimeout(setHdr, 0);
-  Admin.crumbs([['Ajaltoun 4193', '/#ajaltoun-4193'], ['Machines & trucks']]);
+  Admin.crumbs([['Ajaltoun 4193', '/#ajaltoun-4193'], ['Cameras']]);
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   document.getElementById('t-' + VIEW).classList.add('on');
   document.getElementById('v-' + VIEW).hidden = false;
-  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; CARS ? renderCars() : TACOMA ? renderGeorges(D.tacoma || { days: [], pending: 'The Tacoma review is running' }, 't', 'tacoma') : BMW ? renderGeorges(D.bmw || { days: [], pending: 'The BMW review is running' }, 'b', 'bmw') : GEORGES ? renderGeorges(D.georges, 'g', 'georges') : FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
+  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; PLATES ? renderPlates() : CARS ? renderCars() : TACOMA ? renderGeorges(D.tacoma || { days: [], pending: 'The Tacoma review is running' }, 't', 'tacoma') : BMW ? renderGeorges(D.bmw || { days: [], pending: 'The BMW review is running' }, 'b', 'bmw') : GEORGES ? renderGeorges(D.georges, 'g', 'georges') : FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
   catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); }
 });
 </script>

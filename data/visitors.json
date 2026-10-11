@@ -1,0 +1,2479 @@
+{
+ "updated": "2026-10-11",
+ "pending": "",
+ "days": [
+  {
+   "date": "2026-08-28",
+   "present": true,
+   "vehicle": "White Toyota Corolla sedan (black roof wrap)",
+   "plate": "G/S 125842",
+   "visits": [
+    {
+     "arrive": "15:30",
+     "leave": "15:32"
+    }
+   ],
+   "hours": 0.03,
+   "partial": false,
+   "confidence": "low: G,1,2 medium; 3rd digit 6/8; 8,4 medium; last unreadabl",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate 125842 (read by Mario; the letter looks like G or S). Register: G 125842 = silver Honda Accord 1982 (Nelly Boustany, Jeita); S 125842 = black BMW X5 2000 (Nabil Mohammad Zarkat). No Toyota Corolla under 125842 with any letter, so the register is out of date for this plate or a digit is off.",
+   "photo": "20260828_1284.jpg",
+   "series": [
+    "20260828_a1530u1.jpg",
+    "20260828_a1530en.jpg",
+    "20260828_l1532u1.jpg",
+    "20260828_l1532en.jpg",
+    "20260828_l1532d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260828_a1530u1.jpg",
+     "d1 up",
+     "2026-08-28T15:30:00"
+    ],
+    [
+     "20260828_a1530en.jpg",
+     "Entrance",
+     "2026-08-28T15:30:18"
+    ],
+    [
+     "20260828_l1532u1.jpg",
+     "d1 up",
+     "2026-08-28T15:32:00"
+    ],
+    [
+     "20260828_l1532en.jpg",
+     "Entrance",
+     "2026-08-28T15:32:15"
+    ],
+    [
+     "20260828_l1532d2.jpg",
+     "D2",
+     "2026-08-28T15:32:15"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-28",
+   "present": true,
+   "vehicle": "Dark Chevrolet Tahoe SUV (short official-style number)",
+   "plate": "O 1625",
+   "visits": [
+    {
+     "arrive": "16:44",
+     "leave": "16:49"
+    }
+   ],
+   "hours": 0.08,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Chevrolet Tahoe 2017, owner Antoine Khalil Char (Dahr el Souan). Match.",
+   "photo": "20260828_1625.jpg",
+   "series": [
+    "20260828_a1644u1.jpg",
+    "20260828_a1644en.jpg",
+    "20260828_a1644d2.jpg",
+    "20260828_l1649u1.jpg",
+    "20260828_l1649en.jpg",
+    "20260828_l1649d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260828_a1644u1.jpg",
+     "d1 up",
+     "2026-08-28T16:44:00"
+    ],
+    [
+     "20260828_a1644en.jpg",
+     "Entrance",
+     "2026-08-28T16:44:16"
+    ],
+    [
+     "20260828_a1644d2.jpg",
+     "D2",
+     "2026-08-28T16:44:20"
+    ],
+    [
+     "20260828_l1649u1.jpg",
+     "d1 up",
+     "2026-08-28T16:49:00"
+    ],
+    [
+     "20260828_l1649en.jpg",
+     "Entrance",
+     "2026-08-28T16:49:47"
+    ],
+    [
+     "20260828_l1649d2.jpg",
+     "D2",
+     "2026-08-28T16:49:45"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-29",
+   "present": true,
+   "vehicle": "Grey Suzuki Swift hatchback",
+   "plate": "G 656719",
+   "visits": [
+    {
+     "arrive": "09:36",
+     "leave": "09:44"
+    },
+    {
+     "arrive": "10:18",
+     "leave": "10:22"
+    }
+   ],
+   "hours": 0.2,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Suzuki Swift 2022 grey, owner Sami Antoine Manassa (Haret Sakher). Match.",
+   "photo": "20260829_656719.jpg",
+   "series": [
+    "20260829_a0936en.jpg",
+    "20260829_a0936d2.jpg",
+    "20260829_l0944en.jpg",
+    "20260829_l0944d2.jpg",
+    "20260829_a1018en.jpg",
+    "20260829_a1018d2.jpg",
+    "20260829_l1022en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260829_a0936en.jpg",
+     "Entrance",
+     "2026-08-29T09:36:48"
+    ],
+    [
+     "20260829_a0936d2.jpg",
+     "D2",
+     "2026-08-29T09:36:50"
+    ],
+    [
+     "20260829_l0944en.jpg",
+     "Entrance",
+     "2026-08-29T09:44:39"
+    ],
+    [
+     "20260829_l0944d2.jpg",
+     "D2",
+     "2026-08-29T09:44:31"
+    ],
+    [
+     "20260829_a1018en.jpg",
+     "Entrance",
+     "2026-08-29T10:18:28"
+    ],
+    [
+     "20260829_a1018d2.jpg",
+     "D2",
+     "2026-08-29T10:18:30"
+    ],
+    [
+     "20260829_l1022en.jpg",
+     "Entrance",
+     "2026-08-29T10:22:51"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-31",
+   "present": true,
+   "vehicle": "Dark green-blue workers' sedan (Toyota Corona/Cressida type)",
+   "plate": "0338496",
+   "visits": [
+    {
+     "arrive": "06:23",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "daily crew drop-off/pick-up 06:20-06:35 and 17:30-18:20. Register: letter unreadable. O 338496 = navy Nissan Maxima 1996 (Ayad Kamal Khaddaj, Kfarhim); B = grey Mercedes 260E; G = black Chevrolet Epica. Camera saw a Toyota-type sedan, so no sure match. Other times: daily crew drop-off/pick-up 06:20-06:35 and 17:30-18:20",
+   "photo": "20260831_338496.jpg",
+   "series": [
+    "20260831_a0623u1.jpg",
+    "20260831_a0623en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260831_a0623u1.jpg",
+     "d1 up",
+     "2026-08-31T06:23:00"
+    ],
+    [
+     "20260831_a0623en.jpg",
+     "Entrance",
+     "2026-08-31T06:23:42"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-31",
+   "present": true,
+   "vehicle": "Black Jeep Grand Cherokee (likely Mario's)",
+   "plate": "G 388485",
+   "visits": [
+    {
+     "arrive": "10:15",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Jeep Grand Cherokee Laredo 2006 black, owner Lt. Mario Youssef Saliba. Your car. Other times: many Oct visits",
+   "photo": "20260831_388485.jpg",
+   "series": [
+    "20260831_a1015u1.jpg",
+    "20260831_a1015en.jpg",
+    "20260831_a1015d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260831_a1015u1.jpg",
+     "d1 up",
+     "2026-08-31T10:15:00"
+    ],
+    [
+     "20260831_a1015en.jpg",
+     "Entrance",
+     "2026-08-31T10:15:19"
+    ],
+    [
+     "20260831_a1015d2.jpg",
+     "D2",
+     "2026-08-31T10:15:31"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-02",
+   "present": true,
+   "vehicle": "Black Nissan Pathfinder (R52) SUV",
+   "plate": "B 799293",
+   "visits": [
+    {
+     "arrive": "12:59",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high (read front and rear on different days)",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Nissan Pathfinder 2014 black, owner Mario Youssef Saliba (Sin el Fil). Your car.",
+   "photo": "20260902_799293.jpg",
+   "series": [
+    "20260902_a1259u2.jpg",
+    "20260902_a1259u3.jpg",
+    "20260902_a1259o3.jpg",
+    "20260902_a1259en.jpg",
+    "20260902_a1259d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260902_a1259u2.jpg",
+     "D2 up",
+     "2026-09-02T12:59:00"
+    ],
+    [
+     "20260902_a1259u3.jpg",
+     "D3 up",
+     "2026-09-02T12:59:00"
+    ],
+    [
+     "20260902_a1259o3.jpg",
+     "U3 up",
+     "2026-09-02T12:59:00"
+    ],
+    [
+     "20260902_a1259en.jpg",
+     "Entrance",
+     "2026-09-02T12:59:08"
+    ],
+    [
+     "20260902_a1259d2.jpg",
+     "D2",
+     "2026-09-02T12:59:07"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-03",
+   "present": true,
+   "vehicle": "Dark-grey Kia Cerato sedan ('ELEGANCE'), red-band P plate",
+   "plate": "P 390124",
+   "visits": [
+    {
+     "arrive": "13:59",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high (earlier review read P390174; full-res frame shows 3901",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Kia Cerato 2013, owner Georges Youssef Matar (Raachine). Georges' car.",
+   "photo": "20260903_390124.jpg",
+   "series": [
+    "20260903_a1359u2.jpg",
+    "20260903_a1359u3.jpg",
+    "20260903_a1359o3.jpg",
+    "20260903_a1359en.jpg",
+    "20260903_a1359d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260903_a1359u2.jpg",
+     "D2 up",
+     "2026-09-03T13:59:00"
+    ],
+    [
+     "20260903_a1359u3.jpg",
+     "D3 up",
+     "2026-09-03T13:59:00"
+    ],
+    [
+     "20260903_a1359o3.jpg",
+     "U3 up",
+     "2026-09-03T13:59:00"
+    ],
+    [
+     "20260903_a1359en.jpg",
+     "Entrance",
+     "2026-09-03T13:59:00"
+    ],
+    [
+     "20260903_a1359d2.jpg",
+     "D2",
+     "2026-09-03T13:59:06"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-06",
+   "present": true,
+   "vehicle": "Silver Kia Picanto hatchback",
+   "plate": "B 792887",
+   "visits": [
+    {
+     "arrive": "18:34",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Sunday evening, man beside it. Register: Kia Picanto 2007 silver, owner Milad Chahid Farah (Rayfoun), since 19 Sep 2025.",
+   "photo": "20260906_792887.jpg",
+   "series": [
+    "20260906_a1834u1.jpg",
+    "20260906_a1834u2.jpg",
+    "20260906_a1834u3.jpg",
+    "20260906_a1834o3.jpg",
+    "20260906_a1834en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260906_a1834u1.jpg",
+     "d1 up",
+     "2026-09-06T18:34:00"
+    ],
+    [
+     "20260906_a1834u2.jpg",
+     "D2 up",
+     "2026-09-06T18:34:00"
+    ],
+    [
+     "20260906_a1834u3.jpg",
+     "D3 up",
+     "2026-09-06T18:34:00"
+    ],
+    [
+     "20260906_a1834o3.jpg",
+     "U3 up",
+     "2026-09-06T18:34:00"
+    ],
+    [
+     "20260906_a1834en.jpg",
+     "Entrance",
+     "2026-09-06T18:34:31"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-15",
+   "present": true,
+   "vehicle": "Old white Mercedes W124/W126 sedan",
+   "plate": "O 119519",
+   "visits": [
+    {
+     "arrive": "16:29",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "low-medium: 1195 medium, last 1-9 low (could be 8), letter i",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "boot open at Hitachi (D3 up, plate not visible. Register: no O 119519. G 119519 is a black Mercedes 500 SEL (Elias Michel Fahd, Achkout); colour does not match. Plate unresolved.",
+   "photo": "20260915_119519.jpg",
+   "series": [
+    "20260915_a1629u1.jpg",
+    "20260915_a1629u2.jpg",
+    "20260915_a1629u3.jpg",
+    "20260915_a1629o3.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260915_a1629u1.jpg",
+     "d1 up",
+     "2026-09-15T16:29:00"
+    ],
+    [
+     "20260915_a1629u2.jpg",
+     "D2 up",
+     "2026-09-15T16:29:00"
+    ],
+    [
+     "20260915_a1629u3.jpg",
+     "D3 up",
+     "2026-09-15T16:29:00"
+    ],
+    [
+     "20260915_a1629o3.jpg",
+     "U3 up",
+     "2026-09-15T16:29:00"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-18",
+   "present": true,
+   "vehicle": "Black Nissan Pathfinder (R52) SUV",
+   "plate": "B 799293",
+   "visits": [
+    {
+     "arrive": "17:16",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high (read front and rear on different days)",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Nissan Pathfinder 2014 black, owner Mario Youssef Saliba (Sin el Fil). Your car.",
+   "photo": "20260902_799293.jpg",
+   "series": [
+    "20260918_a1716u1.jpg",
+    "20260918_a1716u2.jpg",
+    "20260918_a1716u3.jpg",
+    "20260918_a1716o3.jpg",
+    "20260918_a1716en.jpg",
+    "20260918_a1716d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260918_a1716u1.jpg",
+     "d1 up",
+     "2026-09-18T17:16:00"
+    ],
+    [
+     "20260918_a1716u2.jpg",
+     "D2 up",
+     "2026-09-18T17:16:00"
+    ],
+    [
+     "20260918_a1716u3.jpg",
+     "D3 up",
+     "2026-09-18T17:16:00"
+    ],
+    [
+     "20260918_a1716o3.jpg",
+     "U3 up",
+     "2026-09-18T17:16:00"
+    ],
+    [
+     "20260918_a1716en.jpg",
+     "Entrance",
+     "2026-09-18T17:16:35"
+    ],
+    [
+     "20260918_a1716d2.jpg",
+     "D2",
+     "2026-09-18T17:16:41"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-22",
+   "present": true,
+   "vehicle": "Black Nissan Pathfinder (R52) SUV",
+   "plate": "B 799293",
+   "visits": [
+    {
+     "arrive": "15:50",
+     "leave": "16:45"
+    }
+   ],
+   "hours": 0.92,
+   "partial": false,
+   "confidence": "high (read front and rear on different days)",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Nissan Pathfinder 2014 black, owner Mario Youssef Saliba (Sin el Fil). Your car.",
+   "photo": "20260902_799293.jpg",
+   "series": [
+    "20260922_a1550u1.jpg",
+    "20260922_a1550u2.jpg",
+    "20260922_a1550u3.jpg",
+    "20260922_a1550o3.jpg",
+    "20260922_a1550en.jpg",
+    "20260922_a1550d2.jpg",
+    "20260922_l1645u1.jpg",
+    "20260922_l1645u2.jpg",
+    "20260922_l1645u3.jpg",
+    "20260922_l1645o3.jpg",
+    "20260922_l1645en.jpg",
+    "20260922_l1645d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260922_a1550u1.jpg",
+     "d1 up",
+     "2026-09-22T15:50:00"
+    ],
+    [
+     "20260922_a1550u2.jpg",
+     "D2 up",
+     "2026-09-22T15:50:00"
+    ],
+    [
+     "20260922_a1550u3.jpg",
+     "D3 up",
+     "2026-09-22T15:50:00"
+    ],
+    [
+     "20260922_a1550o3.jpg",
+     "U3 up",
+     "2026-09-22T15:50:00"
+    ],
+    [
+     "20260922_a1550en.jpg",
+     "Entrance",
+     "2026-09-22T15:50:56"
+    ],
+    [
+     "20260922_a1550d2.jpg",
+     "D2",
+     "2026-09-22T15:50:10"
+    ],
+    [
+     "20260922_l1645u1.jpg",
+     "d1 up",
+     "2026-09-22T16:45:00"
+    ],
+    [
+     "20260922_l1645u2.jpg",
+     "D2 up",
+     "2026-09-22T16:45:00"
+    ],
+    [
+     "20260922_l1645u3.jpg",
+     "D3 up",
+     "2026-09-22T16:45:00"
+    ],
+    [
+     "20260922_l1645o3.jpg",
+     "U3 up",
+     "2026-09-22T16:45:00"
+    ],
+    [
+     "20260922_l1645en.jpg",
+     "Entrance",
+     "2026-09-22T16:45:54"
+    ],
+    [
+     "20260922_l1645d2.jpg",
+     "D2",
+     "2026-09-22T16:45:12"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-23",
+   "present": true,
+   "vehicle": "Old white Mercedes W124/W126 sedan",
+   "plate": "O 119519",
+   "visits": [
+    {
+     "arrive": "12:03",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "low-medium: 1195 medium, last 1-9 low (could be 8), letter i",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "rear, unreadable. Register: no O 119519. G 119519 is a black Mercedes 500 SEL (Elias Michel Fahd, Achkout); colour does not match. Plate unresolved.",
+   "photo": "20260915_119519.jpg",
+   "series": [
+    "20260923_a1203u2.jpg",
+    "20260923_a1203u3.jpg",
+    "20260923_a1203o3.jpg",
+    "20260923_a1203en.jpg",
+    "20260923_a1203d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260923_a1203u2.jpg",
+     "D2 up",
+     "2026-09-23T12:03:00"
+    ],
+    [
+     "20260923_a1203u3.jpg",
+     "D3 up",
+     "2026-09-23T12:03:00"
+    ],
+    [
+     "20260923_a1203o3.jpg",
+     "U3 up",
+     "2026-09-23T12:03:00"
+    ],
+    [
+     "20260923_a1203en.jpg",
+     "Entrance",
+     "2026-09-23T12:03:59"
+    ],
+    [
+     "20260923_a1203d2.jpg",
+     "D2",
+     "2026-09-23T12:03:56"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-28",
+   "present": true,
+   "vehicle": "White Scania XT R360 8x4 tipper (red plate, hi-vis driver)",
+   "plate": "? ?52266",
+   "visits": [
+    {
+     "arrive": "09:12",
+     "leave": "09:34"
+    },
+    {
+     "arrive": "10:35",
+     "leave": "10:53"
+    }
+   ],
+   "hours": 0.67,
+   "partial": false,
+   "confidence": "low: 2266 medium, 5 low, first digit unreadable (looks like ",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate not fully readable; not looked up.",
+   "photo": "20260928_52266.jpg",
+   "series": [
+    "20260928_a0912u1.jpg",
+    "20260928_a0912u2.jpg",
+    "20260928_a0912u3.jpg",
+    "20260928_a0912o3.jpg",
+    "20260928_a0912en.jpg",
+    "20260928_a0912d2.jpg",
+    "20260928_l0934u1.jpg",
+    "20260928_l0934u2.jpg",
+    "20260928_l0934u3.jpg",
+    "20260928_l0934o3.jpg",
+    "20260928_l0934en.jpg",
+    "20260928_l0934d2.jpg",
+    "20260928_a1035u1.jpg",
+    "20260928_a1035u2.jpg",
+    "20260928_a1035u3.jpg",
+    "20260928_a1035o3.jpg",
+    "20260928_a1035en.jpg",
+    "20260928_a1035d2.jpg",
+    "20260928_l1053u1.jpg",
+    "20260928_l1053u2.jpg",
+    "20260928_l1053u3.jpg",
+    "20260928_l1053o3.jpg",
+    "20260928_l1053en.jpg",
+    "20260928_l1053d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260928_a0912u1.jpg",
+     "d1 up",
+     "2026-09-28T09:12:00"
+    ],
+    [
+     "20260928_a0912u2.jpg",
+     "D2 up",
+     "2026-09-28T09:12:00"
+    ],
+    [
+     "20260928_a0912u3.jpg",
+     "D3 up",
+     "2026-09-28T09:12:00"
+    ],
+    [
+     "20260928_a0912o3.jpg",
+     "U3 up",
+     "2026-09-28T09:12:00"
+    ],
+    [
+     "20260928_a0912en.jpg",
+     "Entrance",
+     "2026-09-28T09:12:54"
+    ],
+    [
+     "20260928_a0912d2.jpg",
+     "D2",
+     "2026-09-28T09:13:00"
+    ],
+    [
+     "20260928_l0934u1.jpg",
+     "d1 up",
+     "2026-09-28T09:34:00"
+    ],
+    [
+     "20260928_l0934u2.jpg",
+     "D2 up",
+     "2026-09-28T09:34:00"
+    ],
+    [
+     "20260928_l0934u3.jpg",
+     "D3 up",
+     "2026-09-28T09:34:00"
+    ],
+    [
+     "20260928_l0934o3.jpg",
+     "U3 up",
+     "2026-09-28T09:34:00"
+    ],
+    [
+     "20260928_l0934en.jpg",
+     "Entrance",
+     "2026-09-28T09:33:59"
+    ],
+    [
+     "20260928_l0934d2.jpg",
+     "D2",
+     "2026-09-28T09:33:44"
+    ],
+    [
+     "20260928_a1035u1.jpg",
+     "d1 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_a1035u2.jpg",
+     "D2 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_a1035u3.jpg",
+     "D3 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_a1035o3.jpg",
+     "U3 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_a1035en.jpg",
+     "Entrance",
+     "2026-09-28T10:35:10"
+    ],
+    [
+     "20260928_a1035d2.jpg",
+     "D2",
+     "2026-09-28T10:35:12"
+    ],
+    [
+     "20260928_l1053u1.jpg",
+     "d1 up",
+     "2026-09-28T10:53:00"
+    ],
+    [
+     "20260928_l1053u2.jpg",
+     "D2 up",
+     "2026-09-28T10:53:00"
+    ],
+    [
+     "20260928_l1053u3.jpg",
+     "D3 up",
+     "2026-09-28T10:53:00"
+    ],
+    [
+     "20260928_l1053o3.jpg",
+     "U3 up",
+     "2026-09-28T10:53:00"
+    ],
+    [
+     "20260928_l1053en.jpg",
+     "Entrance",
+     "2026-09-28T10:52:59"
+    ],
+    [
+     "20260928_l1053d2.jpg",
+     "D2",
+     "2026-09-28T10:52:49"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-28",
+   "present": true,
+   "vehicle": "Old white Mercedes W124/W126 sedan",
+   "plate": "O 119519",
+   "visits": [
+    {
+     "arrive": "09:36",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "low-medium: 1195 medium, last 1-9 low (could be 8), letter i",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: no O 119519. G 119519 is a black Mercedes 500 SEL (Elias Michel Fahd, Achkout); colour does not match. Plate unresolved.",
+   "photo": "20260915_119519.jpg",
+   "series": [
+    "20260928_a0936u1.jpg",
+    "20260928_a0936u2.jpg",
+    "20260928_a0936u3.jpg",
+    "20260928_a0936o3.jpg",
+    "20260928_a0936en.jpg",
+    "20260928_a0936d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260928_a0936u1.jpg",
+     "d1 up",
+     "2026-09-28T09:36:00"
+    ],
+    [
+     "20260928_a0936u2.jpg",
+     "D2 up",
+     "2026-09-28T09:36:00"
+    ],
+    [
+     "20260928_a0936u3.jpg",
+     "D3 up",
+     "2026-09-28T09:36:00"
+    ],
+    [
+     "20260928_a0936o3.jpg",
+     "U3 up",
+     "2026-09-28T09:36:00"
+    ],
+    [
+     "20260928_a0936en.jpg",
+     "Entrance",
+     "2026-09-28T09:36:01"
+    ],
+    [
+     "20260928_a0936d2.jpg",
+     "D2",
+     "2026-09-28T09:36:02"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-28",
+   "present": true,
+   "vehicle": "Silver/beige Nissan Altima sedan (roof sticker)",
+   "plate": "T 189027",
+   "visits": [
+    {
+     "arrive": "10:30",
+     "leave": "10:35"
+    }
+   ],
+   "hours": 0.08,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: T 189027 = Internal Security Forces (ISF) vehicle.",
+   "photo": "20260928_189027.jpg",
+   "series": [
+    "20260928_a1030u1.jpg",
+    "20260928_a1030u2.jpg",
+    "20260928_a1030u3.jpg",
+    "20260928_a1030o3.jpg",
+    "20260928_a1030en.jpg",
+    "20260928_a1030d2.jpg",
+    "20260928_l1035u1.jpg",
+    "20260928_l1035u2.jpg",
+    "20260928_l1035u3.jpg",
+    "20260928_l1035o3.jpg",
+    "20260928_l1035en.jpg",
+    "20260928_l1035d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260928_a1030u1.jpg",
+     "d1 up",
+     "2026-09-28T10:30:00"
+    ],
+    [
+     "20260928_a1030u2.jpg",
+     "D2 up",
+     "2026-09-28T10:30:00"
+    ],
+    [
+     "20260928_a1030u3.jpg",
+     "D3 up",
+     "2026-09-28T10:30:00"
+    ],
+    [
+     "20260928_a1030o3.jpg",
+     "U3 up",
+     "2026-09-28T10:30:00"
+    ],
+    [
+     "20260928_a1030en.jpg",
+     "Entrance",
+     "2026-09-28T10:30:02"
+    ],
+    [
+     "20260928_a1030d2.jpg",
+     "D2",
+     "2026-09-28T10:30:05"
+    ],
+    [
+     "20260928_l1035u1.jpg",
+     "d1 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_l1035u2.jpg",
+     "D2 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_l1035u3.jpg",
+     "D3 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_l1035o3.jpg",
+     "U3 up",
+     "2026-09-28T10:35:00"
+    ],
+    [
+     "20260928_l1035en.jpg",
+     "Entrance",
+     "2026-09-28T10:35:10"
+    ],
+    [
+     "20260928_l1035d2.jpg",
+     "D2",
+     "2026-09-28T10:35:12"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-28",
+   "present": true,
+   "vehicle": "Dark-grey Kia Cerato sedan ('ELEGANCE'), red-band P plate",
+   "plate": "P 390124",
+   "visits": [
+    {
+     "arrive": "14:34",
+     "leave": "14:38"
+    }
+   ],
+   "hours": 0.07,
+   "partial": false,
+   "confidence": "high (earlier review read P390174; full-res frame shows 3901",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Kia Cerato 2013, owner Georges Youssef Matar (Raachine). Georges' car.",
+   "photo": "20260903_390124.jpg",
+   "series": [
+    "20260928_a1434u1.jpg",
+    "20260928_a1434u2.jpg",
+    "20260928_a1434u3.jpg",
+    "20260928_a1434o3.jpg",
+    "20260928_a1434en.jpg",
+    "20260928_a1434d2.jpg",
+    "20260928_l1438u1.jpg",
+    "20260928_l1438u2.jpg",
+    "20260928_l1438u3.jpg",
+    "20260928_l1438o3.jpg",
+    "20260928_l1438en.jpg",
+    "20260928_l1438d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260928_a1434u1.jpg",
+     "d1 up",
+     "2026-09-28T14:34:00"
+    ],
+    [
+     "20260928_a1434u2.jpg",
+     "D2 up",
+     "2026-09-28T14:34:00"
+    ],
+    [
+     "20260928_a1434u3.jpg",
+     "D3 up",
+     "2026-09-28T14:34:00"
+    ],
+    [
+     "20260928_a1434o3.jpg",
+     "U3 up",
+     "2026-09-28T14:34:00"
+    ],
+    [
+     "20260928_a1434en.jpg",
+     "Entrance",
+     "2026-09-28T14:34:43"
+    ],
+    [
+     "20260928_a1434d2.jpg",
+     "D2",
+     "2026-09-28T14:34:45"
+    ],
+    [
+     "20260928_l1438u1.jpg",
+     "d1 up",
+     "2026-09-28T14:38:00"
+    ],
+    [
+     "20260928_l1438u2.jpg",
+     "D2 up",
+     "2026-09-28T14:38:00"
+    ],
+    [
+     "20260928_l1438u3.jpg",
+     "D3 up",
+     "2026-09-28T14:38:00"
+    ],
+    [
+     "20260928_l1438o3.jpg",
+     "U3 up",
+     "2026-09-28T14:38:00"
+    ],
+    [
+     "20260928_l1438en.jpg",
+     "Entrance",
+     "2026-09-28T14:38:21"
+    ],
+    [
+     "20260928_l1438d2.jpg",
+     "D2",
+     "2026-09-28T14:38:23"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-29",
+   "present": true,
+   "vehicle": "Old white Mercedes W124/W126 sedan",
+   "plate": "O 119519",
+   "visits": [
+    {
+     "arrive": "11:06",
+     "leave": "11:49"
+    }
+   ],
+   "hours": 0.72,
+   "partial": false,
+   "confidence": "low-medium: 1195 medium, last 1-9 low (could be 8), letter i",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: no O 119519. G 119519 is a black Mercedes 500 SEL (Elias Michel Fahd, Achkout); colour does not match. Plate unresolved.",
+   "photo": "20260915_119519.jpg",
+   "series": [
+    "20260929_a1106u2.jpg",
+    "20260929_a1106u3.jpg",
+    "20260929_a1106o3.jpg",
+    "20260929_a1106en.jpg",
+    "20260929_a1106d2.jpg",
+    "20260929_l1149u2.jpg",
+    "20260929_l1149u3.jpg",
+    "20260929_l1149o3.jpg",
+    "20260929_l1149en.jpg",
+    "20260929_l1149d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260929_a1106u2.jpg",
+     "D2 up",
+     "2026-09-29T11:06:00"
+    ],
+    [
+     "20260929_a1106u3.jpg",
+     "D3 up",
+     "2026-09-29T11:06:00"
+    ],
+    [
+     "20260929_a1106o3.jpg",
+     "U3 up",
+     "2026-09-29T11:06:00"
+    ],
+    [
+     "20260929_a1106en.jpg",
+     "Entrance",
+     "2026-09-29T11:06:10"
+    ],
+    [
+     "20260929_a1106d2.jpg",
+     "D2",
+     "2026-09-29T11:06:11"
+    ],
+    [
+     "20260929_l1149u2.jpg",
+     "D2 up",
+     "2026-09-29T11:49:00"
+    ],
+    [
+     "20260929_l1149u3.jpg",
+     "D3 up",
+     "2026-09-29T11:49:00"
+    ],
+    [
+     "20260929_l1149o3.jpg",
+     "U3 up",
+     "2026-09-29T11:49:00"
+    ],
+    [
+     "20260929_l1149en.jpg",
+     "Entrance",
+     "2026-09-29T11:49:47"
+    ],
+    [
+     "20260929_l1149d2.jpg",
+     "D2",
+     "2026-09-29T11:49:44"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-29",
+   "present": true,
+   "vehicle": "Dark-grey Kia Cerato sedan ('ELEGANCE'), red-band P plate",
+   "plate": "P 390124",
+   "visits": [
+    {
+     "arrive": "13:00",
+     "leave": "13:04"
+    }
+   ],
+   "hours": 0.07,
+   "partial": false,
+   "confidence": "high (earlier review read P390174; full-res frame shows 3901",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Kia Cerato 2013, owner Georges Youssef Matar (Raachine). Georges' car.",
+   "photo": "20260903_390124.jpg",
+   "series": [
+    "20260929_a1300u2.jpg",
+    "20260929_a1300u3.jpg",
+    "20260929_a1300o3.jpg",
+    "20260929_a1300en.jpg",
+    "20260929_a1300d2.jpg",
+    "20260929_l1304u2.jpg",
+    "20260929_l1304u3.jpg",
+    "20260929_l1304o3.jpg",
+    "20260929_l1304en.jpg",
+    "20260929_l1304d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260929_a1300u2.jpg",
+     "D2 up",
+     "2026-09-29T13:00:00"
+    ],
+    [
+     "20260929_a1300u3.jpg",
+     "D3 up",
+     "2026-09-29T13:00:00"
+    ],
+    [
+     "20260929_a1300o3.jpg",
+     "U3 up",
+     "2026-09-29T13:00:00"
+    ],
+    [
+     "20260929_a1300en.jpg",
+     "Entrance",
+     "2026-09-29T13:00:06"
+    ],
+    [
+     "20260929_a1300d2.jpg",
+     "D2",
+     "2026-09-29T13:00:10"
+    ],
+    [
+     "20260929_l1304u2.jpg",
+     "D2 up",
+     "2026-09-29T13:04:00"
+    ],
+    [
+     "20260929_l1304u3.jpg",
+     "D3 up",
+     "2026-09-29T13:04:00"
+    ],
+    [
+     "20260929_l1304o3.jpg",
+     "U3 up",
+     "2026-09-29T13:04:00"
+    ],
+    [
+     "20260929_l1304en.jpg",
+     "Entrance",
+     "2026-09-29T13:04:09"
+    ],
+    [
+     "20260929_l1304d2.jpg",
+     "D2",
+     "2026-09-29T13:03:51"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-30",
+   "present": true,
+   "vehicle": "White Astra 8x4 tipper 'mkanna/mhanna' (red plate)",
+   "plate": "M 362049",
+   "visits": [
+    {
+     "arrive": "10:26",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "digits 362049 high (same on 4 days); letter cut off / unread",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate letter M (read by Mario). Register: M 362049 = Mercedes 2636 tipper 1984, owner Michel Awad Awad (Bhersaf); camera sees an Astra, so the register entry may be out of date (P 362049 is a white 2020 Astra HD9 owned by S.A.D Lebanon Contracting).",
+   "photo": "20260930_362049.jpg",
+   "series": [
+    "20260930_a1026u2.jpg",
+    "20260930_a1026u3.jpg",
+    "20260930_a1026o3.jpg",
+    "20260930_a1026en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260930_a1026u2.jpg",
+     "D2 up",
+     "2026-09-30T10:26:00"
+    ],
+    [
+     "20260930_a1026u3.jpg",
+     "D3 up",
+     "2026-09-30T10:26:00"
+    ],
+    [
+     "20260930_a1026o3.jpg",
+     "U3 up",
+     "2026-09-30T10:26:00"
+    ],
+    [
+     "20260930_a1026en.jpg",
+     "Entrance",
+     "2026-09-30T10:26:08"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-30",
+   "present": true,
+   "vehicle": "Black Nissan Pathfinder (R52) SUV",
+   "plate": "B 799293",
+   "visits": [
+    {
+     "arrive": "15:58",
+     "leave": "17:43"
+    }
+   ],
+   "hours": 1.75,
+   "partial": false,
+   "confidence": "high (read front and rear on different days)",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Nissan Pathfinder 2014 black, owner Mario Youssef Saliba (Sin el Fil). Your car.",
+   "photo": "20260902_799293.jpg",
+   "series": [
+    "20260930_a1558u2.jpg",
+    "20260930_a1558u3.jpg",
+    "20260930_a1558o3.jpg",
+    "20260930_a1558en.jpg",
+    "20260930_a1558d2.jpg",
+    "20260930_l1743u2.jpg",
+    "20260930_l1743u3.jpg",
+    "20260930_l1743o3.jpg",
+    "20260930_l1743en.jpg",
+    "20260930_l1743d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260930_a1558u2.jpg",
+     "D2 up",
+     "2026-09-30T15:58:00"
+    ],
+    [
+     "20260930_a1558u3.jpg",
+     "D3 up",
+     "2026-09-30T15:58:00"
+    ],
+    [
+     "20260930_a1558o3.jpg",
+     "U3 up",
+     "2026-09-30T15:58:00"
+    ],
+    [
+     "20260930_a1558en.jpg",
+     "Entrance",
+     "2026-09-30T15:58:44"
+    ],
+    [
+     "20260930_a1558d2.jpg",
+     "D2",
+     "2026-09-30T15:58:49"
+    ],
+    [
+     "20260930_l1743u2.jpg",
+     "D2 up",
+     "2026-09-30T17:43:00"
+    ],
+    [
+     "20260930_l1743u3.jpg",
+     "D3 up",
+     "2026-09-30T17:43:00"
+    ],
+    [
+     "20260930_l1743o3.jpg",
+     "U3 up",
+     "2026-09-30T17:43:00"
+    ],
+    [
+     "20260930_l1743en.jpg",
+     "Entrance",
+     "2026-09-30T17:42:27"
+    ],
+    [
+     "20260930_l1743d2.jpg",
+     "D2",
+     "2026-09-30T17:43:49"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-01",
+   "present": true,
+   "vehicle": "White Hino 500 diesel tanker, 'Mhanna Petroleum'",
+   "plate": "M 364673",
+   "visits": [
+    {
+     "arrive": "07:17",
+     "leave": "07:28"
+    }
+   ],
+   "hours": 0.18,
+   "partial": false,
+   "confidence": "high for 364673; M high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Hino FD1J 2011, owner 588 Al Hilaliyeh Real Estate SAL (Saida). Match on make.",
+   "photo": "20261001_364673.jpg",
+   "series": [
+    "20261001_a0717u2.jpg",
+    "20261001_a0717u3.jpg",
+    "20261001_a0717o3.jpg",
+    "20261001_a0717en.jpg",
+    "20261001_a0717d2.jpg",
+    "20261001_l0728u2.jpg",
+    "20261001_l0728u3.jpg",
+    "20261001_l0728o3.jpg",
+    "20261001_l0728en.jpg",
+    "20261001_l0728d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261001_a0717u2.jpg",
+     "D2 up",
+     "2026-10-01T07:17:00"
+    ],
+    [
+     "20261001_a0717u3.jpg",
+     "D3 up",
+     "2026-10-01T07:17:00"
+    ],
+    [
+     "20261001_a0717o3.jpg",
+     "U3 up",
+     "2026-10-01T07:17:00"
+    ],
+    [
+     "20261001_a0717en.jpg",
+     "Entrance",
+     "2026-10-01T07:17:44"
+    ],
+    [
+     "20261001_a0717d2.jpg",
+     "D2",
+     "2026-10-01T07:17:43"
+    ],
+    [
+     "20261001_l0728u2.jpg",
+     "D2 up",
+     "2026-10-01T07:28:00"
+    ],
+    [
+     "20261001_l0728u3.jpg",
+     "D3 up",
+     "2026-10-01T07:28:00"
+    ],
+    [
+     "20261001_l0728o3.jpg",
+     "U3 up",
+     "2026-10-01T07:28:00"
+    ],
+    [
+     "20261001_l0728en.jpg",
+     "Entrance",
+     "2026-10-01T07:28:24"
+    ],
+    [
+     "20261001_l0728d2.jpg",
+     "D2",
+     "2026-10-01T07:28:06"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-01",
+   "present": true,
+   "vehicle": "Old white Mercedes W124/W126 sedan",
+   "plate": "O 119519",
+   "visits": [
+    {
+     "arrive": "09:26",
+     "leave": "10:02"
+    }
+   ],
+   "hours": 0.6,
+   "partial": false,
+   "confidence": "low-medium: 1195 medium, last 1-9 low (could be 8), letter i",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: no O 119519. G 119519 is a black Mercedes 500 SEL (Elias Michel Fahd, Achkout); colour does not match. Plate unresolved.",
+   "photo": "20260915_119519.jpg",
+   "series": [
+    "20261001_a0926u2.jpg",
+    "20261001_a0926u3.jpg",
+    "20261001_a0926o3.jpg",
+    "20261001_a0926en.jpg",
+    "20261001_a0926d2.jpg",
+    "20261001_l1002u2.jpg",
+    "20261001_l1002u3.jpg",
+    "20261001_l1002o3.jpg",
+    "20261001_l1002en.jpg",
+    "20261001_l1002d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261001_a0926u2.jpg",
+     "D2 up",
+     "2026-10-01T09:26:00"
+    ],
+    [
+     "20261001_a0926u3.jpg",
+     "D3 up",
+     "2026-10-01T09:26:00"
+    ],
+    [
+     "20261001_a0926o3.jpg",
+     "U3 up",
+     "2026-10-01T09:26:00"
+    ],
+    [
+     "20261001_a0926en.jpg",
+     "Entrance",
+     "2026-10-01T09:26:34"
+    ],
+    [
+     "20261001_a0926d2.jpg",
+     "D2",
+     "2026-10-01T09:26:32"
+    ],
+    [
+     "20261001_l1002u2.jpg",
+     "D2 up",
+     "2026-10-01T10:02:00"
+    ],
+    [
+     "20261001_l1002u3.jpg",
+     "D3 up",
+     "2026-10-01T10:02:00"
+    ],
+    [
+     "20261001_l1002o3.jpg",
+     "U3 up",
+     "2026-10-01T10:02:00"
+    ],
+    [
+     "20261001_l1002en.jpg",
+     "Entrance",
+     "2026-10-01T10:01:59"
+    ],
+    [
+     "20261001_l1002d2.jpg",
+     "D2",
+     "2026-10-01T10:01:52"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-03",
+   "present": true,
+   "vehicle": "White Astra 8x4 tipper 'mkanna/mhanna' (red plate)",
+   "plate": "M 362049",
+   "visits": [
+    {
+     "arrive": "10:44",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "digits 362049 high (same on 4 days); letter cut off / unread",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate letter M (read by Mario). Register: M 362049 = Mercedes 2636 tipper 1984, owner Michel Awad Awad (Bhersaf); camera sees an Astra, so the register entry may be out of date (P 362049 is a white 2020 Astra HD9 owned by S.A.D Lebanon Contracting).",
+   "photo": "20260930_362049.jpg",
+   "series": [
+    "20261003_a1044u1.jpg",
+    "20261003_a1044u2.jpg",
+    "20261003_a1044u3.jpg",
+    "20261003_a1044o3.jpg",
+    "20261003_a1044en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261003_a1044u1.jpg",
+     "d1 up",
+     "2026-10-03T10:44:00"
+    ],
+    [
+     "20261003_a1044u2.jpg",
+     "D2 up",
+     "2026-10-03T10:44:00"
+    ],
+    [
+     "20261003_a1044u3.jpg",
+     "D3 up",
+     "2026-10-03T10:44:00"
+    ],
+    [
+     "20261003_a1044o3.jpg",
+     "U3 up",
+     "2026-10-03T10:44:00"
+    ],
+    [
+     "20261003_a1044en.jpg",
+     "Entrance",
+     "2026-10-03T10:44:42"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-05",
+   "present": true,
+   "vehicle": "White Astra 8x4 tipper 'mkanna/mhanna' (red plate)",
+   "plate": "M 362049",
+   "visits": [
+    {
+     "arrive": "12:58",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "digits 362049 high (same on 4 days); letter cut off / unread",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate letter M (read by Mario). Register: M 362049 = Mercedes 2636 tipper 1984, owner Michel Awad Awad (Bhersaf); camera sees an Astra, so the register entry may be out of date (P 362049 is a white 2020 Astra HD9 owned by S.A.D Lebanon Contracting).",
+   "photo": "20260930_362049.jpg",
+   "series": [
+    "20261005_a1258u1.jpg",
+    "20261005_a1258u2.jpg",
+    "20261005_a1258u3.jpg",
+    "20261005_a1258o3.jpg",
+    "20261005_a1258en.jpg",
+    "20261005_a1258d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261005_a1258u1.jpg",
+     "d1 up",
+     "2026-10-05T12:58:00"
+    ],
+    [
+     "20261005_a1258u2.jpg",
+     "D2 up",
+     "2026-10-05T12:58:00"
+    ],
+    [
+     "20261005_a1258u3.jpg",
+     "D3 up",
+     "2026-10-05T12:58:00"
+    ],
+    [
+     "20261005_a1258o3.jpg",
+     "U3 up",
+     "2026-10-05T12:58:00"
+    ],
+    [
+     "20261005_a1258en.jpg",
+     "Entrance",
+     "2026-10-05T12:58:06"
+    ],
+    [
+     "20261005_a1258d2.jpg",
+     "D2",
+     "2026-10-05T12:58:06"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-05",
+   "present": true,
+   "vehicle": "White Hino 500 diesel tanker, 'Mhanna Petroleum'",
+   "plate": "M 364673",
+   "visits": [
+    {
+     "arrive": "14:37",
+     "leave": "14:48"
+    }
+   ],
+   "hours": 0.18,
+   "partial": false,
+   "confidence": "high for 364673; M high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Hino FD1J 2011, owner 588 Al Hilaliyeh Real Estate SAL (Saida). Match on make.",
+   "photo": "20261001_364673.jpg",
+   "series": [
+    "20261005_a1437u1.jpg",
+    "20261005_a1437u2.jpg",
+    "20261005_a1437u3.jpg",
+    "20261005_a1437o3.jpg",
+    "20261005_a1437en.jpg",
+    "20261005_a1437d2.jpg",
+    "20261005_l1448u1.jpg",
+    "20261005_l1448u2.jpg",
+    "20261005_l1448u3.jpg",
+    "20261005_l1448o3.jpg",
+    "20261005_l1448en.jpg",
+    "20261005_l1448d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261005_a1437u1.jpg",
+     "d1 up",
+     "2026-10-05T14:37:00"
+    ],
+    [
+     "20261005_a1437u2.jpg",
+     "D2 up",
+     "2026-10-05T14:37:00"
+    ],
+    [
+     "20261005_a1437u3.jpg",
+     "D3 up",
+     "2026-10-05T14:37:00"
+    ],
+    [
+     "20261005_a1437o3.jpg",
+     "U3 up",
+     "2026-10-05T14:37:00"
+    ],
+    [
+     "20261005_a1437en.jpg",
+     "Entrance",
+     "2026-10-05T14:37:00"
+    ],
+    [
+     "20261005_a1437d2.jpg",
+     "D2",
+     "2026-10-05T14:37:02"
+    ],
+    [
+     "20261005_l1448u1.jpg",
+     "d1 up",
+     "2026-10-05T14:48:00"
+    ],
+    [
+     "20261005_l1448u2.jpg",
+     "D2 up",
+     "2026-10-05T14:48:00"
+    ],
+    [
+     "20261005_l1448u3.jpg",
+     "D3 up",
+     "2026-10-05T14:48:00"
+    ],
+    [
+     "20261005_l1448o3.jpg",
+     "U3 up",
+     "2026-10-05T14:48:00"
+    ],
+    [
+     "20261005_l1448en.jpg",
+     "Entrance",
+     "2026-10-05T14:48:35"
+    ],
+    [
+     "20261005_l1448d2.jpg",
+     "D2",
+     "2026-10-05T14:48:32"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-06",
+   "present": true,
+   "vehicle": "Red 3-door hatchback (old Mazda 323 type)",
+   "plate": "S 145239",
+   "visits": [
+    {
+     "arrive": "07:12",
+     "leave": "07:29"
+    }
+   ],
+   "hours": 0.28,
+   "partial": false,
+   "confidence": "medium: S medium, 1452 medium-high, 3 medium, 9 medium (moti",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: S 145239 = red Nissan Bluebird 1989, owner Bassel Issam Zeidan (Semqaniyeh, Chouf). Colour matches, model does not (camera saw a 3-door hatchback), so the plate read may be off.",
+   "photo": "20261006_145239.jpg",
+   "series": [
+    "20261006_a0712u1.jpg",
+    "20261006_a0712u2.jpg",
+    "20261006_a0712u3.jpg",
+    "20261006_a0712o3.jpg",
+    "20261006_a0712en.jpg",
+    "20261006_a0712d2.jpg",
+    "20261006_l0729u1.jpg",
+    "20261006_l0729u2.jpg",
+    "20261006_l0729u3.jpg",
+    "20261006_l0729o3.jpg",
+    "20261006_l0729en.jpg",
+    "20261006_l0729d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261006_a0712u1.jpg",
+     "d1 up",
+     "2026-10-06T07:12:00"
+    ],
+    [
+     "20261006_a0712u2.jpg",
+     "D2 up",
+     "2026-10-06T07:12:00"
+    ],
+    [
+     "20261006_a0712u3.jpg",
+     "D3 up",
+     "2026-10-06T07:12:00"
+    ],
+    [
+     "20261006_a0712o3.jpg",
+     "U3 up",
+     "2026-10-06T07:12:00"
+    ],
+    [
+     "20261006_a0712en.jpg",
+     "Entrance",
+     "2026-10-06T07:12:53"
+    ],
+    [
+     "20261006_a0712d2.jpg",
+     "D2",
+     "2026-10-06T07:12:53"
+    ],
+    [
+     "20261006_l0729u1.jpg",
+     "d1 up",
+     "2026-10-06T07:29:00"
+    ],
+    [
+     "20261006_l0729u2.jpg",
+     "D2 up",
+     "2026-10-06T07:29:00"
+    ],
+    [
+     "20261006_l0729u3.jpg",
+     "D3 up",
+     "2026-10-06T07:29:00"
+    ],
+    [
+     "20261006_l0729o3.jpg",
+     "U3 up",
+     "2026-10-06T07:29:00"
+    ],
+    [
+     "20261006_l0729en.jpg",
+     "Entrance",
+     "2026-10-06T07:29:08"
+    ],
+    [
+     "20261006_l0729d2.jpg",
+     "D2",
+     "2026-10-06T07:29:12"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-06",
+   "present": true,
+   "vehicle": "White Astra 8x4 tipper 'mkanna/mhanna' (red plate)",
+   "plate": "M 362049",
+   "visits": [
+    {
+     "arrive": "10:35",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "digits 362049 high (same on 4 days); letter cut off / unread",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate letter M (read by Mario). Register: M 362049 = Mercedes 2636 tipper 1984, owner Michel Awad Awad (Bhersaf); camera sees an Astra, so the register entry may be out of date (P 362049 is a white 2020 Astra HD9 owned by S.A.D Lebanon Contracting).",
+   "photo": "20260930_362049.jpg",
+   "series": [
+    "20261006_a1035u1.jpg",
+    "20261006_a1035u2.jpg",
+    "20261006_a1035u3.jpg",
+    "20261006_a1035o3.jpg",
+    "20261006_a1035en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261006_a1035u1.jpg",
+     "d1 up",
+     "2026-10-06T10:35:00"
+    ],
+    [
+     "20261006_a1035u2.jpg",
+     "D2 up",
+     "2026-10-06T10:35:00"
+    ],
+    [
+     "20261006_a1035u3.jpg",
+     "D3 up",
+     "2026-10-06T10:35:00"
+    ],
+    [
+     "20261006_a1035o3.jpg",
+     "U3 up",
+     "2026-10-06T10:35:00"
+    ],
+    [
+     "20261006_a1035en.jpg",
+     "Entrance",
+     "2026-10-06T10:35:41"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-07",
+   "present": true,
+   "vehicle": "White Astra 8x4 tipper 'mkanna/mhanna' (red plate)",
+   "plate": "M 362049",
+   "visits": [
+    {
+     "arrive": "11:12",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "digits 362049 high (same on 4 days); letter cut off / unread",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate letter M (read by Mario). Register: M 362049 = Mercedes 2636 tipper 1984, owner Michel Awad Awad (Bhersaf); camera sees an Astra, so the register entry may be out of date (P 362049 is a white 2020 Astra HD9 owned by S.A.D Lebanon Contracting).",
+   "photo": "20260930_362049.jpg",
+   "series": [
+    "20261007_a1112u2.jpg",
+    "20261007_a1112u3.jpg",
+    "20261007_a1112o3.jpg",
+    "20261007_a1112en.jpg",
+    "20261007_a1112d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261007_a1112u2.jpg",
+     "D2 up",
+     "2026-10-07T11:12:00"
+    ],
+    [
+     "20261007_a1112u3.jpg",
+     "D3 up",
+     "2026-10-07T11:12:00"
+    ],
+    [
+     "20261007_a1112o3.jpg",
+     "U3 up",
+     "2026-10-07T11:12:00"
+    ],
+    [
+     "20261007_a1112en.jpg",
+     "Entrance",
+     "2026-10-07T11:12:15"
+    ],
+    [
+     "20261007_a1112d2.jpg",
+     "D2",
+     "2026-10-07T11:12:35"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-07",
+   "present": true,
+   "vehicle": "Silver Kia Picanto hatchback",
+   "plate": "B 792887",
+   "visits": [
+    {
+     "arrive": "17:37",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Kia Picanto 2007 silver, owner Milad Chahid Farah (Rayfoun), since 19 Sep 2025.",
+   "photo": "20260906_792887.jpg",
+   "series": [
+    "20261007_a1737u1.jpg",
+    "20261007_a1737u2.jpg",
+    "20261007_a1737u3.jpg",
+    "20261007_a1737o3.jpg",
+    "20261007_a1737en.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261007_a1737u1.jpg",
+     "d1 up",
+     "2026-10-07T17:37:00"
+    ],
+    [
+     "20261007_a1737u2.jpg",
+     "D2 up",
+     "2026-10-07T17:37:00"
+    ],
+    [
+     "20261007_a1737u3.jpg",
+     "D3 up",
+     "2026-10-07T17:37:00"
+    ],
+    [
+     "20261007_a1737o3.jpg",
+     "U3 up",
+     "2026-10-07T17:37:00"
+    ],
+    [
+     "20261007_a1737en.jpg",
+     "Entrance",
+     "2026-10-07T17:37:20"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-08",
+   "present": true,
+   "vehicle": "White Astra 8x4 tipper 'mkanna/mhanna' (red plate)",
+   "plate": "M 362049",
+   "visits": [
+    {
+     "arrive": "11:24",
+     "leave": "?"
+    },
+    {
+     "arrive": "13:34",
+     "leave": "?"
+    }
+   ],
+   "hours": null,
+   "partial": true,
+   "confidence": "digits 362049 high (same on 4 days); letter cut off / unread",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Plate letter M (read by Mario). Register: M 362049 = Mercedes 2636 tipper 1984, owner Michel Awad Awad (Bhersaf); camera sees an Astra, so the register entry may be out of date (P 362049 is a white 2020 Astra HD9 owned by S.A.D Lebanon Contracting).",
+   "photo": "20260930_362049.jpg",
+   "series": [
+    "20261008_a1124u1.jpg",
+    "20261008_a1124u2.jpg",
+    "20261008_a1124u3.jpg",
+    "20261008_a1124o3.jpg",
+    "20261008_a1124en.jpg",
+    "20261008_a1124d2.jpg",
+    "20261008_a1334u1.jpg",
+    "20261008_a1334u2.jpg",
+    "20261008_a1334u3.jpg",
+    "20261008_a1334o3.jpg",
+    "20261008_a1334en.jpg",
+    "20261008_a1334d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261008_a1124u1.jpg",
+     "d1 up",
+     "2026-10-08T11:24:00"
+    ],
+    [
+     "20261008_a1124u2.jpg",
+     "D2 up",
+     "2026-10-08T11:24:00"
+    ],
+    [
+     "20261008_a1124u3.jpg",
+     "D3 up",
+     "2026-10-08T11:24:00"
+    ],
+    [
+     "20261008_a1124o3.jpg",
+     "U3 up",
+     "2026-10-08T11:24:00"
+    ],
+    [
+     "20261008_a1124en.jpg",
+     "Entrance",
+     "2026-10-08T11:24:49"
+    ],
+    [
+     "20261008_a1124d2.jpg",
+     "D2",
+     "2026-10-08T11:24:54"
+    ],
+    [
+     "20261008_a1334u1.jpg",
+     "d1 up",
+     "2026-10-08T13:34:00"
+    ],
+    [
+     "20261008_a1334u2.jpg",
+     "D2 up",
+     "2026-10-08T13:34:00"
+    ],
+    [
+     "20261008_a1334u3.jpg",
+     "D3 up",
+     "2026-10-08T13:34:00"
+    ],
+    [
+     "20261008_a1334o3.jpg",
+     "U3 up",
+     "2026-10-08T13:34:00"
+    ],
+    [
+     "20261008_a1334en.jpg",
+     "Entrance",
+     "2026-10-08T13:34:35"
+    ],
+    [
+     "20261008_a1334d2.jpg",
+     "D2",
+     "2026-10-08T13:34:35"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-09",
+   "present": true,
+   "vehicle": "Black Range Rover Sport",
+   "plate": "B 778668",
+   "visits": [
+    {
+     "arrive": "14:28",
+     "leave": "14:29"
+    }
+   ],
+   "hours": 0.02,
+   "partial": false,
+   "confidence": "high",
+   "cameras": [
+    "Entrance"
+   ],
+   "notes": "Register: Range Rover Supercharged Dynamic 2018 black, owner Cendrella Joseph El Hayek (Zouk Mosbeh), since 11 Apr 2025.",
+   "photo": "20261009_778668.jpg",
+   "series": [
+    "20261009_a1428u1.jpg",
+    "20261009_a1428u2.jpg",
+    "20261009_a1428u3.jpg",
+    "20261009_a1428o3.jpg",
+    "20261009_a1428en.jpg",
+    "20261009_a1428d2.jpg",
+    "20261009_l1429u1.jpg",
+    "20261009_l1429u2.jpg",
+    "20261009_l1429u3.jpg",
+    "20261009_l1429o3.jpg",
+    "20261009_l1429en.jpg",
+    "20261009_l1429d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261009_a1428u1.jpg",
+     "d1 up",
+     "2026-10-09T14:28:00"
+    ],
+    [
+     "20261009_a1428u2.jpg",
+     "D2 up",
+     "2026-10-09T14:28:00"
+    ],
+    [
+     "20261009_a1428u3.jpg",
+     "D3 up",
+     "2026-10-09T14:28:00"
+    ],
+    [
+     "20261009_a1428o3.jpg",
+     "U3 up",
+     "2026-10-09T14:28:00"
+    ],
+    [
+     "20261009_a1428en.jpg",
+     "Entrance",
+     "2026-10-09T14:28:47"
+    ],
+    [
+     "20261009_a1428d2.jpg",
+     "D2",
+     "2026-10-09T14:28:55"
+    ],
+    [
+     "20261009_l1429u1.jpg",
+     "d1 up",
+     "2026-10-09T14:29:00"
+    ],
+    [
+     "20261009_l1429u2.jpg",
+     "D2 up",
+     "2026-10-09T14:29:00"
+    ],
+    [
+     "20261009_l1429u3.jpg",
+     "D3 up",
+     "2026-10-09T14:29:00"
+    ],
+    [
+     "20261009_l1429o3.jpg",
+     "U3 up",
+     "2026-10-09T14:29:00"
+    ],
+    [
+     "20261009_l1429en.jpg",
+     "Entrance",
+     "2026-10-09T14:29:01"
+    ],
+    [
+     "20261009_l1429d2.jpg",
+     "D2",
+     "2026-10-09T14:28:55"
+    ]
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "plate": "B 799293",
+   "car": "Black Nissan Pathfinder",
+   "owner": "Mario Youssef Saliba (Sin el Fil)",
+   "match": "yes",
+   "kind": "yours",
+   "seen": [
+    "2026-09-02",
+    "2026-09-18",
+    "2026-09-22",
+    "2026-09-30"
+   ],
+   "photo": "20260902_799293.jpg"
+  },
+  {
+   "plate": "G 388485",
+   "car": "Black Jeep Grand Cherokee",
+   "owner": "Lt. Mario Youssef Saliba",
+   "match": "yes",
+   "kind": "yours",
+   "seen": [
+    "2026-08-31"
+   ],
+   "photo": "20260831_388485.jpg"
+  },
+  {
+   "plate": "B 310944",
+   "car": "Silver BMW 318i",
+   "owner": "Milada Raef Matar – Mario Youssef Saliba",
+   "match": "yes",
+   "kind": "yours",
+   "seen": [],
+   "photo": "",
+   "tab": "bmw"
+  },
+  {
+   "plate": "M 293450",
+   "car": "Silver Toyota Tacoma 2007",
+   "owner": "Shift Group SARL (Sin el Fil)",
+   "match": "yes",
+   "kind": "yours",
+   "seen": [],
+   "photo": "",
+   "tab": "tacoma"
+  },
+  {
+   "plate": "B 483534",
+   "car": "Silver Toyota RAV4",
+   "owner": "Therese Georges Matar",
+   "match": "yes",
+   "kind": "team",
+   "seen": [],
+   "photo": "",
+   "tab": "georges"
+  },
+  {
+   "plate": "P 390124",
+   "car": "Dark-grey Kia Cerato 2013",
+   "owner": "Georges Youssef Matar (Raachine)",
+   "match": "yes",
+   "kind": "team",
+   "seen": [
+    "2026-09-03",
+    "2026-09-28",
+    "2026-09-29"
+   ],
+   "photo": "20260903_390124.jpg"
+  },
+  {
+   "plate": "M 397057 ?",
+   "car": "Grey Dodge Dakota (Anthony)",
+   "owner": "not found: the register lists a 1983 Renault R9 under M 397057; the camera read is unsure",
+   "match": "no",
+   "kind": "team",
+   "seen": [],
+   "photo": "",
+   "tab": "dodge"
+  },
+  {
+   "plate": "M 364673",
+   "car": "White Hino diesel tanker, \"Mhanna Petroleum\"",
+   "owner": "588 Al Hilaliyeh Real Estate SAL (Saida)",
+   "match": "yes",
+   "kind": "supplier",
+   "seen": [
+    "2026-10-01",
+    "2026-10-05"
+   ],
+   "photo": "20261001_364673.jpg"
+  },
+  {
+   "plate": "P 362049",
+   "car": "White Astra 8x4 tipper",
+   "owner": "S.A.D Lebanon Contracting & Trading SAL (Abou Mizan)",
+   "match": "yes",
+   "kind": "supplier",
+   "seen": [
+    "2026-09-30",
+    "2026-10-03",
+    "2026-10-05",
+    "2026-10-06",
+    "2026-10-07",
+    "2026-10-08"
+   ],
+   "photo": "20260930_362049.jpg"
+  },
+  {
+   "plate": "T 189027",
+   "car": "Silver Nissan Altima",
+   "owner": "Internal Security Forces (ISF)",
+   "match": "yes",
+   "kind": "visitor",
+   "seen": [
+    "2026-09-28"
+   ],
+   "photo": "20260928_189027.jpg"
+  },
+  {
+   "plate": "B 778668",
+   "car": "Black Range Rover Sport",
+   "owner": "Cendrella Joseph El Hayek (Zouk Mosbeh), since Apr 2025",
+   "match": "yes",
+   "kind": "visitor",
+   "seen": [
+    "2026-10-09"
+   ],
+   "photo": "20261009_778668.jpg"
+  },
+  {
+   "plate": "B 792887",
+   "car": "Silver Kia Picanto",
+   "owner": "Milad Chahid Farah (Rayfoun), since Sep 2025",
+   "match": "yes",
+   "kind": "visitor",
+   "seen": [
+    "2026-09-06",
+    "2026-10-07"
+   ],
+   "photo": "20260906_792887.jpg"
+  },
+  {
+   "plate": "G 656719",
+   "car": "Grey Suzuki Swift 2022",
+   "owner": "Sami Antoine Manassa (Haret Sakher)",
+   "match": "yes",
+   "kind": "visitor",
+   "seen": [
+    "2026-08-29"
+   ],
+   "photo": "20260829_656719.jpg"
+  },
+  {
+   "plate": "O 1625",
+   "car": "Dark Chevrolet Tahoe 2017",
+   "owner": "Antoine Khalil Char (Dahr el Souan)",
+   "match": "yes",
+   "kind": "visitor",
+   "seen": [
+    "2026-08-28"
+   ],
+   "photo": "20260828_1625.jpg"
+  },
+  {
+   "plate": "B 395000",
+   "car": "Audi A6",
+   "owner": "Michel Maroun Awad (Qornet Chehwan), 03/622402",
+   "match": "yes",
+   "kind": "visitor",
+   "seen": [
+    "2026-10-08"
+   ],
+   "photo": "",
+   "flagphoto": "20261008_02.jpg"
+  },
+  {
+   "plate": "S 145239",
+   "car": "Red 3-door hatchback",
+   "owner": "register: red Nissan Bluebird 1989, Bassel Issam Zeidan (Chouf) — model differs",
+   "match": "unsure",
+   "kind": "visitor",
+   "seen": [
+    "2026-10-06"
+   ],
+   "photo": "20261006_145239.jpg"
+  },
+  {
+   "plate": "O 119519 ?",
+   "car": "Old white Mercedes sedan",
+   "owner": "no O 119519; G 119519 is a black Mercedes 500 SEL — no match",
+   "match": "no",
+   "kind": "visitor",
+   "seen": [
+    "2026-09-15",
+    "2026-09-23",
+    "2026-09-28",
+    "2026-09-29",
+    "2026-10-01"
+   ],
+   "photo": "20260915_119519.jpg"
+  },
+  {
+   "plate": "? 338496",
+   "car": "Workers' dark sedan",
+   "owner": "letter unreadable; none of the register cars with this number is a Toyota-type sedan",
+   "match": "no",
+   "kind": "team",
+   "seen": [
+    "2026-08-31"
+   ],
+   "photo": "20260831_338496.jpg"
+  },
+  {
+   "plate": "? ?52266",
+   "car": "White Scania XT tipper",
+   "owner": "plate not fully readable",
+   "match": "—",
+   "kind": "supplier",
+   "seen": [
+    "2026-09-28"
+   ],
+   "photo": "20260928_52266.jpg"
+  },
+  {
+   "plate": "G/S 125842",
+   "car": "White Toyota Corolla",
+   "owner": "no match: G 125842 = silver Honda Accord 1982 (Nelly Boustany, Jeita); S 125842 = black BMW X5 2000 (Nabil Zarkat); no Corolla under 125842",
+   "match": "no",
+   "kind": "visitor",
+   "seen": [
+    "2026-08-28"
+   ],
+   "photo": "20260828_1284.jpg"
+  }
+ ]
+}

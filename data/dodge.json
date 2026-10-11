@@ -1,0 +1,5676 @@
+{
+ "updated": "2026-10-11",
+ "pending": "",
+ "plate": "red plate read as about M 397057 (medium confidence, stacked from 39 Entrance crops); the register lists M 397057 as a 1983 Renault R9, so at least one digit is probably wrong; no Dodge Dakota with a close number found",
+ "days": [
+  {
+   "date": "2026-08-03",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:40",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. D2 sees it come in with a bed of green cans; no exit seen. d1 up too hazy to pick out the Dodge.",
+   "photo": "20260803.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260803_a0740u1.jpg",
+    "20260803_a0740d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260803_a0740u1.jpg",
+     "d1 up",
+     "2026-08-03T07:40:00"
+    ],
+    [
+     "20260803_a0740d2.jpg",
+     "D2",
+     "2026-08-03T07:40:31"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-04",
+   "present": null,
+   "visits": [],
+   "hours": 0,
+   "confidence": "low",
+   "notes": "Not seen on D2 (only the RAV4 at 07:35). D2 is event-only, so absence is not proven.",
+   "photo": "",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-05",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:13",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In with cans 07:13 (D2). No exit seen. d1 up has no daytime footage.",
+   "photo": "20260805.jpg",
+   "cameras": [
+    "D2"
+   ],
+   "partial": true,
+   "series": [
+    "20260805_a0713d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260805_a0713d2.jpg",
+     "D2",
+     "2026-08-05T07:13:54"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-06",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:35",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "18:43",
+     "leave": "?",
+     "cans_in": "?",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?; cans in ? / out ?. In 07:35 with cans; an unseen exit, then back in AFTER HOURS 18:43 while cars gathered 18:37-18:52 (D2).",
+   "photo": "20260806.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260806_a0735d2.jpg",
+    "20260806_a1843u1.jpg",
+    "20260806_a1843d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260806_a0735d2.jpg",
+     "D2",
+     "2026-08-06T07:35:17"
+    ],
+    [
+     "20260806_a1843u1.jpg",
+     "d1 up",
+     "2026-08-06T18:43:00"
+    ],
+    [
+     "20260806_a1843d2.jpg",
+     "D2",
+     "2026-08-06T18:43:15"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-07",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:23",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 07:23 with cans (D2). No exit seen.",
+   "photo": "20260807.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260807_a0723u1.jpg",
+    "20260807_a0723d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260807_a0723u1.jpg",
+     "d1 up",
+     "2026-08-07T07:23:00"
+    ],
+    [
+     "20260807_a0723d2.jpg",
+     "D2",
+     "2026-08-07T07:23:11"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-08",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:02",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. Saturday. In 07:02 with cans (D2); tanker 15:21-15:36. d1 up no daytime footage.",
+   "photo": "20260808.jpg",
+   "cameras": [
+    "D2"
+   ],
+   "partial": true,
+   "series": [
+    "20260808_a0702d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260808_a0702d2.jpg",
+     "D2",
+     "2026-08-08T07:02:05"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-09",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "medium",
+   "notes": "Sunday. Only a black SUV on D2; nothing on d1 up.",
+   "photo": "",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-10",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:34",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 07:34 with cans (D2). No exit seen.",
+   "photo": "20260810.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260810_a0734u1.jpg",
+    "20260810_a0734d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260810_a0734u1.jpg",
+     "d1 up",
+     "2026-08-10T07:34:00"
+    ],
+    [
+     "20260810_a0734d2.jpg",
+     "D2",
+     "2026-08-10T07:34:25"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-11",
+   "present": null,
+   "visits": [],
+   "hours": 0,
+   "confidence": "none",
+   "notes": "No camera recorded this day (no D2 folder, no d1 up daytime, Entrance not installed).",
+   "photo": "",
+   "cameras": [],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-12",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:29",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 07:29 with cans (D2). d1 up checked every 15 min: too hazy/small to identify the Dodge.",
+   "photo": "20260812.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260812_a0729d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260812_a0729d2.jpg",
+     "D2",
+     "2026-08-12T07:29:47"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-13",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:50",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 07:50 with a full bed (D2). d1 up timeline checked: vehicles not identifiable.",
+   "photo": "20260813.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260813_a0750u1.jpg",
+    "20260813_a0750d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260813_a0750u1.jpg",
+     "d1 up",
+     "2026-08-13T07:50:00"
+    ],
+    [
+     "20260813_a0750d2.jpg",
+     "D2",
+     "2026-08-13T07:50:07"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-14",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:36",
+     "leave": "16:58",
+     "cans_in": "?",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 9.37,
+   "confidence": "medium",
+   "notes": "cans in ? / out full. In 07:36; leaves 16:58 with the bed packed with cans (D2 clip tp00052).",
+   "photo": "20260814.jpg",
+   "cameras": [
+    "D2"
+   ],
+   "partial": false,
+   "series": [
+    "20260814_a0736d2.jpg",
+    "20260814_l1658d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260814_a0736d2.jpg",
+     "D2",
+     "2026-08-14T07:36:52"
+    ],
+    [
+     "20260814_l1658d2.jpg",
+     "D2",
+     "2026-08-14T16:58:45"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-15",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "medium",
+   "notes": "Saturday/holiday: only black SUVs on D2.",
+   "photo": "",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-16",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "medium",
+   "notes": "Sunday: nothing on D2 or d1 up.",
+   "photo": "",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-17",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:37",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "17:39",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?; cans in full / out ?. In 07:37; unseen exit; back AFTER HOURS 17:39 with cans and a spare wheel (D2). Tanker 16:07-16:25.",
+   "photo": "20260817.jpg",
+   "cameras": [
+    "D2"
+   ],
+   "partial": true,
+   "series": [
+    "20260817_a0737d2.jpg",
+    "20260817_a1739d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260817_a0737d2.jpg",
+     "D2",
+     "2026-08-17T07:37:19"
+    ],
+    [
+     "20260817_a1739d2.jpg",
+     "D2",
+     "2026-08-17T17:39:51"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-18",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:41",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "14:55",
+     "leave": "16:48",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?; cans in full / out ?. In 07:41; unseen exit; back 14:55 with cans; passes toward the gate 16:48 (probably the exit). D2 + partial d1 up.",
+   "photo": "20260818.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260818_a0741d2.jpg",
+    "20260818_a1455u1.jpg",
+    "20260818_a1455d2.jpg",
+    "20260818_l1648u1.jpg",
+    "20260818_l1648d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260818_a0741d2.jpg",
+     "D2",
+     "2026-08-18T07:41:27"
+    ],
+    [
+     "20260818_a1455u1.jpg",
+     "d1 up",
+     "2026-08-18T14:55:00"
+    ],
+    [
+     "20260818_a1455d2.jpg",
+     "D2",
+     "2026-08-18T14:55:02"
+    ],
+    [
+     "20260818_l1648u1.jpg",
+     "d1 up",
+     "2026-08-18T16:48:00"
+    ],
+    [
+     "20260818_l1648d2.jpg",
+     "D2",
+     "2026-08-18T16:48:24"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-19",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:41",
+     "leave": "14:23",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 6.7,
+   "confidence": "medium",
+   "notes": "cans in full / out full. In 07:41; at the parked Komatsu with ~15 cans 13:52-14:23, then leaves 14:23 (D2 clip tp00053).",
+   "photo": "20260819.jpg",
+   "cameras": [
+    "D2"
+   ],
+   "partial": false,
+   "series": [
+    "20260819_a0741d2.jpg",
+    "20260819_l1423d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260819_a0741d2.jpg",
+     "D2",
+     "2026-08-19T07:41:16"
+    ],
+    [
+     "20260819_l1423d2.jpg",
+     "D2",
+     "2026-08-19T14:23:48"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-20",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:44",
+     "leave": "15:52",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 8.13,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 07:44 with cans; 15:52 pass toward the camera = probably the exit (D2).",
+   "photo": "20260820.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260820_a0744d2.jpg",
+    "20260820_l1552u1.jpg",
+    "20260820_l1552d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260820_a0744d2.jpg",
+     "D2",
+     "2026-08-20T07:44:03"
+    ],
+    [
+     "20260820_l1552u1.jpg",
+     "d1 up",
+     "2026-08-20T15:52:00"
+    ],
+    [
+     "20260820_l1552d2.jpg",
+     "D2",
+     "2026-08-20T15:52:40"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-21",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:38",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "15:58",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?; cans in full / out ?. In 07:38; unseen exit; back 15:58 with cans (D2).",
+   "photo": "20260821.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260821_a0738d2.jpg",
+    "20260821_a1558u1.jpg",
+    "20260821_a1558d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260821_a0738d2.jpg",
+     "D2",
+     "2026-08-21T07:38:46"
+    ],
+    [
+     "20260821_a1558u1.jpg",
+     "d1 up",
+     "2026-08-21T15:58:00"
+    ],
+    [
+     "20260821_a1558d2.jpg",
+     "D2",
+     "2026-08-21T15:58:56"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-22",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:57",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "09:29",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "13:04",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?; cans in full / out ?; cans in full / out ?. Saturday. Three entries with cans (07:57, 09:29, 13:04 at lunch); exits not seen. Dark vehicle at the machines 12:21. Night vehicle at the Hitachi 23:18-23:23 (not identified). d1 up no daytime footage.",
+   "photo": "20260822.jpg",
+   "cameras": [
+    "D2"
+   ],
+   "partial": true,
+   "series": [
+    "20260822_a0757d2.jpg",
+    "20260822_a0929d2.jpg",
+    "20260822_a1304d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260822_a0757d2.jpg",
+     "D2",
+     "2026-08-22T07:57:10"
+    ],
+    [
+     "20260822_a0929d2.jpg",
+     "D2",
+     "2026-08-22T09:29:45"
+    ],
+    [
+     "20260822_a1304d2.jpg",
+     "D2",
+     "2026-08-22T13:04:21"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-23",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "10:16",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "medium",
+   "notes": "cans in full / out ?. SUNDAY. A dark car is up at the machines 09:45, then the Dodge comes in with cans 10:16:53 (D2, OSD-checked). d1 up has no footage before 10:05 and shows the machines idle after. Exit not seen.",
+   "photo": "20260823.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260823_f094547.jpg",
+    "20260823_f094555.jpg",
+    "20260823_a1016u1.jpg",
+    "20260823_a1016d2.jpg",
+    "20260823_f101654.jpg",
+    "20260823_f101703.jpg",
+    "20260823_u1025.jpg",
+    "20260823_u1045.jpg",
+    "20260823_u1105.jpg",
+    "20260823_u1125.jpg",
+    "20260823_u1145.jpg",
+    "20260823_u1205.jpg",
+    "20260823_u1225.jpg",
+    "20260823_u1245.jpg",
+    "20260823_u1305.jpg",
+    "20260823_u1325.jpg",
+    "20260823_u1345.jpg",
+    "20260823_u1405.jpg",
+    "20260823_u1425.jpg",
+    "20260823_u1445.jpg",
+    "20260823_u1505.jpg",
+    "20260823_u1525.jpg",
+    "20260823_u1545.jpg",
+    "20260823_u1605.jpg",
+    "20260823_u1625.jpg",
+    "20260823_u1645.jpg",
+    "20260823_u1705.jpg",
+    "20260823_u1725.jpg",
+    "20260823_u1745.jpg",
+    "20260823_f175627.jpg",
+    "20260823_f175634.jpg",
+    "20260823_u1805.jpg",
+    "20260823_u1825.jpg",
+    "20260823_f183120.jpg",
+    "20260823_f183208.jpg",
+    "20260823_u1845.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260823_f094547.jpg",
+     "D2",
+     "2026-08-23T09:45:47"
+    ],
+    [
+     "20260823_f094555.jpg",
+     "D2",
+     "2026-08-23T09:45:55"
+    ],
+    [
+     "20260823_a1016u1.jpg",
+     "d1 up",
+     "2026-08-23T10:16:00"
+    ],
+    [
+     "20260823_a1016d2.jpg",
+     "D2",
+     "2026-08-23T10:16:53"
+    ],
+    [
+     "20260823_f101654.jpg",
+     "D2",
+     "2026-08-23T10:16:54"
+    ],
+    [
+     "20260823_f101703.jpg",
+     "D2",
+     "2026-08-23T10:17:03"
+    ],
+    [
+     "20260823_u1025.jpg",
+     "d1 up",
+     "2026-08-23T10:25:00"
+    ],
+    [
+     "20260823_u1045.jpg",
+     "d1 up",
+     "2026-08-23T10:45:00"
+    ],
+    [
+     "20260823_u1105.jpg",
+     "d1 up",
+     "2026-08-23T11:05:00"
+    ],
+    [
+     "20260823_u1125.jpg",
+     "d1 up",
+     "2026-08-23T11:25:00"
+    ],
+    [
+     "20260823_u1145.jpg",
+     "d1 up",
+     "2026-08-23T11:45:00"
+    ],
+    [
+     "20260823_u1205.jpg",
+     "d1 up",
+     "2026-08-23T12:05:00"
+    ],
+    [
+     "20260823_u1225.jpg",
+     "d1 up",
+     "2026-08-23T12:25:00"
+    ],
+    [
+     "20260823_u1245.jpg",
+     "d1 up",
+     "2026-08-23T12:45:00"
+    ],
+    [
+     "20260823_u1305.jpg",
+     "d1 up",
+     "2026-08-23T13:05:00"
+    ],
+    [
+     "20260823_u1325.jpg",
+     "d1 up",
+     "2026-08-23T13:25:00"
+    ],
+    [
+     "20260823_u1345.jpg",
+     "d1 up",
+     "2026-08-23T13:45:00"
+    ],
+    [
+     "20260823_u1405.jpg",
+     "d1 up",
+     "2026-08-23T14:05:00"
+    ],
+    [
+     "20260823_u1425.jpg",
+     "d1 up",
+     "2026-08-23T14:25:00"
+    ],
+    [
+     "20260823_u1445.jpg",
+     "d1 up",
+     "2026-08-23T14:45:00"
+    ],
+    [
+     "20260823_u1505.jpg",
+     "d1 up",
+     "2026-08-23T15:05:00"
+    ],
+    [
+     "20260823_u1525.jpg",
+     "d1 up",
+     "2026-08-23T15:25:00"
+    ],
+    [
+     "20260823_u1545.jpg",
+     "d1 up",
+     "2026-08-23T15:45:00"
+    ],
+    [
+     "20260823_u1605.jpg",
+     "d1 up",
+     "2026-08-23T16:05:00"
+    ],
+    [
+     "20260823_u1625.jpg",
+     "d1 up",
+     "2026-08-23T16:25:00"
+    ],
+    [
+     "20260823_u1645.jpg",
+     "d1 up",
+     "2026-08-23T16:45:00"
+    ],
+    [
+     "20260823_u1705.jpg",
+     "d1 up",
+     "2026-08-23T17:05:00"
+    ],
+    [
+     "20260823_u1725.jpg",
+     "d1 up",
+     "2026-08-23T17:25:00"
+    ],
+    [
+     "20260823_u1745.jpg",
+     "d1 up",
+     "2026-08-23T17:45:00"
+    ],
+    [
+     "20260823_f175627.jpg",
+     "D2",
+     "2026-08-23T17:56:27"
+    ],
+    [
+     "20260823_f175634.jpg",
+     "D2",
+     "2026-08-23T17:56:34"
+    ],
+    [
+     "20260823_u1805.jpg",
+     "d1 up",
+     "2026-08-23T18:05:00"
+    ],
+    [
+     "20260823_u1825.jpg",
+     "d1 up",
+     "2026-08-23T18:25:00"
+    ],
+    [
+     "20260823_f183120.jpg",
+     "D2",
+     "2026-08-23T18:31:20"
+    ],
+    [
+     "20260823_f183208.jpg",
+     "D2",
+     "2026-08-23T18:32:08"
+    ],
+    [
+     "20260823_u1845.jpg",
+     "d1 up",
+     "2026-08-23T18:45:00"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-24",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:02",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 08:02 with cans (D2). No exit seen.",
+   "photo": "20260824.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260824_a0802u1.jpg",
+    "20260824_a0802d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260824_a0802u1.jpg",
+     "d1 up",
+     "2026-08-24T08:02:00"
+    ],
+    [
+     "20260824_a0802d2.jpg",
+     "D2",
+     "2026-08-24T08:02:49"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-25",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:30",
+     "leave": "08:06",
+     "cans_in": "?",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "09:16",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "14:46",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in ? / out ?; cans in full / out ?; cans in full / out ?. In 07:30, out 08:06, back 09:16 with cans, again in 14:46 with cans (unseen exit between). D2; d1 up shows a pickup by the Hitachi 09:24-09:57.",
+   "photo": "20260825.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260825_a0730u1.jpg",
+    "20260825_a0730d2.jpg",
+    "20260825_l0806u1.jpg",
+    "20260825_l0806d2.jpg",
+    "20260825_a0916u1.jpg",
+    "20260825_a0916d2.jpg",
+    "20260825_a1446u1.jpg",
+    "20260825_a1446d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260825_a0730u1.jpg",
+     "d1 up",
+     "2026-08-25T07:30:00"
+    ],
+    [
+     "20260825_a0730d2.jpg",
+     "D2",
+     "2026-08-25T07:30:18"
+    ],
+    [
+     "20260825_l0806u1.jpg",
+     "d1 up",
+     "2026-08-25T08:06:00"
+    ],
+    [
+     "20260825_l0806d2.jpg",
+     "D2",
+     "2026-08-25T08:06:22"
+    ],
+    [
+     "20260825_a0916u1.jpg",
+     "d1 up",
+     "2026-08-25T09:16:00"
+    ],
+    [
+     "20260825_a0916d2.jpg",
+     "D2",
+     "2026-08-25T09:16:34"
+    ],
+    [
+     "20260825_a1446u1.jpg",
+     "d1 up",
+     "2026-08-25T14:46:00"
+    ],
+    [
+     "20260825_a1446d2.jpg",
+     "D2",
+     "2026-08-25T14:46:16"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-26",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:44",
+     "leave": "?",
+     "cans_in": "?",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "08:39",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "14:46",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in ? / out ?; cans in full / out ?; cans in full / out ?. In 07:44; back 08:39 with cans and parked at the Komatsu until 10:27 with people at the bed; in again 14:46 with cans. d1 up no daytime footage.",
+   "photo": "20260826.jpg",
+   "cameras": [
+    "D2"
+   ],
+   "partial": true,
+   "series": [
+    "20260826_a0744d2.jpg",
+    "20260826_a0839d2.jpg",
+    "20260826_a1446d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260826_a0744d2.jpg",
+     "D2",
+     "2026-08-26T07:44:33"
+    ],
+    [
+     "20260826_a0839d2.jpg",
+     "D2",
+     "2026-08-26T08:39:27"
+    ],
+    [
+     "20260826_a1446d2.jpg",
+     "D2",
+     "2026-08-26T14:46:49"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-27",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "06:55",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 06:55 with cans (D2). d1 up: a dark pickup between the parked machines 13:30-14:09 (probably the Dodge).",
+   "photo": "20260827.jpg",
+   "cameras": [
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260827_a0655d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260827_a0655d2.jpg",
+     "D2",
+     "2026-08-27T06:55:20"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-28",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:03",
+     "leave": "?",
+     "cans_in": "?",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "14:06",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in ? / out ?; cans in full / out ?. In 08:03; seen again 14:06 near D2 with cans. Entrance only from 15:30 and shows no Dodge after.",
+   "photo": "20260828.jpg",
+   "cameras": [
+    "D2",
+    "d1 up",
+    "D1 Entrance"
+   ],
+   "partial": true,
+   "series": [
+    "20260828_a0803u1.jpg",
+    "20260828_a0803d2.jpg",
+    "20260828_a1406u1.jpg",
+    "20260828_a1406d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260828_a0803u1.jpg",
+     "d1 up",
+     "2026-08-28T08:03:00"
+    ],
+    [
+     "20260828_a0803d2.jpg",
+     "D2",
+     "2026-08-28T08:03:03"
+    ],
+    [
+     "20260828_a1406u1.jpg",
+     "d1 up",
+     "2026-08-28T14:06:00"
+    ],
+    [
+     "20260828_a1406d2.jpg",
+     "D2",
+     "2026-08-28T14:06:06"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-29",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:27",
+     "leave": "13:57",
+     "cans_in": "?",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 6.5,
+   "confidence": "high",
+   "notes": "cans in ? / out full. Saturday. Entrance + D2: in 07:27:33, out 13:57 reversing up the road with a full bed of green cans.",
+   "photo": "20260829.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2"
+   ],
+   "partial": false,
+   "series": [
+    "20260829_a0727en.jpg",
+    "20260829_a0727d2.jpg",
+    "20260829_l1357en.jpg",
+    "20260829_l1357d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260829_a0727en.jpg",
+     "Entrance",
+     "2026-08-29T07:27:25"
+    ],
+    [
+     "20260829_a0727d2.jpg",
+     "D2",
+     "2026-08-29T07:27:37"
+    ],
+    [
+     "20260829_l1357en.jpg",
+     "Entrance",
+     "2026-08-29T13:57:06"
+    ],
+    [
+     "20260829_l1357d2.jpg",
+     "D2",
+     "2026-08-29T13:57:10"
+    ]
+   ]
+  },
+  {
+   "date": "2026-08-30",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "high",
+   "notes": "Sunday. No Dodge on the Entrance or D2.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-08-31",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:37",
+     "leave": "12:39",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "13:08",
+     "leave": "17:14",
+     "cans_in": "?",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 9.13,
+   "confidence": "high",
+   "notes": "cans in full / out ?; cans in ? / out full. Entrance + D2 agree to the second: in 07:37, out 12:39 (lunch), back 13:08, out 17:14 with cans.",
+   "photo": "20260831.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260831_a0737u1.jpg",
+    "20260831_a0737en.jpg",
+    "20260831_a0737d2.jpg",
+    "20260831_l1239u1.jpg",
+    "20260831_l1239en.jpg",
+    "20260831_l1239d2.jpg",
+    "20260831_a1308u1.jpg",
+    "20260831_a1308en.jpg",
+    "20260831_a1308d2.jpg",
+    "20260831_l1714u1.jpg",
+    "20260831_l1714en.jpg",
+    "20260831_l1714d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260831_a0737u1.jpg",
+     "d1 up",
+     "2026-08-31T07:37:00"
+    ],
+    [
+     "20260831_a0737en.jpg",
+     "Entrance",
+     "2026-08-31T07:37:29"
+    ],
+    [
+     "20260831_a0737d2.jpg",
+     "D2",
+     "2026-08-31T07:37:36"
+    ],
+    [
+     "20260831_l1239u1.jpg",
+     "d1 up",
+     "2026-08-31T12:39:00"
+    ],
+    [
+     "20260831_l1239en.jpg",
+     "Entrance",
+     "2026-08-31T12:39:19"
+    ],
+    [
+     "20260831_l1239d2.jpg",
+     "D2",
+     "2026-08-31T12:39:17"
+    ],
+    [
+     "20260831_a1308u1.jpg",
+     "d1 up",
+     "2026-08-31T13:08:00"
+    ],
+    [
+     "20260831_a1308en.jpg",
+     "Entrance",
+     "2026-08-31T13:08:31"
+    ],
+    [
+     "20260831_a1308d2.jpg",
+     "D2",
+     "2026-08-31T13:08:33"
+    ],
+    [
+     "20260831_l1714u1.jpg",
+     "d1 up",
+     "2026-08-31T17:14:00"
+    ],
+    [
+     "20260831_l1714en.jpg",
+     "Entrance",
+     "2026-08-31T17:13:25"
+    ],
+    [
+     "20260831_l1714d2.jpg",
+     "D2",
+     "2026-08-31T17:14:52"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-01",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:57",
+     "leave": "17:38",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 9.68,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 07:57 with cans; OUT 17:38 with cans (Entrance + D2 at the same second; the offdays note calling 17:38 an entry is corrected).",
+   "photo": "20260901.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "U3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260901_a0757en.jpg",
+    "20260901_a0757d2.jpg",
+    "20260901_l1738u1.jpg",
+    "20260901_l1738o3.jpg",
+    "20260901_l1738en.jpg",
+    "20260901_l1738d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260901_a0757en.jpg",
+     "Entrance",
+     "2026-09-01T07:57:28"
+    ],
+    [
+     "20260901_a0757d2.jpg",
+     "D2",
+     "2026-09-01T07:57:33"
+    ],
+    [
+     "20260901_l1738u1.jpg",
+     "d1 up",
+     "2026-09-01T17:38:00"
+    ],
+    [
+     "20260901_l1738o3.jpg",
+     "U3 up",
+     "2026-09-01T17:38:00"
+    ],
+    [
+     "20260901_l1738en.jpg",
+     "Entrance",
+     "2026-09-01T17:38:22"
+    ],
+    [
+     "20260901_l1738d2.jpg",
+     "D2",
+     "2026-09-01T17:38:21"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-02",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:20",
+     "leave": "11:34",
+     "cans_in": "?",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "11:52",
+     "leave": "15:05",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 5.45,
+   "confidence": "high",
+   "notes": "cans in ? / out full; cans in full / out full. In 09:20, out 11:34 with cans, back 11:52 with cans, out 15:05. D3 up: against the idle Hitachi 09:23-11:29, parked near D3 12:10-15:04.",
+   "photo": "20260902.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "D2 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260902_a0920u2.jpg",
+    "20260902_a0920u3.jpg",
+    "20260902_a0920o3.jpg",
+    "20260902_a0920en.jpg",
+    "20260902_a0920d2.jpg",
+    "20260902_l1134u2.jpg",
+    "20260902_l1134u3.jpg",
+    "20260902_l1134o3.jpg",
+    "20260902_l1134en.jpg",
+    "20260902_l1134d2.jpg",
+    "20260902_a1152u2.jpg",
+    "20260902_a1152u3.jpg",
+    "20260902_a1152o3.jpg",
+    "20260902_a1152en.jpg",
+    "20260902_a1152d2.jpg",
+    "20260902_l1505u2.jpg",
+    "20260902_l1505u3.jpg",
+    "20260902_l1505o3.jpg",
+    "20260902_l1505en.jpg",
+    "20260902_l1505d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260902_a0920u2.jpg",
+     "D2 up",
+     "2026-09-02T09:20:00"
+    ],
+    [
+     "20260902_a0920u3.jpg",
+     "D3 up",
+     "2026-09-02T09:20:00"
+    ],
+    [
+     "20260902_a0920o3.jpg",
+     "U3 up",
+     "2026-09-02T09:20:00"
+    ],
+    [
+     "20260902_a0920en.jpg",
+     "Entrance",
+     "2026-09-02T09:20:13"
+    ],
+    [
+     "20260902_a0920d2.jpg",
+     "D2",
+     "2026-09-02T09:20:13"
+    ],
+    [
+     "20260902_l1134u2.jpg",
+     "D2 up",
+     "2026-09-02T11:34:00"
+    ],
+    [
+     "20260902_l1134u3.jpg",
+     "D3 up",
+     "2026-09-02T11:34:00"
+    ],
+    [
+     "20260902_l1134o3.jpg",
+     "U3 up",
+     "2026-09-02T11:34:00"
+    ],
+    [
+     "20260902_l1134en.jpg",
+     "Entrance",
+     "2026-09-02T11:34:12"
+    ],
+    [
+     "20260902_l1134d2.jpg",
+     "D2",
+     "2026-09-02T11:34:17"
+    ],
+    [
+     "20260902_a1152u2.jpg",
+     "D2 up",
+     "2026-09-02T11:52:00"
+    ],
+    [
+     "20260902_a1152u3.jpg",
+     "D3 up",
+     "2026-09-02T11:52:00"
+    ],
+    [
+     "20260902_a1152o3.jpg",
+     "U3 up",
+     "2026-09-02T11:52:00"
+    ],
+    [
+     "20260902_a1152en.jpg",
+     "Entrance",
+     "2026-09-02T11:52:46"
+    ],
+    [
+     "20260902_a1152d2.jpg",
+     "D2",
+     "2026-09-02T11:52:48"
+    ],
+    [
+     "20260902_l1505u2.jpg",
+     "D2 up",
+     "2026-09-02T15:05:00"
+    ],
+    [
+     "20260902_l1505u3.jpg",
+     "D3 up",
+     "2026-09-02T15:05:00"
+    ],
+    [
+     "20260902_l1505o3.jpg",
+     "U3 up",
+     "2026-09-02T15:05:00"
+    ],
+    [
+     "20260902_l1505en.jpg",
+     "Entrance",
+     "2026-09-02T15:05:49"
+    ],
+    [
+     "20260902_l1505d2.jpg",
+     "D2",
+     "2026-09-02T15:05:47"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-03",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:07",
+     "leave": "15:44",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 7.62,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 08:07 with cans; parked by D3 08:19-15:40; at the Komatsu 15:44 right after the tanker; leaves ~15:44 (Entrance).",
+   "photo": "20260903.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "D2 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260903_a0807u2.jpg",
+    "20260903_a0807u3.jpg",
+    "20260903_a0807o3.jpg",
+    "20260903_a0807en.jpg",
+    "20260903_a0807d2.jpg",
+    "20260903_l1544u2.jpg",
+    "20260903_l1544u3.jpg",
+    "20260903_l1544o3.jpg",
+    "20260903_l1544en.jpg",
+    "20260903_l1544d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260903_a0807u2.jpg",
+     "D2 up",
+     "2026-09-03T08:07:00"
+    ],
+    [
+     "20260903_a0807u3.jpg",
+     "D3 up",
+     "2026-09-03T08:07:00"
+    ],
+    [
+     "20260903_a0807o3.jpg",
+     "U3 up",
+     "2026-09-03T08:07:00"
+    ],
+    [
+     "20260903_a0807en.jpg",
+     "Entrance",
+     "2026-09-03T08:07:34"
+    ],
+    [
+     "20260903_a0807d2.jpg",
+     "D2",
+     "2026-09-03T08:07:37"
+    ],
+    [
+     "20260903_l1544u2.jpg",
+     "D2 up",
+     "2026-09-03T15:44:00"
+    ],
+    [
+     "20260903_l1544u3.jpg",
+     "D3 up",
+     "2026-09-03T15:44:00"
+    ],
+    [
+     "20260903_l1544o3.jpg",
+     "U3 up",
+     "2026-09-03T15:44:00"
+    ],
+    [
+     "20260903_l1544en.jpg",
+     "Entrance",
+     "2026-09-03T15:44:13"
+    ],
+    [
+     "20260903_l1544d2.jpg",
+     "D2",
+     "2026-09-03T15:44:12"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-04",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:17",
+     "leave": "16:11",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 6.9,
+   "confidence": "high",
+   "notes": "cans in full / out ?. In 09:17, out 16:11 (Entrance). D3 up: parked 09:39-16:09; at the Komatsu deck 09:22, at the can pile 09:56-10:25.",
+   "photo": "20260904.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "D2 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260904_a0917u2.jpg",
+    "20260904_a0917u3.jpg",
+    "20260904_a0917o3.jpg",
+    "20260904_a0917en.jpg",
+    "20260904_a0917d2.jpg",
+    "20260904_l1611u2.jpg",
+    "20260904_l1611u3.jpg",
+    "20260904_l1611o3.jpg",
+    "20260904_l1611en.jpg",
+    "20260904_l1611d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260904_a0917u2.jpg",
+     "D2 up",
+     "2026-09-04T09:17:00"
+    ],
+    [
+     "20260904_a0917u3.jpg",
+     "D3 up",
+     "2026-09-04T09:17:00"
+    ],
+    [
+     "20260904_a0917o3.jpg",
+     "U3 up",
+     "2026-09-04T09:17:00"
+    ],
+    [
+     "20260904_a0917en.jpg",
+     "Entrance",
+     "2026-09-04T09:17:08"
+    ],
+    [
+     "20260904_a0917d2.jpg",
+     "D2",
+     "2026-09-04T09:17:11"
+    ],
+    [
+     "20260904_l1611u2.jpg",
+     "D2 up",
+     "2026-09-04T16:11:00"
+    ],
+    [
+     "20260904_l1611u3.jpg",
+     "D3 up",
+     "2026-09-04T16:11:00"
+    ],
+    [
+     "20260904_l1611o3.jpg",
+     "U3 up",
+     "2026-09-04T16:11:00"
+    ],
+    [
+     "20260904_l1611en.jpg",
+     "Entrance",
+     "2026-09-04T16:11:00"
+    ],
+    [
+     "20260904_l1611d2.jpg",
+     "D2",
+     "2026-09-04T16:10:47"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-05",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:01",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "medium",
+   "notes": "cans in full / out ?. Saturday. In 08:01 with cans (Entrance + D2). D3: at the Komatsu 08:01-08:22, at it again at lunch 11:58-12:11, gone by 17:50. D2 12:56 Dodge passing toward the camera with cans = probably the exit.",
+   "photo": "20260905.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "D2 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260905_a0801u2.jpg",
+    "20260905_a0801u3.jpg",
+    "20260905_a0801o3.jpg",
+    "20260905_a0801en.jpg",
+    "20260905_a0801d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260905_a0801u2.jpg",
+     "D2 up",
+     "2026-09-05T08:01:00"
+    ],
+    [
+     "20260905_a0801u3.jpg",
+     "D3 up",
+     "2026-09-05T08:01:00"
+    ],
+    [
+     "20260905_a0801o3.jpg",
+     "U3 up",
+     "2026-09-05T08:01:00"
+    ],
+    [
+     "20260905_a0801en.jpg",
+     "Entrance",
+     "2026-09-05T08:01:19"
+    ],
+    [
+     "20260905_a0801d2.jpg",
+     "D2",
+     "2026-09-05T08:01:28"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-06",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "high",
+   "notes": "Sunday. No Dodge on D3/U3/Entrance.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-07",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:59",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "medium",
+   "notes": "cans in full / out ?. In 07:59 with cans (Entrance + D2). D3: at the Komatsu 08:01-08:13, in the yard 14:12; D2 14:29 Dodge passing with cans. Exit not resolved.",
+   "photo": "20260907.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260907_a0759u1.jpg",
+    "20260907_a0759u2.jpg",
+    "20260907_a0759u3.jpg",
+    "20260907_a0759o3.jpg",
+    "20260907_a0759en.jpg",
+    "20260907_a0759d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260907_a0759u1.jpg",
+     "d1 up",
+     "2026-09-07T07:59:00"
+    ],
+    [
+     "20260907_a0759u2.jpg",
+     "D2 up",
+     "2026-09-07T07:59:00"
+    ],
+    [
+     "20260907_a0759u3.jpg",
+     "D3 up",
+     "2026-09-07T07:59:00"
+    ],
+    [
+     "20260907_a0759o3.jpg",
+     "U3 up",
+     "2026-09-07T07:59:00"
+    ],
+    [
+     "20260907_a0759en.jpg",
+     "Entrance",
+     "2026-09-07T07:59:29"
+    ],
+    [
+     "20260907_a0759d2.jpg",
+     "D2",
+     "2026-09-07T07:59:30"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-08",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:59",
+     "leave": "08:50",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "11:55",
+     "leave": "12:02",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "13:09",
+     "leave": "15:43",
+     "cans_in": "?",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "16:31",
+     "leave": "17:03",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 4.07,
+   "confidence": "medium",
+   "notes": "cans in full / out ?; cans in full / out full; cans in ? / out ?; cans in full / out full. Many passes, all on D2 and Entrance (Entrance aimed at the pile, so direction is from D2): in 07:59, out 08:50, in 11:55, out 12:02, in 13:09, out 15:43, in 16:31, out 17:03-17:04 (after hours). D3: by the Hitachi/Komatsu 13:45-17:03.",
+   "photo": "20260908.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260908_a0759u1.jpg",
+    "20260908_a0759u2.jpg",
+    "20260908_a0759u3.jpg",
+    "20260908_a0759o3.jpg",
+    "20260908_a0759en.jpg",
+    "20260908_a0759d2.jpg",
+    "20260908_l0850u1.jpg",
+    "20260908_l0850u2.jpg",
+    "20260908_l0850u3.jpg",
+    "20260908_l0850o3.jpg",
+    "20260908_l0850en.jpg",
+    "20260908_l0850d2.jpg",
+    "20260908_a1155u1.jpg",
+    "20260908_a1155u2.jpg",
+    "20260908_a1155u3.jpg",
+    "20260908_a1155o3.jpg",
+    "20260908_a1155en.jpg",
+    "20260908_a1155d2.jpg",
+    "20260908_l1202u1.jpg",
+    "20260908_l1202u2.jpg",
+    "20260908_l1202u3.jpg",
+    "20260908_l1202o3.jpg",
+    "20260908_l1202en.jpg",
+    "20260908_l1202d2.jpg",
+    "20260908_a1309u1.jpg",
+    "20260908_a1309u2.jpg",
+    "20260908_a1309u3.jpg",
+    "20260908_a1309o3.jpg",
+    "20260908_a1309d2.jpg",
+    "20260908_l1543u1.jpg",
+    "20260908_l1543u2.jpg",
+    "20260908_l1543u3.jpg",
+    "20260908_l1543o3.jpg",
+    "20260908_l1543en.jpg",
+    "20260908_l1543d2.jpg",
+    "20260908_a1631u1.jpg",
+    "20260908_a1631u2.jpg",
+    "20260908_a1631u3.jpg",
+    "20260908_a1631o3.jpg",
+    "20260908_a1631en.jpg",
+    "20260908_a1631d2.jpg",
+    "20260908_l1703u1.jpg",
+    "20260908_l1703u2.jpg",
+    "20260908_l1703u3.jpg",
+    "20260908_l1703o3.jpg",
+    "20260908_l1703en.jpg",
+    "20260908_l1703d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260908_a0759u1.jpg",
+     "d1 up",
+     "2026-09-08T07:59:00"
+    ],
+    [
+     "20260908_a0759u2.jpg",
+     "D2 up",
+     "2026-09-08T07:59:00"
+    ],
+    [
+     "20260908_a0759u3.jpg",
+     "D3 up",
+     "2026-09-08T07:59:00"
+    ],
+    [
+     "20260908_a0759o3.jpg",
+     "U3 up",
+     "2026-09-08T07:59:00"
+    ],
+    [
+     "20260908_a0759en.jpg",
+     "Entrance",
+     "2026-09-08T07:59:36"
+    ],
+    [
+     "20260908_a0759d2.jpg",
+     "D2",
+     "2026-09-08T07:59:37"
+    ],
+    [
+     "20260908_l0850u1.jpg",
+     "d1 up",
+     "2026-09-08T08:50:00"
+    ],
+    [
+     "20260908_l0850u2.jpg",
+     "D2 up",
+     "2026-09-08T08:50:00"
+    ],
+    [
+     "20260908_l0850u3.jpg",
+     "D3 up",
+     "2026-09-08T08:50:00"
+    ],
+    [
+     "20260908_l0850o3.jpg",
+     "U3 up",
+     "2026-09-08T08:50:00"
+    ],
+    [
+     "20260908_l0850en.jpg",
+     "Entrance",
+     "2026-09-08T08:50:51"
+    ],
+    [
+     "20260908_l0850d2.jpg",
+     "D2",
+     "2026-09-08T08:50:51"
+    ],
+    [
+     "20260908_a1155u1.jpg",
+     "d1 up",
+     "2026-09-08T11:55:00"
+    ],
+    [
+     "20260908_a1155u2.jpg",
+     "D2 up",
+     "2026-09-08T11:55:00"
+    ],
+    [
+     "20260908_a1155u3.jpg",
+     "D3 up",
+     "2026-09-08T11:55:00"
+    ],
+    [
+     "20260908_a1155o3.jpg",
+     "U3 up",
+     "2026-09-08T11:55:00"
+    ],
+    [
+     "20260908_a1155en.jpg",
+     "Entrance",
+     "2026-09-08T11:55:33"
+    ],
+    [
+     "20260908_a1155d2.jpg",
+     "D2",
+     "2026-09-08T11:55:32"
+    ],
+    [
+     "20260908_l1202u1.jpg",
+     "d1 up",
+     "2026-09-08T12:02:00"
+    ],
+    [
+     "20260908_l1202u2.jpg",
+     "D2 up",
+     "2026-09-08T12:02:00"
+    ],
+    [
+     "20260908_l1202u3.jpg",
+     "D3 up",
+     "2026-09-08T12:02:00"
+    ],
+    [
+     "20260908_l1202o3.jpg",
+     "U3 up",
+     "2026-09-08T12:02:00"
+    ],
+    [
+     "20260908_l1202en.jpg",
+     "Entrance",
+     "2026-09-08T12:02:20"
+    ],
+    [
+     "20260908_l1202d2.jpg",
+     "D2",
+     "2026-09-08T12:02:19"
+    ],
+    [
+     "20260908_a1309u1.jpg",
+     "d1 up",
+     "2026-09-08T13:09:00"
+    ],
+    [
+     "20260908_a1309u2.jpg",
+     "D2 up",
+     "2026-09-08T13:09:00"
+    ],
+    [
+     "20260908_a1309u3.jpg",
+     "D3 up",
+     "2026-09-08T13:09:00"
+    ],
+    [
+     "20260908_a1309o3.jpg",
+     "U3 up",
+     "2026-09-08T13:09:00"
+    ],
+    [
+     "20260908_a1309d2.jpg",
+     "D2",
+     "2026-09-08T13:09:06"
+    ],
+    [
+     "20260908_l1543u1.jpg",
+     "d1 up",
+     "2026-09-08T15:43:00"
+    ],
+    [
+     "20260908_l1543u2.jpg",
+     "D2 up",
+     "2026-09-08T15:43:00"
+    ],
+    [
+     "20260908_l1543u3.jpg",
+     "D3 up",
+     "2026-09-08T15:43:00"
+    ],
+    [
+     "20260908_l1543o3.jpg",
+     "U3 up",
+     "2026-09-08T15:43:00"
+    ],
+    [
+     "20260908_l1543en.jpg",
+     "Entrance",
+     "2026-09-08T15:43:05"
+    ],
+    [
+     "20260908_l1543d2.jpg",
+     "D2",
+     "2026-09-08T15:43:09"
+    ],
+    [
+     "20260908_a1631u1.jpg",
+     "d1 up",
+     "2026-09-08T16:31:00"
+    ],
+    [
+     "20260908_a1631u2.jpg",
+     "D2 up",
+     "2026-09-08T16:31:00"
+    ],
+    [
+     "20260908_a1631u3.jpg",
+     "D3 up",
+     "2026-09-08T16:31:00"
+    ],
+    [
+     "20260908_a1631o3.jpg",
+     "U3 up",
+     "2026-09-08T16:31:00"
+    ],
+    [
+     "20260908_a1631en.jpg",
+     "Entrance",
+     "2026-09-08T16:31:48"
+    ],
+    [
+     "20260908_a1631d2.jpg",
+     "D2",
+     "2026-09-08T16:31:48"
+    ],
+    [
+     "20260908_l1703u1.jpg",
+     "d1 up",
+     "2026-09-08T17:03:00"
+    ],
+    [
+     "20260908_l1703u2.jpg",
+     "D2 up",
+     "2026-09-08T17:03:00"
+    ],
+    [
+     "20260908_l1703u3.jpg",
+     "D3 up",
+     "2026-09-08T17:03:00"
+    ],
+    [
+     "20260908_l1703o3.jpg",
+     "U3 up",
+     "2026-09-08T17:03:00"
+    ],
+    [
+     "20260908_l1703en.jpg",
+     "Entrance",
+     "2026-09-08T17:03:58"
+    ],
+    [
+     "20260908_l1703d2.jpg",
+     "D2",
+     "2026-09-08T17:03:53"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-09",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:41",
+     "leave": "15:40",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 5.98,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 09:41 with ~20 cans and a hose/pump coil; beside the Hitachi until 15:39; leaves 15:40 with the bed full (D2 + d1 up).",
+   "photo": "20260909.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "d1 up",
+    "D2 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260909_a0941u2.jpg",
+    "20260909_a0941u3.jpg",
+    "20260909_a0941o3.jpg",
+    "20260909_a0941en.jpg",
+    "20260909_a0941d2.jpg",
+    "20260909_l1540u1.jpg",
+    "20260909_l1540u2.jpg",
+    "20260909_l1540u3.jpg",
+    "20260909_l1540o3.jpg",
+    "20260909_l1540en.jpg",
+    "20260909_l1540d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260909_a0941u2.jpg",
+     "D2 up",
+     "2026-09-09T09:41:00"
+    ],
+    [
+     "20260909_a0941u3.jpg",
+     "D3 up",
+     "2026-09-09T09:41:00"
+    ],
+    [
+     "20260909_a0941o3.jpg",
+     "U3 up",
+     "2026-09-09T09:41:00"
+    ],
+    [
+     "20260909_a0941en.jpg",
+     "Entrance",
+     "2026-09-09T09:41:31"
+    ],
+    [
+     "20260909_a0941d2.jpg",
+     "D2",
+     "2026-09-09T09:41:29"
+    ],
+    [
+     "20260909_l1540u1.jpg",
+     "d1 up",
+     "2026-09-09T15:40:00"
+    ],
+    [
+     "20260909_l1540u2.jpg",
+     "D2 up",
+     "2026-09-09T15:40:00"
+    ],
+    [
+     "20260909_l1540u3.jpg",
+     "D3 up",
+     "2026-09-09T15:40:00"
+    ],
+    [
+     "20260909_l1540o3.jpg",
+     "U3 up",
+     "2026-09-09T15:40:00"
+    ],
+    [
+     "20260909_l1540en.jpg",
+     "Entrance",
+     "2026-09-09T15:40:00"
+    ],
+    [
+     "20260909_l1540d2.jpg",
+     "D2",
+     "2026-09-09T15:40:02"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-10",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:41",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "15:01",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "medium",
+   "notes": "cans in full / out ?; cans in full / out ?. In 07:41; unseen exit; back 15:01 with cans just after the Hitachi stopped (D2 + Entrance same second). Final exit not seen (Entrance aimed at the pile).",
+   "photo": "20260910.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260910_a0741u1.jpg",
+    "20260910_a0741u2.jpg",
+    "20260910_a0741u3.jpg",
+    "20260910_a0741o3.jpg",
+    "20260910_a0741en.jpg",
+    "20260910_a0741d2.jpg",
+    "20260910_a1501u2.jpg",
+    "20260910_a1501u3.jpg",
+    "20260910_a1501o3.jpg",
+    "20260910_a1501en.jpg",
+    "20260910_a1501d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260910_a0741u1.jpg",
+     "d1 up",
+     "2026-09-10T07:41:00"
+    ],
+    [
+     "20260910_a0741u2.jpg",
+     "D2 up",
+     "2026-09-10T07:41:00"
+    ],
+    [
+     "20260910_a0741u3.jpg",
+     "D3 up",
+     "2026-09-10T07:41:00"
+    ],
+    [
+     "20260910_a0741o3.jpg",
+     "U3 up",
+     "2026-09-10T07:41:00"
+    ],
+    [
+     "20260910_a0741en.jpg",
+     "Entrance",
+     "2026-09-10T07:41:14"
+    ],
+    [
+     "20260910_a0741d2.jpg",
+     "D2",
+     "2026-09-10T07:41:20"
+    ],
+    [
+     "20260910_a1501u2.jpg",
+     "D2 up",
+     "2026-09-10T15:01:00"
+    ],
+    [
+     "20260910_a1501u3.jpg",
+     "D3 up",
+     "2026-09-10T15:01:00"
+    ],
+    [
+     "20260910_a1501o3.jpg",
+     "U3 up",
+     "2026-09-10T15:01:00"
+    ],
+    [
+     "20260910_a1501en.jpg",
+     "Entrance",
+     "2026-09-10T15:01:53"
+    ],
+    [
+     "20260910_a1501d2.jpg",
+     "D2",
+     "2026-09-10T15:01:57"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-11",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:33",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "11:04",
+     "leave": "15:35",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "medium",
+   "notes": "cans in full / out ?; cans in full / out ?. In 09:33 with cans; unseen exit; in again 11:04; a pass by D2 13:07 (direction unclear); out 15:35, after the tanker visit 15:09-15:22.",
+   "photo": "20260911.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260911_a0933u2.jpg",
+    "20260911_a0933u3.jpg",
+    "20260911_a0933o3.jpg",
+    "20260911_a0933en.jpg",
+    "20260911_a0933d2.jpg",
+    "20260911_a1104u2.jpg",
+    "20260911_a1104u3.jpg",
+    "20260911_a1104o3.jpg",
+    "20260911_a1104en.jpg",
+    "20260911_a1104d2.jpg",
+    "20260911_l1535u1.jpg",
+    "20260911_l1535u2.jpg",
+    "20260911_l1535u3.jpg",
+    "20260911_l1535o3.jpg",
+    "20260911_l1535en.jpg",
+    "20260911_l1535d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260911_a0933u2.jpg",
+     "D2 up",
+     "2026-09-11T09:33:00"
+    ],
+    [
+     "20260911_a0933u3.jpg",
+     "D3 up",
+     "2026-09-11T09:33:00"
+    ],
+    [
+     "20260911_a0933o3.jpg",
+     "U3 up",
+     "2026-09-11T09:33:00"
+    ],
+    [
+     "20260911_a0933en.jpg",
+     "Entrance",
+     "2026-09-11T09:33:15"
+    ],
+    [
+     "20260911_a0933d2.jpg",
+     "D2",
+     "2026-09-11T09:33:14"
+    ],
+    [
+     "20260911_a1104u2.jpg",
+     "D2 up",
+     "2026-09-11T11:04:00"
+    ],
+    [
+     "20260911_a1104u3.jpg",
+     "D3 up",
+     "2026-09-11T11:04:00"
+    ],
+    [
+     "20260911_a1104o3.jpg",
+     "U3 up",
+     "2026-09-11T11:04:00"
+    ],
+    [
+     "20260911_a1104en.jpg",
+     "Entrance",
+     "2026-09-11T11:04:18"
+    ],
+    [
+     "20260911_a1104d2.jpg",
+     "D2",
+     "2026-09-11T11:04:19"
+    ],
+    [
+     "20260911_l1535u1.jpg",
+     "d1 up",
+     "2026-09-11T15:35:00"
+    ],
+    [
+     "20260911_l1535u2.jpg",
+     "D2 up",
+     "2026-09-11T15:35:00"
+    ],
+    [
+     "20260911_l1535u3.jpg",
+     "D3 up",
+     "2026-09-11T15:35:00"
+    ],
+    [
+     "20260911_l1535o3.jpg",
+     "U3 up",
+     "2026-09-11T15:35:00"
+    ],
+    [
+     "20260911_l1535en.jpg",
+     "Entrance",
+     "2026-09-11T15:35:16"
+    ],
+    [
+     "20260911_l1535d2.jpg",
+     "D2",
+     "2026-09-11T15:35:15"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-12",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:52",
+     "leave": "10:17",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "10:38",
+     "leave": "15:56",
+     "cans_in": "?",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 7.72,
+   "confidence": "medium",
+   "notes": "cans in full / out full; cans in ? / out ?. Saturday. In 07:52, out 10:17 with cans, back 10:38 and parked against the Hitachi with a man on its deck 10:42-11:12 (D3), out 15:56.",
+   "photo": "20260912.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260912_a0752u1.jpg",
+    "20260912_a0752u2.jpg",
+    "20260912_a0752u3.jpg",
+    "20260912_a0752o3.jpg",
+    "20260912_a0752en.jpg",
+    "20260912_a0752d2.jpg",
+    "20260912_l1017u1.jpg",
+    "20260912_l1017u2.jpg",
+    "20260912_l1017u3.jpg",
+    "20260912_l1017o3.jpg",
+    "20260912_l1017en.jpg",
+    "20260912_l1017d2.jpg",
+    "20260912_a1038u1.jpg",
+    "20260912_a1038u2.jpg",
+    "20260912_a1038u3.jpg",
+    "20260912_a1038o3.jpg",
+    "20260912_a1038en.jpg",
+    "20260912_a1038d2.jpg",
+    "20260912_l1556u1.jpg",
+    "20260912_l1556u2.jpg",
+    "20260912_l1556u3.jpg",
+    "20260912_l1556o3.jpg",
+    "20260912_l1556en.jpg",
+    "20260912_l1556d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260912_a0752u1.jpg",
+     "d1 up",
+     "2026-09-12T07:52:00"
+    ],
+    [
+     "20260912_a0752u2.jpg",
+     "D2 up",
+     "2026-09-12T07:52:00"
+    ],
+    [
+     "20260912_a0752u3.jpg",
+     "D3 up",
+     "2026-09-12T07:52:00"
+    ],
+    [
+     "20260912_a0752o3.jpg",
+     "U3 up",
+     "2026-09-12T07:52:00"
+    ],
+    [
+     "20260912_a0752en.jpg",
+     "Entrance",
+     "2026-09-12T07:53:00"
+    ],
+    [
+     "20260912_a0752d2.jpg",
+     "D2",
+     "2026-09-12T07:52:59"
+    ],
+    [
+     "20260912_l1017u1.jpg",
+     "d1 up",
+     "2026-09-12T10:17:00"
+    ],
+    [
+     "20260912_l1017u2.jpg",
+     "D2 up",
+     "2026-09-12T10:17:00"
+    ],
+    [
+     "20260912_l1017u3.jpg",
+     "D3 up",
+     "2026-09-12T10:17:00"
+    ],
+    [
+     "20260912_l1017o3.jpg",
+     "U3 up",
+     "2026-09-12T10:17:00"
+    ],
+    [
+     "20260912_l1017en.jpg",
+     "Entrance",
+     "2026-09-12T10:17:11"
+    ],
+    [
+     "20260912_l1017d2.jpg",
+     "D2",
+     "2026-09-12T10:17:17"
+    ],
+    [
+     "20260912_a1038u1.jpg",
+     "d1 up",
+     "2026-09-12T10:38:00"
+    ],
+    [
+     "20260912_a1038u2.jpg",
+     "D2 up",
+     "2026-09-12T10:38:00"
+    ],
+    [
+     "20260912_a1038u3.jpg",
+     "D3 up",
+     "2026-09-12T10:38:00"
+    ],
+    [
+     "20260912_a1038o3.jpg",
+     "U3 up",
+     "2026-09-12T10:38:00"
+    ],
+    [
+     "20260912_a1038en.jpg",
+     "Entrance",
+     "2026-09-12T10:38:02"
+    ],
+    [
+     "20260912_a1038d2.jpg",
+     "D2",
+     "2026-09-12T10:38:03"
+    ],
+    [
+     "20260912_l1556u1.jpg",
+     "d1 up",
+     "2026-09-12T15:56:00"
+    ],
+    [
+     "20260912_l1556u2.jpg",
+     "D2 up",
+     "2026-09-12T15:56:00"
+    ],
+    [
+     "20260912_l1556u3.jpg",
+     "D3 up",
+     "2026-09-12T15:56:00"
+    ],
+    [
+     "20260912_l1556o3.jpg",
+     "U3 up",
+     "2026-09-12T15:56:00"
+    ],
+    [
+     "20260912_l1556en.jpg",
+     "Entrance",
+     "2026-09-12T15:56:20"
+    ],
+    [
+     "20260912_l1556d2.jpg",
+     "D2",
+     "2026-09-12T15:56:17"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-13",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "high",
+   "notes": "Sunday. No Dodge on any camera.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "U3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-14",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:41",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "low",
+   "notes": "cans in full / out ?. In 07:41 with cans (D2 + Entrance). Exit not seen; Entrance aimed into the pit.",
+   "photo": "20260914.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260914_a0741u1.jpg",
+    "20260914_a0741u2.jpg",
+    "20260914_a0741u3.jpg",
+    "20260914_a0741o3.jpg",
+    "20260914_a0741en.jpg",
+    "20260914_a0741d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260914_a0741u1.jpg",
+     "d1 up",
+     "2026-09-14T07:41:00"
+    ],
+    [
+     "20260914_a0741u2.jpg",
+     "D2 up",
+     "2026-09-14T07:41:00"
+    ],
+    [
+     "20260914_a0741u3.jpg",
+     "D3 up",
+     "2026-09-14T07:41:00"
+    ],
+    [
+     "20260914_a0741o3.jpg",
+     "U3 up",
+     "2026-09-14T07:41:00"
+    ],
+    [
+     "20260914_a0741en.jpg",
+     "Entrance",
+     "2026-09-14T07:41:42"
+    ],
+    [
+     "20260914_a0741d2.jpg",
+     "D2",
+     "2026-09-14T07:41:43"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-15",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:51",
+     "leave": "17:23",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 9.53,
+   "confidence": "medium",
+   "notes": "cans in full / out ?. In 07:51 with cans; at the Hitachi with men after work 16:56-17:22 (D3); out 17:23 (D2).",
+   "photo": "20260915.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260915_a0751u1.jpg",
+    "20260915_a0751u2.jpg",
+    "20260915_a0751u3.jpg",
+    "20260915_a0751o3.jpg",
+    "20260915_a0751en.jpg",
+    "20260915_a0751d2.jpg",
+    "20260915_l1723u1.jpg",
+    "20260915_l1723u2.jpg",
+    "20260915_l1723u3.jpg",
+    "20260915_l1723o3.jpg",
+    "20260915_l1723en.jpg",
+    "20260915_l1723d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260915_a0751u1.jpg",
+     "d1 up",
+     "2026-09-15T07:51:00"
+    ],
+    [
+     "20260915_a0751u2.jpg",
+     "D2 up",
+     "2026-09-15T07:51:00"
+    ],
+    [
+     "20260915_a0751u3.jpg",
+     "D3 up",
+     "2026-09-15T07:51:00"
+    ],
+    [
+     "20260915_a0751o3.jpg",
+     "U3 up",
+     "2026-09-15T07:51:00"
+    ],
+    [
+     "20260915_a0751en.jpg",
+     "Entrance",
+     "2026-09-15T07:51:38"
+    ],
+    [
+     "20260915_a0751d2.jpg",
+     "D2",
+     "2026-09-15T07:51:39"
+    ],
+    [
+     "20260915_l1723u1.jpg",
+     "d1 up",
+     "2026-09-15T17:23:00"
+    ],
+    [
+     "20260915_l1723u2.jpg",
+     "D2 up",
+     "2026-09-15T17:23:00"
+    ],
+    [
+     "20260915_l1723u3.jpg",
+     "D3 up",
+     "2026-09-15T17:23:00"
+    ],
+    [
+     "20260915_l1723o3.jpg",
+     "U3 up",
+     "2026-09-15T17:23:00"
+    ],
+    [
+     "20260915_l1723en.jpg",
+     "Entrance",
+     "2026-09-15T17:23:31"
+    ],
+    [
+     "20260915_l1723d2.jpg",
+     "D2",
+     "2026-09-15T17:23:33"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-16",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:35",
+     "leave": "15:55",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 7.33,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 08:35 (D2 + Entrance); against the parked Hitachi 08:36-09:04, parked in the yard all day; leaves the yard 15:46 and the gate 15:55.",
+   "photo": "20260916.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260916_a0835u1.jpg",
+    "20260916_a0835u2.jpg",
+    "20260916_a0835u3.jpg",
+    "20260916_a0835o3.jpg",
+    "20260916_a0835en.jpg",
+    "20260916_a0835d2.jpg",
+    "20260916_l1555u1.jpg",
+    "20260916_l1555u2.jpg",
+    "20260916_l1555u3.jpg",
+    "20260916_l1555o3.jpg",
+    "20260916_l1555en.jpg",
+    "20260916_l1555d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260916_a0835u1.jpg",
+     "d1 up",
+     "2026-09-16T08:35:00"
+    ],
+    [
+     "20260916_a0835u2.jpg",
+     "D2 up",
+     "2026-09-16T08:35:00"
+    ],
+    [
+     "20260916_a0835u3.jpg",
+     "D3 up",
+     "2026-09-16T08:35:00"
+    ],
+    [
+     "20260916_a0835o3.jpg",
+     "U3 up",
+     "2026-09-16T08:35:00"
+    ],
+    [
+     "20260916_a0835en.jpg",
+     "Entrance",
+     "2026-09-16T08:35:17"
+    ],
+    [
+     "20260916_a0835d2.jpg",
+     "D2",
+     "2026-09-16T08:35:18"
+    ],
+    [
+     "20260916_l1555u1.jpg",
+     "d1 up",
+     "2026-09-16T15:55:00"
+    ],
+    [
+     "20260916_l1555u2.jpg",
+     "D2 up",
+     "2026-09-16T15:55:00"
+    ],
+    [
+     "20260916_l1555u3.jpg",
+     "D3 up",
+     "2026-09-16T15:55:00"
+    ],
+    [
+     "20260916_l1555o3.jpg",
+     "U3 up",
+     "2026-09-16T15:55:00"
+    ],
+    [
+     "20260916_l1555en.jpg",
+     "Entrance",
+     "2026-09-16T15:55:31"
+    ],
+    [
+     "20260916_l1555d2.jpg",
+     "D2",
+     "2026-09-16T15:54:05"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-17",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:31",
+     "leave": "10:33",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "15:49",
+     "leave": "17:16",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 3.48,
+   "confidence": "high",
+   "notes": "cans in full / out full; cans in full / out full. In 08:31, out 10:33 with cans, back 15:49 with cans after the tanker fuelled the Hitachi (14:47-14:58), men on the Hitachi deck, out 17:16 after hours.",
+   "photo": "20260917.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260917_a0831u1.jpg",
+    "20260917_a0831u2.jpg",
+    "20260917_a0831u3.jpg",
+    "20260917_a0831o3.jpg",
+    "20260917_a0831en.jpg",
+    "20260917_a0831d2.jpg",
+    "20260917_l1033u1.jpg",
+    "20260917_l1033u2.jpg",
+    "20260917_l1033u3.jpg",
+    "20260917_l1033o3.jpg",
+    "20260917_l1033en.jpg",
+    "20260917_l1033d2.jpg",
+    "20260917_a1549u1.jpg",
+    "20260917_a1549u2.jpg",
+    "20260917_a1549u3.jpg",
+    "20260917_a1549o3.jpg",
+    "20260917_a1549en.jpg",
+    "20260917_a1549d2.jpg",
+    "20260917_l1716u1.jpg",
+    "20260917_l1716u2.jpg",
+    "20260917_l1716u3.jpg",
+    "20260917_l1716o3.jpg",
+    "20260917_l1716en.jpg",
+    "20260917_l1716d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260917_a0831u1.jpg",
+     "d1 up",
+     "2026-09-17T08:31:00"
+    ],
+    [
+     "20260917_a0831u2.jpg",
+     "D2 up",
+     "2026-09-17T08:31:00"
+    ],
+    [
+     "20260917_a0831u3.jpg",
+     "D3 up",
+     "2026-09-17T08:31:00"
+    ],
+    [
+     "20260917_a0831o3.jpg",
+     "U3 up",
+     "2026-09-17T08:31:00"
+    ],
+    [
+     "20260917_a0831en.jpg",
+     "Entrance",
+     "2026-09-17T08:31:09"
+    ],
+    [
+     "20260917_a0831d2.jpg",
+     "D2",
+     "2026-09-17T08:31:11"
+    ],
+    [
+     "20260917_l1033u1.jpg",
+     "d1 up",
+     "2026-09-17T10:33:00"
+    ],
+    [
+     "20260917_l1033u2.jpg",
+     "D2 up",
+     "2026-09-17T10:33:00"
+    ],
+    [
+     "20260917_l1033u3.jpg",
+     "D3 up",
+     "2026-09-17T10:33:00"
+    ],
+    [
+     "20260917_l1033o3.jpg",
+     "U3 up",
+     "2026-09-17T10:33:00"
+    ],
+    [
+     "20260917_l1033en.jpg",
+     "Entrance",
+     "2026-09-17T10:33:03"
+    ],
+    [
+     "20260917_l1033d2.jpg",
+     "D2",
+     "2026-09-17T10:33:05"
+    ],
+    [
+     "20260917_a1549u1.jpg",
+     "d1 up",
+     "2026-09-17T15:49:00"
+    ],
+    [
+     "20260917_a1549u2.jpg",
+     "D2 up",
+     "2026-09-17T15:49:00"
+    ],
+    [
+     "20260917_a1549u3.jpg",
+     "D3 up",
+     "2026-09-17T15:49:00"
+    ],
+    [
+     "20260917_a1549o3.jpg",
+     "U3 up",
+     "2026-09-17T15:49:00"
+    ],
+    [
+     "20260917_a1549en.jpg",
+     "Entrance",
+     "2026-09-17T15:49:02"
+    ],
+    [
+     "20260917_a1549d2.jpg",
+     "D2",
+     "2026-09-17T15:49:10"
+    ],
+    [
+     "20260917_l1716u1.jpg",
+     "d1 up",
+     "2026-09-17T17:16:00"
+    ],
+    [
+     "20260917_l1716u2.jpg",
+     "D2 up",
+     "2026-09-17T17:16:00"
+    ],
+    [
+     "20260917_l1716u3.jpg",
+     "D3 up",
+     "2026-09-17T17:16:00"
+    ],
+    [
+     "20260917_l1716o3.jpg",
+     "U3 up",
+     "2026-09-17T17:16:00"
+    ],
+    [
+     "20260917_l1716en.jpg",
+     "Entrance",
+     "2026-09-17T17:16:22"
+    ],
+    [
+     "20260917_l1716d2.jpg",
+     "D2",
+     "2026-09-17T17:16:22"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-18",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:37",
+     "leave": "?",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": null,
+   "confidence": "medium",
+   "notes": "cans in full / out ?. In 07:37 (D2 + Entrance); Hitachi hood open with the Dodge alongside 07:37-07:44 (D2 up/D3). Rain; exit not seen.",
+   "photo": "20260918.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": true,
+   "series": [
+    "20260918_a0737u1.jpg",
+    "20260918_a0737u2.jpg",
+    "20260918_a0737u3.jpg",
+    "20260918_a0737o3.jpg",
+    "20260918_a0737en.jpg",
+    "20260918_a0737d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260918_a0737u1.jpg",
+     "d1 up",
+     "2026-09-18T07:37:00"
+    ],
+    [
+     "20260918_a0737u2.jpg",
+     "D2 up",
+     "2026-09-18T07:37:00"
+    ],
+    [
+     "20260918_a0737u3.jpg",
+     "D3 up",
+     "2026-09-18T07:37:00"
+    ],
+    [
+     "20260918_a0737o3.jpg",
+     "U3 up",
+     "2026-09-18T07:37:00"
+    ],
+    [
+     "20260918_a0737en.jpg",
+     "Entrance",
+     "2026-09-18T07:37:00"
+    ],
+    [
+     "20260918_a0737d2.jpg",
+     "D2",
+     "2026-09-18T07:36:57"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-19",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "medium",
+   "notes": "Saturday. Only cars/RAV4 on Entrance and D2.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-20",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "medium",
+   "notes": "Sunday. No Dodge on Entrance or D2.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-21",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:48",
+     "leave": "16:03",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 8.25,
+   "confidence": "high",
+   "notes": "cans in full / out ?. In 07:48 with cans; man at the bed beside the stopped Hitachi 15:20-15:41; at the Komatsu deck 15:41-16:03; out 16:03 (Entrance + D2).",
+   "photo": "20260921.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260921_a0748u2.jpg",
+    "20260921_a0748u3.jpg",
+    "20260921_a0748o3.jpg",
+    "20260921_a0748en.jpg",
+    "20260921_a0748d2.jpg",
+    "20260921_l1603u1.jpg",
+    "20260921_l1603u2.jpg",
+    "20260921_l1603u3.jpg",
+    "20260921_l1603o3.jpg",
+    "20260921_l1603en.jpg",
+    "20260921_l1603d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260921_a0748u2.jpg",
+     "D2 up",
+     "2026-09-21T07:48:00"
+    ],
+    [
+     "20260921_a0748u3.jpg",
+     "D3 up",
+     "2026-09-21T07:48:00"
+    ],
+    [
+     "20260921_a0748o3.jpg",
+     "U3 up",
+     "2026-09-21T07:48:00"
+    ],
+    [
+     "20260921_a0748en.jpg",
+     "Entrance",
+     "2026-09-21T07:48:38"
+    ],
+    [
+     "20260921_a0748d2.jpg",
+     "D2",
+     "2026-09-21T07:48:39"
+    ],
+    [
+     "20260921_l1603u1.jpg",
+     "d1 up",
+     "2026-09-21T16:03:00"
+    ],
+    [
+     "20260921_l1603u2.jpg",
+     "D2 up",
+     "2026-09-21T16:03:00"
+    ],
+    [
+     "20260921_l1603u3.jpg",
+     "D3 up",
+     "2026-09-21T16:03:00"
+    ],
+    [
+     "20260921_l1603o3.jpg",
+     "U3 up",
+     "2026-09-21T16:03:00"
+    ],
+    [
+     "20260921_l1603en.jpg",
+     "Entrance",
+     "2026-09-21T16:03:50"
+    ],
+    [
+     "20260921_l1603d2.jpg",
+     "D2",
+     "2026-09-21T16:03:50"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-22",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:41",
+     "leave": "16:47",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 9.1,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 07:41, out 16:47 with cans (Entrance + D2). Parked by the Komatsu 12:30-16:47 with people at the bed.",
+   "photo": "20260922.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260922_a0741u1.jpg",
+    "20260922_a0741u2.jpg",
+    "20260922_a0741u3.jpg",
+    "20260922_a0741o3.jpg",
+    "20260922_a0741en.jpg",
+    "20260922_a0741d2.jpg",
+    "20260922_l1647u1.jpg",
+    "20260922_l1647u2.jpg",
+    "20260922_l1647u3.jpg",
+    "20260922_l1647o3.jpg",
+    "20260922_l1647en.jpg",
+    "20260922_l1647d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260922_a0741u1.jpg",
+     "d1 up",
+     "2026-09-22T07:41:00"
+    ],
+    [
+     "20260922_a0741u2.jpg",
+     "D2 up",
+     "2026-09-22T07:41:00"
+    ],
+    [
+     "20260922_a0741u3.jpg",
+     "D3 up",
+     "2026-09-22T07:41:00"
+    ],
+    [
+     "20260922_a0741o3.jpg",
+     "U3 up",
+     "2026-09-22T07:41:00"
+    ],
+    [
+     "20260922_a0741en.jpg",
+     "Entrance",
+     "2026-09-22T07:41:25"
+    ],
+    [
+     "20260922_a0741d2.jpg",
+     "D2",
+     "2026-09-22T07:41:25"
+    ],
+    [
+     "20260922_l1647u1.jpg",
+     "d1 up",
+     "2026-09-22T16:47:00"
+    ],
+    [
+     "20260922_l1647u2.jpg",
+     "D2 up",
+     "2026-09-22T16:47:00"
+    ],
+    [
+     "20260922_l1647u3.jpg",
+     "D3 up",
+     "2026-09-22T16:47:00"
+    ],
+    [
+     "20260922_l1647o3.jpg",
+     "U3 up",
+     "2026-09-22T16:47:00"
+    ],
+    [
+     "20260922_l1647en.jpg",
+     "Entrance",
+     "2026-09-22T16:47:40"
+    ],
+    [
+     "20260922_l1647d2.jpg",
+     "D2",
+     "2026-09-22T16:47:36"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-23",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:43",
+     "leave": "09:47",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "09:59",
+     "leave": "16:33",
+     "cans_in": "?",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 8.63,
+   "confidence": "high",
+   "notes": "cans in full / out full; cans in ? / out full. In 07:43, out 09:47, back 09:59, out 16:33 (Entrance + D2).",
+   "photo": "20260923.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260923_a0743u2.jpg",
+    "20260923_a0743u3.jpg",
+    "20260923_a0743o3.jpg",
+    "20260923_a0743en.jpg",
+    "20260923_a0743d2.jpg",
+    "20260923_l0947u2.jpg",
+    "20260923_l0947u3.jpg",
+    "20260923_l0947o3.jpg",
+    "20260923_l0947en.jpg",
+    "20260923_l0947d2.jpg",
+    "20260923_a0959u2.jpg",
+    "20260923_a0959u3.jpg",
+    "20260923_a0959o3.jpg",
+    "20260923_a0959en.jpg",
+    "20260923_a0959d2.jpg",
+    "20260923_l1633u1.jpg",
+    "20260923_l1633u2.jpg",
+    "20260923_l1633u3.jpg",
+    "20260923_l1633o3.jpg",
+    "20260923_l1633en.jpg",
+    "20260923_l1633d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260923_a0743u2.jpg",
+     "D2 up",
+     "2026-09-23T07:43:00"
+    ],
+    [
+     "20260923_a0743u3.jpg",
+     "D3 up",
+     "2026-09-23T07:43:00"
+    ],
+    [
+     "20260923_a0743o3.jpg",
+     "U3 up",
+     "2026-09-23T07:43:00"
+    ],
+    [
+     "20260923_a0743en.jpg",
+     "Entrance",
+     "2026-09-23T07:43:16"
+    ],
+    [
+     "20260923_a0743d2.jpg",
+     "D2",
+     "2026-09-23T07:43:15"
+    ],
+    [
+     "20260923_l0947u2.jpg",
+     "D2 up",
+     "2026-09-23T09:47:00"
+    ],
+    [
+     "20260923_l0947u3.jpg",
+     "D3 up",
+     "2026-09-23T09:47:00"
+    ],
+    [
+     "20260923_l0947o3.jpg",
+     "U3 up",
+     "2026-09-23T09:47:00"
+    ],
+    [
+     "20260923_l0947en.jpg",
+     "Entrance",
+     "2026-09-23T09:47:55"
+    ],
+    [
+     "20260923_l0947d2.jpg",
+     "D2",
+     "2026-09-23T09:47:52"
+    ],
+    [
+     "20260923_a0959u2.jpg",
+     "D2 up",
+     "2026-09-23T09:59:00"
+    ],
+    [
+     "20260923_a0959u3.jpg",
+     "D3 up",
+     "2026-09-23T09:59:00"
+    ],
+    [
+     "20260923_a0959o3.jpg",
+     "U3 up",
+     "2026-09-23T09:59:00"
+    ],
+    [
+     "20260923_a0959en.jpg",
+     "Entrance",
+     "2026-09-23T09:59:46"
+    ],
+    [
+     "20260923_a0959d2.jpg",
+     "D2",
+     "2026-09-23T09:59:45"
+    ],
+    [
+     "20260923_l1633u1.jpg",
+     "d1 up",
+     "2026-09-23T16:33:00"
+    ],
+    [
+     "20260923_l1633u2.jpg",
+     "D2 up",
+     "2026-09-23T16:33:00"
+    ],
+    [
+     "20260923_l1633u3.jpg",
+     "D3 up",
+     "2026-09-23T16:33:00"
+    ],
+    [
+     "20260923_l1633o3.jpg",
+     "U3 up",
+     "2026-09-23T16:33:00"
+    ],
+    [
+     "20260923_l1633en.jpg",
+     "Entrance",
+     "2026-09-23T16:33:09"
+    ],
+    [
+     "20260923_l1633d2.jpg",
+     "D2",
+     "2026-09-23T16:33:07"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-24",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:24",
+     "leave": "12:14",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 4.83,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 07:24; Hitachi parked against it 08:10-08:52; out 12:14 with cans; no return on Entrance or D2.",
+   "photo": "20260924.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260924_a0724u1.jpg",
+    "20260924_a0724u2.jpg",
+    "20260924_a0724u3.jpg",
+    "20260924_a0724o3.jpg",
+    "20260924_a0724en.jpg",
+    "20260924_l1214u1.jpg",
+    "20260924_l1214u2.jpg",
+    "20260924_l1214u3.jpg",
+    "20260924_l1214o3.jpg",
+    "20260924_l1214en.jpg",
+    "20260924_l1214d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260924_a0724u1.jpg",
+     "d1 up",
+     "2026-09-24T07:24:00"
+    ],
+    [
+     "20260924_a0724u2.jpg",
+     "D2 up",
+     "2026-09-24T07:24:00"
+    ],
+    [
+     "20260924_a0724u3.jpg",
+     "D3 up",
+     "2026-09-24T07:24:00"
+    ],
+    [
+     "20260924_a0724o3.jpg",
+     "U3 up",
+     "2026-09-24T07:24:00"
+    ],
+    [
+     "20260924_a0724en.jpg",
+     "Entrance",
+     "2026-09-24T07:24:44"
+    ],
+    [
+     "20260924_l1214u1.jpg",
+     "d1 up",
+     "2026-09-24T12:14:00"
+    ],
+    [
+     "20260924_l1214u2.jpg",
+     "D2 up",
+     "2026-09-24T12:14:00"
+    ],
+    [
+     "20260924_l1214u3.jpg",
+     "D3 up",
+     "2026-09-24T12:14:00"
+    ],
+    [
+     "20260924_l1214o3.jpg",
+     "U3 up",
+     "2026-09-24T12:14:00"
+    ],
+    [
+     "20260924_l1214en.jpg",
+     "Entrance",
+     "2026-09-24T12:14:33"
+    ],
+    [
+     "20260924_l1214d2.jpg",
+     "D2",
+     "2026-09-24T12:14:34"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-25",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:22",
+     "leave": "08:19",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "08:32",
+     "leave": "08:45",
+     "cans_in": "?",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "08:56",
+     "leave": "09:16",
+     "cans_in": "?",
+     "cans_out": "?"
+    },
+    {
+     "arrive": "09:27",
+     "leave": "09:51",
+     "cans_in": "?",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "10:03",
+     "leave": "15:59",
+     "cans_in": "?",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 7.83,
+   "confidence": "high",
+   "notes": "cans in full / out full; cans in ? / out full; cans in ? / out ?; cans in ? / out full; cans in ? / out ?. Shuttle morning (Entrance frames): in 07:22, out 08:19, back ~08:32 (inferred from the 08:32 event, Dodge not in the keyframe), out 08:45, in 08:56, out 09:16, in 09:27, out 09:52, back ~10:03 (far vehicle), out 15:59. Five round trips 07:22-10:03 (in/out every 10-25 min), each with the bed of cans; then parked until 15:59; at the Hitachi with two men 15:48-15:59 (D3). Entrance + D2.",
+   "photo": "20260925.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260925_a0722u1.jpg",
+    "20260925_a0722u2.jpg",
+    "20260925_a0722u3.jpg",
+    "20260925_a0722o3.jpg",
+    "20260925_a0722en.jpg",
+    "20260925_a0722d2.jpg",
+    "20260925_l0819u1.jpg",
+    "20260925_l0819u2.jpg",
+    "20260925_l0819u3.jpg",
+    "20260925_l0819o3.jpg",
+    "20260925_l0819en.jpg",
+    "20260925_l0819d2.jpg",
+    "20260925_a0832u1.jpg",
+    "20260925_a0832u2.jpg",
+    "20260925_a0832u3.jpg",
+    "20260925_a0832o3.jpg",
+    "20260925_a0832en.jpg",
+    "20260925_a0832d2.jpg",
+    "20260925_l0845u1.jpg",
+    "20260925_l0845u2.jpg",
+    "20260925_l0845u3.jpg",
+    "20260925_l0845o3.jpg",
+    "20260925_l0845en.jpg",
+    "20260925_l0845d2.jpg",
+    "20260925_a0856u1.jpg",
+    "20260925_a0856u2.jpg",
+    "20260925_a0856u3.jpg",
+    "20260925_a0856o3.jpg",
+    "20260925_a0856en.jpg",
+    "20260925_a0856d2.jpg",
+    "20260925_l0916u1.jpg",
+    "20260925_l0916u2.jpg",
+    "20260925_l0916u3.jpg",
+    "20260925_l0916o3.jpg",
+    "20260925_l0916en.jpg",
+    "20260925_l0916d2.jpg",
+    "20260925_a0927u1.jpg",
+    "20260925_a0927u2.jpg",
+    "20260925_a0927u3.jpg",
+    "20260925_a0927o3.jpg",
+    "20260925_a0927en.jpg",
+    "20260925_a0927d2.jpg",
+    "20260925_l0951u1.jpg",
+    "20260925_l0951u2.jpg",
+    "20260925_l0951u3.jpg",
+    "20260925_l0951o3.jpg",
+    "20260925_l0951en.jpg",
+    "20260925_l0951d2.jpg",
+    "20260925_a1003u1.jpg",
+    "20260925_a1003u2.jpg",
+    "20260925_a1003u3.jpg",
+    "20260925_a1003o3.jpg",
+    "20260925_a1003en.jpg",
+    "20260925_a1003d2.jpg",
+    "20260925_l1559u1.jpg",
+    "20260925_l1559u2.jpg",
+    "20260925_l1559o3.jpg",
+    "20260925_l1559en.jpg",
+    "20260925_l1559d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260925_a0722u1.jpg",
+     "d1 up",
+     "2026-09-25T07:22:00"
+    ],
+    [
+     "20260925_a0722u2.jpg",
+     "D2 up",
+     "2026-09-25T07:22:00"
+    ],
+    [
+     "20260925_a0722u3.jpg",
+     "D3 up",
+     "2026-09-25T07:22:00"
+    ],
+    [
+     "20260925_a0722o3.jpg",
+     "U3 up",
+     "2026-09-25T07:22:00"
+    ],
+    [
+     "20260925_a0722en.jpg",
+     "Entrance",
+     "2026-09-25T07:22:48"
+    ],
+    [
+     "20260925_a0722d2.jpg",
+     "D2",
+     "2026-09-25T07:22:51"
+    ],
+    [
+     "20260925_l0819u1.jpg",
+     "d1 up",
+     "2026-09-25T08:19:00"
+    ],
+    [
+     "20260925_l0819u2.jpg",
+     "D2 up",
+     "2026-09-25T08:19:00"
+    ],
+    [
+     "20260925_l0819u3.jpg",
+     "D3 up",
+     "2026-09-25T08:19:00"
+    ],
+    [
+     "20260925_l0819o3.jpg",
+     "U3 up",
+     "2026-09-25T08:19:00"
+    ],
+    [
+     "20260925_l0819en.jpg",
+     "Entrance",
+     "2026-09-25T08:19:30"
+    ],
+    [
+     "20260925_l0819d2.jpg",
+     "D2",
+     "2026-09-25T08:19:28"
+    ],
+    [
+     "20260925_a0832u1.jpg",
+     "d1 up",
+     "2026-09-25T08:32:00"
+    ],
+    [
+     "20260925_a0832u2.jpg",
+     "D2 up",
+     "2026-09-25T08:32:00"
+    ],
+    [
+     "20260925_a0832u3.jpg",
+     "D3 up",
+     "2026-09-25T08:32:00"
+    ],
+    [
+     "20260925_a0832o3.jpg",
+     "U3 up",
+     "2026-09-25T08:32:00"
+    ],
+    [
+     "20260925_a0832en.jpg",
+     "Entrance",
+     "2026-09-25T08:32:33"
+    ],
+    [
+     "20260925_a0832d2.jpg",
+     "D2",
+     "2026-09-25T08:32:34"
+    ],
+    [
+     "20260925_l0845u1.jpg",
+     "d1 up",
+     "2026-09-25T08:45:00"
+    ],
+    [
+     "20260925_l0845u2.jpg",
+     "D2 up",
+     "2026-09-25T08:45:00"
+    ],
+    [
+     "20260925_l0845u3.jpg",
+     "D3 up",
+     "2026-09-25T08:45:00"
+    ],
+    [
+     "20260925_l0845o3.jpg",
+     "U3 up",
+     "2026-09-25T08:45:00"
+    ],
+    [
+     "20260925_l0845en.jpg",
+     "Entrance",
+     "2026-09-25T08:45:06"
+    ],
+    [
+     "20260925_l0845d2.jpg",
+     "D2",
+     "2026-09-25T08:45:04"
+    ],
+    [
+     "20260925_a0856u1.jpg",
+     "d1 up",
+     "2026-09-25T08:56:00"
+    ],
+    [
+     "20260925_a0856u2.jpg",
+     "D2 up",
+     "2026-09-25T08:56:00"
+    ],
+    [
+     "20260925_a0856u3.jpg",
+     "D3 up",
+     "2026-09-25T08:56:00"
+    ],
+    [
+     "20260925_a0856o3.jpg",
+     "U3 up",
+     "2026-09-25T08:56:00"
+    ],
+    [
+     "20260925_a0856en.jpg",
+     "Entrance",
+     "2026-09-25T08:55:49"
+    ],
+    [
+     "20260925_a0856d2.jpg",
+     "D2",
+     "2026-09-25T08:55:31"
+    ],
+    [
+     "20260925_l0916u1.jpg",
+     "d1 up",
+     "2026-09-25T09:16:00"
+    ],
+    [
+     "20260925_l0916u2.jpg",
+     "D2 up",
+     "2026-09-25T09:16:00"
+    ],
+    [
+     "20260925_l0916u3.jpg",
+     "D3 up",
+     "2026-09-25T09:16:00"
+    ],
+    [
+     "20260925_l0916o3.jpg",
+     "U3 up",
+     "2026-09-25T09:16:00"
+    ],
+    [
+     "20260925_l0916en.jpg",
+     "Entrance",
+     "2026-09-25T09:16:14"
+    ],
+    [
+     "20260925_l0916d2.jpg",
+     "D2",
+     "2026-09-25T09:16:12"
+    ],
+    [
+     "20260925_a0927u1.jpg",
+     "d1 up",
+     "2026-09-25T09:27:00"
+    ],
+    [
+     "20260925_a0927u2.jpg",
+     "D2 up",
+     "2026-09-25T09:27:00"
+    ],
+    [
+     "20260925_a0927u3.jpg",
+     "D3 up",
+     "2026-09-25T09:27:00"
+    ],
+    [
+     "20260925_a0927o3.jpg",
+     "U3 up",
+     "2026-09-25T09:27:00"
+    ],
+    [
+     "20260925_a0927en.jpg",
+     "Entrance",
+     "2026-09-25T09:27:01"
+    ],
+    [
+     "20260925_a0927d2.jpg",
+     "D2",
+     "2026-09-25T09:27:03"
+    ],
+    [
+     "20260925_l0951u1.jpg",
+     "d1 up",
+     "2026-09-25T09:51:00"
+    ],
+    [
+     "20260925_l0951u2.jpg",
+     "D2 up",
+     "2026-09-25T09:51:00"
+    ],
+    [
+     "20260925_l0951u3.jpg",
+     "D3 up",
+     "2026-09-25T09:51:00"
+    ],
+    [
+     "20260925_l0951o3.jpg",
+     "U3 up",
+     "2026-09-25T09:51:00"
+    ],
+    [
+     "20260925_l0951en.jpg",
+     "Entrance",
+     "2026-09-25T09:51:39"
+    ],
+    [
+     "20260925_l0951d2.jpg",
+     "D2",
+     "2026-09-25T09:51:44"
+    ],
+    [
+     "20260925_a1003u1.jpg",
+     "d1 up",
+     "2026-09-25T10:03:00"
+    ],
+    [
+     "20260925_a1003u2.jpg",
+     "D2 up",
+     "2026-09-25T10:03:00"
+    ],
+    [
+     "20260925_a1003u3.jpg",
+     "D3 up",
+     "2026-09-25T10:03:00"
+    ],
+    [
+     "20260925_a1003o3.jpg",
+     "U3 up",
+     "2026-09-25T10:03:00"
+    ],
+    [
+     "20260925_a1003en.jpg",
+     "Entrance",
+     "2026-09-25T10:03:15"
+    ],
+    [
+     "20260925_a1003d2.jpg",
+     "D2",
+     "2026-09-25T10:03:16"
+    ],
+    [
+     "20260925_l1559u1.jpg",
+     "d1 up",
+     "2026-09-25T15:59:00"
+    ],
+    [
+     "20260925_l1559u2.jpg",
+     "D2 up",
+     "2026-09-25T15:59:00"
+    ],
+    [
+     "20260925_l1559o3.jpg",
+     "U3 up",
+     "2026-09-25T15:59:00"
+    ],
+    [
+     "20260925_l1559en.jpg",
+     "Entrance",
+     "2026-09-25T15:59:18"
+    ],
+    [
+     "20260925_l1559d2.jpg",
+     "D2",
+     "2026-09-25T15:59:16"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-26",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "medium",
+   "notes": "Saturday. Only the crew sedan, trucks and a black Mercedes; no Dodge.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-27",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "medium",
+   "notes": "Sunday. Crew sedan only.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-09-28",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "09:02",
+     "leave": "16:07",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 7.08,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 09:02 with ~20 cans; against the Hitachi 09:02-09:20 (oil change per Anthony) and 09:39-10:30; lunch at the Komatsu 12:18-13:38; out 16:07.",
+   "photo": "20260928.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260928_a0902u1.jpg",
+    "20260928_a0902u2.jpg",
+    "20260928_a0902u3.jpg",
+    "20260928_a0902o3.jpg",
+    "20260928_a0902en.jpg",
+    "20260928_a0902d2.jpg",
+    "20260928_l1607u1.jpg",
+    "20260928_l1607u2.jpg",
+    "20260928_l1607u3.jpg",
+    "20260928_l1607o3.jpg",
+    "20260928_l1607en.jpg",
+    "20260928_l1607d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260928_a0902u1.jpg",
+     "d1 up",
+     "2026-09-28T09:02:00"
+    ],
+    [
+     "20260928_a0902u2.jpg",
+     "D2 up",
+     "2026-09-28T09:02:00"
+    ],
+    [
+     "20260928_a0902u3.jpg",
+     "D3 up",
+     "2026-09-28T09:02:00"
+    ],
+    [
+     "20260928_a0902o3.jpg",
+     "U3 up",
+     "2026-09-28T09:02:00"
+    ],
+    [
+     "20260928_a0902en.jpg",
+     "Entrance",
+     "2026-09-28T09:02:17"
+    ],
+    [
+     "20260928_a0902d2.jpg",
+     "D2",
+     "2026-09-28T09:02:34"
+    ],
+    [
+     "20260928_l1607u1.jpg",
+     "d1 up",
+     "2026-09-28T16:07:00"
+    ],
+    [
+     "20260928_l1607u2.jpg",
+     "D2 up",
+     "2026-09-28T16:07:00"
+    ],
+    [
+     "20260928_l1607u3.jpg",
+     "D3 up",
+     "2026-09-28T16:07:00"
+    ],
+    [
+     "20260928_l1607o3.jpg",
+     "U3 up",
+     "2026-09-28T16:07:00"
+    ],
+    [
+     "20260928_l1607en.jpg",
+     "Entrance",
+     "2026-09-28T16:07:23"
+    ],
+    [
+     "20260928_l1607d2.jpg",
+     "D2",
+     "2026-09-28T16:07:22"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-29",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:05",
+     "leave": "16:12",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 8.12,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 08:05; man on Hitachi and Komatsu decks, yellow can 08:05-08:25 (D3); out 16:12:37 (Entrance + D2 same second, bed full). The earlier note 'Dodge nose-in at the Hitachi 16:22' (combine1009) cannot be the Dodge: it had left 10 min before; the dark vehicle at the far end at 16:22 is unidentified.",
+   "photo": "20260929.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260929_a0805u2.jpg",
+    "20260929_a0805u3.jpg",
+    "20260929_a0805o3.jpg",
+    "20260929_a0805en.jpg",
+    "20260929_a0805d2.jpg",
+    "20260929_l1612u2.jpg",
+    "20260929_l1612u3.jpg",
+    "20260929_l1612o3.jpg",
+    "20260929_l1612en.jpg",
+    "20260929_l1612d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260929_a0805u2.jpg",
+     "D2 up",
+     "2026-09-29T08:05:00"
+    ],
+    [
+     "20260929_a0805u3.jpg",
+     "D3 up",
+     "2026-09-29T08:05:00"
+    ],
+    [
+     "20260929_a0805o3.jpg",
+     "U3 up",
+     "2026-09-29T08:05:00"
+    ],
+    [
+     "20260929_a0805en.jpg",
+     "Entrance",
+     "2026-09-29T08:05:49"
+    ],
+    [
+     "20260929_a0805d2.jpg",
+     "D2",
+     "2026-09-29T08:05:47"
+    ],
+    [
+     "20260929_l1612u2.jpg",
+     "D2 up",
+     "2026-09-29T16:12:00"
+    ],
+    [
+     "20260929_l1612u3.jpg",
+     "D3 up",
+     "2026-09-29T16:12:00"
+    ],
+    [
+     "20260929_l1612o3.jpg",
+     "U3 up",
+     "2026-09-29T16:12:00"
+    ],
+    [
+     "20260929_l1612en.jpg",
+     "Entrance",
+     "2026-09-29T16:12:30"
+    ],
+    [
+     "20260929_l1612d2.jpg",
+     "D2",
+     "2026-09-29T16:12:37"
+    ]
+   ]
+  },
+  {
+   "date": "2026-09-30",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:46",
+     "leave": "16:19",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "16:46",
+     "leave": "17:33",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 9.33,
+   "confidence": "high",
+   "notes": "cans in full / out full; cans in full / out full. In 07:46, out 16:19, back 16:46 with cans and a hose, beside the Hitachi after hours 17:02-17:21, out 17:33 with cans, roots and plywood.",
+   "photo": "20260930.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20260930_a0746u2.jpg",
+    "20260930_a0746u3.jpg",
+    "20260930_a0746o3.jpg",
+    "20260930_a0746en.jpg",
+    "20260930_a0746d2.jpg",
+    "20260930_l1619u2.jpg",
+    "20260930_l1619u3.jpg",
+    "20260930_l1619o3.jpg",
+    "20260930_l1619en.jpg",
+    "20260930_l1619d2.jpg",
+    "20260930_a1646u2.jpg",
+    "20260930_a1646u3.jpg",
+    "20260930_a1646o3.jpg",
+    "20260930_a1646en.jpg",
+    "20260930_a1646d2.jpg",
+    "20260930_l1733u2.jpg",
+    "20260930_l1733u3.jpg",
+    "20260930_l1733o3.jpg",
+    "20260930_l1733en.jpg",
+    "20260930_l1733d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20260930_a0746u2.jpg",
+     "D2 up",
+     "2026-09-30T07:46:00"
+    ],
+    [
+     "20260930_a0746u3.jpg",
+     "D3 up",
+     "2026-09-30T07:46:00"
+    ],
+    [
+     "20260930_a0746o3.jpg",
+     "U3 up",
+     "2026-09-30T07:46:00"
+    ],
+    [
+     "20260930_a0746en.jpg",
+     "Entrance",
+     "2026-09-30T07:46:32"
+    ],
+    [
+     "20260930_a0746d2.jpg",
+     "D2",
+     "2026-09-30T07:46:35"
+    ],
+    [
+     "20260930_l1619u2.jpg",
+     "D2 up",
+     "2026-09-30T16:19:00"
+    ],
+    [
+     "20260930_l1619u3.jpg",
+     "D3 up",
+     "2026-09-30T16:19:00"
+    ],
+    [
+     "20260930_l1619o3.jpg",
+     "U3 up",
+     "2026-09-30T16:19:00"
+    ],
+    [
+     "20260930_l1619en.jpg",
+     "Entrance",
+     "2026-09-30T16:19:48"
+    ],
+    [
+     "20260930_l1619d2.jpg",
+     "D2",
+     "2026-09-30T16:19:37"
+    ],
+    [
+     "20260930_a1646u2.jpg",
+     "D2 up",
+     "2026-09-30T16:46:00"
+    ],
+    [
+     "20260930_a1646u3.jpg",
+     "D3 up",
+     "2026-09-30T16:46:00"
+    ],
+    [
+     "20260930_a1646o3.jpg",
+     "U3 up",
+     "2026-09-30T16:46:00"
+    ],
+    [
+     "20260930_a1646en.jpg",
+     "Entrance",
+     "2026-09-30T16:46:31"
+    ],
+    [
+     "20260930_a1646d2.jpg",
+     "D2",
+     "2026-09-30T16:46:36"
+    ],
+    [
+     "20260930_l1733u2.jpg",
+     "D2 up",
+     "2026-09-30T17:33:00"
+    ],
+    [
+     "20260930_l1733u3.jpg",
+     "D3 up",
+     "2026-09-30T17:33:00"
+    ],
+    [
+     "20260930_l1733o3.jpg",
+     "U3 up",
+     "2026-09-30T17:33:00"
+    ],
+    [
+     "20260930_l1733en.jpg",
+     "Entrance",
+     "2026-09-30T17:33:47"
+    ],
+    [
+     "20260930_l1733d2.jpg",
+     "D2",
+     "2026-09-30T17:33:44"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-01",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "08:03",
+     "leave": "12:10",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "12:31",
+     "leave": "12:53",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "13:18",
+     "leave": "16:00",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 7.18,
+   "confidence": "high",
+   "notes": "cans in full / out full; cans in full / out full; cans in full / out full. In 08:03; out 12:10 with a coiled black hose (not in the app); back 12:31 and 20 min at the parked Hitachi; out 12:53; back 13:18 with a new yellow can; out 16:00.",
+   "photo": "20261001.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20261001_a0803u2.jpg",
+    "20261001_a0803u3.jpg",
+    "20261001_a0803o3.jpg",
+    "20261001_a0803en.jpg",
+    "20261001_a0803d2.jpg",
+    "20261001_l1210u1.jpg",
+    "20261001_l1210u2.jpg",
+    "20261001_l1210u3.jpg",
+    "20261001_l1210o3.jpg",
+    "20261001_l1210en.jpg",
+    "20261001_l1210d2.jpg",
+    "20261001_a1231u1.jpg",
+    "20261001_a1231u2.jpg",
+    "20261001_a1231u3.jpg",
+    "20261001_a1231o3.jpg",
+    "20261001_a1231en.jpg",
+    "20261001_a1231d2.jpg",
+    "20261001_l1253u1.jpg",
+    "20261001_l1253u2.jpg",
+    "20261001_l1253u3.jpg",
+    "20261001_l1253o3.jpg",
+    "20261001_l1253en.jpg",
+    "20261001_l1253d2.jpg",
+    "20261001_a1318u1.jpg",
+    "20261001_a1318u2.jpg",
+    "20261001_a1318u3.jpg",
+    "20261001_a1318o3.jpg",
+    "20261001_a1318en.jpg",
+    "20261001_a1318d2.jpg",
+    "20261001_l1600u1.jpg",
+    "20261001_l1600u2.jpg",
+    "20261001_l1600u3.jpg",
+    "20261001_l1600o3.jpg",
+    "20261001_l1600en.jpg",
+    "20261001_l1600d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261001_a0803u2.jpg",
+     "D2 up",
+     "2026-10-01T08:03:00"
+    ],
+    [
+     "20261001_a0803u3.jpg",
+     "D3 up",
+     "2026-10-01T08:03:00"
+    ],
+    [
+     "20261001_a0803o3.jpg",
+     "U3 up",
+     "2026-10-01T08:03:00"
+    ],
+    [
+     "20261001_a0803en.jpg",
+     "Entrance",
+     "2026-10-01T08:02:59"
+    ],
+    [
+     "20261001_a0803d2.jpg",
+     "D2",
+     "2026-10-01T08:03:48"
+    ],
+    [
+     "20261001_l1210u1.jpg",
+     "d1 up",
+     "2026-10-01T12:10:00"
+    ],
+    [
+     "20261001_l1210u2.jpg",
+     "D2 up",
+     "2026-10-01T12:10:00"
+    ],
+    [
+     "20261001_l1210u3.jpg",
+     "D3 up",
+     "2026-10-01T12:10:00"
+    ],
+    [
+     "20261001_l1210o3.jpg",
+     "U3 up",
+     "2026-10-01T12:10:00"
+    ],
+    [
+     "20261001_l1210en.jpg",
+     "Entrance",
+     "2026-10-01T12:10:46"
+    ],
+    [
+     "20261001_l1210d2.jpg",
+     "D2",
+     "2026-10-01T12:10:46"
+    ],
+    [
+     "20261001_a1231u1.jpg",
+     "d1 up",
+     "2026-10-01T12:31:00"
+    ],
+    [
+     "20261001_a1231u2.jpg",
+     "D2 up",
+     "2026-10-01T12:31:00"
+    ],
+    [
+     "20261001_a1231u3.jpg",
+     "D3 up",
+     "2026-10-01T12:31:00"
+    ],
+    [
+     "20261001_a1231o3.jpg",
+     "U3 up",
+     "2026-10-01T12:31:00"
+    ],
+    [
+     "20261001_a1231en.jpg",
+     "Entrance",
+     "2026-10-01T12:31:47"
+    ],
+    [
+     "20261001_a1231d2.jpg",
+     "D2",
+     "2026-10-01T12:31:48"
+    ],
+    [
+     "20261001_l1253u1.jpg",
+     "d1 up",
+     "2026-10-01T12:53:00"
+    ],
+    [
+     "20261001_l1253u2.jpg",
+     "D2 up",
+     "2026-10-01T12:53:00"
+    ],
+    [
+     "20261001_l1253u3.jpg",
+     "D3 up",
+     "2026-10-01T12:53:00"
+    ],
+    [
+     "20261001_l1253o3.jpg",
+     "U3 up",
+     "2026-10-01T12:53:00"
+    ],
+    [
+     "20261001_l1253en.jpg",
+     "Entrance",
+     "2026-10-01T12:53:18"
+    ],
+    [
+     "20261001_l1253d2.jpg",
+     "D2",
+     "2026-10-01T12:53:14"
+    ],
+    [
+     "20261001_a1318u1.jpg",
+     "d1 up",
+     "2026-10-01T13:18:00"
+    ],
+    [
+     "20261001_a1318u2.jpg",
+     "D2 up",
+     "2026-10-01T13:18:00"
+    ],
+    [
+     "20261001_a1318u3.jpg",
+     "D3 up",
+     "2026-10-01T13:18:00"
+    ],
+    [
+     "20261001_a1318o3.jpg",
+     "U3 up",
+     "2026-10-01T13:18:00"
+    ],
+    [
+     "20261001_a1318en.jpg",
+     "Entrance",
+     "2026-10-01T13:18:03"
+    ],
+    [
+     "20261001_a1318d2.jpg",
+     "D2",
+     "2026-10-01T13:18:04"
+    ],
+    [
+     "20261001_l1600u1.jpg",
+     "d1 up",
+     "2026-10-01T16:00:00"
+    ],
+    [
+     "20261001_l1600u2.jpg",
+     "D2 up",
+     "2026-10-01T16:00:00"
+    ],
+    [
+     "20261001_l1600u3.jpg",
+     "D3 up",
+     "2026-10-01T16:00:00"
+    ],
+    [
+     "20261001_l1600o3.jpg",
+     "U3 up",
+     "2026-10-01T16:00:00"
+    ],
+    [
+     "20261001_l1600en.jpg",
+     "Entrance",
+     "2026-10-01T16:00:12"
+    ],
+    [
+     "20261001_l1600d2.jpg",
+     "D2",
+     "2026-10-01T16:00:12"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-02",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:27",
+     "leave": "16:05",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 8.63,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 07:27; against the Hitachi 07:27-07:42; out 16:05 (not in the app), stops at the road top 16:11 to load firewood on top.",
+   "photo": "20261002.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20261002_a0727u1.jpg",
+    "20261002_a0727u2.jpg",
+    "20261002_a0727u3.jpg",
+    "20261002_a0727o3.jpg",
+    "20261002_a0727en.jpg",
+    "20261002_a0727d2.jpg",
+    "20261002_l1605u1.jpg",
+    "20261002_l1605u2.jpg",
+    "20261002_l1605u3.jpg",
+    "20261002_l1605o3.jpg",
+    "20261002_l1605en.jpg",
+    "20261002_l1605d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261002_a0727u1.jpg",
+     "d1 up",
+     "2026-10-02T07:27:00"
+    ],
+    [
+     "20261002_a0727u2.jpg",
+     "D2 up",
+     "2026-10-02T07:27:00"
+    ],
+    [
+     "20261002_a0727u3.jpg",
+     "D3 up",
+     "2026-10-02T07:27:00"
+    ],
+    [
+     "20261002_a0727o3.jpg",
+     "U3 up",
+     "2026-10-02T07:27:00"
+    ],
+    [
+     "20261002_a0727en.jpg",
+     "Entrance",
+     "2026-10-02T07:27:55"
+    ],
+    [
+     "20261002_a0727d2.jpg",
+     "D2",
+     "2026-10-02T07:27:56"
+    ],
+    [
+     "20261002_l1605u1.jpg",
+     "d1 up",
+     "2026-10-02T16:05:00"
+    ],
+    [
+     "20261002_l1605u2.jpg",
+     "D2 up",
+     "2026-10-02T16:05:00"
+    ],
+    [
+     "20261002_l1605u3.jpg",
+     "D3 up",
+     "2026-10-02T16:05:00"
+    ],
+    [
+     "20261002_l1605o3.jpg",
+     "U3 up",
+     "2026-10-02T16:05:00"
+    ],
+    [
+     "20261002_l1605en.jpg",
+     "Entrance",
+     "2026-10-02T16:05:37"
+    ],
+    [
+     "20261002_l1605d2.jpg",
+     "D2",
+     "2026-10-02T16:05:38"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-03",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:24",
+     "leave": "12:27",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 5.05,
+   "confidence": "high",
+   "notes": "cans in full / out full. Saturday. In 07:24; beside the Komatsu 07:29-10:10, driver on its deck 10:09; out 12:27.",
+   "photo": "20261003.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20261003_a0724u1.jpg",
+    "20261003_a0724u2.jpg",
+    "20261003_a0724u3.jpg",
+    "20261003_a0724o3.jpg",
+    "20261003_a0724en.jpg",
+    "20261003_a0724d2.jpg",
+    "20261003_l1227u1.jpg",
+    "20261003_l1227u2.jpg",
+    "20261003_l1227u3.jpg",
+    "20261003_l1227o3.jpg",
+    "20261003_l1227en.jpg",
+    "20261003_l1227d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261003_a0724u1.jpg",
+     "d1 up",
+     "2026-10-03T07:24:00"
+    ],
+    [
+     "20261003_a0724u2.jpg",
+     "D2 up",
+     "2026-10-03T07:24:00"
+    ],
+    [
+     "20261003_a0724u3.jpg",
+     "D3 up",
+     "2026-10-03T07:24:00"
+    ],
+    [
+     "20261003_a0724o3.jpg",
+     "U3 up",
+     "2026-10-03T07:24:00"
+    ],
+    [
+     "20261003_a0724en.jpg",
+     "Entrance",
+     "2026-10-03T07:24:43"
+    ],
+    [
+     "20261003_a0724d2.jpg",
+     "D2",
+     "2026-10-03T07:24:51"
+    ],
+    [
+     "20261003_l1227u1.jpg",
+     "d1 up",
+     "2026-10-03T12:27:00"
+    ],
+    [
+     "20261003_l1227u2.jpg",
+     "D2 up",
+     "2026-10-03T12:27:00"
+    ],
+    [
+     "20261003_l1227u3.jpg",
+     "D3 up",
+     "2026-10-03T12:27:00"
+    ],
+    [
+     "20261003_l1227o3.jpg",
+     "U3 up",
+     "2026-10-03T12:27:00"
+    ],
+    [
+     "20261003_l1227en.jpg",
+     "Entrance",
+     "2026-10-03T12:27:48"
+    ],
+    [
+     "20261003_l1227d2.jpg",
+     "D2",
+     "2026-10-03T12:27:47"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-04",
+   "present": false,
+   "visits": [],
+   "hours": 0,
+   "confidence": "high",
+   "notes": "Sunday. No Dodge on any camera.",
+   "photo": "",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [],
+   "series_meta": []
+  },
+  {
+   "date": "2026-10-05",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:28",
+     "leave": "16:28",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 9.0,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 07:28, out 16:28, bed looks the same both ways. Against the Hitachi 07:30-07:46.",
+   "photo": "20261005.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up"
+   ],
+   "partial": false,
+   "series": [
+    "20261005_a0728u1.jpg",
+    "20261005_a0728u2.jpg",
+    "20261005_a0728u3.jpg",
+    "20261005_a0728o3.jpg",
+    "20261005_a0728en.jpg",
+    "20261005_a0728d2.jpg",
+    "20261005_l1628u1.jpg",
+    "20261005_l1628u2.jpg",
+    "20261005_l1628u3.jpg",
+    "20261005_l1628o3.jpg",
+    "20261005_l1628en.jpg",
+    "20261005_l1628d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261005_a0728u1.jpg",
+     "d1 up",
+     "2026-10-05T07:28:00"
+    ],
+    [
+     "20261005_a0728u2.jpg",
+     "D2 up",
+     "2026-10-05T07:28:00"
+    ],
+    [
+     "20261005_a0728u3.jpg",
+     "D3 up",
+     "2026-10-05T07:28:00"
+    ],
+    [
+     "20261005_a0728o3.jpg",
+     "U3 up",
+     "2026-10-05T07:28:00"
+    ],
+    [
+     "20261005_a0728en.jpg",
+     "Entrance",
+     "2026-10-05T07:28:09"
+    ],
+    [
+     "20261005_a0728d2.jpg",
+     "D2",
+     "2026-10-05T07:28:09"
+    ],
+    [
+     "20261005_l1628u1.jpg",
+     "d1 up",
+     "2026-10-05T16:28:00"
+    ],
+    [
+     "20261005_l1628u2.jpg",
+     "D2 up",
+     "2026-10-05T16:28:00"
+    ],
+    [
+     "20261005_l1628u3.jpg",
+     "D3 up",
+     "2026-10-05T16:28:00"
+    ],
+    [
+     "20261005_l1628o3.jpg",
+     "U3 up",
+     "2026-10-05T16:28:00"
+    ],
+    [
+     "20261005_l1628en.jpg",
+     "Entrance",
+     "2026-10-05T16:28:06"
+    ],
+    [
+     "20261005_l1628d2.jpg",
+     "D2",
+     "2026-10-05T16:28:03"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-06",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:35",
+     "leave": "16:12",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 8.62,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 07:35, out 16:12 with ~17-19 green + 2 blue cans and a hose.",
+   "photo": "20261006.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up",
+    "Pergola"
+   ],
+   "partial": false,
+   "series": [
+    "20261006_a0735u1.jpg",
+    "20261006_a0735u2.jpg",
+    "20261006_a0735u3.jpg",
+    "20261006_a0735o3.jpg",
+    "20261006_a0735en.jpg",
+    "20261006_a0735d2.jpg",
+    "20261006_l1612u1.jpg",
+    "20261006_l1612u2.jpg",
+    "20261006_l1612u3.jpg",
+    "20261006_l1612o3.jpg",
+    "20261006_l1612en.jpg",
+    "20261006_l1612d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261006_a0735u1.jpg",
+     "d1 up",
+     "2026-10-06T07:35:00"
+    ],
+    [
+     "20261006_a0735u2.jpg",
+     "D2 up",
+     "2026-10-06T07:35:00"
+    ],
+    [
+     "20261006_a0735u3.jpg",
+     "D3 up",
+     "2026-10-06T07:35:00"
+    ],
+    [
+     "20261006_a0735o3.jpg",
+     "U3 up",
+     "2026-10-06T07:35:00"
+    ],
+    [
+     "20261006_a0735en.jpg",
+     "Entrance",
+     "2026-10-06T07:35:47"
+    ],
+    [
+     "20261006_a0735d2.jpg",
+     "D2",
+     "2026-10-06T07:35:48"
+    ],
+    [
+     "20261006_l1612u1.jpg",
+     "d1 up",
+     "2026-10-06T16:12:00"
+    ],
+    [
+     "20261006_l1612u2.jpg",
+     "D2 up",
+     "2026-10-06T16:12:00"
+    ],
+    [
+     "20261006_l1612u3.jpg",
+     "D3 up",
+     "2026-10-06T16:12:00"
+    ],
+    [
+     "20261006_l1612o3.jpg",
+     "U3 up",
+     "2026-10-06T16:12:00"
+    ],
+    [
+     "20261006_l1612en.jpg",
+     "Entrance",
+     "2026-10-06T16:12:41"
+    ],
+    [
+     "20261006_l1612d2.jpg",
+     "D2",
+     "2026-10-06T16:12:38"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-07",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:37",
+     "leave": "16:57",
+     "cans_in": "full",
+     "cans_out": "full"
+    }
+   ],
+   "hours": 9.33,
+   "confidence": "high",
+   "notes": "cans in full / out full. In 07:37, out 16:57. 13:46-13:57 lubricant cans carried between the Hitachi and the Dodge (D2-D3).",
+   "photo": "20261007.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up",
+    "D2-D3"
+   ],
+   "partial": false,
+   "series": [
+    "20261007_a0737u2.jpg",
+    "20261007_a0737u3.jpg",
+    "20261007_a0737o3.jpg",
+    "20261007_a0737en.jpg",
+    "20261007_a0737d2.jpg",
+    "20261007_l1657u1.jpg",
+    "20261007_l1657u2.jpg",
+    "20261007_l1657u3.jpg",
+    "20261007_l1657o3.jpg",
+    "20261007_l1657en.jpg",
+    "20261007_l1657d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261007_a0737u2.jpg",
+     "D2 up",
+     "2026-10-07T07:37:00"
+    ],
+    [
+     "20261007_a0737u3.jpg",
+     "D3 up",
+     "2026-10-07T07:37:00"
+    ],
+    [
+     "20261007_a0737o3.jpg",
+     "U3 up",
+     "2026-10-07T07:37:00"
+    ],
+    [
+     "20261007_a0737en.jpg",
+     "Entrance",
+     "2026-10-07T07:37:49"
+    ],
+    [
+     "20261007_a0737d2.jpg",
+     "D2",
+     "2026-10-07T07:37:54"
+    ],
+    [
+     "20261007_l1657u1.jpg",
+     "d1 up",
+     "2026-10-07T16:57:00"
+    ],
+    [
+     "20261007_l1657u2.jpg",
+     "D2 up",
+     "2026-10-07T16:57:00"
+    ],
+    [
+     "20261007_l1657u3.jpg",
+     "D3 up",
+     "2026-10-07T16:57:00"
+    ],
+    [
+     "20261007_l1657o3.jpg",
+     "U3 up",
+     "2026-10-07T16:57:00"
+    ],
+    [
+     "20261007_l1657en.jpg",
+     "Entrance",
+     "2026-10-07T16:56:59"
+    ],
+    [
+     "20261007_l1657d2.jpg",
+     "D2",
+     "2026-10-07T16:56:50"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-08",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:35",
+     "leave": "07:40",
+     "cans_in": "full",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "07:58",
+     "leave": "16:22",
+     "cans_in": "full",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 8.48,
+   "confidence": "high",
+   "notes": "cans in full / out full; cans in full / out ?. In 07:35, out 07:40, back 07:58 for the logged 200 L Komatsu fill (08:00-08:12), out 16:22 (bed not visible).",
+   "photo": "20261008.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up",
+    "D2-D3",
+    "Pergola"
+   ],
+   "partial": false,
+   "series": [
+    "20261008_a0735u1.jpg",
+    "20261008_a0735u2.jpg",
+    "20261008_a0735u3.jpg",
+    "20261008_a0735o3.jpg",
+    "20261008_a0735en.jpg",
+    "20261008_l0740u1.jpg",
+    "20261008_l0740u2.jpg",
+    "20261008_l0740u3.jpg",
+    "20261008_l0740o3.jpg",
+    "20261008_l0740en.jpg",
+    "20261008_l0740d2.jpg",
+    "20261008_a0758u1.jpg",
+    "20261008_a0758u2.jpg",
+    "20261008_a0758u3.jpg",
+    "20261008_a0758o3.jpg",
+    "20261008_a0758en.jpg",
+    "20261008_a0758d2.jpg",
+    "20261008_l1622u1.jpg",
+    "20261008_l1622u2.jpg",
+    "20261008_l1622u3.jpg",
+    "20261008_l1622o3.jpg",
+    "20261008_l1622en.jpg",
+    "20261008_l1622d2.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261008_a0735u1.jpg",
+     "d1 up",
+     "2026-10-08T07:35:00"
+    ],
+    [
+     "20261008_a0735u2.jpg",
+     "D2 up",
+     "2026-10-08T07:35:00"
+    ],
+    [
+     "20261008_a0735u3.jpg",
+     "D3 up",
+     "2026-10-08T07:35:00"
+    ],
+    [
+     "20261008_a0735o3.jpg",
+     "U3 up",
+     "2026-10-08T07:35:00"
+    ],
+    [
+     "20261008_a0735en.jpg",
+     "Entrance",
+     "2026-10-08T07:35:42"
+    ],
+    [
+     "20261008_l0740u1.jpg",
+     "d1 up",
+     "2026-10-08T07:40:00"
+    ],
+    [
+     "20261008_l0740u2.jpg",
+     "D2 up",
+     "2026-10-08T07:40:00"
+    ],
+    [
+     "20261008_l0740u3.jpg",
+     "D3 up",
+     "2026-10-08T07:40:00"
+    ],
+    [
+     "20261008_l0740o3.jpg",
+     "U3 up",
+     "2026-10-08T07:40:00"
+    ],
+    [
+     "20261008_l0740en.jpg",
+     "Entrance",
+     "2026-10-08T07:40:19"
+    ],
+    [
+     "20261008_l0740d2.jpg",
+     "D2",
+     "2026-10-08T07:40:18"
+    ],
+    [
+     "20261008_a0758u1.jpg",
+     "d1 up",
+     "2026-10-08T07:58:00"
+    ],
+    [
+     "20261008_a0758u2.jpg",
+     "D2 up",
+     "2026-10-08T07:58:00"
+    ],
+    [
+     "20261008_a0758u3.jpg",
+     "D3 up",
+     "2026-10-08T07:58:00"
+    ],
+    [
+     "20261008_a0758o3.jpg",
+     "U3 up",
+     "2026-10-08T07:58:00"
+    ],
+    [
+     "20261008_a0758en.jpg",
+     "Entrance",
+     "2026-10-08T07:58:11"
+    ],
+    [
+     "20261008_a0758d2.jpg",
+     "D2",
+     "2026-10-08T07:58:11"
+    ],
+    [
+     "20261008_l1622u1.jpg",
+     "d1 up",
+     "2026-10-08T16:22:00"
+    ],
+    [
+     "20261008_l1622u2.jpg",
+     "D2 up",
+     "2026-10-08T16:22:00"
+    ],
+    [
+     "20261008_l1622u3.jpg",
+     "D3 up",
+     "2026-10-08T16:22:00"
+    ],
+    [
+     "20261008_l1622o3.jpg",
+     "U3 up",
+     "2026-10-08T16:22:00"
+    ],
+    [
+     "20261008_l1622en.jpg",
+     "Entrance",
+     "2026-10-08T16:22:05"
+    ],
+    [
+     "20261008_l1622d2.jpg",
+     "D2",
+     "2026-10-08T16:22:04"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-09",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:23",
+     "leave": "14:35",
+     "cans_in": "?",
+     "cans_out": "full"
+    },
+    {
+     "arrive": "15:01",
+     "leave": "16:27",
+     "cans_in": "?",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 8.63,
+   "confidence": "high",
+   "notes": "cans in ? / out full; cans in ? / out ?. In 07:23; parked at the jerrycan pile all day; out 14:35 with ~20 cans; back 15:01 (not in the app); D3 up shows it at its spot until 16:25 and gone at 16:30 (the Entrance had stopped at 16:08).",
+   "photo": "20261009.jpg",
+   "cameras": [
+    "D1 Entrance",
+    "D2",
+    "D2 up",
+    "D3 up",
+    "d1 up",
+    "Pergola"
+   ],
+   "partial": false,
+   "series": [
+    "20261009_a0723u1.jpg",
+    "20261009_a0723u2.jpg",
+    "20261009_a0723u3.jpg",
+    "20261009_a0723o3.jpg",
+    "20261009_a0723en.jpg",
+    "20261009_a0723d2.jpg",
+    "20261009_l1435u1.jpg",
+    "20261009_l1435u2.jpg",
+    "20261009_l1435u3.jpg",
+    "20261009_l1435o3.jpg",
+    "20261009_l1435en.jpg",
+    "20261009_l1435d2.jpg",
+    "20261009_a1501u1.jpg",
+    "20261009_a1501u2.jpg",
+    "20261009_a1501u3.jpg",
+    "20261009_a1501o3.jpg",
+    "20261009_a1501en.jpg",
+    "20261009_a1501d2.jpg",
+    "20261009_l1627u1.jpg",
+    "20261009_l1627u3.jpg",
+    "20261009_l1627o3.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261009_a0723u1.jpg",
+     "d1 up",
+     "2026-10-09T07:23:00"
+    ],
+    [
+     "20261009_a0723u2.jpg",
+     "D2 up",
+     "2026-10-09T07:23:00"
+    ],
+    [
+     "20261009_a0723u3.jpg",
+     "D3 up",
+     "2026-10-09T07:23:00"
+    ],
+    [
+     "20261009_a0723o3.jpg",
+     "U3 up",
+     "2026-10-09T07:23:00"
+    ],
+    [
+     "20261009_a0723en.jpg",
+     "Entrance",
+     "2026-10-09T07:23:36"
+    ],
+    [
+     "20261009_a0723d2.jpg",
+     "D2",
+     "2026-10-09T07:23:59"
+    ],
+    [
+     "20261009_l1435u1.jpg",
+     "d1 up",
+     "2026-10-09T14:35:00"
+    ],
+    [
+     "20261009_l1435u2.jpg",
+     "D2 up",
+     "2026-10-09T14:35:00"
+    ],
+    [
+     "20261009_l1435u3.jpg",
+     "D3 up",
+     "2026-10-09T14:35:00"
+    ],
+    [
+     "20261009_l1435o3.jpg",
+     "U3 up",
+     "2026-10-09T14:35:00"
+    ],
+    [
+     "20261009_l1435en.jpg",
+     "Entrance",
+     "2026-10-09T14:35:35"
+    ],
+    [
+     "20261009_l1435d2.jpg",
+     "D2",
+     "2026-10-09T14:35:43"
+    ],
+    [
+     "20261009_a1501u1.jpg",
+     "d1 up",
+     "2026-10-09T15:01:00"
+    ],
+    [
+     "20261009_a1501u2.jpg",
+     "D2 up",
+     "2026-10-09T15:01:00"
+    ],
+    [
+     "20261009_a1501u3.jpg",
+     "D3 up",
+     "2026-10-09T15:01:00"
+    ],
+    [
+     "20261009_a1501o3.jpg",
+     "U3 up",
+     "2026-10-09T15:01:00"
+    ],
+    [
+     "20261009_a1501en.jpg",
+     "Entrance",
+     "2026-10-09T15:01:00"
+    ],
+    [
+     "20261009_a1501d2.jpg",
+     "D2",
+     "2026-10-09T15:01:27"
+    ],
+    [
+     "20261009_l1627u1.jpg",
+     "d1 up",
+     "2026-10-09T16:27:00"
+    ],
+    [
+     "20261009_l1627u3.jpg",
+     "D3 up",
+     "2026-10-09T16:27:00"
+    ],
+    [
+     "20261009_l1627o3.jpg",
+     "U3 up",
+     "2026-10-09T16:27:00"
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-10",
+   "present": true,
+   "visits": [
+    {
+     "arrive": "07:20",
+     "leave": "14:06",
+     "cans_in": "?",
+     "cans_out": "?"
+    }
+   ],
+   "hours": 6.77,
+   "confidence": "medium",
+   "notes": "cans in ? / out ?. Saturday; Entrance and D2 no longer recording. D3 up: Dodge reaches its spot at the back fence between 07:17 and 07:24, the Hitachi parks beside it 08:07-09:48 (man at the Dodge bed, then on the Hitachi), the Dodge stays until it drives off 14:05-14:07. Bed covered; cans not countable. Times to +-3 min.",
+   "photo": "20261010.jpg",
+   "cameras": [
+    "D3 up",
+    "D2 up",
+    "U3 up"
+   ],
+   "partial": false,
+   "series": [
+    "20261010_a0720u2.jpg",
+    "20261010_a0720u3.jpg",
+    "20261010_a0720o3.jpg",
+    "20261010_l1406u2.jpg",
+    "20261010_l1406u3.jpg",
+    "20261010_l1406o3.jpg"
+   ],
+   "series_meta": [
+    [
+     "20261010_a0720u2.jpg",
+     "D2 up",
+     "2026-10-10T07:20:00"
+    ],
+    [
+     "20261010_a0720u3.jpg",
+     "D3 up",
+     "2026-10-10T07:20:00"
+    ],
+    [
+     "20261010_a0720o3.jpg",
+     "U3 up",
+     "2026-10-10T07:20:00"
+    ],
+    [
+     "20261010_l1406u2.jpg",
+     "D2 up",
+     "2026-10-10T14:06:00"
+    ],
+    [
+     "20261010_l1406u3.jpg",
+     "D3 up",
+     "2026-10-10T14:06:00"
+    ],
+    [
+     "20261010_l1406o3.jpg",
+     "U3 up",
+     "2026-10-10T14:06:00"
+    ]
+   ]
+  }
+ ]
+}
