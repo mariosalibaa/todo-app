@@ -272,11 +272,11 @@ function setFV(v) { FV = v; try { localStorage.setItem('flagsView', v); } catch 
 function renderFlags() {
   const ALL = D.flags || [];
   const months0 = [...new Set(ALL.map(l => l.date.slice(0, 7)))].sort();
-  if (FV === 'table' && !['all', 'strong'].includes(FM)) FM = 'all';
-  const L = FM === 'strong' ? ALL.filter(l => l.strong) : FM === 'all' ? ALL : ALL.filter(l => l.date.startsWith(FM));
+  if (FV === 'table' && !['all', 'strong', 'theft'].includes(FM)) FM = 'all';
+  const L = FM === 'theft' ? ALL.filter(l => l.theft) : FM === 'strong' ? ALL.filter(l => l.strong) : FM === 'all' ? ALL : ALL.filter(l => l.date.startsWith(FM));
   document.getElementById('ffilters').innerHTML =
     `<button class="${FV === 'table' ? 'on' : ''}" onclick="setFV('table')">☰ Table</button><button class="${FV === 'cards' ? 'on' : ''}" onclick="setFV('cards')">▦ Photos</button><span style="width:14px"></span>` +
-    `<button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest (${ALL.filter(l => l.strong).length})</button><button class="${FM === 'all' ? 'on' : ''}" onclick="FM='all';renderFlags()">All (${ALL.length})</button>` +
+    `<button class="${FM === 'theft' ? 'on' : ''}" onclick="FM='theft';renderFlags()" style="border-color:var(--red);color:var(--red)">⚠ Possible theft (${ALL.filter(l => l.theft).length})</button><button class="${FM === 'strong' ? 'on' : ''}" onclick="FM='strong';renderFlags()">★ Strongest (${ALL.filter(l => l.strong).length})</button><button class="${FM === 'all' ? 'on' : ''}" onclick="FM='all';renderFlags()">All (${ALL.length})</button>` +
     (FV === 'cards' ? months0.map(m => `<button class="${FM === m ? 'on' : ''}" onclick="FM='${m}';renderFlags()">${monthName(m)} (${ALL.filter(l => l.date.startsWith(m)).length})</button>`).join('') : '');
   document.getElementById('flags').hidden = FV !== 'cards'; document.getElementById('ftabwrap').hidden = FV !== 'table';
   if (FV === 'cards') {
