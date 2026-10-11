@@ -55,6 +55,8 @@
   .vbar .vtitle{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .vbody{flex:1;overflow:auto;padding:12px;} .vbody img{display:block;margin:0 auto;max-width:100%;height:auto;}
   a{color:var(--amber);}
+  .varrow{position:fixed;top:50%;left:12px;transform:translateY(-50%);z-index:610;width:52px;height:72px;border:0;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:44px;cursor:pointer;line-height:1;} .varrow.r{left:auto;right:12px;} .varrow:hover{background:rgba(242,169,59,.7);}
+  .vcount{color:var(--sub);font-size:.8rem;margin-left:8px;}
 </style>
 </head>
 <body>
@@ -127,6 +129,7 @@
 <div id="viewer">
   <div class="vbar"><a class="vback" href="#" onclick="closeViewer();return false;">&lsaquo; Back</a><div class="vtitle" id="vtitle"></div></div>
   <div class="vbody" id="vbody"></div>
+  <button class="varrow" id="vprev" onclick="stepViewer(-1)" hidden>&lsaquo;</button><button class="varrow r" id="vnext" onclick="stepViewer(1)" hidden>&rsaquo;</button>
 </div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -279,7 +282,7 @@ function renderFlags() {
   if (FV === 'cards') {
     document.getElementById('flags').innerHTML = L.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).map(l => {
       const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
-      return `<div class="ld"><div class="ph" ${u ? `onclick="openViewer('${u}', '${esc(x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera)}')"` : ''}>${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
+      return `<div class="ld"><div class="ph" ${u ? `onclick="openFlag(${ALL.indexOf(l)})"` : ''} style="position:relative">${(l.series || []).length ? `<span class="badge" style="position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff">${(l.series || []).length + 1} photos</span>` : ''}${u ? `<img loading="lazy" src="${u}" alt="">` : 'no photo'}</div>
         <div class="bd"><div class="top"><b>${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day} · ${esc(l.time)}</b><span class="badge f-unk">${esc(l.camera)}</span></div><div class="small">${esc(l.what)}</div></div></div>`;
     }).join('');
     return;
@@ -292,7 +295,7 @@ function renderFlags() {
     for (const l of ml.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))) {
       const x = dd(l.date), u = l.photo ? '/api/ajaltoun/machines/flag/' + l.photo : '';
       html += `<tr data-fm="${m}" hidden class="${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${l.strong ? '<span style="color:var(--red)">★</span> ' : ''}${x.wd} ${x.day}</td><td style="white-space:nowrap">${esc(l.time)}</td><td class="small">${esc(l.camera)}</td><td class="small">${esc(l.what)}</td>
-        <td>${u ? `<img src="${u}" loading="lazy" style="width:120px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera)}')">` : ''}</td></tr>`;
+        <td style="white-space:nowrap">${u ? `<img src="${u}" loading="lazy" style="width:120px;border-radius:6px;cursor:zoom-in;vertical-align:middle" onclick="openFlag(${ALL.indexOf(l)})">` : ''}${(l.series || []).length ? `<div class="small muted">${(l.series || []).length + 1} photos ›</div>` : ''}</td></tr>`;
     }
   }
   html += `<tr class="mon tot"><td>Total</td><td colspan="2">${L.length} events</td><td class="small">${L.filter(l => l.strong).length} strongest · on ${new Set(L.map(l => l.date)).size} days</td><td></td></tr>`;
@@ -300,12 +303,24 @@ function renderFlags() {
 }
 function foldF(m) { const rows = document.querySelectorAll(`#ftab tr[data-fm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('ffold-' + m).textContent = open ? '▾' : '▸'; }
 function foldL(m) { const rows = document.querySelectorAll(`#ltab tr[data-lm="${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById('lfold-' + m).textContent = open ? '▾' : '▸'; }
+let VS = [], VI = 0, VT = '';
+function showViewer() {
+  document.getElementById('vtitle').innerHTML = esc(VT) + (VS.length > 1 ? `<span class="vcount">${VI + 1} / ${VS.length}</span>` : '');
+  document.getElementById('vbody').innerHTML = `<img src="${VS[VI]}" alt="">`;
+  document.getElementById('vprev').hidden = document.getElementById('vnext').hidden = VS.length < 2;
+}
+(() => { let x0 = null; const v = () => document.getElementById('viewer');
+  addEventListener('touchstart', e => { if (v()?.classList.contains('on')) x0 = e.touches[0].clientX; }, { passive: true });
+  addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) stepViewer(dx < 0 ? 1 : -1); }, { passive: true }); })();
+function stepViewer(d) { if (VS.length < 2) return; VI = (VI + d + VS.length) % VS.length; showViewer(); }
+function openSeries(list, i, title) { VS = list; VI = i || 0; VT = title; showViewer(); document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden'; }
+function openFlag(k) { const l = (D.flags || [])[k]; if (!l) return; const x = dd(l.date); const P = '/api/ajaltoun/machines/flag/'; openSeries([l.photo, ...(l.series || [])].filter(Boolean).map(n => P + n), 0, x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera); }
 function openViewer(url, title) {
-  document.getElementById('vtitle').textContent = title; document.getElementById('vbody').innerHTML = `<img src="${url}" alt="">`;
+  VS = [url]; VI = 0; VT = title; showViewer();
   document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden';
 }
 function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); if (document.getElementById('viewer').classList.contains('on')) { if (e.key === 'ArrowLeft') stepViewer(-1); if (e.key === 'ArrowRight') stepViewer(1); } });
 
 const setHdr = () => document.documentElement.style.setProperty('--hdr', (document.querySelector('header')?.offsetHeight || 64) + 'px');
 addEventListener('resize', setHdr);
