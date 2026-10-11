@@ -22,3 +22,6 @@ learn/
 plants-watch.log
 bonvin-data.json
 _scratch/
+
+# Ajaltoun camera photos live in Firebase Storage (scripts/upload-excavation-photos.js), not in git
+public/excavation/
