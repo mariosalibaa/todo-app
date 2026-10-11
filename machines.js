@@ -32,8 +32,10 @@ async function handle(req, res, url, user, ctx) {
     const georges = readJson('georges.json', null);
     const bmw = readJson('bmw.json', null);
     const tacoma = readJson('tacoma.json', null);
+    const dodge = readJson('dodge.json', null);
+    const visitors = readJson('visitors.json', null);
     const reviews = await readReviews(ctx);
-    res.end(JSON.stringify({ ...days, loads, diesel, flags, georges, bmw, tacoma, reviews }));
+    res.end(JSON.stringify({ ...days, loads, diesel, flags, georges, bmw, tacoma, dodge, visitors, reviews }));
     return true;
   }
   const m = p.match(/^\/api\/ajaltoun\/machines\/photo\/(\d{8}_\d{4}[\w-]*\.jpg)$/);
@@ -54,7 +56,7 @@ async function handle(req, res, url, user, ctx) {
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, id, ...doc }));
     return true;
   }
-  const gp = p.match(/^\/api\/ajaltoun\/machines\/(georges|bmw|tacoma)\/(\d{8}\.jpg)$/);
+  const gp = p.match(/^\/api\/ajaltoun\/machines\/(georges|bmw|tacoma|dodge|visitors)\/(\d{8}[\w-]{0,12}\.jpg)$/);
   if (gp && req.method === 'GET') {
     const f = path.join(__dirname, 'public', 'excavation', gp[1], gp[2]);
     if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }

@@ -73,7 +73,7 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a></nav>
+  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a><a id="t-cars" href="/ajaltoun/machines/cars">All cars</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -121,6 +121,12 @@
     <div class="card tcard"><table id="ttab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="tnote"></div>
   </section>
+  <section id="v-cars" hidden>
+    <h1>Cars on site — all vehicles together</h1>
+    <p class="lead">Every tracked car in one table: tick the cars to show, tap a month to open it, a photo to enlarge. Each car's own tab stays as well.</p>
+    <div class="filters" id="cfilters"></div>
+    <div class="card tcard"><table id="ctab"><thead><tr><th>Date</th><th>Car</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+  </section>
   <section id="v-diesel" hidden>
     <h1>Diesel vs machine hours</h1>
     <div class="note" id="dverdict" style="margin-top:0;color:var(--text)"></div>
@@ -148,8 +154,8 @@
 const esc = Admin.esc; let D = null, MONTH = 'all';
 const LOADS = /\/loads$/.test(location.pathname), DIESEL = /\/diesel$/.test(location.pathname);
 const FLAGS = /\/flags$/.test(location.pathname);
-const GEORGES = /\/georges$/.test(location.pathname), BMW = /\/bmw$/.test(location.pathname), TACOMA = /\/tacoma$/.test(location.pathname);
-const VIEW = TACOMA ? 'tacoma' : BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
+const GEORGES = /\/georges$/.test(location.pathname), BMW = /\/bmw$/.test(location.pathname), TACOMA = /\/tacoma$/.test(location.pathname), CARS = /\/cars$/.test(location.pathname);
+const VIEW = CARS ? 'cars' : TACOMA ? 'tacoma' : BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
 const h1 = n => n == null ? '—' : (+n).toFixed(1);
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dd = s => { const d = new Date(s + 'T12:00:00'); return { day: d.getDate() + ' ' + MON[d.getMonth()], wd: d.toLocaleDateString('en-GB', { weekday: 'short' }), m: s.slice(0, 7), sun: d.getDay() === 0 }; };
@@ -275,6 +281,37 @@ function renderGeorges(G, P, api) {
   document.getElementById(P + 'note').textContent = (G.pending ? G.pending + '. ' : '') + 'Hours = arrival to departure; two visits on one day are added. "?" = arrival or departure not seen.';
 }
 function foldG(P, m) { const rows = document.querySelectorAll(`#${P}tab tr[data-gm="${P}${m}"]`), open = rows[0] && rows[0].hidden; rows.forEach(r => r.hidden = !open); document.getElementById(P + 'fold-' + m).textContent = open ? '▾' : '▸'; }
+const CARDEF = [['dodge', 'Grey Dodge (Anthony)', '#f38ba8'], ['georges', 'Silver RAV4', '#89b4fa'], ['bmw', 'Silver BMW', '#cba6f7'], ['tacoma', 'Silver Tacoma', '#fab387'], ['visitors', 'Other cars', '#a6e3a1']];
+let CSEL = (() => { try { return JSON.parse(localStorage.getItem('carsSel')) || null; } catch { return null; } })() || CARDEF.map(c => c[0]);
+const COPEN = new Set();
+function renderCars() {
+  const rows = [];
+  for (const [k, name, col] of CARDEF) for (const d of ((D[k] || {}).days || [])) if (d.present) rows.push({ ...d, car: k, carName: d.vehicle || name, col });
+  const hm = h => h == null ? '—' : Math.floor(h) + 'h' + String(Math.round((h % 1) * 60)).padStart(2, '0');
+  document.getElementById('cfilters').innerHTML = `<button onclick="CSEL=CARDEF.map(c=>c[0]);saveCsel()">Show all</button>` + CARDEF.map(([k, name, col]) => {
+    const n = rows.filter(r => r.car === k).length;
+    return `<label style="display:inline-flex;align-items:center;gap:5px;border:1px solid ${col};border-radius:16px;padding:4px 10px;font-size:.78rem;color:${col};cursor:pointer;opacity:${n ? 1 : .5}"><input type="checkbox" ${CSEL.includes(k) ? 'checked' : ''} onchange="toggleCar('${k}', this.checked)"> ${name} (${n} days${n ? '' : ' — review running'})</label>`;
+  }).join('');
+  const R = rows.filter(r => CSEL.includes(r.car)).sort((a, b) => b.date.localeCompare(a.date) || a.car.localeCompare(b.car));
+  const months = [...new Set(R.map(r => r.date.slice(0, 7)))].sort().reverse();
+  let html = '';
+  for (const m of months) {
+    const mr = R.filter(r => r.date.startsWith(m));
+    const per = CARDEF.filter(c => CSEL.includes(c[0])).map(([k, name, col]) => { const x = mr.filter(r => r.car === k); return x.length ? `<span style="color:${col}">${name.split(' (')[0]} ${x.length}d · ${hm(x.reduce((s, r) => s + (r.hours || 0), 0))}</span>` : ''; }).filter(Boolean).join(' · ');
+    html += `<tr class="mon" onclick="foldC('${m}')"><td><span class="fold" id="cfold-${m}">${COPEN.has(m) ? '▾' : '▸'}</span> ${monthName(m)}</td><td colspan="7" class="small">${per}</td></tr>`;
+    for (const r of mr) {
+      const x = dd(r.date), v = r.visits || [], u = r.photo ? '/api/ajaltoun/machines/' + r.car + '/' + r.photo : '';
+      html += `<tr data-cm="${m}" ${COPEN.has(m) ? '' : 'hidden'} class="${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td><td style="white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.col};margin-right:6px"></span>${esc(r.carName)}${r.plate ? `<div class="small muted">${esc(r.plate)}</div>` : ''}</td>
+        <td style="white-space:nowrap">${v.map(a => esc(a.arrive)).join('<br>')}</td><td style="white-space:nowrap">${v.map(a => esc(a.leave)).join('<br>')}</td><td class="n"><b>${(r.partial && r.hours ? '≥' : '') + hm(r.hours)}</b></td>
+        <td class="small">${esc(r.confidence || '')}</td><td class="small muted">${esc(r.notes || '')}</td>
+        <td>${u ? `<img src="${u}" loading="lazy" style="width:120px;border-radius:6px;cursor:zoom-in" onclick="openViewer('${u}','${esc(x.wd + ' ' + x.day + ' — ' + r.carName)}')">` : ''}</td></tr>`;
+    }
+  }
+  document.querySelector('#ctab tbody').innerHTML = html || '<tr><td colspan="8" class="muted">No car selected.</td></tr>';
+}
+function toggleCar(k, on) { CSEL = on ? [...new Set([...CSEL, k])] : CSEL.filter(x => x !== k); saveCsel(); }
+function saveCsel() { try { localStorage.setItem('carsSel', JSON.stringify(CSEL)); } catch {} renderCars(); }
+function foldC(m) { COPEN.has(m) ? COPEN.delete(m) : COPEN.add(m); const rows = document.querySelectorAll(`#ctab tr[data-cm="${m}"]`); rows.forEach(r => r.hidden = !COPEN.has(m)); document.getElementById('cfold-' + m).textContent = COPEN.has(m) ? '▾' : '▸'; }
 let FM = 'all';
 const RVS = { suspicious: ['s', 'Suspicious'], investigate: ['i', 'Needs investigation'], not: ['n', 'Not suspicious'] };
 function rv(l) { const r = (D.reviews || {})[l.id]; return r || (l.explained ? { status: 'not', note: '', auto: true } : { status: '', note: '' }); }
@@ -372,7 +409,7 @@ Admin.require(['ajaltoun', 'excavation'], async me => {
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   document.getElementById('t-' + VIEW).classList.add('on');
   document.getElementById('v-' + VIEW).hidden = false;
-  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; TACOMA ? renderGeorges(D.tacoma || { days: [], pending: 'The Tacoma review is running' }, 't', 'tacoma') : BMW ? renderGeorges(D.bmw || { days: [], pending: 'The BMW review is running' }, 'b', 'bmw') : GEORGES ? renderGeorges(D.georges, 'g', 'georges') : FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
+  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; CARS ? renderCars() : TACOMA ? renderGeorges(D.tacoma || { days: [], pending: 'The Tacoma review is running' }, 't', 'tacoma') : BMW ? renderGeorges(D.bmw || { days: [], pending: 'The BMW review is running' }, 'b', 'bmw') : GEORGES ? renderGeorges(D.georges, 'g', 'georges') : FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
   catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); }
 });
 </script>
