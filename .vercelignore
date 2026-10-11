@@ -14,3 +14,6 @@ start-todo*.bat
 render.yaml
 partners-terms.json
 bonvin-data.json
+# camera photos live in Firebase Storage (scripts/upload-excavation-photos.js); bundled they made every deploy 453 MB
+public/excavation
+verify

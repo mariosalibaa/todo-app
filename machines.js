@@ -1,13 +1,30 @@
 // Ajaltoun 4193 — machines & trucks from the site cameras (Mario, 2026-10-10).
 // Static data reviewed from the SD cards: data/excavation-days.json (hours per machine and truck loads per
 // day) and data/excavation-loads.json (every truck load with a photo and how well it was filled).
-// Photos live in public/excavation/loads/ and are only handed out here, behind the same access as
-// /api/ajaltoun (the 'ajaltoun' or 'excavation' app).
+// Photos live in public/excavation/<folder>/ and are only handed out here, behind the same access as
+// /api/ajaltoun (the 'ajaltoun' or 'excavation' app). public/excavation is kept out of the deploy (.vercelignore,
+// 449 MB filled Vercel's free Function Storage): on Vercel they stream from Firebase Storage excavation/<folder>/,
+// uploaded with scripts/upload-excavation-photos.js — re-run it after adding photos (2026-10-11).
 const fs = require('fs');
 const path = require('path');
 
 const DATA = path.join(__dirname, 'data');
-const PHOTOS = path.join(__dirname, 'public', 'excavation', 'loads');
+const PHOTOS = path.join(__dirname, 'public', 'excavation');
+
+// local file when there is one (dev), else Firebase Storage
+function sendPhoto(res, folder, name) {
+  const f = path.join(PHOTOS, folder, name);
+  if (fs.existsSync(f)) {
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
+    res.end(fs.readFileSync(f));
+    return;
+  }
+  const file = require('firebase-admin').storage().bucket().file(`excavation/${folder}/${name}`);
+  return file.download().then(([buf]) => {
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
+    res.end(buf);
+  }, e => { res.writeHead(e.code === 404 ? 404 : 502); res.end(e.code === 404 ? 'not found' : 'photo unavailable'); });
+}
 
 function readJson(name, fallback) {
   try { return JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8')); } catch { return fallback; }
@@ -40,10 +57,7 @@ async function handle(req, res, url, user, ctx) {
   }
   const m = p.match(/^\/api\/ajaltoun\/machines\/photo\/(\d{8}_\d{4}[\w-]*\.jpg)$/);
   if (m && req.method === 'GET') {
-    const f = path.join(PHOTOS, m[1]);
-    if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
-    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
-    res.end(fs.readFileSync(f));
+    await sendPhoto(res, 'loads', m[1]);
     return true;
   }
   if (p === '/api/ajaltoun/machines/review' && req.method === 'POST') {
@@ -58,18 +72,12 @@ async function handle(req, res, url, user, ctx) {
   }
   const gp = p.match(/^\/api\/ajaltoun\/machines\/(georges|bmw|tacoma|dodge|visitors)\/(\d{8}[\w-]{0,12}\.jpg)$/);
   if (gp && req.method === 'GET') {
-    const f = path.join(__dirname, 'public', 'excavation', gp[1], gp[2]);
-    if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
-    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
-    res.end(fs.readFileSync(f));
+    await sendPhoto(res, gp[1], gp[2]);
     return true;
   }
   const fl = p.match(/^\/api\/ajaltoun\/machines\/flag\/(\d{8}_[a-z0-9_]{2,24}\.jpg)$/);
   if (fl && req.method === 'GET') {
-    const f = path.join(__dirname, 'public', 'excavation', 'flags', fl[1]);
-    if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
-    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
-    res.end(fs.readFileSync(f));
+    await sendPhoto(res, 'flags', fl[1]);
     return true;
   }
   return false;
