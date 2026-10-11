@@ -60,7 +60,7 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a></nav>
+  <nav class="tabs"><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -100,6 +100,13 @@
     <div class="card" style="overflow-x:auto"><table id="btab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="bnote"></div>
   </section>
+  <section id="v-tacoma" hidden>
+    <h1>Silver Tacoma pickup on site</h1>
+    <p class="lead">When the silver Toyota Tacoma-type pickup arrived and left each day, what it carried and where it went, from all cameras combined. Tap a month to open it, a photo to enlarge.</p>
+    <div class="kpis" id="tkpis"></div>
+    <div class="card" style="overflow-x:auto"><table id="ttab"><thead><tr><th>Date</th><th>Arrived</th><th>Left</th><th class="n">Hours</th><th>Certainty</th><th>Notes</th><th>Photo</th></tr></thead><tbody></tbody></table></div>
+    <div class="note" id="tnote"></div>
+  </section>
   <section id="v-diesel" hidden>
     <h1>Diesel vs machine hours</h1>
     <div class="note" id="dverdict" style="margin-top:0;color:var(--text)"></div>
@@ -125,8 +132,8 @@
 const esc = Admin.esc; let D = null, MONTH = 'all';
 const LOADS = /\/loads$/.test(location.pathname), DIESEL = /\/diesel$/.test(location.pathname);
 const FLAGS = /\/flags$/.test(location.pathname);
-const GEORGES = /\/georges$/.test(location.pathname), BMW = /\/bmw$/.test(location.pathname);
-const VIEW = BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
+const GEORGES = /\/georges$/.test(location.pathname), BMW = /\/bmw$/.test(location.pathname), TACOMA = /\/tacoma$/.test(location.pathname);
+const VIEW = TACOMA ? 'tacoma' : BMW ? 'bmw' : GEORGES ? 'georges' : FLAGS ? 'flags' : DIESEL ? 'diesel' : LOADS ? 'loads' : 'days';
 const h1 = n => n == null ? '—' : (+n).toFixed(1);
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dd = s => { const d = new Date(s + 'T12:00:00'); return { day: d.getDate() + ' ' + MON[d.getMonth()], wd: d.toLocaleDateString('en-GB', { weekday: 'short' }), m: s.slice(0, 7), sun: d.getDay() === 0 }; };
@@ -276,7 +283,7 @@ Admin.require(['ajaltoun', 'excavation'], async me => {
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   document.getElementById('t-' + VIEW).classList.add('on');
   document.getElementById('v-' + VIEW).hidden = false;
-  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; BMW ? renderGeorges(D.bmw || { days: [], pending: 'The BMW review is running' }, 'b', 'bmw') : GEORGES ? renderGeorges(D.georges, 'g', 'georges') : FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
+  try { D = await Admin.api('GET', '/api/ajaltoun/machines'); document.getElementById('status').textContent = ''; TACOMA ? renderGeorges(D.tacoma || { days: [], pending: 'The Tacoma review is running' }, 't', 'tacoma') : BMW ? renderGeorges(D.bmw || { days: [], pending: 'The BMW review is running' }, 'b', 'bmw') : GEORGES ? renderGeorges(D.georges, 'g', 'georges') : FLAGS ? renderFlags() : DIESEL ? renderDiesel() : LOADS ? renderLoads() : renderDays(); }
   catch (e) { document.getElementById('status').textContent = 'Could not load: ' + (e.message || e); }
 });
 </script>

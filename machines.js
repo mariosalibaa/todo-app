@@ -23,7 +23,8 @@ async function handle(req, res, url) {
     const flags = readJson('excavation-flags.json', []);
     const georges = readJson('georges.json', null);
     const bmw = readJson('bmw.json', null);
-    res.end(JSON.stringify({ ...days, loads, diesel, flags, georges, bmw }));
+    const tacoma = readJson('tacoma.json', null);
+    res.end(JSON.stringify({ ...days, loads, diesel, flags, georges, bmw, tacoma }));
     return true;
   }
   const m = p.match(/^\/api\/ajaltoun\/machines\/photo\/(\d{8}_\d{4}[\w-]*\.jpg)$/);
@@ -34,7 +35,7 @@ async function handle(req, res, url) {
     res.end(fs.readFileSync(f));
     return true;
   }
-  const gp = p.match(/^\/api\/ajaltoun\/machines\/(georges|bmw)\/(\d{8}\.jpg)$/);
+  const gp = p.match(/^\/api\/ajaltoun\/machines\/(georges|bmw|tacoma)\/(\d{8}\.jpg)$/);
   if (gp && req.method === 'GET') {
     const f = path.join(__dirname, 'public', 'excavation', gp[1], gp[2]);
     if (!fs.existsSync(f)) { res.writeHead(404); res.end('not found'); return true; }
