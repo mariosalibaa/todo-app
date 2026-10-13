@@ -472,7 +472,13 @@ function openSeries(list, i, title, cams) {
   const vc = document.getElementById('vcams'); VALL = null; vc.hidden = true;
   if (cams && new Set(cams).size > 1) { VALL = list.map((u, k) => [u, cams[k]]); VCAM = 'all'; renderCams(); }
   VS = list; VI = i || 0; VT = title; showViewer(); document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden'; }
-function openFlag(k) { const l = (D.flags || [])[k]; if (!l) return; const x = dd(l.date); const P = '/api/ajaltoun/machines/flag/'; openSeries([l.photo, ...(l.series || [])].filter(Boolean).map(n => P + n), 0, x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera); }
+// camera chips in the suspicious viewer too (Mario 2026-10-14), from series_meta [file, camera, time]
+function openFlag(k) {
+  const l = (D.flags || [])[k]; if (!l) return; const x = dd(l.date); const P = '/api/ajaltoun/machines/flag/';
+  const M = l.series_meta || [], cam = n => ((M.find(m => m[0] === n) || [])[1]) || (/\+/.test(l.camera || '') ? (M[0] || [])[1] : l.camera) || 'camera';
+  const files = [l.photo, ...(l.series || [])].filter(Boolean);
+  openSeries(files.map(n => P + n), 0, x.wd + ' ' + x.day + ' ' + l.time + ' — ' + l.camera, files.map(cam));
+}
 const NOTES = [];
 function noteCell(t, title) {
   t = t || ''; if (t.length < 230) return `<td class="small muted notes">${esc(t)}</td>`;
