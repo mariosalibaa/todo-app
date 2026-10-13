@@ -36,7 +36,7 @@ const money = n => Math.round(Number(n || 0) * 100) / 100;
 
 // What a rule may say. Everything but the phone is optional, so a rule can be as loose as
 // "this number is always Patrick" or as tight as "$60 out, and only $60".
-const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName', 'book', 'accountId',
+const FIELDS = ['label', 'phone', 'contains', 'amount', 'direction', 'partnerId', 'partnerName', 'book', 'hubAccountId',
   'companyId', 'companyName', 'journalId', 'accountId', 'accountCode', 'analyticId', 'analyticName',
   'paymentJournalId', 'paymentJournalName', 'description', 'active', 'section', 'auto'];
 
@@ -192,7 +192,7 @@ async function autoBook(ctx, accountId, ids, who) {
     if (!snap.exists) continue;
     const t = { id: String(id), ...snap.data() };
     if (t.booked || alreadyInOdoo(t)) continue;
-    const rule = rules.find(r => (!r.accountId || r.accountId === account.id) && fits(r, t));
+    const rule = rules.find(r => (!r.hubAccountId || r.hubAccountId === account.id) && fits(r, t));
     if (!rule) continue;
     try { out.push(await bookPayment(odooCall, account, col, t, rule, who, { apply: true })); }
     catch (e) { out.push({ id, error: String(e.message || e).slice(0, 300) }); }
@@ -239,7 +239,7 @@ async function handle(req, res, url, user, ctx) {
   if ((m = url.match(/^\/api\/accounting\/accounts\/([\w-]+)\/book-preview$/)) && req.method === 'POST') {
     const account = await accounts.resolve(ws, m[1]);
     if (!account) { json(res, 404, { error: 'no such account' }); return true; }
-    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.accountId || r.accountId === account.id);
+    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.hubAccountId || r.hubAccountId === account.id);
     if (!rules.length) { json(res, 200, { rules: 0, candidates: [] }); return true; }
     const txs = (await accounts.txCol(account).get()).docs.map(d => d.data());
     const cand = [];
@@ -282,7 +282,7 @@ async function handle(req, res, url, user, ctx) {
     if (!ids.length) { json(res, 400, { error: 'nothing selected' }); return true; }
     if (ids.length > 20) { json(res, 400, { error: 'up to 20 lines at a time' }); return true; }
 
-    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.accountId || r.accountId === account.id);
+    const rules = (await ws.collection('whishRules').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.hubAccountId || r.hubAccountId === account.id);
     const col = accounts.txCol(account);
     const out = [];
     for (const id of ids) {

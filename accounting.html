@@ -1490,7 +1490,7 @@ function ruleFor(t) {
   if (t.src === 'odoo' || t.kind === 'transfer') return null;   // already in the books / not a purchase
   if (isExcelKept() || (account && account.odooPartner && account.odooPartner.id)) return null;   // Whish rules are for statement accounts, not worker ledgers
   return rules.find(r => r.active !== false
-    && (!r.accountId || r.accountId === acc)
+    && (!r.hubAccountId || r.hubAccountId === acc)
     && (r.phone || r.contains)
     && (!r.phone || String(t.phone || '') === String(r.phone))
     && (!r.contains || String(t.description || '').toLowerCase().includes(String(r.contains).toLowerCase()))
@@ -3631,7 +3631,7 @@ function drawBills() {
     + (done.length ? `<h4>${done.length} booked</h4>` + done.map(line).join('') : '')
     + '<h4>Rules</h4>'
     + (rules.length ? rules.map(r => `<div class="rule${r.active === false ? ' off' : ''}">
-        <span class="grow"><b>${esc(r.label || r.partnerName || '')}</b>${r.accountId ? `<span class="src">${esc((accounts.find(a => a.id === r.accountId) || {}).name || r.accountId)}</span>` : ''}
+        <span class="grow"><b>${esc(r.label || r.partnerName || '')}</b>${r.hubAccountId ? `<span class="src">${esc((accounts.find(a => a.id === r.hubAccountId) || {}).name || r.hubAccountId)}</span>` : ''}
           <div class="what">${r.phone ? '0' + esc(String(r.phone).replace(/^961/, '')) : ''}${r.contains ? (r.phone ? ' · ' : '') + '“' + esc(r.contains) + '”' : ''}${r.amount ? ' · ' + fmt(r.amount) : ' · any amount'} → ${esc([r.companyName, r.accountCode, r.analyticName].filter(Boolean).join(' · '))}</div></span>
         <button class="btn" onclick="dropRule('${r.id}')" title="Delete this rule">✕</button></div>`).join('')
       : '<p class="hint">No rules yet.</p>');
