@@ -38,6 +38,33 @@ async function readReviews(ctx) {
   try { const snap = await reviewsCol(ctx).get(); const o = {}; snap.forEach(d => { o[d.id] = d.data(); }); return o; } catch { return {}; }
 }
 
+// Days after the last SD-card review fill in by themselves from the phone's Tapo event lists (Mario 2026-10-14:
+// "this should be auto updated with new data"): working day / activity window / vehicle + person counts; hours and
+// loads stay null until they are counted from Tapo frames (not the SD cards, Mario 2026-10-14).
+const PIT = ['D2 C425', 'D2_Up C630', 'D3 up C630', 'Tapo C630 D2-D3'];   // cameras that look at the machines
+async function phoneDays(ctx, sdDays) {
+  if (!ctx || !ctx.db) return [];
+  const last = sdDays.reduce((m, d) => d.date > m ? d.date : m, '');
+  const out = [];
+  try {
+    const snap = await ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('cameraDays').get();
+    snap.forEach(doc => {
+      const c = doc.data();
+      if (!c.date || c.date <= last) return;
+      const cams = (c.cameras || []).filter(x => x.total > 0);
+      const pit = cams.filter(x => PIT.includes(x.cam));
+      const day = t => t >= '06:00' && t < '19:00';
+      const pitEv = pit.flatMap(x => (x.events || []).filter(e => day((e.time || '').slice(0, 5))));
+      const veh = pitEv.filter(e => /Vehicle/.test(e.kind)).length;
+      const times = pitEv.map(e => e.time.slice(0, 5)).sort();
+      out.push({ date: c.date, hitachi: null, komatsu: null, loads: null, cams: cams.map(x => x.cam.replace(/ C\d{3}$/, '')),
+        phone: { partial: !!c.partial, work: veh >= 3, vehicle: veh, person: pitEv.filter(e => /Person/.test(e.kind)).length,
+          first: times[0] || '', last: times[times.length - 1] || '', events: cams.reduce((s, x) => s + x.total, 0) } });
+    });
+  } catch { return []; }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 async function handle(req, res, url, user, ctx) {
   const p = url.split('?')[0];
   if (p === '/api/ajaltoun/machines' && req.method === 'GET') {
@@ -52,6 +79,7 @@ async function handle(req, res, url, user, ctx) {
     const dodge = readJson('dodge.json', null);
     const visitors = readJson('visitors.json', null);
     const reviews = await readReviews(ctx);
+    days.days = [...(days.days || []), ...await phoneDays(ctx, days.days || [])];
     res.end(JSON.stringify({ ...days, loads, diesel, flags, georges, bmw, tacoma, dodge, visitors, reviews }));
     return true;
   }

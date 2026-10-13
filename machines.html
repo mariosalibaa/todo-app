@@ -190,10 +190,12 @@ const monthName = m => MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4);
 
 // working / off / unknown (Mario 2026-10-10: "indicate off days number and working days")
 const seenElsewhere = d => /seen working|breaking|work happened|Entrance/i.test(d.notes || '');
-const isWork = d => d.hitachi != null ? (d.hitachi + d.komatsu > 0 || d.loads > 0) : (d.loads > 0 || seenElsewhere(d));
+const isWork = d => d.phone ? d.phone.work : d.hitachi != null ? (d.hitachi + d.komatsu > 0 || d.loads > 0) : (d.loads > 0 || seenElsewhere(d));
+// a day read from the phone (Tapo events) but not yet from the SD cards: worked / off is known, hours and loads are not
+const known = d => d.hitachi != null || !!d.phone;
 function dayStats(md) {
-  const work = md.filter(isWork), off = md.filter(d => d.hitachi != null && !isWork(d));
-  return { work: work.length, off: off.length, unk: md.length - work.length - off.length, workSeen: work.filter(d => d.hitachi != null).length, workBlind: work.filter(d => d.hitachi == null).length };
+  const work = md.filter(isWork), off = md.filter(d => known(d) && !isWork(d) && !(d.phone && d.phone.partial));
+  return { work: work.length, off: off.length, unk: md.filter(d => !isWork(d) && !known(d)).length, workSeen: work.filter(d => d.hitachi != null).length, workBlind: work.filter(d => d.hitachi == null).length };
 }
 function renderDays() {
   const days = D.days || [];
@@ -224,6 +226,14 @@ function renderDays() {
     html += grp(`<span class="fold" id="fold-${m}">▸</span> ${monthName(m)} <span class="small muted">${md[0].date.slice(8)}–${md[md.length - 1].date.slice(8)}</span>`, md, 'mon', `onclick="foldMonth('${m}')"`);
     for (const d of md.slice().reverse()) {
       // no week subtotal rows — Mario 2026-10-14: "cancel the weekly summary"; the month row is the only summary
+      if (d.phone) {   // from the phone: hours / loads pending (Tapo frames next, Mario 2026-10-14: "do not wait sd card, use tapo")
+        const x = dd(d.date), P = d.phone;
+        html += `<tr data-m="${m}" hidden class="part ${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}${P.partial ? ' <span class="small muted">so far</span>' : ''}</td>
+          <td class="n">${P.work ? tick : ''}</td><td class="n">${!P.work && !P.partial ? '●' : ''}</td><td class="n">${x.sun ? '●' : ''}</td><td class="n"></td>
+          <td class="n muted" colspan="4">hours &amp; loads pending</td>
+          <td class="small foot">📱 phone events${P.first ? ` · pit active ${P.first}–${P.last}` : ' · no activity on the pit cameras'} · 🚚 ${P.vehicle} 🚶 ${P.person}<div class="muted">${esc((d.cams || []).join(' + ') || 'no camera events')}</div></td><td class="small muted"><a href="/ajaltoun/machines/daily" style="color:var(--amber)">day report ›</a></td></tr>`;
+        continue;
+      }
       const x = dd(d.date), none = d.hitachi == null, part = /^from|until|mostly|pit camera/.test(d.footage || ''), work = isWork(d);
       html += `<tr data-m="${m}" hidden class="${none ? 'none' : part ? 'part' : ''} ${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
         <td class="n">${work ? tick : ''}</td><td class="n">${!none && !work ? '●' : ''}</td><td class="n">${x.sun ? '●' : ''}</td><td class="n muted">${none && !work ? '●' : ''}</td>
