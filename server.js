@@ -784,7 +784,7 @@ const handler = async (req, res) => {
     '/dev': 'dev.html',   // the dev queue: what the ✦ assistant could not do because it needs code; Claude Code drains it (Mario 2026-10-07)
     '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
     '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
-    '/tohme': 'tohme.html',   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025 (Mario 2026-10-13)
+    '/tohme': 'tohme.html',   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025; PUBLIC, no sign-in (Mario 2026-10-13)
     '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
     '/cpr/dynamic': 'cpr-dynamic.html',   // big generator fuel vs Cummins datasheet — PUBLIC snapshot for the supplier, no prices (Mario 2026-10-03)
@@ -1095,16 +1095,6 @@ const handler = async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `mahab_ok=${tk}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax` });
     res.end(JSON.stringify({ ok: true })); return;
   }
-  // /api/tohme — Villa Tohme per day (tohme.js), same access rule. A hub admin always; anyone else with the
-  // TOHME_PASSWORD cookie (tohme_ok, POST /api/tohme/login) — no password set = admins only.
-  if (url === '/api/tohme/login' && req.method === 'POST') {
-    let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }
-    let pw = ''; try { pw = String(JSON.parse(b || '{}').password || ''); } catch {}
-    if (!process.env.TOHME_PASSWORD || pw !== process.env.TOHME_PASSWORD) { await new Promise(r => setTimeout(r, 1500)); res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Wrong password' })); return; }
-    const tk = crypto.createHmac('sha256', process.env.TOHME_PASSWORD).update('tohme-ok').digest('hex').slice(0, 32);
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `tohme_ok=${tk}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax` });
-    res.end(JSON.stringify({ ok: true })); return;
-  }
   // /api/plants — all plants (plants.js). Admins; one plant + its devices with a share key (?src=&id=&k=) for anyone.
   if (url.split('?')[0].startsWith('/api/plants') && url.split('?')[0] !== '/api/plants/check') {
     const q = new URL(req.url, 'http://x').searchParams, P = require('./plants');
@@ -1206,11 +1196,9 @@ const handler = async (req, res) => {
     catch (e) { console.error('mahab error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
+  // /api/tohme — Villa Tohme per day (tohme.js). PUBLIC, no sign-in (Mario 2026-10-13: "make it without password"); isAdmin only shows the Hub link.
   if (url.split('?')[0] === '/api/tohme' && req.method === 'GET') {
-    const acc = await cprAccess();   // its isAdmin = the hub session check; the CPR password plays no part here
-    const tk = process.env.TOHME_PASSWORD ? crypto.createHmac('sha256', process.env.TOHME_PASSWORD).update('tohme-ok').digest('hex').slice(0, 32) : null;
-    const pw = !!tk && (/(?:^|;\s*)tohme_ok=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1] === tk;
-    if (!acc.isAdmin && !pw) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'password', needPassword: true, hasPassword: !!tk })); return; }
+    const acc = await cprAccess();
     try { const v = await require('./tohme').days({ db, TEAM_ID }); v.isAdmin = acc.isAdmin; res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
     catch (e) { console.error('tohme error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;

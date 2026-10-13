@@ -43,7 +43,6 @@
   .note b{color:var(--text);font-weight:600;}
   .err{color:var(--red);font-size:.8rem;margin:8px 0;}
   .mh{font-size:.95rem;margin:22px 0 8px;font-weight:600;}
-  #login{max-width:320px;margin:60px auto;text-align:center;} #login input{width:100%;margin:10px 0;padding:10px;} #login button{width:100%;padding:10px;}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   .ph{display:none;}
   /* the phone: the table fits the width — days, battery and solar share move under the month name */
@@ -67,13 +66,6 @@
 </header>
 <div id="ptr">↓ Pull to refresh</div>
 <main>
-  <div id="login" hidden>
-    <h1>Villa Tohme solar</h1>
-    <p class="lead" id="loginMsg">Enter the password.</p>
-    <input type="password" id="pw" placeholder="Password" autocomplete="current-password">
-    <button id="pwGo">Open</button>
-    <div class="err" id="pwErr"></div>
-  </div>
   <div id="app" hidden>
     <h1>Villa Tohme — The House of Christmas — 40.7 kWp</h1>
     <p class="lead" id="lead">Energy per month from DeyeCloud (station 61475496), integrated from the 5-minute power readings, since Shift installed the plant in April 2025.</p>
@@ -101,15 +93,9 @@
 
   async function load() {
     const r = await fetch('/api/tohme', { credentials: 'same-origin' });
-    if (r.status === 401) {
-      const j = await r.json().catch(() => ({}));
-      $('login').hidden = false; $('app').hidden = true;
-      if (!j.hasPassword) { $('loginMsg').textContent = 'Sign in to the Shift Hub first (admins only for now).'; $('pw').hidden = $('pwGo').hidden = true; }
-      return;
-    }
     D = await r.json();
     if (D.isAdmin) $('hubLink').hidden = false;
-    $('login').hidden = true; $('app').hidden = false;
+    $('app').hidden = false;
     if (D.error) $('err').textContent = 'DeyeCloud not reachable right now (' + D.error + ') — showing the stored days.';
     const ys = [...new Set(D.days.map(d => d.slice(0, 4)))];
     if (!year) year = ys[ys.length - 1];
@@ -165,12 +151,6 @@
 
   $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; load(); });
   $('tbl').addEventListener('click', e => { const tr = e.target.closest('tr.row'); if (!tr) return; open[tr.dataset.m] = !open[tr.dataset.m]; render(); });
-  $('pwGo').addEventListener('click', async () => {
-    $('pwErr').textContent = '';
-    const r = await fetch('/api/tohme/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('pw').value }) });
-    if (r.ok) load(); else $('pwErr').textContent = 'Wrong password';
-  });
-  $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('pwGo').click(); });
   load().catch(e => { $('err').textContent = String(e.message || e); $('app').hidden = false; });
 
   // pull-to-refresh on a phone: drag down from the top, let go past 80 px → read again (as on /cpr)
