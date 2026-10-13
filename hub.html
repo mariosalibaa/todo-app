@@ -25,7 +25,10 @@
   main{max-width:1240px;margin:0 auto;padding:22px 20px 40px;}
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:0 0 14px;font-weight:600;}
   .hback{display:inline-block;color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;margin-bottom:14px;} .hback:hover{background:var(--surface0);}
-  .apps-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;} .apps-head h2{margin:0;}
+  .apps-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;} .apps-head h2{margin:0;}
+  .apps-tools{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;} .apps-tools .hback{margin:0;}
+  /* inside a folder (#energy…) the back button, View as and the search sit on their own row under the folder name (Mario, 2026-10-13) */
+  .apps-head.folder .apps-tools{flex-basis:100%;margin-left:0;} .apps-head.folder #viewAs{margin-left:auto;}
   #viewAs{margin-left:auto;background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--sub);font:inherit;font-size:.85rem;max-width:260px;} #viewAs.on{color:var(--amber);border-color:var(--amber);}
   #tileSearch{width:min(260px,100%);background:var(--mantle);border:1px solid var(--surface0);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:.85rem;} #tileSearch:focus{outline:none;border-color:var(--amber);}
   .tile.hide,.tile.sub{display:none;} .tiles.q .tile.sub:not(.hide){display:grid;}
@@ -76,8 +79,7 @@
   <div class="who" id="who"></div>
 </header>
 <main>
-  <a class="hback" id="folderBack" href="#" style="display:none">‹ Back to the hub</a>
-  <div class="apps-head"><h2>Apps</h2><select id="viewAs" title="See the hub the way a member sees it (preview only — nothing changes)" style="display:none" onchange="viewAs(this.value)"><option value="">View as…</option></select><input type="search" id="tileSearch" placeholder="Search apps…" autocomplete="off" oninput="filterTiles(this.value)"></div>
+  <div class="apps-head"><h2>Apps</h2><div class="apps-tools"><a class="hback" id="folderBack" href="#" style="display:none">‹ Back to the hub</a><select id="viewAs" title="See the hub the way a member sees it (preview only — nothing changes)" style="display:none" onchange="viewAs(this.value)"><option value="">View as…</option></select><input type="search" id="tileSearch" placeholder="Search apps…" autocomplete="off" oninput="filterTiles(this.value)"></div></div>
   <div id="viewAsNote" class="note" style="display:none;margin:-4px 0 12px"></div>
   <div class="tiles" id="tiles"></div>
   <section id="members" style="display:none;">
@@ -153,6 +155,7 @@ const APPS = [
   { folder: 'energy' },
   { id: 'cpr', in: 'energy', ico: '⚡', name: 'CPR', desc: 'Energy per month — School, Church, Kamal (Liqaa + Hotel), solar, EDL, the generators and diesel; meters against Deye. Public link, no sign-in', href: '/cpr', admin: true },
   { id: 'mahab', in: 'energy', ico: '☀', name: 'Mahab', desc: 'Taan / Machmouchi 25 kWp plant — kWh per month from solar, EDL and the generators (DeyeCloud)', href: '/mahab', admin: true },
+  { id: 'tohme', in: 'energy', ico: '☀', name: 'Tohme', desc: 'Villa Tohme 40.7 kWp plant — kWh per month from solar, EDL and the generator since the install (DeyeCloud)', href: '/tohme', admin: true },
   { id: 'plants', in: 'energy', ico: '🔆', name: 'Plants', desc: 'Every DeyeCloud and Solarman plant — online / offline, power now, kWh today, month and year', href: '/plants', admin: true },
   { id: 'makhlouf', in: 'energy', ico: '⚡', name: 'Makhlouf', desc: 'Maison M Naccache generator — load, peak demand and kWh from the power logger', href: '/makhlouf', admin: true },
   { id: 'dev', ico: '🛠️', name: 'Dev requests', desc: 'What the ✦ assistant could not do because it needs code — queued for Claude Code, drained from VS Code with /hub-dev-queue', href: '/dev', admin: true },
@@ -243,6 +246,7 @@ function renderTiles(who) {
   const sole = only && only.length === 1 && vis.length > 1 ? only[0] : '';
   const open = sole || (FOLDERS[location.hash.slice(1)] ? location.hash.slice(1) : '');
   document.getElementById('folderBack').style.display = open && !sole ? '' : 'none';
+  document.querySelector('.apps-head').classList.toggle('folder', !!open);
   document.querySelector('.apps-head h2').textContent = open ? FOLDERS[open].name : 'Apps';
   document.getElementById('tiles').innerHTML = (open ? vis.filter(a => a.in === open).map(a => tile(a)).join('') : APPS.map(a => {
     if (!a.folder) return !a.in && vis.includes(a) ? tile(a) : '';
