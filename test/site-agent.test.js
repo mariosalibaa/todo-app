@@ -69,3 +69,36 @@ test('pendingWrites / mergeDone: a ✓ retry runs only what has not gone through
   assert.deepStrictEqual(mergeDone(['a'], ['c', 'a', 7]), ['a', 'c']);
   assert.deepStrictEqual(pendingWrites({ writes: [{ id: 'x' }] }).map(w => w.id), ['x']);
 });
+
+const { findTasks, todoPatch, todoDeletePatch, patchReceipt } = require('../site-agent');
+
+test('findTasks: open tasks only, scored by query words, id + title + due back', () => {
+  const tasks = [
+    { id: 'a1', title: 'Quote Phoenix Group — 4 electrical items', project: 'General Tasks', createdAt: '2026-10-10', notes: 'breaker, SPD' },
+    { id: 'a2', title: 'Write Airbnb guest review', project: 'General Tasks', createdAt: '2026-10-12' },
+    { id: 'a3', title: 'Phoenix done', done: true },
+    { id: 'a4', title: 'Phoenix gone', deleted: true },
+    { id: 'a5', title: 'Phoenix old', archived: true },
+  ];
+  const r = findTasks(tasks, 'phoenix quote');
+  assert.deepStrictEqual(r.map(t => t.id), ['a1']);
+  assert.deepStrictEqual(Object.keys(r[0]), ['id', 'title', 'due', 'project', 'priority', 'notes']);
+  assert.deepStrictEqual(findTasks(tasks, '').map(t => t.id), ['a2', 'a1'], 'no query = every open task, newest first');
+  assert.deepStrictEqual(findTasks(tasks, 'zzz'), []);
+});
+
+test('todoPatch: only the named fields move, blanks clear, unchanged = null', () => {
+  const cur = { title: 'Call Roger', due: '2026-10-20', priority: 'high', notes: '', assignees: [], done: false };
+  const users = [{ id: 'u1', name: 'Christa' }];
+  assert.strictEqual(todoPatch({}, cur, users, 'shift'), null);
+  assert.strictEqual(todoPatch({ due: '2026-10-20' }, cur, users, 'shift'), null, 'same value = no change');
+  const p = todoPatch({ due: '2026-10-25', priority: '', assignee: 'chris', title: '  Call Roger about VAT ' }, cur, users, 'shift');
+  assert.strictEqual(p.due, '2026-10-25'); assert.strictEqual(p.priority, ''); assert.deepStrictEqual(p.assignees, ['u1']);
+  assert.strictEqual(p.title, 'Call Roger about VAT'); assert.strictEqual(p.updatedBy, 'shift'); assert.ok(p.updatedAt);
+  assert.strictEqual(todoPatch({ due: 'next week' }, cur, users, 'shift'), null, 'a bad date is ignored');
+  const d = todoPatch({ done: true }, cur, users, 'shift'); assert.strictEqual(d.done, true); assert.ok(d.doneAt);
+  const unk = todoPatch({ assignee: 'Walid' }, cur, users, 'shift'); assert.strictEqual(unk.notes, 'for Walid'); assert.strictEqual(unk.assignees, undefined);
+  assert.strictEqual(patchReceipt(p), 'title → Call Roger about VAT, due → 2026-10-25, priority → (cleared)');
+  assert.strictEqual(patchReceipt(d), 'ticked done');
+  const del = todoDeletePatch('shift'); assert.strictEqual(del.deleted, true); assert.strictEqual(del.deletedBy, 'shift');
+});

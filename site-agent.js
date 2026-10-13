@@ -46,6 +46,48 @@ function todoDoc(input, who, users) {
     clientName: '', clientId: null, subtasks: [], assignees: user ? [user.id] : [], createdBy: who, origin: 'api' };
 }
 
+// ── editing / removing a task from the chat (Mario, 2026-10-14) ──────────────
+// what the agent reads to find a task: open (not done, not deleted, not archived) tasks, newest
+// first, one line each with the id it must quote back on hub_todo_update / hub_todo_delete.
+const taskWords = s => String(s || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+function findTasks(tasks, query, limit = 30) {
+  const open = (tasks || []).filter(t => t && !t.done && !t.deleted && !t.archived && t.title);
+  const words = taskWords(query);
+  const hay = t => [t.title, t.notes, t.project, t.partner, t.clientName].map(x => String(x || '').toLowerCase()).join(' ');
+  const scored = open.map(t => ({ t, hits: words.filter(w => hay(t).includes(w)).length }))
+    .filter(x => !words.length || x.hits > 0)
+    .sort((a, b) => b.hits - a.hits || String(b.t.createdAt || '').localeCompare(String(a.t.createdAt || '')));
+  return scored.slice(0, limit).map(({ t }) => ({ id: t.id, title: t.title, due: t.due || '', project: t.project || '', priority: t.priority || '', notes: String(t.notes || '').slice(0, 120) }));
+}
+// the fields the agent may change on an existing task — a blank string clears due / priority / project / notes,
+// a missing key leaves the field alone. `done` ticks or unticks it. Returns null when nothing changes.
+function todoPatch(input, cur, users, who) {
+  const patch = {};
+  const has = k => Object.prototype.hasOwnProperty.call(input || {}, k) && input[k] !== undefined && input[k] !== null;
+  if (has('title') && String(input.title).trim()) patch.title = String(input.title).trim().slice(0, 200);
+  if (has('due')) { const d = String(input.due).trim(); if (d === '' || /^\d{4}-\d{2}-\d{2}$/.test(d)) patch.due = d; }
+  if (has('priority')) { const p = String(input.priority).trim().toLowerCase(); if (p === '' || PRIORITIES.includes(p)) patch.priority = p; }
+  if (has('project')) patch.project = String(input.project).trim().slice(0, 100);
+  if (has('notes')) patch.notes = String(input.notes).trim().slice(0, 4000);
+  if (has('assignee')) {
+    const name = String(input.assignee).trim().toLowerCase();
+    const user = name ? (users || []).find(u => String(u.name || '').toLowerCase().startsWith(name)) : null;
+    if (!name) patch.assignees = [];
+    else if (user) patch.assignees = [user.id];
+    else patch.notes = [String(has('notes') ? patch.notes : (cur && cur.notes) || '').trim(), `for ${String(input.assignee).trim()}`].filter(Boolean).join(' · ').slice(0, 4000);
+  }
+  if (has('done')) { patch.done = !!input.done; patch.doneAt = input.done ? now() : null; }
+  const changed = Object.keys(patch).filter(k => JSON.stringify(patch[k]) !== JSON.stringify(cur ? cur[k] : undefined));
+  if (!changed.length) return null;
+  const out = {}; for (const k of changed) out[k] = patch[k];
+  out.updatedAt = now(); out.updatedBy = who;
+  return out;
+}
+// what the board does from its recycle bin: a soft delete the Trash page can restore
+const todoDeletePatch = who => ({ deleted: true, deletedAt: now(), deletedBy: who, updatedAt: now(), updatedBy: who });
+// one line for the card receipt: which fields moved
+const patchReceipt = patch => Object.keys(patch).filter(k => !['updatedAt', 'updatedBy', 'doneAt', 'assignees'].includes(k))
+  .map(k => k === 'done' ? (patch.done ? 'ticked done' : 'reopened') : `${k} → ${patch[k] === '' ? '(cleared)' : String(patch[k]).slice(0, 60)}`).join(', ');
 const previewOf = p => p.kind === 'action' ? `${p.status === 'done' ? '✓' : p.status === 'declined' ? '✗' : '✓?'} ${(p.action && p.action.summary) || ''}` : String(p.text || '');
 
 // the ledger line a card's write becomes: site-<card>-<tail of the tool_use id>. One card, one line per
@@ -151,6 +193,29 @@ async function handle(req, res, url, user, ctx) {
         await ws.collection('tasks').doc(t.id).set({ ...t, workspaceId: TEAM_ID });
         return json(res, 200, { ok: true, receipt: `to-do "${t.title}"${t.due ? ' due ' + t.due : ''}`, url: host + '/todo', taskId: t.id });
       }
+      // read: the open tasks that match, so the agent can quote an id back (never a card)
+      if (w.name === 'hub_todo_find') {
+        const snap = await ws.collection('tasks').get();
+        const tasks = findTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })), input.query, 30);
+        return json(res, 200, { ok: true, tasks, note: tasks.length ? 'quote the id on hub_todo_update / hub_todo_delete' : 'no open task matches — ask Mario which one, or widen the query' });
+      }
+      if (w.name === 'hub_todo_update' || w.name === 'hub_todo_delete') {
+        const id = String(input.id || '').trim();
+        if (!/^[\w-]{4,80}$/.test(id)) return json(res, 400, { error: 'a task id from hub_todo_find is needed' });
+        const ref = ws.collection('tasks').doc(id);
+        const d = await ref.get(); if (!d.exists) return json(res, 404, { error: 'no task ' + id });
+        const cur = d.data();
+        if (cur.deleted) return json(res, 409, { error: `"${cur.title}" is already in the recycle bin` });
+        if (w.name === 'hub_todo_delete') {
+          await ref.set(todoDeletePatch(AGENT), { merge: true });
+          return json(res, 200, { ok: true, receipt: `to-do "${cur.title}" moved to the recycle bin`, url: host + '/todo', taskId: id });
+        }
+        const users = (await ws.collection('users').get()).docs.map(x => ({ id: x.id, ...x.data() }));
+        const patch = todoPatch(input, cur, users, AGENT);
+        if (!patch) return json(res, 200, { ok: true, receipt: `to-do "${cur.title}" — nothing to change`, url: host + '/todo', taskId: id });
+        await ref.set(patch, { merge: true });
+        return json(res, 200, { ok: true, receipt: `to-do "${patch.title || cur.title}": ${patchReceipt(patch)}`, url: host + '/todo', taskId: id });
+      }
       return json(res, 400, { error: 'unknown hub write ' + w.name });
     }
 
@@ -190,4 +255,4 @@ async function handle(req, res, url, user, ctx) {
   return false;
 }
 
-module.exports = { AGENT, isTrigger, stripTrigger, contextLines, todoDoc, previewOf, lineIdOf, pendingWrites, mergeDone, handle };
+module.exports = { AGENT, isTrigger, stripTrigger, contextLines, todoDoc, findTasks, todoPatch, todoDeletePatch, patchReceipt, previewOf, lineIdOf, pendingWrites, mergeDone, handle };
