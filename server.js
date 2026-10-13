@@ -1197,6 +1197,13 @@ const handler = async (req, res) => {
     return;
   }
   // /api/tohme — Villa Tohme per day (tohme.js). PUBLIC, no sign-in (Mario 2026-10-13: "make it without password"); isAdmin only shows the Hub link.
+  if (url.split('?')[0] === '/api/tohme/day' && req.method === 'GET') {   // one day's 5-min series for the chart (public, like the page)
+    const d = String(new URL(req.url, 'http://x').searchParams.get('d') || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'd=yyyy-mm-dd' })); return; }
+    try { const v = await require('./tohme').day({ db, TEAM_ID }, d); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600' }); res.end(JSON.stringify(v)); }
+    catch (e) { console.error('tohme day error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
   if (url.split('?')[0] === '/api/tohme' && req.method === 'GET') {
     const acc = await cprAccess();
     try { const v = await require('./tohme').days({ db, TEAM_ID }); v.isAdmin = acc.isAdmin; res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }

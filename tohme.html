@@ -45,6 +45,12 @@
   .mh{font-size:.95rem;margin:22px 0 8px;font-weight:600;}
   #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);background:var(--amber);color:#1e1e2e;font-weight:600;font-size:.8rem;padding:8px 14px;border-radius:0 0 12px 12px;z-index:60;transition:transform .15s;}
   .ph{display:none;}
+  .mn{white-space:nowrap;} .views{margin:-2px 0 12px;} .views button{border-radius:8px;}
+  tr.chart>td{padding:10px 12px 14px;background:rgba(49,50,68,.25);white-space:normal;text-align:left;}
+  canvas.pp{width:100%;height:320px;display:block;} .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:.7rem;color:var(--sub);margin:6px 0 2px;} .legend i{display:inline-block;width:10px;height:3px;vertical-align:middle;margin-right:4px;}
+  .chartNote{font-size:.74rem;color:var(--sub);line-height:1.5;margin-top:6px;}
+  .kpi.thrown b{color:var(--amber);} .kpi.rack b{color:var(--green);}
+  @media (max-width:640px){ canvas.pp{height:240px;} }
   /* the phone: the table fits the width — days, battery and solar share move under the month name */
   @media (max-width:640px){
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
@@ -70,6 +76,7 @@
     <h1>Villa Tohme — The House of Christmas — 40.7 kWp</h1>
     <p class="lead" id="lead">Energy per month from DeyeCloud (station 61475496), integrated from the 5-minute power readings, since Shift installed the plant in April 2025.</p>
     <div class="tabs" id="years"></div>
+    <div class="tabs views" id="views"><button data-v="energy" class="on">Energy</button><button data-v="batt">Second battery rack</button></div>
     <div class="kpis" id="kpis"></div>
     <div class="card"><table id="tbl"></table></div>
     <div class="err" id="err"></div>
@@ -83,7 +90,9 @@
   const fmt = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : Math.round(v).toLocaleString('en-US'));
   const fmt1 = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : (Math.round(v * 10) / 10).toLocaleString('en-US'));
   const pc = (a, b) => b > 0 ? Math.round(a / b * 100) + ' %' : '';
-  let D = null, year = null, open = {};
+  let D = null, year = null, open = {}, view = 'energy', openDay = null, dayCache = {};
+  const yearAgo = () => { const t = D.today || D.days[D.days.length - 1]; return (+t.slice(0, 4) - 1) + t.slice(4); };
+  const fmtDay = d => `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
 
   // one day → the sources: the grid port = EDL, the generator port = the generator, export = what went out on either port
   function split(day, v) {
@@ -99,15 +108,17 @@
     if (D.error) $('err').textContent = 'DeyeCloud not reachable right now (' + D.error + ') — showing the stored days.';
     const ys = [...new Set(D.days.map(d => d.slice(0, 4)))];
     if (!year) year = ys[ys.length - 1];
-    $('years').innerHTML = ys.map(y => `<button data-y="${y}" class="${y === year ? 'on' : ''}">${y}</button>`).join('');
+    // "Last 12 months" = the same date a year ago → today (Mario 2026-10-13: "13 oct 2025 to 13 oct 2026")
+    $('years').innerHTML = ys.map(y => `<button data-y="${y}" class="${y === year ? 'on' : ''}">${y}</button>`).join('') + `<button data-y="last12" class="${year === 'last12' ? 'on' : ''}">Last 12 months</button>`;
     render();
   }
 
   function render() {
+    if (view === 'batt') return renderBatt();
     const months = {};
     const fi = D.fields.reduce((o, f, i) => (o[f] = i, o), {});
     D.days.forEach((d, i) => {
-      if (d.slice(0, 4) !== year) return;
+      if (year === 'last12' ? d < yearAgo() : d.slice(0, 4) !== year) return;
       const a = D.data[i]; if (!a) return;
       const v = {}; for (const f in fi) v[f] = a[fi[f]];
       const s = split(d, v); s.day = d;
@@ -139,7 +150,7 @@
           `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td>${fmt1(s.use)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
       }
     }
-    rows += line('tot', 'Total ' + year, T);
+    rows += line('tot', year === 'last12' ? `Total ${fmtDay(yearAgo())} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : 'Total ' + year, T);
     $('tbl').innerHTML = head + rows;
     $('note').innerHTML =
       `<b>Ports.</b> EDL comes into the inverter on its grid port (blue), the generator on its generator port (purple); Export is what went back out on either port. ` +
@@ -149,8 +160,95 @@
   }
 
 
+  // ── the second-rack case ────────────────────────────────────────────────────────────────────────────────────
+  // per day (server tohme-batt.js): battery full at, the daylight window it stayed full, solar thrown in that window
+  // (clear-sky curve fitted to the same morning − what the panels gave), what a 60 kWh rack (90 % usable) would have
+  // stored, the night's generator + grid, and what the rack would have replaced.
+  const inRange = d => d >= (D.rack.from || '0') && (year === 'last12' ? d >= yearAgo() : d.slice(0, 4) === year);
+  const hm = s => s ? +s.slice(0, 2) * 60 + +s.slice(3) : null;
+  const mh = m => m == null ? '—' : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+  function renderBatt() {
+    const months = {};
+    D.days.forEach(d => {
+      if (!inRange(d)) return;
+      const b = D.batt[d]; if (!b) return;
+      const k = d.slice(0, 7); (months[k] = months[k] || { list: [], t: { days: 0, full: 0, mins: 0, thrown: 0, store: 0, night: 0, replaced: 0, nightDays: 0 } }).list.push({ day: d, ...b });
+      const t = months[k].t; t.days++;
+      if (b.fullAt) { t.full++; t.mins += hm(b.fullAt); t.thrown += b.thrown || 0; t.store += b.store || 0; }
+      if (b.night != null) { t.night += b.night; t.replaced += b.replaced || 0; t.nightDays++; }
+    });
+    const keys = Object.keys(months).sort();
+    const T = { days: 0, full: 0, mins: 0, thrown: 0, store: 0, night: 0, replaced: 0, nightDays: 0 };
+    keys.forEach(k => { for (const f in T) T[f] += months[k].t[f]; });
+    $('kpis').innerHTML =
+      `<div class="kpi"><span>Battery full</span><b>${T.full} days</b><small>of ${T.days} · on average at ${T.full ? mh(T.mins / T.full) : '—'}</small></div>` +
+      `<div class="kpi thrown"><span>Solar thrown</span><b>${fmt(T.thrown)} kWh</b><small>panels throttled while the battery was full</small></div>` +
+      `<div class="kpi rack"><span>A second rack would store</span><b>${fmt(T.store)} kWh</b><small>60 kWh rack, 90 % usable = 54 kWh a day at most</small></div>` +
+      `<div class="kpi mix"><span>Night generator + EDL</span><b>${fmt(T.night)} kWh</b><small>${T.nightDays} nights after a full battery</small></div>` +
+      `<div class="kpi rack"><span>It would have replaced</span><b>${fmt(T.replaced)} kWh</b><small>${pc(T.replaced, T.night)} of those nights</small></div>`;
+    const head = `<tr><th>Month</th><th class="hide-sm">Days full<small>of days</small></th><th>Full at<small>average</small></th><th>Solar thrown<small>kWh</small></th><th>Rack would store<small>kWh</small></th><th class="hide-sm">Night gen + EDL<small>kWh</small></th><th>Would replace<small>kWh</small></th></tr>`;
+    const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td><span class="mn">${label}</span><span class="ph">${t.full}/${t.days} full</span></td><td class="hide-sm">${t.full} / ${t.days}</td>` +
+      `<td>${t.full ? mh(t.mins / t.full) : '—'}</td><td class="sol">${fmt(t.thrown)}</td><td class="exp">${fmt(t.store)}</td><td class="hide-sm mix">${fmt(t.night)}</td><td class="exp">${fmt(t.replaced)}</td></tr>`;
+    let rows = '';
+    for (const k of keys) {
+      const m = months[k], [y, mo] = k.split('-');
+      rows += line('row', `${MONTHS[+mo - 1]} ${y}${D.today && D.today.startsWith(k) ? ' <small>to today</small>' : ''}`, m.t, `data-m="${k}"`);
+      if (open[k]) for (const b of m.list) {
+        const dd = +b.day.slice(8);
+        rows += `<tr class="row day" data-d="${b.day}"><td>${dd} ${MONTHS[+mo - 1]}${b.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${b.fullAt ? 'full ' + b.fullAt + ' → ' + b.clipTo : 'never full · max ' + b.socMax + ' %'}</span></td>` +
+          `<td class="hide-sm">${b.fullAt ? '<small>full ' + b.fullAt + ' → ' + b.clipTo + '</small>' : '<small>max ' + b.socMax + ' %</small>'}</td><td>${b.fullAt || '—'}</td>` +
+          `<td class="sol">${b.fullAt ? fmt1(b.thrown) : ''}</td><td class="exp">${b.fullAt ? fmt1(b.store) : ''}</td><td class="hide-sm mix">${b.night != null ? fmt1(b.night) : ''}</td><td class="exp">${b.replaced != null ? fmt1(b.replaced) : ''}</td></tr>`;
+        if (openDay === b.day) rows += `<tr class="chart"><td colspan="7"><div class="legend"><span><i style="background:#cba6f7"></i>PV</span><span><i style="background:#F2A93B;opacity:.5"></i>PV the sun allowed (clear-sky fit)</span><span><i style="background:#fab387"></i>Consumption</span><span><i style="background:#89dceb"></i>Battery (− charging)</span><span><i style="background:#94e2d5"></i>Generator</span><span><i style="background:#b4befe"></i>Grid</span><span><i style="background:#89b4fa;height:2px"></i>SOC %</span></div><canvas class="pp" id="cv-${b.day}"></canvas><div class="chartNote" id="cn-${b.day}">Reading DeyeCloud…</div></td></tr>`;
+      }
+    }
+    rows += line('tot', year === 'last12' ? `Total ${fmtDay(yearAgo())} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : 'Total ' + year, T);
+    $('tbl').innerHTML = head + rows;
+    if (openDay && $('cv-' + openDay)) chart(openDay);
+    $('note').innerHTML =
+      `<b>The case.</b> One 60 kWh rack (12 × 5 kWh) fills from the panels by early afternoon. From that moment the inverter throttles the panels down to the house load — on DeyeCloud's Power Profile the PV line drops onto Consumption while SOC sits at 100 % — and in the evening the generator and EDL carry the house. ` +
+      `<b>Solar thrown</b> = what the sun allowed minus what the panels gave, over the daylight window the battery stayed full. "What the sun allowed" is a clear-sky curve for that date in Lebanon, scaled to what the panels were giving in the <b>90 minutes before</b> the battery filled — a cloudy day gives a lower curve. ` +
+      `<b>A second rack</b> of 60 kWh at 90 % usable takes up to 54 kWh of that; <b>would replace</b> = the smaller of what it stores and what the generator + EDL gave that night (to the next sunrise). Tap a month for its days, a day for its chart.`;
+  }
+
+  async function chart(d) {
+    let v = dayCache[d];
+    if (!v) { try { v = dayCache[d] = await (await fetch('/api/tohme/day?d=' + d)).json(); } catch (e) { $('cn-' + d).textContent = 'DeyeCloud not reachable: ' + e.message; return; } }
+    const cv = $('cv-' + d); if (!cv) return;
+    const W = cv.clientWidth, H = cv.clientHeight, dpr = devicePixelRatio || 1;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const c = cv.getContext('2d'); c.scale(dpr, dpr);
+    const L = 36, R = 34, T = 10, Bm = 22, w = W - L - R, h = H - T - Bm;
+    const n = v.t.length; if (!n) { $('cn-' + d).textContent = 'No readings for this day.'; return; }
+    const t0 = v.t[0] - (v.t[0] % 300), span = 86400;
+    const x = t => L + (t - t0) / span * w;
+    const kMax = Math.max(5, ...v.pv, ...v.use, ...v.gen, ...v.grid, ...(v.pot || []), ...v.bat.map(Math.abs)); const lim = Math.ceil(kMax / 10) * 10;
+    const yk = k => T + h / 2 - k / lim * h / 2, ys = s => T + h - s / 100 * h;
+    c.clearRect(0, 0, W, H);
+    c.strokeStyle = '#313244'; c.lineWidth = 1; c.font = '10px system-ui'; c.fillStyle = '#6c7086';
+    for (let k = -lim; k <= lim; k += lim / 2) { c.beginPath(); c.moveTo(L, yk(k)); c.lineTo(L + w, yk(k)); c.stroke(); c.textAlign = 'right'; c.fillText(k, L - 4, yk(k) + 3); }
+    for (let hh = 0; hh <= 24; hh += 3) { const xx = L + hh / 24 * w; c.textAlign = 'center'; c.fillText(String(hh).padStart(2, '0') + ':00', xx, H - 6); }
+    for (let p = 0; p <= 100; p += 50) { c.textAlign = 'left'; c.fillText(p + ' %', L + w + 4, ys(p) + 3); }
+    // the thrown solar: shaded between the clear-sky curve and PV, inside the full window
+    const a = v.batt;
+    if (v.pot && a.iFull != null) {
+      c.beginPath(); c.fillStyle = 'rgba(242,169,59,.28)';
+      for (let i = a.iFull; i <= a.iEnd; i++) c.lineTo(x(v.t[i]), yk(Math.max(v.pot[i], v.pv[i])));
+      for (let i = a.iEnd; i >= a.iFull; i--) c.lineTo(x(v.t[i]), yk(v.pv[i]));
+      c.closePath(); c.fill();
+      c.strokeStyle = '#F2A93B'; c.setLineDash([4, 3]); c.beginPath(); v.pot.forEach((p, i) => { if (i === 0) c.moveTo(x(v.t[i]), yk(p)); else c.lineTo(x(v.t[i]), yk(p)); }); c.stroke(); c.setLineDash([]);
+      c.strokeStyle = '#F2A93B'; c.beginPath(); c.moveTo(x(v.t[a.iFull]), T); c.lineTo(x(v.t[a.iFull]), T + h); c.stroke();
+      c.fillStyle = '#F2A93B'; c.textAlign = 'left'; c.fillText('full ' + a.fullAt, x(v.t[a.iFull]) + 3, T + 10);
+    }
+    const line = (arr, col, y, wd) => { c.strokeStyle = col; c.lineWidth = wd || 1.4; c.beginPath(); arr.forEach((p, i) => { if (i === 0) c.moveTo(x(v.t[i]), y(p)); else c.lineTo(x(v.t[i]), y(p)); }); c.stroke(); };
+    line(v.gen, '#94e2d5', yk); line(v.grid, '#b4befe', yk); line(v.bat, '#89dceb', yk); line(v.use, '#fab387', yk); line(v.pv, '#cba6f7', yk, 1.8); line(v.soc, '#89b4fa', ys, 2);
+    $('cn-' + d).innerHTML = a.fullAt
+      ? `Battery full at <b>${a.fullAt}</b>, stayed full until ${a.clipTo}. In that window the sun allowed about ${fmt1(a.pvPot)} kWh, the panels gave ${fmt1(a.pvPot - a.thrown)} — <b>${fmt1(a.thrown)} kWh thrown</b> (shaded). Clear-sky curve fitted on ${a.fitN} readings before full. PV peak ${a.pvPeak} kW.`
+      : `The battery never filled this day (max ${a.socMax} %). PV peak ${a.pvPeak} kW.`;
+  }
+
+  $('views').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; view = b.dataset.v; open = {}; openDay = null; [...$('views').children].forEach(x => x.classList.toggle('on', x === b)); render(); });
   $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; load(); });
-  $('tbl').addEventListener('click', e => { const tr = e.target.closest('tr.row'); if (!tr) return; open[tr.dataset.m] = !open[tr.dataset.m]; render(); });
+  $('tbl').addEventListener('click', e => { const tr = e.target.closest('tr.row'); if (!tr) return; if (tr.dataset.d) { openDay = openDay === tr.dataset.d ? null : tr.dataset.d; return render(); } open[tr.dataset.m] = !open[tr.dataset.m]; render(); });
   load().catch(e => { $('err').textContent = String(e.message || e); $('app').hidden = false; });
 
   // pull-to-refresh on a phone: drag down from the top, let go past 80 px → read again (as on /cpr)
