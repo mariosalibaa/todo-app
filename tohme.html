@@ -195,8 +195,8 @@
       rows += line('row', `${MONTHS[+mo - 1]} ${y}${D.today && D.today.startsWith(k) ? ' <small>to today</small>' : ''}`, m.t, `data-m="${k}"`);
       if (open[k]) for (const b of m.list) {
         const dd = +b.day.slice(8);
-        rows += `<tr class="row day" data-d="${b.day}"><td>${dd} ${MONTHS[+mo - 1]}${b.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${b.fullAt ? 'full ' + b.fullAt + ' → ' + b.clipTo : 'never full · max ' + b.socMax + ' %'}</span></td>` +
-          `<td class="hide-sm">${b.fullAt ? '<small>full ' + b.fullAt + ' → ' + b.clipTo + '</small>' : '<small>max ' + b.socMax + ' %</small>'}</td><td>${b.fullAt || '—'}</td>` +
+        rows += `<tr class="row day" data-d="${b.day}"><td>${dd} ${MONTHS[+mo - 1]}${b.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${b.fullAt ? 'full ' + b.fullAt + ' → ' + b.clipTo : b.fullOther ? '100 % at ' + b.fullOther.at + ' from ' + b.fullOther.from : 'max ' + b.socMax + ' %'}</span></td>` +
+          `<td class="hide-sm">${b.fullAt ? '<small>full ' + b.fullAt + ' → ' + b.clipTo + '</small>' : b.fullOther ? '<small>100 % at ' + b.fullOther.at + ' from ' + b.fullOther.from + '</small>' : '<small>max ' + b.socMax + ' %</small>'}</td><td>${b.fullAt || '—'}</td>` +
           `<td class="sol">${b.fullAt ? fmt1(b.thrown) : ''}</td><td class="exp">${b.fullAt ? fmt1(b.store) : ''}</td><td class="hide-sm mix">${b.night != null ? fmt1(b.night) : ''}</td><td class="exp">${b.replaced != null ? fmt1(b.replaced) : ''}</td></tr>`;
         if (openDay === b.day) rows += `<tr class="chart"><td colspan="7"><div class="legend"><span><i style="background:#cba6f7"></i>PV</span><span><i style="background:#F2A93B;opacity:.5"></i>PV the sun allowed (clear-sky fit)</span><span><i style="background:#fab387"></i>Consumption</span><span><i style="background:#89dceb"></i>Battery (− charging)</span><span><i style="background:#94e2d5"></i>Generator</span><span><i style="background:#b4befe"></i>Grid</span><span><i style="background:#89b4fa;height:2px"></i>SOC %</span></div><canvas class="pp" id="cv-${b.day}"></canvas><div class="chartNote" id="cn-${b.day}">Reading DeyeCloud…</div></td></tr>`;
       }
@@ -207,7 +207,7 @@
     $('note').innerHTML =
       `<b>The case.</b> One 60 kWh rack (12 × 5 kWh) fills from the panels by early afternoon. From that moment the inverter throttles the panels down to the house load — on DeyeCloud's Power Profile the PV line drops onto Consumption while SOC sits at 100 % — and in the evening the generator and EDL carry the house. ` +
       `<b>Solar thrown</b> = what the sun allowed minus what the panels gave, over the daylight window the battery stayed full. "What the sun allowed" is a clear-sky curve for that date in Lebanon, scaled to what the panels were giving in the <b>90 minutes before</b> the battery filled — a cloudy day gives a lower curve. ` +
-      `<b>A second rack</b> of 60 kWh at 90 % usable takes up to 54 kWh of that; <b>would replace</b> = the smaller of what it stores and what the generator + EDL gave that night (to the next sunrise). Tap a month for its days, a day for its chart.`;
+      `<b>A second rack</b> of 60 kWh at 90 % usable takes up to 54 kWh of that; <b>would replace</b> = the smaller of what it stores and what the generator + EDL gave that night (to the next sunrise). "Full at" counts only a battery filled by the panels in daylight; a battery that reaches 100 % in the evening from EDL or the generator threw no solar, so the line says so and counts nothing. Tap a month for its days, a day for its chart.`;
   }
 
   async function chart(d) {

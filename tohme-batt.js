@@ -55,7 +55,12 @@ function analyze(recs, next) {
   out.socMax = Math.max(...recs.map(soc)); out.pvPeak = Math.round(Math.max(...recs.map(pv)) * 10) / 10;
   let iFull = -1;
   for (let i = 0; i < recs.length; i++) if (soc(recs[i]) >= 99 && pv(recs[i]) > 0.2) { iFull = i; break; }
-  if (iFull < 0) return out;
+  if (iFull < 0) {
+    // full, but not from the sun (EDL / generator in the evening or at night): say when and from what
+    const i = recs.findIndex(r => soc(r) >= 99);
+    if (i >= 0) { const r = recs[i]; out.fullOther = { at: beirut(r.dateTime), from: (+r.generatorPower || 0) > (+r.wirePower || 0) ? 'generator' : 'EDL' }; }
+    return out;
+  }
   out.fullAt = beirut(recs[iFull].dateTime);
   // the clear-sky curve, scaled to what the panels were giving just before the battery filled: 75th percentile of
   // pv / shape over the 90 min before full (sun ≥ 12°, battery charging), carried along the sun's curve. Earlier
