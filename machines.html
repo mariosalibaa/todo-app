@@ -223,11 +223,7 @@ function renderDays() {
     const md = days.filter(d => d.date.startsWith(m));
     html += grp(`<span class="fold" id="fold-${m}">▸</span> ${monthName(m)} <span class="small muted">${md[0].date.slice(8)}–${md[md.length - 1].date.slice(8)}</span>`, md, 'mon', `onclick="foldMonth('${m}')"`);
     for (const d of md.slice().reverse()) {
-      // week subtotal above each Sunday→Monday block (newest first, so print it when we reach the week's last day in the list)
-      if (wdOf(d.date) === 6 || d === md[md.length - 1]) {
-        const end = new Date(d.date + 'T12:00:00'), wk = md.filter(x => { const t = new Date(x.date + 'T12:00:00'); return t <= end && (end - t) / 864e5 <= wdOf(d.date); });
-        html += grp(`Week ${dd(wk[0].date).day} – ${dd(wk[wk.length - 1].date).day}`, wk, 'wk', `data-m="${m}" hidden`);
-      }
+      // no week subtotal rows — Mario 2026-10-14: "cancel the weekly summary"; the month row is the only summary
       const x = dd(d.date), none = d.hitachi == null, part = /^from|until|mostly|pit camera/.test(d.footage || ''), work = isWork(d);
       html += `<tr data-m="${m}" hidden class="${none ? 'none' : part ? 'part' : ''} ${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}</td>
         <td class="n">${work ? tick : ''}</td><td class="n">${!none && !work ? '●' : ''}</td><td class="n">${x.sun ? '●' : ''}</td><td class="n muted">${none && !work ? '●' : ''}</td>
@@ -519,7 +515,7 @@ const setThh = () => { const t = [...document.querySelectorAll('thead')].find(h 
 addEventListener('scroll', setThh, { passive: true });
 Admin.require(['ajaltoun', 'excavation'], async me => {
   setTimeout(setHdr, 0);
-  Admin.crumbs([['Ajaltoun 4193', '/#ajaltoun-4193'], ['Cameras']]);
+  Admin.crumbs([['Ajaltoun 4193', '/ajaltoun4193'], ['Cameras']]);
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   document.getElementById('t-' + VIEW).classList.add('on');
   document.getElementById('v-' + VIEW).hidden = false;

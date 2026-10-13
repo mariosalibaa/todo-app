@@ -767,6 +767,7 @@ const handler = async (req, res) => {
     '/accounting': 'accounting-home.html', '/accounting/whish': 'accounting.html', '/accounting/accounts': 'accounting.html',
     '/accounting/daily': 'daily.html', '/accounting/statements': 'statements.html', '/accounting/transfers': 'transfers.html', '/accounting/wise': 'wise.html', '/accounting/budget': 'budget.html', '/accounting/dashboard': 'dashboard.html',
     '/partners': 'partners.html', '/ajaltoun': 'ajaltoun.html', '/site': 'site.html',
+    '/ajaltoun4193': 'hub.html',   // the Ajaltoun 4193 folder of the hub on its own link (Mario 2026-10-14), was /#ajaltoun-4193
     '/reports': 'reports.html', '/projectcost': 'projectcost.html', '/suppliers': 'suppliers.html', '/accounting/trial-balance': 'reports.html', '/ajaltoun/excavation': 'excavation.html', '/ajaltoun/excavation/summary': 'excavation-summary.html',
     '/ajaltoun/machines': 'machines.html', '/ajaltoun/machines/loads': 'machines.html', '/ajaltoun/machines/diesel': 'machines.html', '/ajaltoun/machines/flags': 'machines.html', '/ajaltoun/machines/georges': 'machines.html', '/ajaltoun/machines/bmw': 'machines.html', '/ajaltoun/machines/tacoma': 'machines.html', '/ajaltoun/machines/cars': 'machines.html', '/ajaltoun/machines/plates': 'machines.html', '/ajaltoun/machines/daily': 'machines.html',   // machine hours + truck loads from the cameras (Mario 2026-10-10)
     '/decide': 'decisions.html', '/decisions': 'decisions.html',   // the member's own list of questions put to him
