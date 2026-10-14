@@ -298,7 +298,8 @@
    "lKomatsu": 138,
    "supplier": "Dib",
    "odoo": "to confirm (price)",
-   "paid": "none"
+   "paid": "none",
+   "medco": 1.358
   }
  ],
  "intervals": [
