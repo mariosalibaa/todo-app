@@ -196,9 +196,95 @@ async function build(ctx) {
   return { provision, layout, at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
 }
 
+// Diesel fills, one row per fill, newest first (Mario, 2026-10-14): date, supplier (Dib / IPT), litres, $/L, amount,
+// litres and hours per machine, the Odoo bill(s), the $0.80/L part inside Anthony's price and Mario's part above it,
+// and the payment(s) that paid the fill (date, amount, journal + method, payment name + Whish ref, cash account).
+//
+//   GET /api/ajaltoun/excavation/diesel   { fills, totals, at }
+//
+// Fills come from the lines of Georges' AJ4193-n-DIESEL bills ("d-m diesel <L>L*<$/L>…", priced at $/L − 0.80);
+// a fill the cameras saw that is on no bill yet (data/excavation-diesel.json) is listed as "to confirm".
+// A payment belongs to a fill by its memo ("filled d-m-yyyy" / "mazout d-m-yyyy"); a Dib payment without that
+// (e.g. "Dib Mokhtar (Whish) — diesel · WHISH-…") takes the oldest unpaid fill of the same amount (±$2) on or before it.
+const AT080 = 0.8, DIB_PHONE = '96171324324';
+const fs = require('fs'), path = require('path');
+async function diesel(ctx) {
+  const { odooCall, db, TEAM_ID } = ctx;
+  const [gBills, iptPartners] = await Promise.all([
+    odooCall('account.move', 'search_read', [[['partner_id', '=', PARTNER], ['company_id', '=', COMPANY], ['move_type', '=', 'in_invoice'], ['state', '=', 'posted']]], { fields: ['name', 'ref', 'date', 'invoice_line_ids'], context: CTX }),
+    odooCall('res.partner', 'search_read', [[['name', 'ilike', 'IPT']]], { fields: ['id'], context: CTX }),
+  ]);
+  const dBills = gBills.filter(b => isDiesel(b.ref));
+  const iptIds = iptPartners.map(p => p.id);
+  // IPT's own bills (the full price, paid to IPT) and the refund on Georges that takes it back from him
+  const iptBills = await odooCall('account.move', 'search_read', [[['company_id', '=', COMPANY], ['state', '=', 'posted'], ['move_type', 'in', ['in_invoice', 'in_refund']], '|', ['partner_id', 'in', iptIds.length ? iptIds : [0]], '&', ['partner_id', '=', PARTNER], ['ref', 'ilike', 'IPT']]],
+    { fields: ['name', 'ref', 'date', 'move_type', 'invoice_line_ids'], context: CTX });
+  const lineIds = [...dBills, ...iptBills].flatMap(b => b.invoice_line_ids || []);
+  const lines = lineIds.length ? await odooCall('account.move.line', 'read', [lineIds, ['move_id', 'name', 'quantity', 'price_unit', 'price_subtotal', 'display_type']], { context: CTX }) : [];
+  const pays = await odooCall('account.payment', 'search_read', [[['company_id', '=', COMPANY], ['partner_id', 'in', [PARTNER, ...iptIds]], ['state', 'in', ['paid', 'in_process', 'posted']], ['payment_type', '=', 'outbound'], '|', '|', ['memo', 'ilike', 'diesel'], ['memo', 'ilike', 'mazout'], ['memo', 'ilike', 'dib']]],
+    { fields: ['name', 'date', 'amount', 'memo', 'journal_id', 'payment_method_line_id', 'move_id'], order: 'date, id', context: CTX });
+  const jIds = [...new Set(pays.map(p => p.journal_id && p.journal_id[0]).filter(Boolean))];
+  const journals = jIds.length ? Object.fromEntries((await odooCall('account.journal', 'read', [jIds, ['name', 'code', 'default_account_id']], { context: CTX })).map(j => [j.id, j])) : {};
+  // the hub's Whish line tied to each payment (older memos carry no WHISH-<id>)
+  const whishOf = {};
+  for (const d of (await db.collection('workspaces').doc(TEAM_ID).collection('whishAccounts').get()).docs) {
+    const q = await d.ref.collection('tx').where('phone', '==', DIB_PHONE).get();
+    for (const x of q.docs) { const t = x.data(), won = t.odoo && (t.odoo.matches || []).find(m => m.chosen); if (won && won.moveId) whishOf[won.moveId] = x.id; }
+  }
+  const key = (dd, mm, yy) => `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  const billRef = b => ({ id: b.id, name: b.name, ref: b.ref || '' });
+  const fills = [];
+  for (const l of lines) {
+    if (l.display_type && l.display_type !== 'product') continue;
+    const b = dBills.find(x => x.id === l.move_id[0]); if (!b) continue;
+    const d = (l.name || '').match(/^(\d{1,2})-(\d{1,2})/); if (!d) continue;
+    const L = +l.quantity || 0, m = (l.name || '').match(/L\s*\*\s*-?([\d.]+)/i), perL = m ? +m[1] : r2(+l.price_unit + AT080);
+    const date = key(d[1], d[2], b.date.slice(0, 4)), ipt = /\bIPT\b/i.test(l.name || '');
+    // an IPT fill also has IPT's bill and the refund on Georges, by the same "d-m mazout/diesel" line
+    const iptDocs = ipt ? iptBills.filter(x => lines.some(o => o.move_id[0] === x.id && new RegExp('^' + (+d[1]) + '-' + (+d[2]) + '\\b').test(o.name || ''))).map(billRef) : [];
+    fills.push({ date, supplier: ipt ? 'IPT' : 'Dib', litres: L, perL, amount: r2(L * perL), anthony: r2(L * AT080), mario: r2(+l.price_subtotal || L * (perL - AT080)),
+      bills: [billRef(b), ...iptDocs], label: l.name || '', payments: [] });
+  }
+  // the cameras' side: which machine took the fill, and each machine's hours since the previous fill
+  let cam = { fills: [], intervals: [] };
+  try { cam = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'excavation-diesel.json'), 'utf8')); } catch (e) {}
+  for (const c of cam.fills || []) if (!fills.some(x => x.date === c.date))
+    fills.push({ date: c.date, supplier: '', litres: c.litres || 0, perL: c.perL || null, amount: c.total || null, anthony: c.litres ? r2(c.litres * AT080) : null, mario: c.perL ? r2(c.litres * (c.perL - AT080)) : null, bills: [], label: '', payments: [], toConfirm: true });
+  for (const x of fills) {
+    const c = (cam.fills || []).find(y => y.date === x.date), iv = (cam.intervals || []).find(y => y.fill === x.date);
+    const mach = (c && c.machine) || '';
+    x.machine = mach;
+    x.lHitachi = /^hitachi/i.test(mach) ? x.litres : null; x.lKomatsu = /^komatsu/i.test(mach) ? x.litres : null;
+    x.hHitachi = iv ? iv.hit : null; x.hKomatsu = iv ? iv.kom : null; x.hoursFrom = iv ? iv.start : '';
+  }
+  fills.sort((a, b) => a.date.localeCompare(b.date));
+  // payments → fills: by the date in the memo first, then by amount for the Dib payments that do not say
+  const payOut = p => {
+    const j = journals[p.journal_id && p.journal_id[0]] || {}, w = (String(p.memo || '').match(/WHISH-(\d+)/) || [])[1] || whishOf[p.move_id && p.move_id[0]] || '';
+    return { id: p.id, name: p.name, date: p.date, amount: r2(p.amount), journal: p.journal_id ? p.journal_id[1] : '', method: p.payment_method_line_id ? p.payment_method_line_id[1].replace(/\s*\(.*\)$/, '') : '',
+      whish: w, account: j.default_account_id ? j.default_account_id[1] : '', memo: p.memo || '' };
+  };
+  const left = [];
+  for (const p of pays) {
+    const m = String(p.memo || '').match(/(?:filled|mazout)\s+(\d{1,2})-(\d{1,2})-(\d{4})/i);
+    const x = m && fills.find(f => f.date === key(m[1], m[2], m[3]));
+    if (x) x.payments.push(payOut(p)); else left.push(p);
+  }
+  for (const p of left) {
+    if (!/dib|diesel/i.test(p.memo || '')) continue;
+    const x = fills.find(f => !f.payments.length && f.amount != null && f.supplier !== 'IPT' && f.date <= p.date && Math.abs(f.amount - p.amount) <= 2);
+    if (x) x.payments.push({ ...payOut(p), byAmount: true });
+  }
+  for (const x of fills) { x.paid = r2(x.payments.reduce((t, p) => t + p.amount, 0)); x.open = x.amount != null ? r2(x.amount - x.paid) : null; }
+  const S = k => r2(fills.reduce((t, x) => t + (+x[k] || 0), 0));
+  const totals = { n: fills.length, litres: S('litres'), amount: S('amount'), anthony: S('anthony'), mario: S('mario'), paid: S('paid'), lHitachi: S('lHitachi'), lKomatsu: S('lKomatsu'), hHitachi: S('hHitachi'), hKomatsu: S('hKomatsu') };
+  return { at: new Date().toISOString(), fills: fills.reverse(), totals, camUpdated: cam.updated || '' };
+}
+
 const readBody = req => new Promise((ok, no) => { let s = ''; req.on('data', d => s += d).on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { no(e); } }).on('error', no); });
 async function handle(req, res, url, user, ctx) {
   if (url.split('?')[0] === '/api/ajaltoun/excavation' && req.method === 'GET') return json(res, 200, await build(ctx));
+  if (url.split('?')[0] === '/api/ajaltoun/excavation/diesel' && req.method === 'GET') return json(res, 200, await diesel(ctx));
   if (url.split('?')[0] === '/api/ajaltoun/excavation/text' && req.method === 'PATCH') {   // Mario adjusts a card's wording (2026-09-13)
     if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin only' });
     const b = await readBody(req); const key = String(b.key || '').replace(/[^\w-]/g, '');

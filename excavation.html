@@ -40,7 +40,9 @@
   table.cyc{font-size:.7rem;} table.cyc th,table.cyc td{padding:4px 3px;white-space:nowrap;} table.cyc th{font-size:.56rem;letter-spacing:.02em;white-space:normal;line-height:1.15;vertical-align:bottom;} table.cyc td .of{color:var(--overlay0);font-size:.64rem;} table.cyc td .i{cursor:help;color:var(--amber);margin-left:3px;} .ok{color:var(--green);} .warn{color:var(--amber);} .bad{color:var(--red);}
   table.ledger td:first-child{max-width:340px;white-space:normal;} table.ledger tr.tot td{font-weight:600;border-top:1px solid var(--surface1);}
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
-  a{color:var(--amber);} button{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 10px;font-size:.78rem;cursor:pointer;} button:hover{border-color:var(--amber);}
+  .vtabs{display:flex;gap:4px;margin:0 0 16px;border-bottom:1px solid var(--surface0);} .vtabs a{padding:7px 14px;color:var(--sub);text-decoration:none;font-size:.84rem;border-bottom:2px solid transparent;margin-bottom:-1px;} .vtabs a.on{color:var(--amber);border-bottom-color:var(--amber);font-weight:600;}
+  table.fills td{vertical-align:top;} table.fills td.pay{white-space:normal;min-width:190px;} table.fills td.pay div+div{margin-top:4px;padding-top:4px;border-top:1px dashed var(--surface0);} table.fills tr.tc td{color:var(--amber);}
+    a{color:var(--amber);} button{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 10px;font-size:.78rem;cursor:pointer;} button:hover{border-color:var(--amber);}
 </style>
 </head>
 <body>
@@ -54,6 +56,16 @@
 </header>
 <main>
   <h1>Excavation — Georges EL Hajj · Ajaltoun 4193</h1>
+  <div class="vtabs"><a id="vt-exc" href="/ajaltoun/excavation">Excavation</a><a id="vt-diesel" href="/ajaltoun/excavation/diesel">Diesel fills</a></div>
+  <div id="v-diesel" hidden>
+    <p class="lead">Every diesel fill, newest first. Litres, price and the bill come from the fill lines on Odoo's diesel bills (read live). Litres per machine and hours since the previous fill come from the site cameras. The diesel up to $0.80/L is inside Anthony's price, and Mario pays what is above it. The payment is the Odoo payment that paid that fill: by the date in its memo, or (≈) by the same amount when the memo does not say.</p>
+    <div id="dstatus" class="small muted">Loading…</div>
+    <h2>Fills <span class="r"><select id="dsup" onchange="renderFills()"><option value="">Dib + IPT</option><option>Dib</option><option>IPT</option></select>
+      <label class="small muted">from <input type="date" id="dfrom" onchange="renderFills()"></label> <label class="small muted">to <input type="date" id="dto" onchange="renderFills()"></label> · <button onclick="fillsCsv()">⬇ CSV</button></span></h2>
+    <div class="card"><table class="cyc fills" id="fills"></table></div>
+    <div class="note" id="dfoot"></div>
+  </div>
+  <div id="v-exc">
   <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
   <div id="status" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
@@ -84,6 +96,7 @@
   <div class="note" id="foot"></div>
   <h2>One-page summary <span class="r muted">built from the figures above each time it opens — print it or save it as PDF</span></h2>
   <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><a class="btn" href="/ajaltoun/excavation/summary" target="_blank" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📄 Open the one-page summary</a><span class="small muted">the same page Antoine sees: headline figures, the deal, the partner ledger reconciled, who was paid from which account, cycle by cycle, cost per m³</span></div>
+  </div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -292,8 +305,45 @@ Admin.require(['ajaltoun', 'excavation'], me => {
   Admin.crumbs(full ? [['Ajaltoun 4193', '/ajaltoun#accounts'], ['Excavation']] : [['Ajaltoun 4193 — Excavation']]);
   if (!full) document.querySelector('nav.tabs').hidden = true;
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
-  load();
+  // two tabs on one page (Mario, 2026-10-14): /ajaltoun/excavation and /ajaltoun/excavation/diesel — each loads only its own data
+  const isDiesel = /\/diesel\/?$/.test(location.pathname);
+  document.getElementById('vt-' + (isDiesel ? 'diesel' : 'exc')).classList.add('on');
+  document.getElementById('v-exc').hidden = isDiesel; document.getElementById('v-diesel').hidden = !isDiesel;
+  if (isDiesel) { document.title = 'Diesel fills · Excavation · Shift Hub'; loadDiesel(); } else load();
 });
+// ── Diesel fills: one line per fill, newest first (Mario, 2026-10-14)
+let DF = null;
+async function loadDiesel() {
+  try { DF = await Admin.api('GET', '/api/ajaltoun/excavation/diesel'); document.getElementById('dstatus').textContent = ''; renderFills(); }
+  catch (e) { document.getElementById('dstatus').innerHTML = `<span class="bad">Could not load: ${esc(e.message || e)}</span>`; }
+}
+const dfRows = () => { const s = document.getElementById('dsup').value, a = document.getElementById('dfrom').value, b = document.getElementById('dto').value;
+  return DF.fills.filter(x => (!s || x.supplier === s) && (!a || x.date >= a) && (!b || x.date <= b)); };
+const nz = (v, d = 2) => v == null || v === '' ? '<span class="muted">—</span>' : f(v, d);
+function renderFills() {
+  const rows = dfRows(), S = k => rows.reduce((t, x) => t + (+x[k] || 0), 0);
+  const payCell = x => !x.payments.length ? (x.toConfirm ? '' : `<span class="bad">not paid</span>`)
+    : x.payments.map(p => `<div><b>${esc(p.date)}</b> · ${f(p.amount)}${p.byAmount ? ' <span class="i" title="matched by amount: the memo does not name the fill">≈</span>' : ''}<br><span class="muted">${esc(p.journal)} · ${esc(p.method)}</span><br><a target="_blank" href="${ODOO_PAY}${p.id}">${esc(p.name)}</a>${p.whish ? ` <span class="muted">· WHISH-${esc(p.whish)}</span>` : ''}<br><span class="muted">${esc(p.account)}</span></div>`).join('');
+  const odoo = x => x.bills.length ? x.bills.map(b => `<a target="_blank" href="${ODOO_BILL}${b.id}" title="${esc(b.ref)}">${esc(b.name)}</a>`).join('<br>') : '<span class="warn">to confirm</span>';
+  const mach = x => x.machine ? ` title="${esc(x.machine)}"` : '';
+  document.getElementById('fills').innerHTML = `<thead><tr><th>Date</th><th>Supplier</th><th class="n">Qty L</th><th class="n">$/L</th><th class="n">Amount</th><th class="n">L Hitachi</th><th class="n">L Komatsu</th><th class="n">Hr Hitachi</th><th class="n">Hr Komatsu</th><th>Odoo</th><th class="n" title="litres × $0.80, inside Anthony's price">On Anthony ≤ $0.80</th><th class="n" title="litres × ($/L − 0.80), what Shift pays on top — the Odoo bill line">On Mario &gt; $0.80</th><th class="n">Paid</th><th>Payment · date · amount · method · code · account</th></tr></thead>
+    <tbody>${rows.map(x => `<tr${x.toConfirm ? ' class="tc" title="seen by the cameras, on no Odoo bill yet: confirm the litres and the price"' : ''}><td>${esc(x.date)}</td><td>${esc(x.supplier || '?')}</td><td class="n">${f(x.litres, 0)}</td><td class="n">${x.perL == null ? '<span class="muted">—</span>' : f(x.perL, 3).replace(/0$/, '')}</td><td class="n">${nz(x.amount)}</td>
+      <td class="n"${mach(x)}>${nz(x.lHitachi, 0)}</td><td class="n"${mach(x)}>${nz(x.lKomatsu, 0)}</td><td class="n" title="${x.hoursFrom ? 'hours from ' + esc(x.hoursFrom) + ' to this fill' : ''}">${nz(x.hHitachi, 1)}</td><td class="n">${nz(x.hKomatsu, 1)}</td>
+      <td>${odoo(x)}</td><td class="n">${nz(x.anthony)}</td><td class="n">${nz(x.mario)}</td><td class="n ${x.open > 2 ? 'bad' : 'ok'}" title="${x.open > 2 ? f(x.open) + ' still open' : x.open ? 'Whish rounds to whole dollars' : ''}">${x.payments.length ? f(x.paid) : '<span class="muted">—</span>'}</td><td class="pay small">${payCell(x)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="tot"><td colspan="2">${rows.length} fills</td><td class="n">${f(S('litres'), 0)}</td><td class="n">${S('litres') ? f(S('amount') / S('litres'), 3) : ''}</td><td class="n">${f(S('amount'))}</td><td class="n">${f(S('lHitachi'), 0)}</td><td class="n">${f(S('lKomatsu'), 0)}</td><td class="n">${f(S('hHitachi'), 1)}</td><td class="n">${f(S('hKomatsu'), 1)}</td><td></td><td class="n">${f(S('anthony'))}</td><td class="n">${f(S('mario'))}</td><td class="n">${f(S('paid'))}</td><td></td></tr></tfoot>`;
+  const unpaid = rows.filter(x => !x.toConfirm && !x.payments.length), tc = rows.filter(x => x.toConfirm);
+  document.getElementById('dfoot').innerHTML = `<b>How to read it.</b> Amount = litres × $/L, the price paid to the supplier. On Anthony + On Mario = the amount. L per machine is filled only where the cameras show which machine the tanker filled (hover for what they saw). Hours are each machine's running hours since the previous fill, from all cameras, counted from August.`
+    + (unpaid.length ? ` <span class="bad">Not paid yet: ${unpaid.map(x => esc(x.date) + ' (' + f(x.amount) + ')').join(', ')}.</span>` : '')
+    + (tc.length ? ` <span class="warn">To confirm: ${tc.map(x => esc(x.date) + ' ' + f(x.litres, 0) + ' L').join(', ')}. The cameras saw the fill, but it isn't on an Odoo bill.</span>` : '')
+    + ` <span class="muted">Odoo read ${new Date(DF.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '')}${DF.camUpdated ? ' · cameras ' + esc(DF.camUpdated) : ''}.</span>`;
+}
+function fillsCsv() {
+  const rows = [['Date', 'Supplier', 'Qty L', '$/L', 'Amount', 'L Hitachi', 'L Komatsu', 'Hr Hitachi', 'Hr Komatsu', 'Odoo', 'On Anthony (<= 0.80)', 'On Mario (> 0.80)', 'Payment date', 'Payment amount', 'Method', 'Payment', 'Whish', 'Account'],
+    ...dfRows().flatMap(x => (x.payments.length ? x.payments : [null]).map((p, i) => [x.date, x.supplier, i ? '' : x.litres, i ? '' : x.perL, i ? '' : x.amount, i ? '' : x.lHitachi, i ? '' : x.lKomatsu, i ? '' : x.hHitachi, i ? '' : x.hKomatsu, x.bills.map(b => b.name).join(' + ') || 'to confirm', i ? '' : x.anthony, i ? '' : x.mario,
+      p ? p.date : '', p ? p.amount : '', p ? p.journal + ' · ' + p.method : '', p ? p.name : '', p && p.whish ? 'WHISH-' + p.whish : '', p ? p.account : '']))];
+  const csv = rows.map(r => r.map(v => v == null ? '' : typeof v === 'number' ? v : `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'Ajaltoun diesel fills.csv'; a.click();
+}
 async function load() {
   foldState();
   try { D = await Admin.api('GET', '/api/ajaltoun/excavation'); render(); }
