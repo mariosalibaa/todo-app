@@ -272,7 +272,8 @@
    "odoo": "in Odoo (added 10 Oct)",
    "paid": "none (not paid yet)",
    "time": "14:37",
-   "timeSrc": "camera"
+   "timeSrc": "camera",
+   "medco": 1.434
   },
   {
    "date": "2026-10-08",
