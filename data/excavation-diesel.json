@@ -287,6 +287,18 @@
    "machine": "unknown (Komatsu parked all day 9-10)",
    "odoo": "to confirm",
    "paid": "none"
+  },
+  {
+   "date": "2026-10-14",
+   "litres": 497,
+   "perL": null,
+   "total": null,
+   "machine": "Hitachi 359 L full + Komatsu 138 L full (Mario 14-10)",
+   "lHitachi": 359,
+   "lKomatsu": 138,
+   "supplier": "Dib",
+   "odoo": "to confirm (price)",
+   "paid": "none"
   }
  ],
  "intervals": [

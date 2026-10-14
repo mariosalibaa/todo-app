@@ -249,12 +249,13 @@ async function diesel(ctx) {
   let cam = { fills: [], intervals: [] };
   try { cam = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'excavation-diesel.json'), 'utf8')); } catch (e) {}
   for (const c of cam.fills || []) if (!fills.some(x => x.date === c.date))
-    fills.push({ date: c.date, supplier: '', litres: c.litres || 0, perL: c.perL || null, amount: c.total || null, anthony: c.litres ? r2(c.litres * AT080) : null, mario: c.perL ? r2(c.litres * (c.perL - AT080)) : null, bills: [], label: '', payments: [], toConfirm: true });
+    fills.push({ date: c.date, supplier: c.supplier || '', litres: c.litres || 0, perL: c.perL || null, amount: c.total || null, anthony: c.litres ? r2(c.litres * AT080) : null, mario: c.perL ? r2(c.litres * (c.perL - AT080)) : null, bills: [], label: '', payments: [], toConfirm: true });
   for (const x of fills) {
     const c = (cam.fills || []).find(y => y.date === x.date), iv = (cam.intervals || []).find(y => y.fill === x.date);
     const mach = (c && c.machine) || '';
     x.machine = mach;
-    x.lHitachi = /^hitachi/i.test(mach) ? x.litres : null; x.lKomatsu = /^komatsu/i.test(mach) ? x.litres : null;
+    // a fill split between the two machines carries its own litres (Mario, 2026-10-14: "359L hitachi full ; 138L komatsu full")
+    x.lHitachi = c && c.lHitachi != null ? c.lHitachi : /^hitachi/i.test(mach) ? x.litres : null; x.lKomatsu = c && c.lKomatsu != null ? c.lKomatsu : /^komatsu/i.test(mach) ? x.litres : null;
     x.hHitachi = iv ? iv.hit : null; x.hKomatsu = iv ? iv.kom : null; x.hoursFrom = iv ? iv.start : '';
   }
   fills.sort((a, b) => a.date.localeCompare(b.date));
