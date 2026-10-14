@@ -254,7 +254,8 @@ async function diesel(ctx) {
     const c = (cam.fills || []).find(y => y.date === x.date), iv = (cam.intervals || []).find(y => y.fill === x.date);
     const mach = (c && c.machine) || '';
     x.machine = mach;
-    x.medco = c && c.medco != null ? c.medco : null;   // Medco's official $/L on the fill day (Mario, 2026-10-14) — the reference Dib's price is read against
+    x.medco = c && c.medco != null ? c.medco : null;
+    x.time = (c && c.time) || ''; x.timeSrc = (c && c.timeSrc) || '';   // the hour of the fill (Mario, 2026-10-14), from him or from the cameras   // Medco's official $/L on the fill day (Mario, 2026-10-14) — the reference Dib's price is read against
     // a fill split between the two machines carries its own litres (Mario, 2026-10-14: "359L hitachi full ; 138L komatsu full")
     x.lHitachi = c && c.lHitachi != null ? c.lHitachi : /^hitachi/i.test(mach) ? x.litres : null; x.lKomatsu = c && c.lKomatsu != null ? c.lKomatsu : /^komatsu/i.test(mach) ? x.litres : null;
     x.hHitachi = iv ? iv.hit : null; x.hKomatsu = iv ? iv.kom : null; x.hoursFrom = iv ? iv.start : '';

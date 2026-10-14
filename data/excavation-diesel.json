@@ -259,7 +259,9 @@
    "total": 600,
    "machine": "Hitachi (D2 up: tanker hose to the Hitachi tank 07:22–07:29)",
    "odoo": "in Odoo",
-   "paid": "none in Odoo"
+   "paid": "none in Odoo",
+   "time": "07:17",
+   "timeSrc": "camera"
   },
   {
    "date": "2026-10-05",
@@ -268,7 +270,9 @@
    "total": 740,
    "machine": "Hitachi (camera: tanker 14:37)",
    "odoo": "in Odoo (added 10 Oct)",
-   "paid": "none (not paid yet)"
+   "paid": "none (not paid yet)",
+   "time": "14:37",
+   "timeSrc": "camera"
   },
   {
    "date": "2026-10-08",
@@ -277,7 +281,9 @@
    "total": 300,
    "machine": "Komatsu (camera)",
    "odoo": "in Odoo",
-   "paid": "paid to IPT Saint Nicolas: PCSH2/2026/00054 2026-10-08 $300"
+   "paid": "paid to IPT Saint Nicolas: PCSH2/2026/00054 2026-10-08 $300",
+   "time": "07:30",
+   "timeSrc": "Mario"
   },
   {
    "date": "2026-10-09",
@@ -289,7 +295,9 @@
    "paid": "none",
    "lHitachi": 495,
    "lKomatsu": 0,
-   "medco": 1.372
+   "medco": 1.372,
+   "time": "17:18",
+   "timeSrc": "Mario"
   },
   {
    "date": "2026-10-14",
@@ -302,7 +310,9 @@
    "supplier": "Dib",
    "odoo": "to confirm (price)",
    "paid": "none",
-   "medco": 1.358
+   "medco": 1.358,
+   "time": "09:00",
+   "timeSrc": "Mario"
   }
  ],
  "intervals": [
