@@ -284,9 +284,12 @@
    "litres": 495,
    "perL": null,
    "total": null,
-   "machine": "unknown (Komatsu parked all day 9-10)",
+   "machine": "Hitachi full (Mario 14-10)",
    "odoo": "to confirm",
-   "paid": "none"
+   "paid": "none",
+   "lHitachi": 495,
+   "lKomatsu": 0,
+   "medco": 1.372
   },
   {
    "date": "2026-10-14",
