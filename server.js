@@ -944,14 +944,15 @@ const handler = async (req, res) => {
     return;
   }
 
-  // /makhlouf/offer.pdf — the offer sent to Maison M (13 Oct 2026, public/makhlouf/offer-20261013.pdf). Admins only,
+  // /makhlouf/offer.pdf — the offer to Maison M: rev 2, 14 Oct 2026, generator carries the EDL hours too (public/makhlouf/offer-20261014.pdf;
+  // rev 1 of 13 Oct with EDL 4.8 h/day kept as offer-20261013.pdf). Admins only,
   // by the session cookie like /app/<key>; sits before the static whitelist, which would 404 it.
   if (url.split('?')[0] === '/makhlouf/offer.pdf' && req.method === 'GET') {
     const u = await verifyToken(req);
     const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
     if (!acc || !acc.admin) { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Sign in to the Shift Hub first (admins only).'); return; }
-    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="Maison M Naccache - Solar Offer (SHIFT) 2026-10-13.pdf"', 'Cache-Control': 'private, max-age=600' });
-    res.end(fs.readFileSync(path.join(__dirname, 'public/makhlouf/offer-20261013.pdf'))); return;
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="Maison M Naccache - Solar Offer (SHIFT) rev 2 2026-10-14.pdf"', 'Cache-Control': 'private, max-age=600' });
+    res.end(fs.readFileSync(path.join(__dirname, 'public/makhlouf/offer-20261014.pdf'))); return;
   }
 
   // Static files — an explicit whitelist: the folder also holds the Firebase
