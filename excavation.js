@@ -71,7 +71,7 @@ async function build(ctx) {
     const d = (l.name || '').match(/^(\d{1,2})-(\d{1,2})/); const key = d ? `${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}` : '';
     if (key && (!lastFill || key >= lastFill.key)) lastFill = { key, date: `${d[1]}-${d[2]}`, litres: L, perL };
     // a fill Dib has not been paid for yet: no Dib payment memo says "filled d-m-yyyy" for that date (Mario, 2026-09-13)
-    if (d && !payments.some(p => /dib/i.test(p.collector) && new RegExp('filled ' + (+d[1]) + '-' + (+d[2]) + '-').test(p.memo || ''))) unpaidFills.push({ date: `${d[1]}-${d[2]}`, litres: L, perL, amount: Math.round(L * perL) }); }   // Whish fills are whole dollars (540 × 1.389 = 750)
+    if (d && !/paid to IPT/i.test(l.name || '') && !payments.some(p => /dib/i.test(p.collector) && new RegExp('filled ' + (+d[1]) + '-' + (+d[2]) + '-').test(p.memo || ''))) unpaidFills.push({ date: `${d[1]}-${d[2]}`, litres: L, perL, amount: Math.round(L * perL) }); }   // Whish fills are whole dollars (540 × 1.389 = 750)
   // the excavated volume: the largest "N m3 total" written on a certificate
   const m3 = Math.max(0, ...B.map(b => +(((b.ref.match(/of\s*([\d,\.]+)\s*m3/) || b.ref.match(/([\d,\.]+)\s*m3 total/) || [])[1] || '0').replace(/,/g, ''))));
   const totals = {
