@@ -120,6 +120,15 @@ async function build(ctx) {
   }
   // Mario's hand summary per cycle (2026-09-13): litres → L/m³ × $0.80 = what diesel eats out of Anthony's $5 (his net is the rest);
   // and the cash Mario paid inside the cycle (diesel + Anthony) against the cycle's bills → position after each cycle
+  // a certificate with no diesel fill of its own joins the cycle before it (Mario, 2026-10-16: "group cycle 3 with cycle 2 since it has no diesel fill");
+  // cycle 1 stays alone — Anthony fuelled it himself. Odoo keeps its bills apart; only the table groups them.
+  for (const c of Object.values(cyc).sort((a, b) => b.n - a.n)) {
+    const prev = cyc[c.n - 1];
+    if (c.n > 2 && !c.litres && !c.diesel && prev && prev.litres) {
+      Object.assign(prev, { m3: prev.m3 + c.m3, totalM3: c.totalM3, contract: r2(prev.contract + c.contract), retention: r2(prev.retention + c.retention), till: c.till, certDate: c.certDate, label: `${prev.label || prev.n}+${c.label || c.n}` });
+      delete cyc[c.n];
+    }
+  }
   const sorted = Object.values(cyc).sort((a, b) => a.n - b.n);
   let prevDate = '', pos = 0;
   const cycles = sorted.map((c, i) => {
