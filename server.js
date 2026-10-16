@@ -148,6 +148,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
   fs.readFileSync(path.join(__dirname, 'media-viewer.js'));
   fs.readFileSync(path.join(__dirname, 'install.js'));
+  fs.readFileSync(path.join(__dirname, 'sticky-head.js'));
   fs.readFileSync(path.join(__dirname, 'phone-preview.js'));
   fs.readFileSync(path.join(__dirname, 'dictate.js'));
   fs.readFileSync(path.join(__dirname, 'emoji-picker.js'));
@@ -908,6 +909,8 @@ const handler = async (req, res) => {
   // is put into each page here, so no page has to remember it
   function withViewer(html, pagePath) {
     let h = html;
+    // every hub table keeps its header row on screen while scrolling (Mario, 2026-10-16: "make it a rule for all current and future hub tables")
+    if (!h.includes('/sticky-head.js')) h = /<\/body>/i.test(h) ? h.replace(/<\/body>(?![\s\S]*<\/body>)/i, '<script src="/sticky-head.js"></script></body>') : h + '<script src="/sticky-head.js"></script>';
     if (!h.includes('/media-viewer.js')) h = /<\/body>/i.test(h) ? h.replace(/<\/body>(?![\s\S]*<\/body>)/i, '<script src="/media-viewer.js"></script></body>') : h + '<script src="/media-viewer.js"></script>';
     // every page installable as its own app (Mario 2026-10-07) — the hub home keeps "Shift Hub" (already installed)
     if (pagePath && !h.includes('/install.js')) {
@@ -958,7 +961,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js', '/sticky-head.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {

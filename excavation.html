@@ -112,7 +112,10 @@ const DEFAULT_W = { pays: [96, 150, 150, 170, null, 90, 100], stmt: [96, 150, nu
 function applyCols(id) {
   const t = document.getElementById(id); if (!t || !t.tHead) return;
   const ths = [...t.tHead.rows[0].cells];
-  const saved = D && D.layout && D.layout[id]; const w = (saved && saved.some(x => x)) ? saved : (DEFAULT_W[id] || []);
+  const saved = D && D.layout && D.layout[id]; const w = ((saved && saved.some(x => x)) ? saved : (DEFAULT_W[id] || [])).slice();
+  // the text column (null by default) always takes what is left, so a saved width never pushes the table past the page (Mario, 2026-10-16: no sideways scroll)
+  const avail = (t.parentElement ? t.parentElement.clientWidth : 0) - 32, rest = w.reduce((n, x, i) => n + ((DEFAULT_W[id] || [])[i] === null ? 0 : (x || 0)), 0);
+  if (avail - rest >= 260) (DEFAULT_W[id] || []).forEach((x, i) => { if (x === null) w[i] = null; });   // on a phone the saved widths stay and the card scrolls sideways
   const fixed = w.some(x => x);
   t.style.tableLayout = fixed ? 'fixed' : '';
   ths.forEach((th, i) => { th.style.width = w[i] ? w[i] + 'px' : ''; th.classList.add('rs'); if (!th.querySelector('.grip')) { const g = document.createElement('span'); g.className = 'grip'; g.title = 'drag to resize' + (ME && ME.admin ? ' — saved for everyone' : ''); g.onmousedown = e => startResize(e, id, i); th.appendChild(g); } });
