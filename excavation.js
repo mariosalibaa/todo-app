@@ -290,6 +290,10 @@ async function diesel(ctx) {
   for (const x of fills) { x.paid = r2(x.payments.reduce((t, p) => t + p.amount, 0)); x.open = x.amount != null ? r2(x.amount - x.paid) : null; }
   const S = k => r2(fills.reduce((t, x) => t + (+x[k] || 0), 0));
   const totals = { n: fills.length, litres: S('litres'), amount: S('amount'), anthony: S('anthony'), mario: S('mario'), paid: S('paid'), lHitachi: S('lHitachi'), lKomatsu: S('lKomatsu'), hHitachi: S('hHitachi'), hKomatsu: S('hKomatsu') };
+  // the whole-dollar Whish rounding written off as a gain (small-gaps rule; Mario 2026-10-17: MISC/2026/10/0001 $3.47)
+  const rnd = await odooCall('account.move.line', 'search_read', [[['partner_id', '=', PARTNER], ['company_id', '=', COMPANY], ['parent_state', '=', 'posted'], ['move_id.ref', 'ilike', 'DIESEL-ROUNDING'], ['account_id.account_type', '=', 'liability_payable']]],
+    { fields: ['move_id', 'debit', 'credit'], context: CTX });
+  totals.rounding = r2(rnd.reduce((t, l) => t + l.debit - l.credit, 0)); totals.roundingMoves = [...new Set(rnd.map(l => l.move_id[1].split(' ')[0]))];
   return { at: new Date().toISOString(), fills: fills.reverse(), totals, camUpdated: cam.updated || '' };
 }
 
