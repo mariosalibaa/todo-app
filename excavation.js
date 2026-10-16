@@ -48,7 +48,7 @@ async function build(ctx) {
     const hub = byMove[p.move_id ? p.move_id[0] : 0] || byName[p.name] || null;
     const memo = String(p.memo || '');
     // who collected: the hub line's phone when tied; else the memo's word (diesel = Dib Mokhtar, anthony = Anthony); else cash to Georges
-    const collector = hub ? hub.collector : /dib mokhtar/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony khalil \(cash\)/i.test(memo) ? CASH_COLLECTOR : /anthony khalil/i.test(memo) ? 'Anthony Khalil (Whish)' : /diesel/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony|whish ms/i.test(memo) ? 'Anthony Khalil (Whish)' : CASH_COLLECTOR;
+    const collector = hub && hub.collector ? hub.collector : /^ipt/i.test(memo) ? 'IPT Saint Nicolas (Whish)' : /dib mokhtar/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony khalil \(cash\)/i.test(memo) ? CASH_COLLECTOR : /anthony khalil/i.test(memo) ? 'Anthony Khalil (Whish)' : /diesel/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony|whish ms/i.test(memo) ? 'Anthony Khalil (Whish)' : CASH_COLLECTOR;
     // money back from the collector (an inbound payment) counts against what was collected (Mario, 2026-09-13: 33,472 vs 35,608)
     return { id: p.id, name: p.name, date: p.date, amount: r2(p.payment_type === 'inbound' ? -p.amount : p.amount), memo, journal: p.journal_id ? p.journal_id[1] : '', journalId: p.journal_id ? p.journal_id[0] : null,
       reconciled: !!(p.reconciled_bill_ids || []).length, bills: (p.reconciled_bill_ids || []).length, collector, hubLine: hub ? hub.id : null, project: p.x_studio_project ? p.x_studio_project[1] : '' };
@@ -71,7 +71,7 @@ async function build(ctx) {
     const d = (l.name || '').match(/^(\d{1,2})-(\d{1,2})/); const key = d ? `${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}` : '';
     if (key && (!lastFill || key >= lastFill.key)) lastFill = { key, date: `${d[1]}-${d[2]}`, litres: L, perL };
     // a fill Dib has not been paid for yet: no Dib payment memo says "filled d-m-yyyy" for that date (Mario, 2026-09-13)
-    if (d && !/paid to IPT/i.test(l.name || '') && !payments.some(p => /dib/i.test(p.collector) && new RegExp('filled ' + (+d[1]) + '-' + (+d[2]) + '-').test(p.memo || ''))) unpaidFills.push({ date: `${d[1]}-${d[2]}`, litres: L, perL, amount: Math.round(L * perL) }); }   // Whish fills are whole dollars (540 × 1.389 = 750)
+    if (d && !/paid to IPT/i.test(l.name || '') && !payments.some(p => /dib|ipt/i.test(p.collector) && new RegExp('filled ' + (+d[1]) + '-' + (+d[2]) + '-').test(p.memo || ''))) unpaidFills.push({ date: `${d[1]}-${d[2]}`, litres: L, perL, amount: Math.round(L * perL) }); }   // Whish fills are whole dollars (540 × 1.389 = 750)
   // the excavated volume: the largest "N m3 total" written on a certificate
   const m3 = Math.max(0, ...B.map(b => +(((b.ref.match(/of\s*([\d,\.]+)\s*m3/) || b.ref.match(/([\d,\.]+)\s*m3 total/) || [])[1] || '0').replace(/,/g, ''))));
   const totals = {
