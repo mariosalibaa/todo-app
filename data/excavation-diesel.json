@@ -43,7 +43,9 @@
    "total": 737,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00023 2026-04-28 $737"
+   "paid": "PCSH2/2026/00023 2026-04-28 $737",
+   "medco": 1.25711,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,257.11 USD/1000 L, sent in Anthony's WhatsApp 27-4"
   },
   {
    "date": "2026-05-15",
@@ -61,7 +63,9 @@
    "total": 552,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00006 2026-05-26 $552"
+   "paid": "PCSH2/2026/00006 2026-05-26 $552",
+   "medco": 1.16669,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,166.69 USD/1000 L, sent in Anthony's WhatsApp 21-5"
   },
   {
    "date": "2026-05-28",
@@ -70,7 +74,9 @@
    "total": 614,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00011 2026-05-30 $613"
+   "paid": "PCSH2/2026/00011 2026-05-30 $613",
+   "medco": 1.14067,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,140.67 USD/1000 L, sent in Anthony's WhatsApp 28-5"
   },
   {
    "date": "2026-06-02",
@@ -133,7 +139,9 @@
    "total": 700,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00015 2026-07-02 $700"
+   "paid": "PCSH2/2026/00015 2026-07-02 $700",
+   "medco": 0.93996,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 939.96 USD/1000 L, sent in Anthony's WhatsApp 30-6"
   },
   {
    "date": "2026-07-06",
@@ -142,7 +150,9 @@
    "total": 570,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00024 2026-07-10 $570"
+   "paid": "PCSH2/2026/00024 2026-07-10 $570",
+   "medco": 0.91791,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 917.91 USD/1000 L, sent in Anthony's WhatsApp 6-7"
   },
   {
    "date": "2026-07-10",
@@ -151,7 +161,9 @@
    "total": 736,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00025 2026-07-10 $736"
+   "paid": "PCSH2/2026/00025 2026-07-10 $736",
+   "medco": 0.92748,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 927.48 USD/1000 L, sent in Anthony's WhatsApp 10-7"
   },
   {
    "date": "2026-07-15",
@@ -160,7 +172,9 @@
    "total": 600,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00026 2026-07-15 $600"
+   "paid": "PCSH2/2026/00026 2026-07-15 $600",
+   "medco": 0.94665,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 946.65 USD/1000 L, sent in Anthony's WhatsApp 15-7"
   },
   {
    "date": "2026-07-22",
@@ -178,7 +192,9 @@
    "total": 636,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00029 2026-07-27 $636"
+   "paid": "PCSH2/2026/00029 2026-07-27 $636",
+   "medco": 1.1475,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,147.50 USD/1000 L, sent in Anthony's WhatsApp 27-7"
   },
   {
    "date": "2026-08-01",
@@ -196,7 +212,9 @@
    "total": 952,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00034 2026-08-10 $950"
+   "paid": "PCSH2/2026/00034 2026-08-10 $950",
+   "medco": 1.22688,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,226.88 USD/1000 L, sent in Anthony's WhatsApp 9-8"
   },
   {
    "date": "2026-08-17",
@@ -214,7 +232,9 @@
    "total": 845,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00041 2026-08-26 $845"
+   "paid": "PCSH2/2026/00041 2026-08-26 $845",
+   "medco": 1.25304,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,253.04 USD/1000 L, sent in Anthony's WhatsApp 26-8"
   },
   {
    "date": "2026-09-03",
@@ -232,7 +252,9 @@
    "total": 750,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00048 2026-09-17 $750"
+   "paid": "PCSH2/2026/00048 2026-09-17 $750",
+   "medco": 1.33037,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,330.37 USD/1000 L, sent in Anthony's WhatsApp 11-9"
   },
   {
    "date": "2026-09-17",
@@ -241,7 +263,9 @@
    "total": 676,
    "machine": "",
    "odoo": "in Odoo",
-   "paid": "PCSH2/2026/00051 2026-10-01 $676"
+   "paid": "PCSH2/2026/00051 2026-10-01 $676",
+   "medco": 1.38729,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,387.29 USD/1000 L, sent in Anthony's WhatsApp 17-9"
   },
   {
    "date": "2026-09-24",
@@ -273,7 +297,8 @@
    "paid": "none (not paid yet)",
    "time": "14:37",
    "timeSrc": "camera",
-   "medco": 1.434
+   "medco": 1.43415,
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,434.15 USD/1000 L, sent in Anthony's WhatsApp 3-10 + 5-10"
   },
   {
    "date": "2026-10-08",
@@ -296,10 +321,11 @@
    "paid": "not paid yet",
    "lHitachi": 495,
    "lKomatsu": 0,
-   "medco": 1.372,
+   "medco": 1.37214,
    "time": "17:18",
    "timeSrc": "Mario",
-   "supplier": "Dib"
+   "supplier": "Dib",
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,372.14 USD/1000 L, sent in Anthony's WhatsApp 9-10"
   },
   {
    "date": "2026-10-14",
@@ -312,9 +338,10 @@
    "supplier": "Dib",
    "odoo": "in Odoo (BILL1/2026/09/0004)",
    "paid": "not paid yet",
-   "medco": 1.358,
+   "medco": 1.35828,
    "time": "09:00",
-   "timeSrc": "Mario"
+   "timeSrc": "Mario",
+   "medcoSrc": "Medco 'Fuel Prices Lyom' 1,358.28 USD/1000 L, sent in Anthony's WhatsApp 14-10"
   }
  ],
  "intervals": [
