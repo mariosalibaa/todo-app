@@ -119,7 +119,9 @@
   // ── Budget tab ───────────────────────────────────────────────────────────
   function renderBudget(el) {
     const B = budget(); const S = P.settings;
-    const ids = [...new Set([...Object.keys(B.trades), ...Object.keys(B.spent)])].sort((a, b) => (B.trades[b] || 0) - (B.trades[a] || 0));
+    // Mario's order (2026-10-17: "allow me to arrange the order of items", excavation first); trades not placed yet follow, biggest budget first
+    const ord = tradeOrder(B);
+    const ids = [...new Set([...Object.keys(B.trades), ...Object.keys(B.spent)])].sort((a, b) => ord.indexOf(a) - ord.indexOf(b));
     const rows = ids.filter(id => !isEquip(id)).map(id => { const b = B.trades[id] || 0, s = B.spent[id] || 0; return { id, b, s, r: b - s }; });
     const totB = sum(rows, r => r.b), totS = sum(rows, r => r.s);
     const equipRows = ids.filter(isEquip).map(id => ({ id, s: B.spent[id] || 0 }));
@@ -140,7 +142,7 @@
       <h2>Budget vs spent, by trade <span class="r muted">six villas · spent = Odoo lines classified in that trade</span></h2>
       <div class="card"><div class="wrap"><table>
         <thead><tr><th>Trade</th><th class="n">Budget</th><th class="n">Spent</th><th class="n">Remaining</th><th>Used</th><th class="n">%</th></tr></thead>
-        <tbody>${rows.map(r => `<tr><td>${esc(secName(r.id))}</td><td class="n">${usd(r.b)}</td><td class="n">${usd0(r.s)}</td><td class="n ${r.r < 0 ? 'flag' : ''}">${usd(r.r)}</td>
+        <tbody>${rows.map((r, k) => `<tr><td><span class="mv"><button title="move up" ${k ? '' : 'disabled'} onclick="Plan.moveTrade('${esc(r.id)}', -1)">▲</button><button title="move down" ${k < rows.length - 1 ? '' : 'disabled'} onclick="Plan.moveTrade('${esc(r.id)}', 1)">▼</button></span>${esc(secName(r.id))}</td><td class="n">${usd(r.b)}</td><td class="n">${usd0(r.s)}</td><td class="n ${r.r < 0 ? 'flag' : ''}">${usd(r.r)}</td>
           <td><div class="bar"><i style="width:${Math.min(100, 100 * r.s / Math.max(1, r.b))}%;${r.s > r.b ? 'background:var(--red)' : ''}"></i></div></td><td class="n">${r.b ? (100 * r.s / r.b).toFixed(0) + '%' : '—'}</td></tr>`).join('')}
         <tr class="tot"><td>Project (without equipment)</td><td class="n">${usd(totB)}</td><td class="n">${usd(totS)}</td><td class="n">${usd(totB - totS)}</td><td></td><td class="n">${(100 * totS / Math.max(1, totB)).toFixed(0)}%</td></tr>
         ${equipRows.map(r => `<tr class="eq"><td>${esc(secName(r.id))} <span class="pill eq">equipment</span></td><td class="n">—</td><td class="n">${usd(r.s)}</td><td class="n">—</td><td></td><td></td></tr>`).join('')}
@@ -289,6 +291,19 @@
       </div>`;
   }
 
+  function tradeOrder(B) {
+    const all = [...new Set([...Object.keys(B.trades), ...Object.keys(B.spent)])];
+    const saved = (P.settings.tradeOrder || ['excavation']).filter(id => all.includes(id));
+    return [...saved, ...all.filter(id => !saved.includes(id)).sort((a, b) => (B.trades[b] || 0) - (B.trades[a] || 0))];
+  }
+  async function moveTrade(id, d) {
+    const B = budget(), ord = tradeOrder(B).filter(x => !isEquip(x)), i = ord.indexOf(id), j = i + d;
+    if (i < 0 || j < 0 || j >= ord.length) return;
+    [ord[i], ord[j]] = [ord[j], ord[i]];
+    P.settings.tradeOrder = ord; rerender();
+    try { await Admin.api('POST', '/api/ajaltoun/plan/settings', { settings: { tradeOrder: ord } }); } catch (e) { alert('Could not save the order: ' + e.message); }
+  }
+
   async function saveSettings() {
     const villas = {};
     document.querySelectorAll('[data-v]').forEach(i => { const v = i.dataset.v, k = i.dataset.k; villas[v] = villas[v] || { ...P.settings.villas[v] }; villas[v][k] = i.type === 'number' ? (i.value === '' ? null : +i.value) : i.value; });
@@ -299,7 +314,7 @@
 
   // planned money out per year in the current scenario (the Accounts tab's cash-flow facts use it)
   function yearOut() { if (!P) return null; const R = plan(); const o = {}; for (const y of R.years) o[y] = R.tot(R.out, y); return o; }
-  window.Plan = { load, renderBudget, renderPlan, yearOut, get P() { return P; },
+  window.Plan = { load, moveTrade, renderBudget, renderPlan, yearOut, get P() { return P; },
     setTab: t => { tab = t; rerender(); }, setScenario: s => { scenario = s; rerender(); },
     edit: id => { editing = id || ''; rerender(); },
     filter: f => { Object.assign(BF, f); BF._focus = 'q' in f; rerender(); },
