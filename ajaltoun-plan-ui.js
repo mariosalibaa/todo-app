@@ -139,6 +139,7 @@
         <div class="kpi out"><div class="v">${usd(totS)}</div><div class="l">spent so far (Odoo) · ${(100 * totS / Math.max(1, totB)).toFixed(1)}% of the budget</div></div>
         <div class="kpi"><div class="v">${P.items.filter(i => i.review).length}</div><div class="l">lines still at 2022–2024 prices, to review</div></div>
       </div>
+      ${doneForecast(B, rows)}
       <h2>Budget vs spent, by trade <span class="r muted">six villas · spent = Odoo lines classified in that trade</span></h2>
       <div class="card"><div class="wrap"><table>
         <thead><tr><th>Trade</th><th class="n">Budget</th><th class="n">Spent</th><th class="n">Remaining</th><th>Used</th><th class="n">%</th></tr></thead>
@@ -289,6 +290,34 @@
         </div>
         <div class="note">U2’s money follows Jean’s instalment schedule in Odoo (received to date, then the due dates). An expected villa is paid in equal yearly parts from its sale year; its structure is built in the sale year unless set otherwise, finishing over the two years after.</div>
       </div>`;
+  }
+
+  // BOQ — what is done (real cost, Odoo) and the forecast for what remains, per project and per villa (Mario, 2026-10-17).
+  // A trade's remaining forecast = its budget − what it cost so far, never below 0; a trade whose quantity done reaches the
+  // BOQ quantity (excavation: 7,000 m³ dug) is finished, so nothing more is forecast for it. A villa's remaining is the
+  // project's remaining shared in proportion to the villa's budget.
+  function doneForecast(B, rows) {
+    const qd = (window.D && D.qtyDone) || {};
+    const boqQty = id => { let q = 0; for (const v of VILLAS) for (const i of B.byType[P.settings.villas[v].type]) if (i.trade === id && i.qty) q += +i.qty; return q; };
+    const fin = id => { const q = qd[id], bq = boqQty(id); return !!(q && q.qty && bq && q.qty >= bq - 0.5); };
+    const T = rows.map(r => { const done = fin(r.id), rem = done ? 0 : Math.max(0, r.b - r.s); return { ...r, done, rem, fc: r.s + rem }; });
+    const tb = sum(T, r => r.b), ts = sum(T, r => r.s), tr = sum(T, r => r.rem), tf = ts + tr;
+    const c = window.ajCompute ? window.ajCompute() : null;
+    const vb = Object.fromEntries(VILLAS.map(v => [v, B.villaBudget(v)])), vbTot = sum(VILLAS, v => vb[v]);
+    const V = VILLAS.map(v => { const s = c ? (c.villas.find(x => x.v === v) || {}).total || 0 : 0, rem = tr * vb[v] / Math.max(1, vbTot); return { v, b: vb[v], s, rem, fc: s + rem }; });
+    const varc = x => `<td class="n ${x > 0.5 ? 'flag' : x < -0.5 ? 'ok' : ''}">${x > 0.5 ? '+' : ''}${usd(x)}</td>`;
+    const head = first => `<thead><tr><th>${first}</th><th class="n">Budget</th><th class="n">Done (real cost)</th><th class="n">Forecast remaining</th><th class="n">Forecast at completion</th><th class="n">vs budget</th><th class="n">% done</th></tr></thead>`;
+    return `
+      <h2>Project — done and forecast <span class="r muted">done = real cost in Odoo · remaining = budget − done per trade, 0 once the trade is finished</span></h2>
+      <div class="card"><div class="wrap"><table>${head('Trade')}<tbody>
+        ${T.map(r => `<tr><td>${esc(secName(r.id))}${r.done ? ' <span class="pill">finished</span>' : ''}</td><td class="n">${usd(r.b)}</td><td class="n">${usd0(r.s)}</td><td class="n">${usd0(r.rem)}</td><td class="n">${usd(r.fc)}</td>${varc(r.fc - r.b)}<td class="n">${r.fc ? (100 * r.s / r.fc).toFixed(0) + '%' : '—'}</td></tr>`).join('')}
+        <tr class="tot"><td>Project (without equipment)</td><td class="n">${usd(tb)}</td><td class="n">${usd(ts)}</td><td class="n">${usd(tr)}</td><td class="n">${usd(tf)}</td>${varc(tf - tb)}<td class="n">${tf ? (100 * ts / tf).toFixed(0) + '%' : '—'}</td></tr>
+      </tbody></table></div></div>
+      <h2>Per villa — done and forecast <span class="r muted">done = own works + 1/6 of the common works · remaining = the project's, shared by villa budget</span></h2>
+      <div class="card"><div class="wrap"><table>${head('Villa')}<tbody>
+        ${V.map(x => `<tr><td>${x.v}${x.v === 'D3' ? ' <span class="pill">Mario 100%</span>' : ''} <span class="small muted">${P.settings.villas[x.v].type === 'U' ? 'up 333' : 'down'}</span></td><td class="n">${usd(x.b)}</td><td class="n">${usd0(x.s)}</td><td class="n">${usd0(x.rem)}</td><td class="n">${usd(x.fc)}</td>${varc(x.fc - x.b)}<td class="n">${x.fc ? (100 * x.s / x.fc).toFixed(0) + '%' : '—'}</td></tr>`).join('')}
+        <tr class="tot"><td>Six villas</td><td class="n">${usd(vbTot)}</td><td class="n">${usd(sum(V, x => x.s))}</td><td class="n">${usd(sum(V, x => x.rem))}</td><td class="n">${usd(sum(V, x => x.fc))}</td>${varc(sum(V, x => x.fc) - vbTot)}<td class="n"></td></tr>
+      </tbody></table></div></div>`;
   }
 
   function tradeOrder(B) {

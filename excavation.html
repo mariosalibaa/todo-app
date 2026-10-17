@@ -53,7 +53,7 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a href="/ajaltoun#accounts">Accounts</a><a href="/ajaltoun#budget">Budget (BOQ)</a><a href="/ajaltoun#plan">Cashflow plan</a><a class="on" href="/ajaltoun/excavation">Excavation</a></nav>
+  <nav class="tabs"><a href="/ajaltoun#dashboard">Dashboard</a><a href="/ajaltoun#division">Cost per division</a><a href="/ajaltoun#villas">Cost per villa</a><a href="/ajaltoun#budget">BOQ</a><a href="/ajaltoun#plan">Cashflow plan</a><a class="on" href="/ajaltoun/excavation">Excavation</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -307,7 +307,7 @@ const f = (n, d = 2) => (+n || 0).toLocaleString('en-US', { minimumFractionDigit
 Admin.require(['ajaltoun', 'excavation'], me => {
   ME = me;
   const full = (me.apps || []).includes('ajaltoun');
-  Admin.crumbs(full ? [['Ajaltoun 4193', '/ajaltoun#accounts'], ['Excavation']] : [['Ajaltoun 4193 — Excavation']]);
+  Admin.crumbs(full ? [['Ajaltoun 4193', '/ajaltoun#dashboard'], ['Excavation']] : [['Ajaltoun 4193 — Excavation']]);
   if (!full) document.querySelector('nav.tabs').hidden = true;
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   // two tabs on one page (Mario, 2026-10-14): /ajaltoun/excavation and /ajaltoun/excavation/diesel — each loads only its own data

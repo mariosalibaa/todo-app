@@ -130,7 +130,7 @@
   <div class="who" id="who"></div>
 </header>
 <main>
-  <h1>Ajaltoun 4193 · Accounts</h1>
+  <h1>Ajaltoun 4193</h1>
   <p class="lead">Money in from the sale of Villa U2, money out for the works, and what remains — read live from Odoo. Costs are grouped by work section and by villa, then shared between the partners the way the D3 agreement says.</p>
   <div id="app"><p class="muted">Loading from Odoo…</p></div>
 </main>
@@ -156,7 +156,10 @@ let D = null, ME = null, F = { section: '', villa: '', q: '', review: '', cols: 
 const idA = id => "'" + String(id).replace(/[^\w:.-]/g, '') + "'";
 const lineById = id => D.lines.find(x => x.id === String(id));
 const counted = l => l.paid !== 'proposal';   // a WhatsApp/site proposal waits for Mario's ✓: listed, never counted
-let TAB = (location.hash || '').replace('#', '') || 'accounts';   // accounts · budget · plan
+// tabs (Mario, 2026-10-17): Dashboard · Cost per division · Cost per villa · BOQ · Cashflow plan; the old #accounts opens the dashboard
+const TABS = [['dashboard', 'Dashboard'], ['division', 'Cost per division'], ['villas', 'Cost per villa'], ['budget', 'BOQ'], ['plan', 'Cashflow plan']];
+let TAB = ({ accounts: 'dashboard' })[(location.hash || '').replace('#', '')] || (location.hash || '').replace('#', '') || 'dashboard';
+if (!TABS.some(t => t[0] === TAB)) TAB = 'dashboard';
 // the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
 const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
 let LOG = null, logAll = false;
@@ -226,8 +229,8 @@ let keepY = 0;
 function render() {
   keepY = window.scrollY;   // the page redraws whole; the reader keeps his place (a section opened, a filter typed)
   const root = document.getElementById('app');
-  Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#accounts'], [{ accounts: 'Accounts', budget: 'Budget (BOQ)', plan: 'Cashflow plan' }[TAB] || TAB]]);
-  document.getElementById('tabs').innerHTML = [['accounts', 'Accounts'], ['budget', 'Budget (BOQ)'], ['plan', 'Cashflow plan']].map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('') + '<a href="/ajaltoun/excavation" title="Georges EL Hajj: what was collected, by whom, from which account, against his certificates">Excavation</a>';
+  Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#dashboard'], [(TABS.find(t => t[0] === TAB) || [, TAB])[1]]]);
+  document.getElementById('tabs').innerHTML = TABS.map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('') + '<a href="/ajaltoun/excavation" title="Georges EL Hajj: what was collected, by whom, from which account, against his certificates">Excavation</a>';
   root.innerHTML = `<div id="tab"></div>`;
   history.replaceState(null, '', '#' + TAB);
   const app = document.getElementById('tab');
@@ -236,24 +239,12 @@ function render() {
   renderAccounts(app);
 }
 window.renderTab = render;
+window.ajCompute = () => compute();   // the BOQ tab reads the cost per villa from here
 function renderAccounts(app) {
   const c = compute();
   const inv = c.inv;
   const remaining = c.received - c.paidOut;
-  app.innerHTML = `
-    <div class="kpis">
-      <div class="kpi in"><div class="v">${usd(c.received)}</div><div class="l">received from ${inv ? esc(inv.partner) : 'the buyer'} · ${inv ? inv.received.length : 0} instalments of ${inv ? usd(inv.total) : ''}</div></div>
-      <div class="kpi out"><div class="v">${usd(c.paidOut)}</div><div class="l">paid for Ajaltoun to date${c.owed > 0.5 ? ` · still owed to suppliers ${usd(c.owed)}` : ''}</div></div>
-      <div class="kpi cash"><div class="v">${usd(remaining)}</div><div class="l">remaining project cash — held by Mario</div></div>
-      <div class="kpi"><div class="v">${inv ? usd(inv.residual) : '—'}</div><div class="l">still to come from the sale${c.nextDue ? ` · next ${usd(c.nextDue.amount)} on ${esc(c.nextDue.due)}` : ''}</div></div>
-      <div class="kpi"><div class="v"><span class="ap">${usd(c.approved)}</span> <span class="small muted">/ ${usd(c.paidOut)}</span></div><div class="l">approved by Mario · ${c.bookedN} lines (${usd(c.booked)}) still to approve</div></div>
-      <div class="kpi"><div class="v"><span class="ok">${usd(c.verified)}</span> <span class="small muted">/ ${usd(c.approved)}</span></div><div class="l">verified by the partner · ${c.waitN} lines (${usd(c.wait)}) waiting for him${c.flaggedN ? ` · <span class="flag">${c.flaggedN} flagged</span>` : ''}</div></div>
-      <div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>
-    </div>
-
-    <h2>Cash flow <span class="r muted">in − out = remaining · click a month for its lines</span></h2>
-    <div class="card">${cashflowBlock(c)}</div>
-
+  const DIVISION = `
     <h2>Costs by work section <span class="r muted">click a section for its lines</span></h2>
     <div class="card"><div class="wrap"><table>
       <thead><tr><th>Section</th><th class="n">Lines</th><th class="n">Amount</th><th class="n">Qty done</th><th class="n">$ / unit</th><th class="n">BOQ rate</th><th>Share</th><th class="n">% of cost</th></tr></thead>
@@ -270,6 +261,8 @@ function renderAccounts(app) {
       <div class="note">Prefab and scaffolding are bought once and can serve the next project, so they are shown as equipment and left out of the cost the partners share. Whether Ajaltoun should bear a usage charge for them is still to be agreed.</div>
     </div>
 
+`;
+  const VILLAS_HTML = `
     <div class="grid2">
       <div>
         <h2>Costs by villa</h2>
@@ -293,6 +286,22 @@ function renderAccounts(app) {
       </div>
     </div>
 
+`;
+  app.innerHTML = `
+    ${TAB === 'dashboard' ? `<div class="kpis">
+      <div class="kpi in"><div class="v">${usd(c.received)}</div><div class="l">received from ${inv ? esc(inv.partner) : 'the buyer'} · ${inv ? inv.received.length : 0} instalments of ${inv ? usd(inv.total) : ''}</div></div>
+      <div class="kpi out"><div class="v">${usd(c.paidOut)}</div><div class="l">paid for Ajaltoun to date${c.owed > 0.5 ? ` · still owed to suppliers ${usd(c.owed)}` : ''}</div></div>
+      <div class="kpi cash"><div class="v">${usd(remaining)}</div><div class="l">remaining project cash — held by Mario</div></div>
+      <div class="kpi"><div class="v">${inv ? usd(inv.residual) : '—'}</div><div class="l">still to come from the sale${c.nextDue ? ` · next ${usd(c.nextDue.amount)} on ${esc(c.nextDue.due)}` : ''}</div></div>
+      <div class="kpi"><div class="v"><span class="ap">${usd(c.approved)}</span> <span class="small muted">/ ${usd(c.paidOut)}</span></div><div class="l">approved by Mario · ${c.bookedN} lines (${usd(c.booked)}) still to approve</div></div>
+      <div class="kpi"><div class="v"><span class="ok">${usd(c.verified)}</span> <span class="small muted">/ ${usd(c.approved)}</span></div><div class="l">verified by the partner · ${c.waitN} lines (${usd(c.wait)}) waiting for him${c.flaggedN ? ` · <span class="flag">${c.flaggedN} flagged</span>` : ''}</div></div>
+      <div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>
+    </div>
+
+    <h2>Cash flow <span class="r muted">in − out = remaining · click a month for its lines</span></h2>
+    <div class="card">${cashflowBlock(c)}</div>` : ''}
+
+    ${TAB === 'division' ? DIVISION : ''}${TAB === 'villas' ? VILLAS_HTML : ''}
     <h2>Detail <span class="r muted">${c.lines.length} lines${D.hubLines ? ` · ${D.hubLines} from the hub ledgers not in Odoo` : ''} · Odoo as of ${esc(fmtWhen(D.cachedAt))}${D.stale ? ' · refreshing…' : ''}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">pull now</a>` : ''}</span></h2>
     <div class="filters">
       <span class="combo" id="secfilter"></span>
