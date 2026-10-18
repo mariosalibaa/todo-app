@@ -83,8 +83,8 @@
 <script>
 const esc = Admin.esc;
 const fmt = n => (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// /odoo/web/<model>/<id>: Mario asked for /web (opens clean in his Chrome); Odoo app uninstalled 2026-10-18 so it opens a tab; Odoo switches to the record company by itself
-const ODOO = 'https://shift2.odoo.com/odoo/web/';
+// short /odoo/<model>/<id> link (Mario, 2026-10-18): Odoo app uninstalled so it opens a tab; Odoo switches to the record company by itself
+const ODOO = 'https://shift2.odoo.com/odoo/';
 const odoo = (model, id, label) => id ? `<a class="od" href="${ODOO}${model}/${id}" target="_blank" rel="noopener">${esc(label)}</a>` : esc(label);
 let LIST = [], CUR = null, ME = null, F = { kind: 'all', company: '' };
 const say = (t, cls) => { const m = document.getElementById('msg'); m.textContent = t || ''; m.style.color = cls === 'err' ? 'var(--red)' : ''; };

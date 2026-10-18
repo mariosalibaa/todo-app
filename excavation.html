@@ -463,7 +463,7 @@ function render() {
   document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from Accounting → Accounts (📗 Pay).`;
 }
 const KIND = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate' };
-const ODOO_BILL = 'https://shift2.odoo.com/odoo/web/account.move/', ODOO_PAY = 'https://shift2.odoo.com/odoo/web/account.payment/';   // /odoo/web/<model>/<id>: Mario asked for /web (opens clean in his Chrome); Odoo app uninstalled 2026-10-18 so it opens a tab; Odoo switches to the record company by itself
+const ODOO_BILL = 'https://shift2.odoo.com/odoo/account.move/', ODOO_PAY = 'https://shift2.odoo.com/odoo/account.payment/';   // short /odoo/<model>/<id> link (Mario, 2026-10-18): Odoo app uninstalled so it opens a tab; Odoo switches to the record company by itself
 function renderBills() {
   const rows = ordered(D.bills.filter(b => inPeriod(b.date)).map((b, i) => ({ ...b, seq: i })));
   const T = rows.reduce((a, b) => ({ t: a.t + b.total, p: a.p + (b.total - b.residual), o: a.o + b.residual }), { t: 0, p: 0, o: 0 });
@@ -494,7 +494,7 @@ function renderPays() {
     .filter(p => !open || !p.reconciled).filter(p => inPeriod(p.date));
   ordered(rows);
   document.getElementById('pays').innerHTML = `<thead><tr><th>Date</th><th>Payment</th><th>Collected by</th><th>From account</th><th>Memo</th><th class="n">Amount</th><th>Reconciled</th></tr></thead><tbody>${rows.map(p => `<tr>
-    <td>${esc(p.date)}</td><td>${p.pending ? '<span class="warn">pending</span>' : `<a target="_blank" href="https://shift2.odoo.com/odoo/web/account.payment/${p.id}">${esc(p.name)}</a>`}</td><td>${esc(p.collector)}</td><td>${esc(p.journal)}</td><td class="small muted">${esc(p.memo)}</td><td class="n">${f(p.amount)}</td>
+    <td>${esc(p.date)}</td><td>${p.pending ? '<span class="warn">pending</span>' : `<a target="_blank" href="https://shift2.odoo.com/odoo/account.payment/${p.id}">${esc(p.name)}</a>`}</td><td>${esc(p.collector)}</td><td>${esc(p.journal)}</td><td class="small muted">${esc(p.memo)}</td><td class="n">${f(p.amount)}</td>
     <td>${p.pending ? '<span class="muted">—</span>' : p.reconciled ? '<span class="ok">✓ ' + p.bills + ' bill' + (p.bills > 1 ? 's' : '') + '</span>' : '<span class="warn">○ open</span>'}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="tot" onclick="toggleFold('pays')" title="click to unfold the lines"><td colspan="5"><span class="arrow" data-for="pays">▸</span>${rows.length} payments</td><td class="n">${f(rows.reduce((s, p) => s + p.amount, 0))}</td><td></td></tr></tfoot>`;
 }
