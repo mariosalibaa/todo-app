@@ -497,7 +497,7 @@ function render() {
   document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from Accounting → Accounts (📗 Pay).`;
 }
 const KIND = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate' };
-const ODOO_BILL = 'https://shift2.odoo.com/odoo/bills/', ODOO_PAY = 'https://shift2.odoo.com/odoo/vendor-payments/';   // /odoo/<action path>/<id> link (Mario, 2026-10-18): through the Accounting action so Odoo opens with its menu bar; Odoo switches to the record company by itself
+const ODOO_BILL = 'https://shift2.odoo.com/odoo/vendor-bills/', ODOO_PAY = 'https://shift2.odoo.com/odoo/vendor-payments/';   // /odoo/<action path>/<id> link (Mario, 2026-10-18): through the Accounting action so Odoo opens with its menu bar; Odoo switches to the record company by itself
 function renderBills() {
   const rows = ordered(D.bills.filter(b => inPeriod(b.date)).map((b, i) => ({ ...b, seq: i })));
   const T = rows.reduce((a, b) => ({ t: a.t + b.total, p: a.p + (b.total - b.residual), o: a.o + b.residual }), { t: 0, p: 0, o: 0 });
