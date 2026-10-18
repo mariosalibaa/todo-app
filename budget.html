@@ -644,14 +644,14 @@ function openPhone() {
 function closePhone() { document.getElementById('phone-ov').className = 'phone-ov'; document.getElementById('phone-frame').src = 'about:blank'; }
 
 const M_MENU = [
-  { id: 'expenses',   ico: '\U0001F7E5', lbl: 'Expenses',   c: '#e5323a' },
-  { id: 'income',     ico: '\U0001F4B5', lbl: 'Income',     c: '#2eaa4a' },
-  { id: 'transfers',  ico: '\U0001F501', lbl: 'Transfers',  c: '#16a085' },
-  { id: 'accounts',   ico: '\U0001F3E6', lbl: 'Accounts',   c: '#2d8fe0' },
-  { id: 'payees',     ico: '\U0001F465', lbl: 'Payees' },
-  { id: 'categories', ico: '\U0001F5C2', lbl: 'Categories' },
-  { id: 'reports',    ico: '\U0001F4C8', lbl: 'Reports' },
-  { id: 'search',     ico: '\U0001F50D', lbl: 'Search' },
+  { id: 'expenses',   ico: '\u{1F7E5}', lbl: 'Expenses',   c: '#e5323a' },
+  { id: 'income',     ico: '\u{1F4B5}', lbl: 'Income',     c: '#2eaa4a' },
+  { id: 'transfers',  ico: '\u{1F501}', lbl: 'Transfers',  c: '#16a085' },
+  { id: 'accounts',   ico: '\u{1F3E6}', lbl: 'Accounts',   c: '#2d8fe0' },
+  { id: 'payees',     ico: '\u{1F465}', lbl: 'Payees' },
+  { id: 'categories', ico: '\u{1F5C2}\u{FE0F}', lbl: 'Categories' },
+  { id: 'reports',    ico: '\u{1F4C8}', lbl: 'Reports' },
+  { id: 'search',     ico: '\u{1F50D}', lbl: 'Search' },
 ];
 const M_COLORS = ['#e5323a', '#2d8fe0', '#2eaa4a', '#f39c12', '#8e44ad', '#16a085', '#d35400', '#7f8c8d', '#c0392b', '#27ae60', '#2980b9', '#6b5bd6'];
 const mColor = key => M_COLORS[[...String(key || '?')].reduce((h, c) => h + c.charCodeAt(0), 0) % M_COLORS.length];

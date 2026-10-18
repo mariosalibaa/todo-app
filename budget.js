@@ -46,16 +46,19 @@ async function whishLines(ws) {
   const [accs, hubAccs, contactDocs] = await Promise.all([
     ws.collection('whishAccounts').get(),
     ws.collection('accounts').get(),                       // Mario cash, Neo, the workers' cash — every account of the Accounts page
-    ws.collection('whishContacts').get()
+    ws.collection('whishContacts').select('name').get()
   ]);
   const contacts = {};
   for (const d of contactDocs.docs) contacts[d.id] = (d.data() || {}).name || '';
   const out = [];
   const sources = [...accs.docs.map(d => ({ doc: d, hub: false })), ...hubAccs.docs.filter(d => !(d.data() || {}).archived).map(d => ({ doc: d, hub: true }))];
-  for (const { doc: a, hub } of sources) {
+  // (2026-10-18) only the fields this page reads, every account at once: the full lines carry the whole Odoo booking
+  // (odoo, bookedMove…) — Ziad's 6,300 lines alone took 25 s that way and the phone gave up on "Loading…"
+  const TX_FIELDS = ['date', 'ref', 'service', 'phone', 'partnerName', 'name', 'description', 'debit', 'credit', 'balance', 'note', 'kind', 'analyticName', 'excluded'];
+  const txs = await Promise.all(sources.map(({ doc: a }) => a.ref.collection('tx').select(...TX_FIELDS).get()));
+  for (const [i, { doc: a, hub }] of sources.entries()) {
     const meta = a.data() || {};
-    const tx = await a.ref.collection('tx').get();
-    let docs = tx.docs;
+    let docs = txs[i].docs;
     if (hub) {
       // no printed balance on these: run one from the opening row, skipping lines that are not counted
       docs = docs.slice().sort((x, y) => { const p = x.data().date || '', q = y.data().date || ''; return p < q ? -1 : p > q ? 1 : x.id.localeCompare(y.id); });

@@ -34,6 +34,7 @@
   button:hover,.btn:hover{border-color:var(--amber);}
   button:disabled{opacity:.45;cursor:default;border-color:var(--surface1);}
   .note{font-size:.76rem;color:var(--overlay0);}
+  .twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}   /* the wide table scrolls in its own box on the phone, never the page (2026-10-18) */
   table{width:100%;border-collapse:collapse;font-size:.82rem;}
   th{text-align:left;font-weight:600;color:var(--sub);padding:8px 10px;border-bottom:1px solid var(--surface1);white-space:nowrap;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;}
   td{padding:10px;border-bottom:1px solid var(--surface0);vertical-align:top;}
@@ -68,7 +69,7 @@
     <span id="hh-host"></span>
     <span class="note" id="at"></span>
   </div>
-  <table>
+  <div class="twrap"><table>
     <thead><tr>
       <th>Worker</th>
       <th>Last statement</th>
@@ -82,7 +83,7 @@
       <th></th>
     </tr></thead>
     <tbody id="rows"><tr><td colspan="10" class="dim">Loading…</td></tr></tbody>
-  </table>
+  </table></div>
   <p class="note" id="foot" style="margin-top:14px"></p>
 </main>
 <dialog id="dlg"><div id="dlg-body"></div>

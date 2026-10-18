@@ -78,6 +78,9 @@ async function startLocal() {
         // the accounting pages keep polling; give them 15 s to settle, then judge what is there
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         if (!resp || resp.status() >= 400) { status = 'fail'; note = 'HTTP ' + (resp && resp.status()); }
+        // a page still on its "Loading…" placeholder is slow, not blank: the local hub reads live Firestore over the
+        // laptop's line (Budget's /all is ~3 MB, 30-45 s from here) — wait up to 120 s more before judging (2026-10-18)
+        await page.waitForFunction(() => { const t = (document.body && document.body.innerText || '').trim(); return !(t.length < 80 && /Loading/i.test(t)); }, null, { timeout: 120000 }).catch(() => {});
         await page.waitForTimeout(800);
         const text = (await page.evaluate(() => document.body && document.body.innerText || '')).trim();
         const title = await page.title();
