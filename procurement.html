@@ -36,17 +36,26 @@
   .chip{font-size:.74rem;color:var(--sub);background:var(--mantle);border:1px solid var(--surface0);border-radius:999px;padding:4px 11px;cursor:pointer;}
   .chip:hover,.chip.on{border-color:var(--amber);color:var(--amber);}
   .n{font-size:.78rem;color:var(--overlay0);}
-  table{width:100%;border-collapse:collapse;font-size:.86rem;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;overflow:hidden;}
+  /* tabular, every row at most two lines (Mario 2026-10-18) — the whole text is in the editor and on hover */
+  .tw{overflow-x:auto;border:1px solid var(--surface0);border-radius:12px;background:var(--mantle);}
+  table{width:100%;min-width:900px;border-collapse:collapse;table-layout:fixed;font-size:.84rem;}
   th{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:10px 12px;border-bottom:1px solid var(--surface0);cursor:pointer;white-space:nowrap;}
   th.on{color:var(--amber);}
-  td{padding:10px 12px;border-bottom:1px solid var(--surface0);vertical-align:top;line-height:1.4;}
+  td{padding:7px 12px;border-bottom:1px solid var(--surface0);vertical-align:top;line-height:1.35;height:calc(2.7em + 14px);}
+  td .l1,td .sub{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  td .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;}
+  .pin{background:none;border:1px solid var(--surface0);color:var(--sub);border-radius:6px;padding:2px 7px;font-size:.74rem;cursor:pointer;white-space:nowrap;}
+  .pin:hover{border-color:var(--amber);color:var(--amber);}
+  .tabs{display:inline-flex;border:1px solid var(--surface0);border-radius:10px;overflow:hidden;}
+  .tabs button{background:none;border:0;color:var(--sub);padding:9px 14px;font-size:.85rem;cursor:pointer;}
+  .tabs button.on{background:var(--surface0);color:var(--amber);font-weight:600;}
   tr:last-child td{border-bottom:0;}
   tr.row{cursor:pointer;} tr.row:hover td{background:rgba(242,169,59,.06);}
   td.price{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600;color:var(--amber);}
   th.price{text-align:right;}
-  td.sup{font-weight:600;white-space:nowrap;}
-  td .sub{display:block;font-size:.74rem;color:var(--overlay0);margin-top:2px;font-weight:400;}
-  td .desc{color:var(--sub);white-space:pre-wrap;}
+  td.sup .l1{font-weight:600;}
+  td .sub{font-size:.74rem;color:var(--overlay0);margin-top:1px;font-weight:400;}
+  td .desc{color:var(--sub);}
   td a{color:var(--amber);text-decoration:none;} td a:hover{text-decoration:underline;}
   mark{background:rgba(242,169,59,.28);color:inherit;border-radius:3px;padding:0 1px;}
   .empty{color:var(--overlay0);font-size:.88rem;padding:30px;text-align:center;}
@@ -85,10 +94,7 @@
   .pricewrap{display:flex;gap:6px;} .pricewrap input{flex:1;} .pricewrap select{width:84px;}
   @media (max-width:720px){
     .grid{grid-template-columns:1fr;}
-    table,thead,tbody,tr,td{display:block;} thead{display:none;}
-    tr.row{border-bottom:1px solid var(--surface0);padding:10px 12px;}
-    td{padding:2px 0;border:0;} td.price{text-align:left;} td.sup{white-space:normal;}
-    td:empty{display:none;}
+    main{padding:20px 12px 60px;}
   }
 </style>
 </head>
@@ -102,20 +108,20 @@
 </header>
 <main>
   <h1>Procurement</h1>
-  <p class="lead">Every price a supplier gave us — from a website, a call, a visit. Search by supplier, item, brand or anything in the description; click a row to edit it.</p>
+  <p class="lead">Every price a supplier gave us — from a website, a call, a visit. Search by supplier, item, brand or anything in the description; click a row to edit it and attach the quotation (camera or file). Business cards live in <a href="/contacts" style="color:var(--amber)">Contacts</a>.</p>
   <div class="bar">
+    <div class="tabs"><button id="t-prices" class="on" onclick="view('prices')">Prices</button><button id="t-sups" onclick="view('sups')">Suppliers</button></div>
     <input type="search" id="q" placeholder="Search supplier, item, brand, description…" autocomplete="off">
     <span class="n" id="count"></span>
     <button class="btn ghost" onclick="openEd(null, true)" title="Say the price — supplier, item, price, what is included — and the form fills itself">🎤 Dictate</button>
     <button class="btn" onclick="openEd()">+ Add a price</button>
   </div>
   <div class="chips" id="chips"></div>
-  <table>
-    <thead><tr>
-      <th data-k="supplier">Supplier</th><th data-k="trade">Trade</th><th data-k="item">Item</th><th class="price" data-k="price">Price</th><th data-k="description">Description</th><th data-k="date">Date</th>
-    </tr></thead>
+  <div class="tw"><table>
+    <colgroup id="cols"></colgroup>
+    <thead id="head"></thead>
     <tbody id="rows"></tbody>
-  </table>
+  </table></div>
 </main>
 
 <div id="ed" onclick="if(event.target===this)closeEd()">
@@ -162,7 +168,7 @@
 <script src="/dictate.js"></script>
 <script>
 const esc = Admin.esc;
-let ROWS = [], SORT = { k: 'date', dir: -1 }, CHIP = '', EDIT = null, DICT = null;
+let ROWS = [], SORT = { k: 'date', dir: -1 }, CHIP = '', EDIT = null, DICT = null, VIEW = 'prices';
 const F = ['supplier', 'contact', 'trade', 'division', 'item', 'brand', 'price', 'currency', 'unit', 'description', 'source', 'date', 'project'];
 
 Admin.require(null, async me => {   // admin only — the server refuses /api/procurement to anyone else
@@ -191,7 +197,8 @@ Admin.require(null, async me => {   // admin only — the server refuses /api/pr
   const q = document.getElementById('q');
   q.addEventListener('input', render);
   if (location.hash.length > 1) { q.value = decodeURIComponent(location.hash.slice(1)); render(); }
-  document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; SORT = { k, dir: SORT.k === k ? -SORT.dir : (k === 'price' || k === 'date' ? -1 : 1) }; render(); });
+  document.getElementById('head').onclick = e => { const th = e.target.closest('th[data-k]'); if (!th) return; const k = th.dataset.k; SORT = { k, dir: SORT.k === k ? -SORT.dir : (k === 'price' || k === 'date' || k === 'n' ? -1 : 1) }; render(); };
+  if (/[?&]add=1/.test(location.search)) openEd();   // the hub tile's "add a quotation" straight from the phone
 });
 
 async function load() {
@@ -204,6 +211,22 @@ async function load() {
   render();
 }
 function chip(s) { CHIP = CHIP === s ? '' : s; document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.textContent === CHIP)); render(); }
+// Prices = one row per quote; Suppliers = one row per supplier (how many prices, trades, last quote) — click one → his prices
+function view(v) { VIEW = v; SORT = v === 'sups' ? { k: 'supplier', dir: 1 } : { k: 'date', dir: -1 };
+  document.getElementById('t-prices').classList.toggle('on', v === 'prices'); document.getElementById('t-sups').classList.toggle('on', v === 'sups');
+  document.getElementById('chips').style.display = v === 'sups' ? 'none' : ''; render(); }
+function supRows() {
+  const by = new Map();
+  for (const r of ROWS) { const k = r.supplier || '(no supplier)'; if (!by.has(k)) by.set(k, { supplier: k, rows: [] }); by.get(k).rows.push(r); }
+  return [...by.values()].map(g => { const rs = g.rows, uniq = f => [...new Set(rs.map(f).filter(Boolean))].join(' · ');
+    return { supplier: g.supplier, contact: uniq(r => r.contact), trade: uniq(r => r.trade), division: uniq(r => r.division), items: uniq(r => r.item),
+      n: rs.filter(r => r.price != null && r.price !== '').length, photos: rs.reduce((a, r) => a + ((r.photos || []).length), 0), date: rs.map(r => r.date || '').sort().pop() }; });
+}
+function openSup(s) { view('prices'); CHIP = ''; chip(s); }
+const HEADS = {
+  prices: [['supplier', 'Supplier', 22], ['trade', 'Trade', 11], ['item', 'Item', 20], ['price', 'Price', 9, 'price'], ['description', 'Description', 28], ['photos', '', 5], ['date', 'Date', 9]],
+  sups: [['supplier', 'Supplier', 24], ['contact', 'Contact', 24], ['trade', 'Trade', 14], ['items', 'Items quoted', 22], ['n', 'Prices', 6, 'price'], ['date', 'Last quote', 10]],
+};
 
 const price = r => r.price == null || r.price === '' ? '' : (r.currency && r.currency !== 'USD' ? '' : '$') + Number(r.price).toLocaleString('en-US', { maximumFractionDigits: 2 }) + (r.currency && r.currency !== 'USD' ? ' ' + r.currency : '') + (r.unit ? `<span class="sub">${esc(r.unit)}</span>` : '');
 const dmy = d => d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(8, 10) + '-' + d.slice(5, 7) + '-' + d.slice(0, 4) : (d || '');
@@ -211,10 +234,16 @@ const hi = (s, terms) => { let h = esc(s); for (const t of terms) if (t) h = h.r
 const link = s => /^https?:\/\//i.test(s) ? `<a href="${esc(s)}" target="_blank" rel="noopener">${esc(s.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])} ↗</a>` : esc(s);
 
 const phUrl = (r, p) => `/api/procurement/${encodeURIComponent(r.id)}/photo/${encodeURIComponent(p.id)}`;
-const thumbs = r => (r.photos && r.photos.length) ? `<div class="thumbs" onclick="event.stopPropagation()">${r.photos.map(p => `<a href="${phUrl(r, p)}" onclick="event.preventDefault();openViewer('${esc(r.id)}','${esc(p.id)}')" title="${esc(p.name || '')}">${/pdf$/.test(p.mime || '') ? '<span class="pdf">PDF</span>' : `<img src="${phUrl(r, p)}" alt="" loading="lazy">`}</a>`).join('')}</div>` : '';
+// the offer's photos: one small 📎 button in the row (the thumbnails made rows tall) — opens the first, the editor shows all
+const clip = r => (r.photos && r.photos.length) ? `<button class="pin" title="${esc(r.photos.map(p => p.name || '').join('\n'))}" onclick="event.stopPropagation();openViewer('${esc(r.id)}','${esc(r.photos[0].id)}')">📎 ${r.photos.length}</button>` : '';
+const tip = (...xs) => esc(xs.filter(Boolean).join('\n'));
 
 function render() {
   const terms = document.getElementById('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const heads = HEADS[VIEW];
+  document.getElementById('cols').innerHTML = heads.map(h => `<col style="width:${h[2]}%">`).join('');
+  document.getElementById('head').innerHTML = '<tr>' + heads.map(h => `<th${h[3] ? ` class="${h[3]}"` : ''}${h[1] ? ` data-k="${h[0]}"` : ''}>${h[1]}</th>`).join('') + '</tr>';
+  if (VIEW === 'sups') return renderSups(terms);
   const hay = r => F.map(k => r[k] == null ? '' : String(r[k])).join(' ').toLowerCase();
   let list = ROWS.filter(r => (!CHIP || r.supplier === CHIP) && terms.every(t => hay(r).includes(t)));
   const { k, dir } = SORT;
@@ -222,13 +251,32 @@ function render() {
   document.querySelectorAll('th[data-k]').forEach(th => th.classList.toggle('on', th.dataset.k === k));
   document.getElementById('count').textContent = list.length === ROWS.length ? `${ROWS.length} prices` : `${list.length} of ${ROWS.length}`;
   const tb = document.getElementById('rows');
-  if (!list.length) { tb.innerHTML = `<tr><td colspan="6" class="empty">${ROWS.length ? 'Nothing matches.' : 'No prices yet — add the first one.'}</td></tr>`; return; }
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">${ROWS.length ? 'Nothing matches.' : 'No prices yet — add the first one.'}</td></tr>`; return; }
   tb.innerHTML = list.map(r => `<tr class="row" onclick="openEd('${esc(r.id)}')">
-    <td class="sup">${hi(r.supplier || '', terms)}${r.contact ? `<span class="sub">${hi(r.contact, terms)}</span>` : ''}</td>
-    <td>${hi(r.trade || '', terms)}${r.division ? `<span class="sub">${hi(r.division, terms)}</span>` : ''}</td>
-    <td>${hi(r.item || '', terms)}${r.brand ? `<span class="sub">${hi(r.brand, terms)}</span>` : ''}</td>
+    <td class="sup" title="${tip(r.supplier, r.contact)}"><span class="l1">${hi(r.supplier || '', terms)}</span>${r.contact ? `<span class="sub">${hi(r.contact, terms)}</span>` : ''}</td>
+    <td title="${tip(r.trade, r.division)}"><span class="l1">${hi(r.trade || '', terms)}</span>${r.division ? `<span class="sub">${hi(r.division, terms)}</span>` : ''}</td>
+    <td title="${tip(r.item, r.brand)}"><span class="l1">${hi(r.item || '', terms)}</span>${r.brand ? `<span class="sub">${hi(r.brand, terms)}</span>` : ''}</td>
     <td class="price">${price(r)}</td>
-    <td><span class="desc">${hi(r.description || '', terms)}</span>${r.source ? `<span class="sub">${link(r.source)}</span>` : ''}${r.project ? `<span class="sub">${hi(r.project, terms)}</span>` : ''}${thumbs(r)}</td>
+    <td title="${tip(r.description, r.source, r.project)}"><span class="desc clamp">${hi(r.description || '', terms)}${!r.description && r.source ? link(r.source) : ''}</span></td>
+    <td>${clip(r)}</td>
+    <td>${dmy(r.date)}</td>
+  </tr>`).join('');
+}
+function renderSups(terms) {
+  const hay = r => [r.supplier, r.contact, r.trade, r.division, r.items].join(' ').toLowerCase();
+  let list = supRows().filter(r => terms.every(t => hay(r).includes(t)));
+  const { k, dir } = SORT;
+  list.sort((a, b) => { const x = a[k] == null ? '' : a[k], y = b[k] == null ? '' : b[k]; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * dir; });
+  document.querySelectorAll('th[data-k]').forEach(th => th.classList.toggle('on', th.dataset.k === k));
+  document.getElementById('count').textContent = `${list.length} suppliers`;
+  const tb = document.getElementById('rows');
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="6" class="empty">Nothing matches.</td></tr>`; return; }
+  tb.innerHTML = list.map(r => `<tr class="row" onclick="openSup(${JSON.stringify(r.supplier).replace(/"/g, '&quot;')})" title="Show his prices">
+    <td class="sup" title="${tip(r.supplier)}"><span class="clamp" style="font-weight:600">${hi(r.supplier, terms)}</span></td>
+    <td title="${tip(r.contact)}"><span class="clamp">${hi(r.contact, terms)}</span></td>
+    <td title="${tip(r.trade, r.division)}"><span class="l1">${hi(r.trade, terms)}</span><span class="sub">${hi(r.division, terms)}</span></td>
+    <td title="${tip(r.items)}"><span class="clamp desc">${hi(r.items, terms)}</span></td>
+    <td class="price">${r.n || ''}${r.photos ? `<span class="sub">📎 ${r.photos}</span>` : ''}</td>
     <td>${dmy(r.date)}</td>
   </tr>`).join('');
 }
@@ -251,6 +299,17 @@ function renderPhotos() {
   document.getElementById('f-photos').innerHTML = list.map(p => `<div class="ph"><a href="${phUrl(EDIT, p)}" onclick="event.preventDefault();openViewer('${esc(EDIT.id)}','${esc(p.id)}')">${/pdf$/.test(p.mime || '') ? '<span class="pdf">PDF</span>' : `<img src="${phUrl(EDIT, p)}" alt="">`}</a><button class="x" title="Remove" onclick="delPhoto('${esc(p.id)}')">×</button></div>`).join('')
     + `<button class="add" onclick="document.getElementById('f-file').click()">+ Photo<br><small>camera · file</small></button>`;
 }
+// a phone camera photo is 3–6 MB — over Vercel's 4.5 MB body limit once in base64: images go up as a ≤2000 px JPEG
+async function shrink(f, max = 2000) {
+  const asUrl = b => new Promise((ok, no) => { const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = no; rd.readAsDataURL(b); });
+  if (!/^image\/(jpeg|png|webp|heic|heif)/.test(f.type) || f.size < 900e3) return { dataBase64: await asUrl(f), mime: f.type || 'image/jpeg' };
+  try {
+    const img = await createImageBitmap(f); const k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return { dataBase64: c.toDataURL('image/jpeg', 0.85), mime: 'image/jpeg' };
+  } catch (e) { return { dataBase64: await asUrl(f), mime: f.type }; }
+}
 // Adding a photo saves the row first (a new row has no id yet), then uploads each file as base64
 async function addPhotos(fl) {
   const filesArr = [...(fl || [])]; if (!filesArr.length) return;
@@ -258,8 +317,8 @@ async function addPhotos(fl) {
   try {
     if (!EDIT) { const b = {}; for (const k of F) b[k] = document.getElementById('f-' + k).value; EDIT = await Admin.api('POST', '/api/procurement', b); document.getElementById('ed-title').textContent = 'Edit'; document.getElementById('ed-del').style.display = ''; }
     for (const f of filesArr) {
-      const dataBase64 = await new Promise((ok, no) => { const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = no; rd.readAsDataURL(f); });
-      EDIT = await Admin.api('POST', `/api/procurement/${encodeURIComponent(EDIT.id)}/photo`, { dataBase64, mime: f.type, name: f.name });
+      const { dataBase64, mime } = await shrink(f);
+      EDIT = await Admin.api('POST', `/api/procurement/${encodeURIComponent(EDIT.id)}/photo`, { dataBase64, mime, name: f.name });
     }
     err.textContent = ''; renderPhotos();
     const i = ROWS.findIndex(r => r.id === EDIT.id); if (i >= 0) ROWS[i] = EDIT; else ROWS.unshift(EDIT); render();

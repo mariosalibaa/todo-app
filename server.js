@@ -171,6 +171,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'mechanical.html'));
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
+  fs.readFileSync(path.join(__dirname, 'contacts.html'));
   fs.readFileSync(path.join(__dirname, 'cpr.html'));
   fs.readFileSync(path.join(__dirname, 'cpr-fuel.html'));
   fs.readFileSync(path.join(__dirname, 'cpr-dynamic.html'));
@@ -752,6 +753,7 @@ const handler = async (req, res) => {
     'decisions.html': path.join(__dirname, 'decisions.html'),
     'crm.html': path.join(__dirname, 'crm.html'),
     'procurement.html': path.join(__dirname, 'procurement.html'),
+    'contacts.html': path.join(__dirname, 'contacts.html'),
     'cpr.html': path.join(__dirname, 'cpr.html'),
     'cpr-fuel.html': path.join(__dirname, 'cpr-fuel.html'),
     'cpr-dynamic.html': path.join(__dirname, 'cpr-dynamic.html'),
@@ -778,6 +780,7 @@ const handler = async (req, res) => {
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
     '/usa': 'usa.html',   // Youssef's well pump (Maryland): order of work + photos of the sand fixes; PUBLIC, nothing private (Mario 2026-10-06)
+    '/contacts': 'contacts.html',   // business cards → Mario's Google Contacts (Mario, 2026-10-18)
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
     '/bonvin': 'bonvin.html',   // Sin El Fil 2292/A5 — deeds, leases, rent history, every file; admins only (Mario 2026-10-04)
     '/bonvin/shop': 'bonvin-shop.html',   // the same shop for a renter: plans, photos, office layout — PUBLIC, nothing private
@@ -1606,7 +1609,7 @@ const handler = async (req, res) => {
     catch (e) { console.error('bonvin error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
-  if (url.startsWith('/api/procurement')) {
+  if (url.startsWith('/api/procurement') || url === '/api/contacts' || url.startsWith('/api/contacts/')) {
     if (!access.admin) return noApp('admin');
     try { const handled = await procurement.handle(req, res, url, user, { db, admin, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('procurement error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }

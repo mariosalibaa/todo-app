@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Contacts · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--red:#f38ba8;--green:#a6e3a1;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .hleft{display:flex;align-items:center;gap:16px;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:1100px;margin:0 auto;padding:28px 16px 60px;}
+  h1{font-size:1.35rem;font-weight:600;margin:0 0 6px;}
+  .lead{color:var(--sub);font-size:.88rem;line-height:1.5;margin:0 0 20px;}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  .bar input[type=search]{flex:1;min-width:220px;background:var(--mantle);border:1px solid var(--surface0);color:var(--text);border-radius:10px;padding:10px 14px;font-size:.95rem;}
+  .bar input:focus{outline:none;border-color:var(--amber);}
+  .btn{background:var(--amber);color:var(--base);border:0;border-radius:10px;padding:10px 16px;font-weight:600;font-size:.88rem;cursor:pointer;white-space:nowrap;}
+  .btn.ghost{background:none;border:1px solid var(--surface0);color:var(--sub);font-weight:500;}
+  .btn.ghost:hover{color:var(--text);border-color:var(--surface1);}
+  .btn.danger{background:none;border:1px solid var(--surface0);color:var(--red);}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;}
+  .chip{font-size:.74rem;color:var(--sub);background:var(--mantle);border:1px solid var(--surface0);border-radius:999px;padding:4px 11px;cursor:pointer;}
+  .chip:hover,.chip.on{border-color:var(--amber);color:var(--amber);}
+  .n{font-size:.78rem;color:var(--overlay0);}
+  /* tabular, every row at most two lines (Mario 2026-10-18) — the whole text is in the editor and on hover */
+  .tw{overflow-x:auto;border:1px solid var(--surface0);border-radius:12px;background:var(--mantle);}
+  table{width:100%;min-width:900px;border-collapse:collapse;table-layout:fixed;font-size:.84rem;}
+  th{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:10px 12px;border-bottom:1px solid var(--surface0);cursor:pointer;white-space:nowrap;}
+  th.on{color:var(--amber);}
+  td{padding:7px 12px;border-bottom:1px solid var(--surface0);vertical-align:top;line-height:1.35;height:calc(2.7em + 14px);}
+  td .l1,td .sub{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  td .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;}
+  .pin{background:none;border:1px solid var(--surface0);color:var(--sub);border-radius:6px;padding:2px 7px;font-size:.74rem;cursor:pointer;white-space:nowrap;}
+  .pin:hover{border-color:var(--amber);color:var(--amber);}
+  .tabs{display:inline-flex;border:1px solid var(--surface0);border-radius:10px;overflow:hidden;}
+  .tabs button{background:none;border:0;color:var(--sub);padding:9px 14px;font-size:.85rem;cursor:pointer;}
+  .tabs button.on{background:var(--surface0);color:var(--amber);font-weight:600;}
+  tr:last-child td{border-bottom:0;}
+  tr.row{cursor:pointer;} tr.row:hover td{background:rgba(242,169,59,.06);}
+  td.price{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600;color:var(--amber);}
+  th.price{text-align:right;}
+  td.sup .l1{font-weight:600;}
+  td .sub{font-size:.74rem;color:var(--overlay0);margin-top:1px;font-weight:400;}
+  td .desc{color:var(--sub);}
+  td a{color:var(--amber);text-decoration:none;} td a:hover{text-decoration:underline;}
+  mark{background:rgba(242,169,59,.28);color:inherit;border-radius:3px;padding:0 1px;}
+  .empty{color:var(--overlay0);font-size:.88rem;padding:30px;text-align:center;}
+  .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .thumbs a{display:block;width:54px;height:54px;border-radius:6px;overflow:hidden;border:1px solid var(--surface0);background:var(--base);}
+  .thumbs a:hover{border-color:var(--amber);}
+  .thumbs img{width:100%;height:100%;object-fit:cover;display:block;}
+  .thumbs .pdf{display:flex;align-items:center;justify-content:center;font-size:.6rem;color:var(--sub);height:100%;}
+  .photos{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .photos .ph{position:relative;width:84px;height:84px;border-radius:8px;overflow:hidden;border:1px solid var(--surface0);background:var(--base);}
+  .photos .ph img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photos .ph .x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:50%;width:20px;height:20px;font-size:.75rem;cursor:pointer;line-height:20px;padding:0;}
+  .photos .add{width:84px;height:84px;border-radius:8px;border:1px dashed var(--surface1);color:var(--sub);background:none;cursor:pointer;font-size:.72rem;line-height:1.3;}
+  .photos .add:hover{border-color:var(--amber);color:var(--amber);}
+  /* the viewer, as on the Ajaltoun / Partners pages */
+  #viewer{position:fixed;inset:0;background:#0f0f17;z-index:600;display:none;flex-direction:column;} #viewer.on{display:flex;}
+  .vbar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--mantle);border-bottom:1px solid var(--surface0);flex:none;}
+  .vbar .vback{color:var(--amber);text-decoration:none;font-size:.9rem;font-weight:600;white-space:nowrap;padding:6px 8px;border-radius:8px;} .vbar .vback:hover{background:var(--surface0);}
+  .vbar .vtitle{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .vbar .vbtn{color:var(--sub);text-decoration:none;font-size:.78rem;border:1px solid var(--surface0);border-radius:6px;padding:5px 10px;white-space:nowrap;}
+  .vbody{flex:1;overflow:auto;padding:12px;} .vbody img{display:block;margin:0 auto 12px;max-width:100%;height:auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.5);}
+  .vbody iframe{display:block;width:100%;height:100%;min-height:80vh;border:0;background:#fff;}
+  /* editor */
+  #ed{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:40px 12px;overflow:auto;}
+  #ed.on{display:flex;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:16px;padding:22px;width:100%;max-width:640px;}
+  .card h2{margin:0 0 16px;font-size:1.05rem;font-weight:600;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;}
+  .grid .full{grid-column:1/-1;}
+  label{display:block;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);margin:0 0 4px;}
+  .card input,.card textarea,.card select{width:100%;background:var(--base);border:1px solid var(--surface0);color:var(--text);border-radius:8px;padding:9px 11px;font-size:.9rem;font-family:inherit;}
+  .card input:focus,.card textarea:focus{outline:none;border-color:var(--amber);}
+  .card textarea{min-height:84px;resize:vertical;}
+  .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;align-items:center;}
+  .acts .err{color:var(--red);font-size:.8rem;margin-right:auto;}
+  .pricewrap{display:flex;gap:6px;} .pricewrap input{flex:1;} .pricewrap select{width:84px;}
+  @media (max-width:720px){
+    .grid{grid-template-columns:1fr;}
+    main{padding:20px 12px 60px;}
+  }
+  .gstat{font-size:.74rem;white-space:nowrap;}
+  .gstat.ok{color:var(--green);} .gstat a{color:var(--green);}
+  .bar .btn.g{background:none;border:1px solid var(--surface0);color:var(--text);font-weight:500;}
+  .bar .btn.g:hover{border-color:var(--amber);}
+  .hintline{font-size:.78rem;color:var(--sub);margin:-6px 0 12px;min-height:1em;}
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft">
+    <span id="crumbs"></span>
+    <div class="wordmark">SHIFT <span>GROUP</span><small>CONTACTS</small></div><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Contacts']]));</script>
+  </div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <h1>Contacts</h1>
+  <p class="lead">Business cards and the people behind each supplier. Snap the card (front + back) — the fields fill themselves — then <b>Save to Google</b> writes the person into your Google Contacts. Prices and quotations go in <a href="/procurement" style="color:var(--amber)">Procurement</a>.</p>
+  <div class="bar">
+    <input type="search" id="q" placeholder="Search name, company, phone, trade…" autocomplete="off">
+    <span class="n" id="count"></span>
+    <button class="btn g" onclick="syncGoogle()" title="Write every contact that is not in Google yet (or changed) into your Google Contacts">⟳ Save all to Google</button>
+    <button class="btn" onclick="openEd()">+ Add a card</button>
+  </div>
+  <div class="hintline" id="say"></div>
+  <div class="tw"><table>
+    <colgroup><col style="width:19%"><col style="width:19%"><col style="width:17%"><col style="width:18%"><col style="width:14%"><col style="width:5%"><col style="width:8%"></colgroup>
+    <thead><tr>
+      <th data-k="name">Name</th><th data-k="company">Company</th><th data-k="phone">Phone</th><th data-k="email">Email · web</th><th data-k="notes">Notes</th><th></th><th data-k="google">Google</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+</main>
+
+<div id="ed" onclick="if(event.target===this)closeEd()">
+  <div class="card">
+    <h2 id="ed-title">Add a card</h2>
+    <div class="grid">
+      <div class="full"><label>Card photos — front and back</label>
+        <div class="photos" id="f-photos"></div>
+        <input type="file" id="f-file" accept="image/*,application/pdf" multiple style="display:none" onchange="addPhotos(this.files)">
+      </div>
+      <div><label>Name</label><input id="f-name" placeholder="Georges Khoury"></div>
+      <div><label>Title</label><input id="f-title" placeholder="Sales Manager"></div>
+      <div><label>Company</label><input id="f-company" list="dl-co" placeholder="Brighter Energy"></div>
+      <div><label>Trade</label><input id="f-trade" list="dl-trade" placeholder="solar · steel · glazing"></div>
+      <div class="full"><label>Phone</label><input id="f-phone" placeholder="+961 70 123 456 · +961 1 234 567"></div>
+      <div><label>Email</label><input id="f-email" placeholder="name@company.com"></div>
+      <div><label>Website</label><input id="f-website" placeholder="www.company.com"></div>
+      <div><label>Instagram / social</label><input id="f-social" placeholder="@company"></div>
+      <div><label>Division</label><input id="f-division" list="dl-div" placeholder="Solar · Civil · Electrical"></div>
+      <div class="full"><label>Address</label><input id="f-address" placeholder="Bldg, street, area"></div>
+      <div class="full"><label>Notes</label><textarea id="f-notes" placeholder="Where we met, what they sell, why they matter"></textarea></div>
+      <div><label>Date received</label><input id="f-date" type="date"></div>
+      <div><label>Project</label><input id="f-project" placeholder="AJ4193 · general"></div>
+      <div class="full"><label>Source</label><input id="f-source" placeholder="Business card · WhatsApp · visit"></div>
+    </div>
+    <div class="acts">
+      <span class="err" id="ed-err"></span>
+      <button class="btn danger" id="ed-del" onclick="delRow()" style="display:none">Delete</button>
+      <button class="btn ghost" onclick="closeEd()">Cancel</button>
+      <button class="btn ghost" id="ed-g" onclick="saveRow(true)">Save + Google</button>
+      <button class="btn" onclick="saveRow()">Save</button>
+    </div>
+  </div>
+</div>
+<div id="viewer">
+  <div class="vbar"><a class="vback" href="#" onclick="closeViewer();return false;">&lsaquo; Back</a><div class="vtitle" id="vtitle"></div><a class="vbtn" id="vtab" href="#" target="_blank" rel="noopener">Open in new tab</a></div>
+  <div class="vbody" id="vbody"></div>
+</div>
+<datalist id="dl-co"></datalist><datalist id="dl-trade"></datalist>
+<datalist id="dl-div"><option value="Mechanical"><option value="Electrical"><option value="Civil"><option value="Architectural"><option value="Steel"><option value="Solar"><option value="Survey"><option value="Accounting"><option value="General"></datalist>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+// Contacts — business cards → Mario's Google Contacts (Mario 2026-10-18: "this should be linked to Google
+// Contacts, not procurement"). Rows: /api/contacts (procurement.js, workspaces/team/contacts). Google is
+// written from the browser with Mario's own token (People API, scope contacts) — the server never holds it;
+// the person's resourceName comes back onto the row so a second press updates instead of duplicating.
+const esc = Admin.esc;
+let ROWS = [], SORT = { k: 'date', dir: -1 }, EDIT = null, GTOKEN = null;
+const F = ['name', 'title', 'company', 'trade', 'phone', 'email', 'website', 'social', 'division', 'address', 'notes', 'date', 'project', 'source'];
+const say = (t, err) => { const el = document.getElementById('say'); el.textContent = t || ''; el.style.color = err ? 'var(--red)' : ''; };
+
+Admin.require(null, async me => {   // admin only — the server refuses /api/contacts to anyone else
+  document.getElementById('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  if (!me.admin) { document.querySelector('main').innerHTML = '<p class="empty">This page is for Mario only. <a href="/admin" style="color:var(--amber)">← Back to the hub</a></p>'; return; }
+  await load();
+  const q = document.getElementById('q');
+  q.addEventListener('input', render);
+  if (location.hash.length > 1) { q.value = decodeURIComponent(location.hash.slice(1)); render(); }
+  document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; SORT = { k, dir: SORT.k === k ? -SORT.dir : (k === 'date' ? -1 : 1) }; render(); });
+  if (/[?&]add=1/.test(location.search)) openEd();
+});
+
+async function load() {
+  try { ROWS = await Admin.api('GET', '/api/contacts'); }
+  catch (e) { document.getElementById('rows').innerHTML = `<tr><td colspan="7" class="empty" style="color:var(--red)">Could not load: ${esc(e.message)}</td></tr>`; return; }
+  const opts = f => [...new Set(ROWS.map(f).filter(Boolean))].sort().map(s => `<option value="${esc(s)}">`).join('');
+  document.getElementById('dl-co').innerHTML = opts(r => r.company);
+  document.getElementById('dl-trade').innerHTML = opts(r => r.trade);
+  render();
+}
+
+const dmy = d => d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(8, 10) + '-' + d.slice(5, 7) + '-' + d.slice(0, 4) : (d || '');
+const hi = (s, terms) => { let h = esc(s || ''); for (const t of terms) if (t) h = h.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`); return h; };
+const tip = (...xs) => esc(xs.filter(Boolean).join('\n'));
+const phUrl = (r, p) => `/api/contacts/${encodeURIComponent(r.id)}/photo/${encodeURIComponent(p.id)}`;
+const clip = r => (r.photos && r.photos.length) ? `<button class="pin" title="${esc(r.photos.map(p => p.name || '').join('\n'))}" onclick="event.stopPropagation();openViewer('${esc(r.id)}','${esc(r.photos[0].id)}')">📎 ${r.photos.length}</button>` : '';
+const gLink = r => r.google && r.google.resourceName ? 'https://contacts.google.com/person/' + encodeURIComponent(r.google.resourceName.split('/')[1] || '') : '';
+// in Google and not edited since → ✓; edited after the last write → "changed"
+const gState = r => !(r.google && r.google.resourceName) ? 'no' : (r.updatedAt && r.google.syncedAt && r.updatedAt > r.google.syncedAt ? 'changed' : 'ok');
+
+function render() {
+  const terms = document.getElementById('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = r => F.map(k => r[k] == null ? '' : String(r[k])).join(' ').toLowerCase();
+  let list = ROWS.filter(r => terms.every(t => hay(r).includes(t)));
+  const { k, dir } = SORT;
+  const val = r => k === 'google' ? gState(r) : (r[k] == null ? '' : String(r[k]));
+  list.sort((a, b) => val(a).localeCompare(val(b)) * dir);
+  document.querySelectorAll('th[data-k]').forEach(th => th.classList.toggle('on', th.dataset.k === k));
+  const inG = ROWS.filter(r => gState(r) === 'ok').length;
+  document.getElementById('count').textContent = (list.length === ROWS.length ? `${ROWS.length} contacts` : `${list.length} of ${ROWS.length}`) + ` · ${inG} in Google`;
+  const tb = document.getElementById('rows');
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">${ROWS.length ? 'Nothing matches.' : 'No contacts yet — add the first card.'}</td></tr>`; return; }
+  tb.innerHTML = list.map(r => { const g = gState(r);
+    return `<tr class="row" onclick="openEd('${esc(r.id)}')">
+    <td class="sup" title="${tip(r.name, r.title)}"><span class="l1">${hi(r.name || r.company, terms)}</span>${r.title ? `<span class="sub">${hi(r.title, terms)}</span>` : ''}</td>
+    <td title="${tip(r.company, r.trade, r.division)}"><span class="l1">${hi(r.name ? r.company : '', terms)}</span><span class="sub">${hi([r.trade, r.division].filter(Boolean).join(' · '), terms)}</span></td>
+    <td title="${tip(r.phone)}"><span class="clamp">${hi(r.phone, terms)}</span></td>
+    <td title="${tip(r.email, r.website, r.social)}"><span class="l1">${hi(r.email, terms)}</span><span class="sub">${hi([r.website, r.social].filter(Boolean).join(' · '), terms)}</span></td>
+    <td title="${tip(r.notes, r.address)}"><span class="desc clamp">${hi(r.notes, terms)}</span></td>
+    <td>${clip(r)}</td>
+    <td onclick="event.stopPropagation()">${g === 'ok' ? `<span class="gstat ok"><a href="${gLink(r)}" target="_blank" rel="noopener" title="Open in Google Contacts">✓ in Google</a></span>`
+      : `<button class="pin" onclick="syncGoogle(['${esc(r.id)}'])" title="Write this person into your Google Contacts">${g === 'changed' ? '⟳ update' : '→ Google'}</button>`}</td>
+  </tr>`; }).join('');
+}
+
+// ── Google Contacts (People API, from the browser) ──
+async function gToken() {
+  if (GTOKEN && GTOKEN.at > Date.now() - 50 * 60e3) return GTOKEN.token;
+  const r = await Admin.signIn(['https://www.googleapis.com/auth/contacts']);
+  if (!r.accessToken) throw new Error('Google gave no access token');
+  GTOKEN = { token: r.accessToken, at: Date.now() }; return r.accessToken;
+}
+const parts = s => String(s || '').split(/\s*(?:·|;|,|\||\n)\s*/).map(x => x.trim()).filter(Boolean);
+function person(c) {
+  const p = {
+    names: [{ unstructuredName: c.name || c.company }],
+    organizations: c.company || c.title ? [{ name: c.company || '', title: c.title || '' }] : [],
+    // "M +961 76 361 558" → type mobile; "T …" work; the rest as printed
+    phoneNumbers: parts(c.phone).filter(x => (x.match(/\d/g) || []).length >= 6).map(x => { const m = x.match(/^(M|T|F|Tel|Mob|Mobile|WhatsApp|Office)\.?:?\s+/i);
+      return { value: m ? x.slice(m[0].length) : x.replace(/\s*\(.*\)$/, ''), type: !m ? '' : /^m|whats/i.test(m[1]) ? 'mobile' : /^f/i.test(m[1]) ? 'workFax' : 'work' }; }),
+    emailAddresses: parts(c.email).filter(x => x.includes('@') && !x.startsWith('@')).map(x => ({ value: x, type: 'work' })),
+    urls: [...parts(c.website).map(x => ({ value: /^https?:/i.test(x) ? x : 'https://' + x, type: 'work' })),
+           ...parts(c.social).map(x => ({ value: x.startsWith('@') ? 'https://instagram.com/' + x.slice(1) : x, type: 'Instagram' }))],
+    addresses: c.address ? [{ formattedValue: c.address, type: 'work' }] : [],
+    biographies: [{ value: [c.notes, c.trade && 'Trade: ' + c.trade, 'Shift Hub contact · ' + (c.source || 'business card') + (c.date ? ' · ' + c.date : '')].filter(Boolean).join('\n'), contentType: 'TEXT_PLAIN' }],
+  };
+  return p;
+}
+const FIELDS_MASK = 'names,organizations,phoneNumbers,emailAddresses,urls,addresses,biographies';
+async function gFetch(token, url, opt = {}) {
+  const r = await fetch('https://people.googleapis.com/v1/' + url, { ...opt, headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(`Google ${r.status}: ${(j.error && j.error.message) || ''}`); e.status = r.status; throw e; }
+  return j;
+}
+// the card's front as the contact's picture (only when Google has none from us yet)
+async function cardPhoto(token, c, rn) {
+  const p = (c.photos || []).find(x => /^image\//.test(x.mime || '')); if (!p) return;
+  try {
+    const img = await createImageBitmap(await (await fetch(phUrl(c, p))).blob());
+    const k = Math.min(1, 720 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    await gFetch(token, `${rn}:updateContactPhoto`, { method: 'PATCH', body: JSON.stringify({ photoBytes: cv.toDataURL('image/jpeg', .85).split(',')[1] }) });
+  } catch (e) { console.warn('contact photo skipped:', e.message); }
+}
+async function pushOne(token, c) {
+  const body = person(c); let out, fresh = false;
+  if (c.google && c.google.resourceName) {
+    try {
+      const cur = await gFetch(token, `${c.google.resourceName}?personFields=metadata`);
+      out = await gFetch(token, `${c.google.resourceName}:updateContact?updatePersonFields=${FIELDS_MASK}`, { method: 'PATCH', body: JSON.stringify({ ...body, etag: cur.etag }) });
+    } catch (e) { if (e.status !== 404) throw e; }   // deleted in Google → make it again
+  }
+  if (!out) { out = await gFetch(token, `people:createContact?personFields=metadata`, { method: 'POST', body: JSON.stringify(body) }); fresh = true; }
+  if (fresh) await cardPhoto(token, c, out.resourceName);
+  return Admin.api('POST', '/api/contacts', { id: c.id, google: { resourceName: out.resourceName, etag: out.etag || '' } });
+}
+async function syncGoogle(ids) {
+  const list = ROWS.filter(r => ids ? ids.includes(r.id) : gState(r) !== 'ok');
+  if (!list.length) { say('Everything is already in Google.'); return; }
+  let token; try { say('Opening Google…'); token = await gToken(); } catch (e) { say('Google sign-in cancelled: ' + e.message, true); return; }
+  let ok = 0; const bad = [];
+  for (const c of list) {
+    say(`Writing ${c.name || c.company} to Google… (${ok + bad.length + 1}/${list.length})`);
+    try { const saved = await pushOne(token, c); const i = ROWS.findIndex(r => r.id === c.id); if (i >= 0) ROWS[i] = saved; ok++; }
+    catch (e) { bad.push(`${c.name || c.company}: ${e.message}`); if (e.status === 401) { GTOKEN = null; break; } }
+  }
+  render();
+  say(`${ok} written to Google Contacts` + (bad.length ? ` · ${bad.length} failed — ${bad.join(' · ')}` : ''), !!bad.length);
+}
+
+// ── editor ──
+function openEd(id) {
+  EDIT = id ? ROWS.find(r => r.id === id) : null;
+  document.getElementById('ed-title').textContent = EDIT ? 'Edit contact' : 'Add a card';
+  document.getElementById('ed-del').style.display = EDIT ? '' : 'none';
+  document.getElementById('ed-err').textContent = '';
+  for (const k of F) document.getElementById('f-' + k).value = EDIT ? (EDIT[k] == null ? '' : EDIT[k]) : (k === 'date' ? today() : k === 'source' ? 'Business card' : '');
+  renderPhotos();
+  document.getElementById('ed').classList.add('on');
+  if (EDIT) setTimeout(() => document.getElementById('f-name').focus(), 50);
+}
+function renderPhotos() {
+  const list = (EDIT && EDIT.photos) || [];
+  document.getElementById('f-photos').innerHTML = list.map(p => `<div class="ph"><a href="${phUrl(EDIT, p)}" onclick="event.preventDefault();openViewer('${esc(EDIT.id)}','${esc(p.id)}')">${/pdf$/.test(p.mime || '') ? '<span class="pdf">PDF</span>' : `<img src="${phUrl(EDIT, p)}" alt="">`}</a><button class="x" title="Remove" onclick="delPhoto('${esc(p.id)}')">×</button></div>`).join('')
+    + `<button class="add" onclick="document.getElementById('f-file').click()">+ Photo<br><small>camera · file</small></button>`
+    + (list.some(p => /^image\//.test(p.mime || '')) ? `<button class="add" onclick="readCard()" title="Read the card again into the empty boxes">✦ Read<br><small>the card</small></button>` : '');
+}
+const formBody = () => { const b = {}; for (const k of F) b[k] = document.getElementById('f-' + k).value; return b; };
+// a phone photo is 3–6 MB, over Vercel's 4.5 MB body limit in base64 → ≤ max px JPEG
+async function shrink(f, max = 2000) {
+  const asUrl = b => new Promise((ok, no) => { const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = no; rd.readAsDataURL(b); });
+  if (!/^image\//.test(f.type || '') || (f.size < 900e3 && max >= 2000)) return { dataBase64: await asUrl(f), mime: f.type || 'image/jpeg' };
+  try {
+    const img = await createImageBitmap(f); const k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return { dataBase64: c.toDataURL('image/jpeg', 0.85), mime: 'image/jpeg' };
+  } catch (e) { return { dataBase64: await asUrl(f), mime: f.type }; }
+}
+// Adding a photo saves the row first (a new row needs an id), uploads, then reads the card into the empty boxes
+async function addPhotos(fl) {
+  const filesArr = [...(fl || [])]; if (!filesArr.length) return;
+  const err = document.getElementById('ed-err'); err.textContent = 'Uploading…';
+  try {
+    if (!EDIT) { const b = formBody(); if (!b.name && !b.company) b.company = 'New card'; EDIT = await Admin.api('POST', '/api/contacts', b); document.getElementById('ed-title').textContent = 'Edit contact'; document.getElementById('ed-del').style.display = ''; }
+    for (const f of filesArr) {
+      const { dataBase64, mime } = await shrink(f);
+      EDIT = await Admin.api('POST', `/api/contacts/${encodeURIComponent(EDIT.id)}/photo`, { dataBase64, mime, name: f.name });
+    }
+    renderPhotos(); upsert(EDIT);
+    if (filesArr.some(f => /^image\//.test(f.type || ''))) await readCard(filesArr.filter(f => /^image\//.test(f.type || '')));
+    else err.textContent = '';
+  } catch (e) { err.textContent = e.message; }
+  document.getElementById('f-file').value = '';
+}
+// ✦ the card's text → the boxes that are still empty (nothing typed is overwritten); Save stays a click
+async function readCard(fileList) {
+  const err = document.getElementById('ed-err'); err.textContent = 'Reading the card…';
+  try {
+    let images;
+    if (fileList && fileList.length) images = await Promise.all(fileList.slice(0, 2).map(f => shrink(f, 1400)));
+    else images = await Promise.all((EDIT.photos || []).filter(p => /^image\//.test(p.mime || '')).slice(0, 2).map(async p => shrink(await (await fetch(phUrl(EDIT, p))).blob(), 1400)));
+    const f = await Admin.api('POST', '/api/contacts/read', { images });
+    let n = 0;
+    for (const k of F) { const el = document.getElementById('f-' + k); if (f[k] && (!el.value || el.value === 'New card')) { el.value = f[k]; n++; } }
+    err.textContent = n ? `Read ${n} field${n === 1 ? '' : 's'} off the card — check them, then Save.` : 'Nothing new on the card.';
+  } catch (e) { err.textContent = 'Could not read the card: ' + e.message; }
+}
+async function delPhoto(pid) {
+  if (!EDIT || !confirm('Remove this photo?')) return;
+  try { EDIT = await Admin.api('DELETE', `/api/contacts/${encodeURIComponent(EDIT.id)}/photo/${encodeURIComponent(pid)}`); renderPhotos(); upsert(EDIT); }
+  catch (e) { document.getElementById('ed-err').textContent = e.message; }
+}
+function upsert(r) { const i = ROWS.findIndex(x => x.id === r.id); if (i >= 0) ROWS[i] = r; else ROWS.unshift(r); render(); }
+function openViewer(rowId, pid) {
+  const r = ROWS.find(x => x.id === rowId) || EDIT; const p = r && (r.photos || []).find(x => x.id === pid); if (!p) return;
+  const url = phUrl(r, p), body = document.getElementById('vbody');
+  document.getElementById('vtitle').textContent = `${r.name || r.company || ''} — ${p.name || ''}`; document.getElementById('vtab').href = url;
+  body.innerHTML = /pdf$/.test(p.mime || '') ? `<iframe src="${url}"></iframe>` : (r.photos || []).filter(x => /^image\//.test(x.mime || '')).map(x => `<img src="${phUrl(r, x)}" alt="">`).join('');
+  document.getElementById('viewer').classList.add('on'); document.body.style.overflow = 'hidden';
+}
+function closeViewer() { document.getElementById('viewer').classList.remove('on'); document.body.style.overflow = ''; document.getElementById('vbody').innerHTML = ''; }
+function closeEd() { document.getElementById('ed').classList.remove('on'); EDIT = null; }
+async function saveRow(google) {
+  const b = formBody(); if (EDIT) b.id = EDIT.id;
+  try {
+    const saved = await Admin.api('POST', '/api/contacts', b); upsert(saved); closeEd();
+    if (google) await syncGoogle([saved.id]);
+  } catch (e) { document.getElementById('ed-err').textContent = e.message; }
+}
+async function delRow() {
+  if (!EDIT || !confirm(`Delete ${EDIT.name || EDIT.company} from the hub?` + (EDIT.google && EDIT.google.resourceName ? '\n\n(The copy in Google Contacts stays.)' : ''))) return;
+  try { await Admin.api('DELETE', '/api/contacts/' + EDIT.id); closeEd(); await load(); }
+  catch (e) { document.getElementById('ed-err').textContent = e.message; }
+}
+// yyyy-mm-dd in Beirut — never toISOString() (hub-date-timezone rule)
+function today() { const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Beirut', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()); const g = t => p.find(x => x.type === t).value; return `${g('year')}-${g('month')}-${g('day')}`; }
+document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (document.getElementById('viewer').classList.contains('on')) closeViewer(); else closeEd(); });
+</script>
+</body>
+</html>

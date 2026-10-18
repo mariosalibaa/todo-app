@@ -12,13 +12,24 @@
 // `photos` = the offer itself — the handwritten note, the WhatsApp screenshot, the supplier's PDF
 // (Mario 2026-10-07: "attach the photo"); bytes live in the Storage bucket via hub-files,
 // key procurement/<rowId>/<photoId>.<ext>, served back on GET (cookie auth works for <img>).
+//
+// Contacts (Mario 2026-10-18: "business cards should be linked to Google Contacts, not procurement"):
+// the same handler serves /api/contacts/* off workspaces/<team>/contacts/<id>
+//   { id, name, company, title, phone, email, website, social, trade, division, address, notes, source, date,
+//     project, photos [...], google { resourceName, etag, syncedAt } }
+// — the card's people, with the card photos; the page writes each one to Mario's Google Contacts from the
+// browser (People API, his own Google token) and stores the resourceName back here.
 
 const files = require('./hub-files');
+const parse = require('./site-parse');
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const now = () => new Date().toISOString();
 // trade + division (Mario 2026-09-22: "add trade column: topography", "supplier list for ppr; division mechanical")
-const FIELDS = ['supplier', 'contact', 'item', 'brand', 'unit', 'description', 'source', 'date', 'project', 'currency', 'trade', 'division'];
+const KINDS = {
+  procurement: { fields: ['supplier', 'contact', 'item', 'brand', 'unit', 'description', 'source', 'date', 'project', 'currency', 'trade', 'division'], need: ['supplier', 'item'], label: r => r.supplier || 'offer' },
+  contacts: { fields: ['name', 'company', 'title', 'phone', 'email', 'website', 'social', 'trade', 'division', 'address', 'notes', 'source', 'date', 'project'], need: ['name', 'company'], label: r => r.name || r.company || 'contact' },
+};
 
 function readBody(req, limit) {
   return new Promise((resolve, reject) => {
@@ -33,7 +44,9 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 
 async function handle(req, res, url, user, ctx) {
   const { db, TEAM_ID } = ctx;
-  const col = db.collection('workspaces').doc(TEAM_ID).collection('procurement');
+  const kind = /^\/api\/contacts(\/|$)/.test(url) ? 'contacts' : 'procurement', K = KINDS[kind], base = '/api/' + kind;
+  url = url.replace(base, '/api/procurement');   // one set of routes below, either collection
+  const col = db.collection('workspaces').doc(TEAM_ID).collection(kind);
   const who = (user && user.email) || 'unknown';
   let m;
 
@@ -50,10 +63,16 @@ async function handle(req, res, url, user, ctx) {
     const b = await readBody(req, 64e3);
     const id = (typeof b.id === 'string' && /^[\w-]{1,40}$/.test(b.id)) ? b.id : newId();
     const doc = { id };
-    for (const f of FIELDS) if (b[f] != null) doc[f] = String(b[f]).trim();
-    if (!doc.currency) doc.currency = 'USD';
-    if (b.price != null && b.price !== '') { const p = Number(String(b.price).replace(/[^\d.-]/g, '')); if (!isNaN(p)) doc.price = p; }
-    if (!doc.supplier && !doc.item) return json(res, 400, { error: 'supplier or item is required' });
+    for (const f of K.fields) if (b[f] != null) doc[f] = String(b[f]).trim();
+    if (kind === 'procurement') {
+      if (!doc.currency) doc.currency = 'USD';
+      if (b.price != null && b.price !== '') { const p = Number(String(b.price).replace(/[^\d.-]/g, '')); if (!isNaN(p)) doc.price = p; }
+      else if (b.price === '') doc.price = null;
+    }
+    // the Google Contacts link the page got back from the People API
+    if (kind === 'contacts' && b.google && typeof b.google === 'object') doc.google = { resourceName: String(b.google.resourceName || ''), etag: String(b.google.etag || ''), syncedAt: now() };
+    if (kind === 'contacts' && b.google === null) doc.google = null;
+    if (!K.need.some(f => doc[f])) return json(res, 400, { error: K.need.join(' or ') + ' is required' });
     const ref = col.doc(id); const cur = (await ref.get()).data();
     doc.updatedAt = now(); doc.updatedBy = who;
     if (!cur) { doc.addedAt = doc.updatedAt; doc.addedBy = who; if (!doc.date) doc.date = beirutDay(); }
@@ -61,9 +80,22 @@ async function handle(req, res, url, user, ctx) {
     return json(res, 200, (await ref.get()).data());
   }
 
+  // Read a business card (front + back photos) into the contact's fields — extraction only, the page fills
+  // the empty boxes and Mario saves (Mario 2026-10-18: cards → Google Contacts)
+  if (kind === 'contacts' && url === '/api/procurement/read' && req.method === 'POST') {
+    const b = await readBody(req, 4.4e6);
+    const imgs = (b.images || []).filter(x => x && x.dataBase64).slice(0, 2);
+    if (!imgs.length) return json(res, 400, { error: 'images required' });
+    const out = await parse.anthropic({ model: 'claude-sonnet-5', max_tokens: 600,
+      system: 'These are the front and back of one business card. Return JSON only: {"name":string,"title":string,"company":string,"phone":string,"email":string,"website":string,"social":string,"address":string,"trade":string,"notes":string}. name = the person (empty if none). phone = every number, as printed, joined by " · ", with its label when printed (M, T, F, WhatsApp). email/website/social likewise joined by " · " (social = @handles). trade = 2-3 words for what the company does (e.g. "window film", "steel", "solar software"). notes = one line: brands, distributorships, slogans worth remembering. Empty string when absent.',
+      messages: [{ role: 'user', content: imgs.map(x => ({ type: 'image', source: { type: 'base64', media_type: /png|webp/.test(x.mime || '') ? x.mime : 'image/jpeg', data: String(x.dataBase64).replace(/^data:[^,]*,/, '') } })) }] });
+    const f = {}; for (const k of KINDS.contacts.fields) if (out[k]) f[k] = String(out[k]).slice(0, 400);
+    return json(res, 200, f);
+  }
+
   if ((m = url.match(/^\/api\/procurement\/([\w-]+)$/)) && req.method === 'DELETE') {
     const cur = (await col.doc(m[1]).get()).data();
-    for (const ph of (cur && cur.photos) || []) { try { await files.deleteFile(ctx, ph); } catch (e) { console.warn('procurement photo delete:', e.message); } }
+    for (const ph of (cur && cur.photos) || []) { try { await files.deleteFile(ctx, ph); } catch (e) { console.warn(kind + ' photo delete:', e.message); } }
     await col.doc(m[1]).delete();
     res.writeHead(204); res.end(); return true;
   }
@@ -79,7 +111,7 @@ async function handle(req, res, url, user, ctx) {
     const mime = /^image\/|pdf$/.test(b.mime || '') ? String(b.mime) : 'image/jpeg';
     const ext = /pdf$/.test(mime) ? 'pdf' : /png$/.test(mime) ? 'png' : /webp$/.test(mime) ? 'webp' : 'jpg';
     const pid = newId();
-    const saved = await files.saveFile(ctx, { buf, mime, name: b.name || `${cur.supplier || 'offer'} ${cur.date || ''}.${ext}`.trim(), key: `procurement/${m[1]}/${pid}.${ext}`, who, meta: { procurement: m[1] } });
+    const saved = await files.saveFile(ctx, { buf, mime, name: b.name || `${K.label(cur)} ${cur.date || ''}.${ext}`.trim(), key: `${kind}/${m[1]}/${pid}.${ext}`, who, meta: { [kind]: m[1] } });
     const photo = { ...saved, id: pid };
     await ref.set({ photos: [...(cur.photos || []), photo], updatedAt: now(), updatedBy: who }, { merge: true });
     return json(res, 200, (await ref.get()).data());
@@ -94,7 +126,7 @@ async function handle(req, res, url, user, ctx) {
     const ref = col.doc(m[1]); const cur = (await ref.get()).data();
     const ph = cur && (cur.photos || []).find(p => p.id === m[2]);
     if (!ph) return json(res, 404, { error: 'no such photo' });
-    try { await files.deleteFile(ctx, ph); } catch (e) { console.warn('procurement photo delete:', e.message); }
+    try { await files.deleteFile(ctx, ph); } catch (e) { console.warn(kind + ' photo delete:', e.message); }
     await ref.set({ photos: cur.photos.filter(p => p.id !== m[2]), updatedAt: now(), updatedBy: who }, { merge: true });
     return json(res, 200, (await ref.get()).data());
   }
