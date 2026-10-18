@@ -98,7 +98,7 @@
   <div class="card"><table id="pays" class="folded"></table></div>
   <div class="note" id="foot"></div>
   <h2>One-page summary <span class="r muted">built from the figures above each time it opens — print it or save it as PDF</span></h2>
-  <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><a class="btn" href="/ajaltoun/excavation/summary" target="_blank" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📄 Open the one-page summary</a><span class="small muted">the same page Antoine sees: headline figures, the deal, the partner ledger reconciled, who was paid from which account, cycle by cycle, cost per m³</span></div>
+  <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><a class="btn" href="/ajaltoun/excavation/summary" target="_blank" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📄 Open the one-page summary</a><a href="/api/ajaltoun/excavation/doc/mario-summary-2026-10-18.jpg" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📝 Mario's summary on paper (18-10-2026)</a><span class="small muted">the same page Antoine sees: headline figures, the deal, the partner ledger reconciled, who was paid from which account, cycle by cycle, cost per m³</span></div>
   </div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -187,7 +187,7 @@ const ordered = rows => { const asc = document.getElementById('order').value ===
 const dmy = d => d ? d.split('-').slice(1).reverse().map(x => +x).join('-') : '';   // 2026-08-14 → 14-8
 const N = x => String(Math.round(x));   // plain numbers, the way Mario types them
 // Cycle 1 diesel, bought and paid by Anthony himself — reference only, counts in nothing (Mario, 2026-10-18).
-// From his handwritten paper, transcribed in Desktopuel_log.xlsx (the paper's own $ total said 8,244).
+// From his handwritten paper, transcribed in data/excavation-docs/anthony-fuel-cycle1.xlsx (the paper's own $ total said 8,244).
 const FUEL1 = [['2026-01-02',690,459],['2026-01-17',500,330],['2026-01-16',711,480],['2026-01-21',702,495],['2026-01-26',708,447],['2026-02-02',483,353],['2026-02-05',300,222],['2026-02-11',662,491],['2026-02-11',100,74],['2026-02-19',558,416],['2026-02-20',400,323],['2026-02-25',639,472],['2026-03-04',425,450],['2026-03-06',422,391],['2026-03-11',215,229],['2026-03-13',608,653],['2026-03-19',800,920],['2026-04-15',250,350],['2026-04-16',250,350],['2026-04-17',25,34],['2026-04-17',250,350]];
 const FUEL1_TILL = '2026-03-13';   // cycle 1 certificate
 const fuel1Tot = () => FUEL1.reduce((a, [, l, d]) => ({ l: a.l + l, d: a.d + d }), { l: 0, d: 0 });
@@ -197,7 +197,7 @@ function renderFuel1(m3) {
     <table class="cyc" style="margin-top:6px;width:auto"><thead><tr><th>#</th><th>Date</th><th class="n">Litres</th><th class="n">Amount $</th><th class="n">$/L</th><th></th></tr></thead><tbody>
     ${FUEL1.map(([d, l, a], i) => `<tr${d > FUEL1_TILL ? ' class="muted"' : ''}><td>${i + 1}</td><td>${dmy(d)}-${d.slice(0, 4)}</td><td class="n">${f(l, 0)}</td><td class="n">${f(a, 0)}</td><td class="n">${(a / l).toFixed(3)}</td><td class="small">${d > FUEL1_TILL ? 'after 13-3' : ''}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="tot"><td colspan="2">Total</td><td class="n">${f(T.l, 0)}</td><td class="n">${f(T.d, 0)}</td><td class="n">${(T.d / T.l).toFixed(3)}</td><td></td></tr></tfoot></table>
-    <p class="small muted" style="margin:6px 0 0">From Anthony's handwritten paper (Desktopuel_log.xlsx; the paper's own total said 8,244$). ${late.length} fills, ${f(Lt.l, 0)} L / ${f(Lt.d, 0)}$, are dated after the cycle 1 certificate of 13-3 and before cycle 2+3 starts on 18-4 — without them: ${f((T.l - Lt.l) / m3)} L/m³. Shift's cycles 2–8 run at the L/m³ and $/T of the table above. Not in any total, not in Counted to him.</p>`;
+    <p class="small muted" style="margin:6px 0 0">From Anthony's handwritten paper — <a href="/api/ajaltoun/excavation/doc/anthony-fuel-cycle1.xlsx">📎 the Excel</a>; the paper's own total said 8,244$. ${late.length} fills, ${f(Lt.l, 0)} L / ${f(Lt.d, 0)}$, are dated after the cycle 1 certificate of 13-3 and before cycle 2+3 starts on 18-4 — without them: ${f((T.l - Lt.l) / m3)} L/m³. Shift's cycles 2–8 run at the L/m³ and $/T of the table above. Not in any total, not in Counted to him.</p>`;
 }
 function anthonyRows() {
   return (D.cycles || []).map(c => {
@@ -416,7 +416,8 @@ function render() {
   document.getElementById('odoo-match').innerHTML = !M ? '' : `<h2>Partner Ledger — Georges EL Hajj <span class="r muted">all time, the same three figures as Odoo → Reporting → Partner Ledger</span></h2>
     <div class="card"><table class="ledger"><thead><tr><th></th><th class="n">Debit (paid)</th><th class="n">Credit (billed)</th><th class="n">Balance</th></tr></thead><tbody>
       <tr class="tot"><td>Odoo partner ledger</td><td class="n">${f(Lg.debit)}</td><td class="n">${f(Lg.credit)}</td><td class="n ${Lg.balance < 0 ? 'bad' : 'ok'}">${f(Lg.balance)} <span class="small muted">${Lg.balance < 0 ? 'Shift owes Georges' : 'Georges is ahead'}</span></td></tr>
-      ${mistake || refunds ? `<tr><td class="muted">of which the $${f(refunds)} sent to Anthony by mistake and returned — no bill behind it</td>${sub(mistake, 'paid by mistake')}${sub(refunds, 'returned')}<td class="n muted">${f(r2(mistake - refunds))}</td></tr>` : ''}
+      ${mistake || refunds ? `<tr><td class="muted">of which the $${f(refunds)} sent to Anthony by mistake and returned — no bill behind it</td>${sub(refunds, 'paid by mistake')}${sub(refunds, 'returned')}<td class="n muted">0.00</td></tr>` : ''}
+      ${r2(mistake - refunds) ? `<tr><td class="muted">the whole-dollar Whish rounding on the diesel, written off as a gain (MISC/2026/10/0001) — a debit with no payment and no bill</td>${sub(r2(mistake - refunds), 'rounding')}<td></td><td class="n muted">${f(r2(mistake - refunds))}</td></tr>` : ''}
       <tr class="tot"><td>Payments on bills / bills</td>${sub(M.paymentsTotal, M.paymentsCount + ' payments')}${sub(M.billsTotal, M.billsCount + ' bills')}<td class="n ${M.paymentsTotal < M.billsTotal ? 'bad' : 'ok'}">${f(r2(M.paymentsTotal - M.billsTotal))} <span class="small muted">open</span></td></tr>
       ${coll.map((c, i) => `<tr><td class="small muted">${i === 0 ? 'made of' : ''}</td>${c.sub ? `<td class="n muted small">${f(c.amount)} ${esc(c.key)}</td>` : sub(c.amount, esc(c.key))}${i === 0 ? sub(dueBills, 'excavation + diesel + day rate') : i === 1 ? sub(T.retention, 'commission (retention)') : '<td></td>'}${openLines[i] || '<td></td>'}</tr>`).join('')}
     </tbody></table></div>

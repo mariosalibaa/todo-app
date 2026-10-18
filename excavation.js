@@ -301,6 +301,14 @@ const readBody = req => new Promise((ok, no) => { let s = ''; req.on('data', d =
 async function handle(req, res, url, user, ctx) {
   if (url.split('?')[0] === '/api/ajaltoun/excavation' && req.method === 'GET') return json(res, 200, await build(ctx));
   if (url.split('?')[0] === '/api/ajaltoun/excavation/diesel' && req.method === 'GET') return json(res, 200, await diesel(ctx));
+  // papers kept with the excavation (Mario 2026-10-18: Anthony's cycle 1 fuel log, attached on the page), from data/excavation-docs/
+  const doc = url.split('?')[0].match(/^\/api\/ajaltoun\/excavation\/doc\/([\w.-]+\.(xlsx|pdf|jpg))$/);
+  if (doc && req.method === 'GET') {
+    const f = require('path').join(__dirname, 'data', 'excavation-docs', doc[1]);
+    if (!require('fs').existsSync(f)) return json(res, 404, { error: 'not found' });
+    res.writeHead(200, { 'Content-Type': doc[2] === 'pdf' ? 'application/pdf' : doc[2] === 'jpg' ? 'image/jpeg' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `inline; filename="${doc[1]}"`, 'Cache-Control': 'private, max-age=3600' });
+    res.end(require('fs').readFileSync(f)); return true;
+  }
   if (url.split('?')[0] === '/api/ajaltoun/excavation/text' && req.method === 'PATCH') {   // Mario adjusts a card's wording (2026-09-13)
     if (!ctx.access || !ctx.access.admin) return json(res, 403, { error: 'admin only' });
     const b = await readBody(req); const key = String(b.key || '').replace(/[^\w-]/g, '');
