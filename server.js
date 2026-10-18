@@ -169,6 +169,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'public/rent-law/circular-22-2023-state-rents.pdf'));
   fs.readFileSync(path.join(__dirname, 'public/rent-law/cas-82-inflation-2013-2022.pdf'));
   fs.readFileSync(path.join(__dirname, 'mechanical.html'));
+  fs.readFileSync(path.join(__dirname, 'cars.html'));
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
   fs.readFileSync(path.join(__dirname, 'contacts.html'));
@@ -779,6 +780,7 @@ const handler = async (req, res) => {
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
+    '/cars': 'cars.html',   // the cars' insurance + driving licences, expiry and days left; reminders from tools CarsWatch (Mario 2026-10-18)
     '/usa': 'usa.html',   // Youssef's well pump (Maryland): order of work + photos of the sand fixes; PUBLIC, nothing private (Mario 2026-10-06)
     '/contacts': 'contacts.html',   // business cards → Mario's Google Contacts (Mario, 2026-10-18)
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)

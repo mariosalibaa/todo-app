@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cars – insurance</title>
+<style>
+  :root { --bg:#f7f5f0; --card:#fff; --ink:#1f1f1f; --muted:#666; --amber:#F2A93B; --line:#e6e2da; --soft:#fdf6e9;
+          --red:#c0392b; --redbg:#fdecea; --orange:#b9770e; --orangebg:#fef5e7; --green:#1e8449; --greenbg:#eafaf1; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Segoe UI",Tahoma,Arial,sans-serif; font-size:15px; line-height:1.5; }
+  .wrap { max-width:1000px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  h2 { font-size:18px; margin:28px 0 10px; }
+  .sub { color:var(--muted); font-size:14px; margin-bottom:18px; }
+  .hback { display:inline-block; color:var(--amber); text-decoration:none; font-size:14px; font-weight:600; padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); margin-bottom:14px; }
+  .hback:hover { border-color:var(--amber); }
+  .next { background:var(--soft); border-left:4px solid var(--amber); border-radius:12px; padding:12px 16px; margin-bottom:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { border-bottom:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; white-space:nowrap; }
+  th { background:var(--soft); font-weight:600; font-size:13px; }
+  tr:last-child td { border-bottom:none; }
+  td.n, th.n { text-align:right; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; }
+  .ok { background:var(--greenbg); color:var(--green); }
+  .soon { background:var(--orangebg); color:var(--orange); }
+  .late { background:var(--redbg); color:var(--red); }
+  .note { color:var(--muted); font-size:13px; margin-top:10px; }
+  .note li { margin:3px 0; }
+  /* phone: one card per car instead of a wide table */
+  @media (max-width:640px) {
+    thead { display:none; }
+    table, tbody, tr, td { display:block; width:100%; }
+    tr { border-bottom:1px solid var(--line); padding:8px 4px; }
+    td { border:none; padding:3px 10px; white-space:normal; }
+    td.n { text-align:left; }
+    td[data-l]::before { content:attr(data-l) " · "; color:var(--muted); font-size:12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="hback" href="/">‹ Back to the hub</a>
+  <h1>Cars — insurance expiry</h1>
+  <div class="sub">Read from the Arope policies in Dropbox <b>0. CARS</b> on 18-10-2026 · soonest first · days counted from today</div>
+
+  <div class="next" id="next"></div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>Car</th><th>Plate</th><th>Insured name</th><th>Obligatory (bodily)</th><th>Third party (material)</th><th>Status</th><th class="n">Premium</th><th>Mécanique on file</th></tr></thead>
+      <tbody id="cars"></tbody>
+    </table>
+  </div>
+  <ul class="note">
+    <li>Every car carries two Arope policies: the <b>obligatory</b> one (عقد الضمان الإلزامي, bodily injury) and the <b>third-party material</b> one. No car has all-risk.</li>
+    <li>BMW 318 1995 was renewed to 19-8-2027 — its Dropbox folder still says 19-8-2026.</li>
+    <li>BMW 320: plate on the policy is <b>421956B</b>; the Dropbox folder says 421856B.</li>
+    <li>Tacoma: the material policy runs 4 days longer than the obligatory one (16-2 vs 12-2-2027). It is insured by SHIFT GROUP SARL.</li>
+    <li>Mécanique: BMW 320 and Pathfinder 2005 folders say “needed to pay mécanique 2026”.</li>
+  </ul>
+
+  <h2>Driving licences</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>Who</th><th>Expires</th><th>Status</th></tr></thead>
+      <tbody id="lic"></tbody>
+    </table>
+  </div>
+</div>
+<script>
+// [car, year, plate, insured, obligatory expiry, material expiry, premium $ (both policies), mécanique last paid on file]
+const CARS = [
+  ['Toyota RAV4', 2002, '483534B', 'Therese George Matar', '2026-12-05', '2026-12-05', 65, 2025],
+  ['Jeep Grand Cherokee', 2016, '740640B', 'Therese George Matar', '2026-12-05', '2026-12-05', 65, 2025],
+  ['Nissan Pathfinder', 2014, 'B799293', 'Mario Youssef Saliba', '2027-01-12', '2027-01-12', 65, 2026],
+  ['Toyota Tacoma', 2007, '293450M', 'Shift Group SARL', '2027-02-12', '2027-02-16', 170, 2025],
+  ['Jeep Laredo', 2006, '388485G', 'Mario Youssef Saliba', '2027-03-05', '2027-03-05', 59, 2025],
+  ['Nissan Pathfinder SE', 2005, '233792G', 'Miladeh Matar Saliba', '2027-06-23', '2027-06-23', 59, 2025],
+  ['BMW 320', 2007, '421956B', 'Miladeh Raef Matar', '2027-07-31', '2027-07-31', 80, 2025],
+  ['BMW 318', 1995, '310944B', 'Miladeh Matar & Mario Saliba', '2027-08-19', '2027-08-19', 80, 2025],
+];
+const LIC = [['Dad', '2027-12-12'], ['Mum', '2030-09-23']];
+
+// today in Beirut, as yyyy-mm-dd (never toISOString)
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Beirut' }).format(new Date());
+const dayNum = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5;
+const left = s => dayNum(s) - dayNum(today);
+const fmt = s => { const [y, m, d] = s.split('-'); return `${+d}-${+m}-${y}`; };
+const pill = n => n < 0 ? `<span class="pill late">expired ${-n} d ago</span>`
+  : n <= 45 ? `<span class="pill late">${n} days left</span>`
+  : n <= 90 ? `<span class="pill soon">${n} days left</span>`
+  : `<span class="pill ok">${n} days left</span>`;
+
+const rows = CARS.map(c => ({ c, first: c[4] < c[5] ? c[4] : c[5] })).sort((a, b) => a.first.localeCompare(b.first));
+const year = +today.slice(0, 4);
+document.getElementById('cars').innerHTML = rows.map(({ c, first }) => `<tr>
+  <td data-l="Car"><b>${c[0]} ${c[1]}</b></td>
+  <td data-l="Plate">${c[2]}</td>
+  <td data-l="Insured">${c[3]}</td>
+  <td data-l="Obligatory">${fmt(c[4])}</td>
+  <td data-l="Material">${fmt(c[5])}</td>
+  <td>${pill(left(first))}</td>
+  <td class="n" data-l="Premium">${c[6].toFixed(2)}$</td>
+  <td data-l="Mécanique">${c[7]} paid${c[7] < year ? ` <span class="pill soon">${year} due</span>` : ''}</td>
+</tr>`).join('');
+
+const due = rows.filter(r => left(r.first) <= 90);
+document.getElementById('next').innerHTML = due.length
+  ? `<b>Renew next:</b> ${due.map(r => `${r.c[0]} ${r.c[1]} — ${fmt(r.first)} (${left(r.first)} days)`).join(' · ')}`
+  : `<b>Nothing expires in the next 90 days.</b> Next: ${rows[0].c[0]} ${rows[0].c[1]} on ${fmt(rows[0].first)}.`;
+
+document.getElementById('lic').innerHTML = LIC.map(([who, d]) => `<tr><td data-l="Who"><b>${who}</b></td><td data-l="Expires">${fmt(d)}</td><td>${pill(left(d))}</td></tr>`).join('');
+</script>
+</body>
+</html>
