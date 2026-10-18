@@ -4,6 +4,7 @@
 // bots/agent-site) which answers back through the machine routes below (/api/site/agent/*).
 // The agent writes nothing without Mario's ✓ on an action card (POST …/confirm).
 const acc = require('./accounts');
+const dev = require('./dev-requests');
 const parse = require('./site-parse');
 
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
@@ -137,7 +138,9 @@ async function handle(req, res, url, user, ctx) {
     const context = contextLines(snap.docs.map(x => x.data()).reverse().filter(p => p.id !== id));
     const ledger = await ledgerFor(ws, thread);
     await ref.set({ agentAsk: true, askedAt: now(), answeredAt: null, digestedAt: post.digestedAt || now(), digesting: false, line: null }, { merge: true });
-    try { await render('/site-agent', { thread, postId: id, text, date: post.date, context, ledger }); }
+    const laptop = await dev.laptopState(ws).catch(() => null);
+    if (laptop && laptop.at) laptop.at = new Date(laptop.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    try { await render('/site-agent', { thread, postId: id, text, date: post.date, context, ledger, laptop }); }
     catch (e) { return fail(res, e); }
     return json(res, 200, { ok: true });
   }
@@ -215,6 +218,12 @@ async function handle(req, res, url, user, ctx) {
         if (!patch) return json(res, 200, { ok: true, receipt: `to-do "${cur.title}" — nothing to change`, url: host + '/todo', taskId: id });
         await ref.set(patch, { merge: true });
         return json(res, 200, { ok: true, receipt: `to-do "${patch.title || cur.title}": ${patchReceipt(patch)}`, url: host + '/todo', taskId: id });
+      }
+      // a job for Claude Code on the laptop — the card's ✓ was the go; it answers in the thread the card is in
+      if (w.name === 'hub_dev_request') {
+        const item = await dev.createAuto(ws, input, { thread: /^[\w-]+$/.test(String(b.thread || '')) ? b.thread : AGENT, postId: b.postId, who: AGENT });
+        const l = await dev.laptopState(ws);
+        return json(res, 200, { ok: true, receipt: `laptop job "${item.title}" — ${l.online ? (l.busy ? 'queued behind the current job' : 'starting now') : 'queued, starts when the laptop is on'}`, url: host + '/dev', requestId: item.id });
       }
       return json(res, 400, { error: 'unknown hub write ' + w.name });
     }

@@ -233,8 +233,18 @@ function drawList() {
 const ledgerOf = t => t.kind === 'general' ? 'mario-cash' : t.id;
 function drawChatBar() {
   const t = threads.find(x => x.id === cur); if (!t) { el('chatbar').innerHTML = ''; return; }
-  el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${avClass(t)}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'agent' ? 'Shift · ask anything; ✓ to act' : `${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'} · <a href="/accounting/accounts?id=${encodeURIComponent(ledgerOf(t))}" target="_blank" rel="noopener" title="Open this cash ledger">ledger ↗</a>`}</div></div>`;
+  el('chatbar').innerHTML = `<a class="back" href="#" onclick="showList();return false;">‹</a><div class="av ${avClass(t)}">${initial(t)}</div><div><div class="n">${esc(t.name)}</div><div class="s">${t.kind === 'agent' ? 'Shift · ask anything; ✓ to act <span id="laptop" class="laptop"></span>' : `${t.kind === 'general' ? 'Mario · site notes and receipts' : 'worker chat'} · <a href="/accounting/accounts?id=${encodeURIComponent(ledgerOf(t))}" target="_blank" rel="noopener" title="Open this cash ledger">ledger ↗</a>`}</div></div>`;
+  if (t.kind === 'agent') drawLaptop();
 }
+// the Shift thread says whether the laptop is there to code (dev-runner.mjs beats every 30 s) — Mario 2026-10-18
+async function drawLaptop() {
+  const sp = el('laptop'); if (!sp) return;
+  try { const l = await Admin.api('GET', '/api/dev-requests/laptop'); if (!el('laptop')) return;
+    sp.textContent = l.online ? (l.busy ? ' · 💻 laptop on — working: ' + (l.job || 'a job') : ' · 💻 laptop on — can code') : ' · 💤 laptop off — code requests wait';
+    sp.title = l.at ? 'last seen ' + new Date(l.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut' }) : '';
+  } catch (e) { sp.textContent = ''; }
+}
+setInterval(() => { if (el('laptop')) drawLaptop(); }, 60e3);
 function showList() { document.body.classList.remove('in-chat'); history.replaceState(null, '', location.pathname); }
 function open_(id, wantPost) { pinned = true; cur = id; history.replaceState(null, '', '#' + id); document.body.classList.add('in-chat'); drawList(); drawChatBar(); setComposerEnabled(true); const lp = loadPosts().then(() => wantPost && jumpTo(wantPost)); loadDay(); return lp; }
 // a link from the accounts grid names one message: scroll to it and flash it
