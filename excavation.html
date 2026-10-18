@@ -42,7 +42,7 @@
   .bar{height:6px;background:var(--surface0);border-radius:3px;overflow:hidden;min-width:100px;} .bar i{display:block;height:100%;background:var(--amber);}
   .muted{color:var(--overlay0);} .small{font-size:.74rem;}
   table.cyc{font-size:.7rem;} table.cyc th,table.cyc td{padding:4px 3px;white-space:nowrap;} table.cyc th{font-size:.56rem;letter-spacing:.02em;white-space:normal;line-height:1.15;vertical-align:bottom;} table.cyc td .of{color:var(--overlay0);font-size:.64rem;} table.cyc td .i{cursor:help;color:var(--amber);margin-left:3px;} .ok{color:var(--green);} .warn{color:var(--amber);} .bad{color:var(--red);}
-  table.ledger td:first-child{max-width:340px;white-space:normal;} table.ledger tr.tot td{font-weight:600;border-top:1px solid var(--surface1);}
+  table.ledger{width:100%;table-layout:fixed;} table.ledger td:first-child,table.ledger th:first-child{width:15%;white-space:normal;} table.ledger th:nth-child(2){width:17%;} table.ledger th:nth-child(3){width:22%;} table.ledger td.n,table.ledger th.n{white-space:normal;overflow-wrap:anywhere;} table.ledger td.n .small{display:block;}   /* fits the card, no sideways scroll (Mario, 2026-10-18) */ table.ledger tr.tot td{font-weight:600;border-top:1px solid var(--surface1);}
   .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.5;margin-top:14px;}
   .vtabs{display:flex;gap:4px;margin:0 0 16px;border-bottom:1px solid var(--surface0);} .vtabs a{padding:7px 14px;color:var(--sub);text-decoration:none;font-size:.84rem;border-bottom:2px solid transparent;margin-bottom:-1px;} .vtabs a.on{color:var(--amber);border-bottom-color:var(--amber);font-weight:600;}
   table.fills td{vertical-align:top;} table.fills td.pay{white-space:normal;min-width:190px;} table.fills td.pay div+div{margin-top:4px;padding-top:4px;border-top:1px dashed var(--surface0);} table.fills tr.tc td{color:var(--amber);}
@@ -74,7 +74,6 @@
   <div id="status" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
   <div id="totcost"></div>
-  <div id="prov"></div>
   <div id="odoo-match"></div>
   <div id="cost"></div>
   <div id="cycles"></div>
@@ -319,11 +318,13 @@ function renderProv() {
 // what Anthony got above his certificates is a cost too — he is not coming back to dig it off — then the $/m³ of it all
 function renderTotal() {
   const T = D.totals, C = D.cost || {}, P = D.patrick || { paid: 0, open: 0, m3: 0, bills: [] }, el = document.getElementById('totcost');
-  const prov = +((D.provision || {}).anthony) || 0, left = anthonyRows().reduce((t, c) => t + c.left, 0) - prov;
-  const extra = Math.max(0, Math.round(-left * 100) / 100), r2 = x => Math.round(x * 100) / 100;
+  const prov = +((D.provision || {}).anthony) || 0;
+  const r2 = x => Math.round(x * 100) / 100;
   const geo = r2(T.collected + prov + T.retentionOpen + T.dueDib), pat = r2(P.paid + P.open), all = r2(geo + pat);
+  // the extra = all he gets (paid + still to pay) above his bills, to the cent (Mario, 2026-10-18: "why we have rounding"); the
+  // per-cycle Anthony table counts the diesel at $0.80/L in whole dollars, so it reads ~3.49 more
+  const extra = Math.max(0, r2(geo - T.bills));
   const m3G = C.m3 || 0, m3P = P.m3 || 0, m3 = m3G + m3P, pm = (v, q) => q ? '$ ' + f(v / q) + ' /m³' : '—';
-  const gap = r2(geo - T.bills - extra);
   const row = (label, v, cls = '', note = '') => `<tr${cls ? ` class="${cls}"` : ''}><td>${label}${note ? ` <span class="muted small">· ${note}</span>` : ''}</td><td class="n">$ ${f(v)}</td></tr>`;
   el.innerHTML = `<h2>Total excavation cost <span class="r muted">paid + still to pay, Georges and Patrick</span></h2><div class="card"><table class="prov"><tbody>
     ${row('Paid by Shift to the Georges side', T.collected, '', `${f(T.paidOdoo)} in Odoo${T.pendingHub ? ' + ' + f(T.pendingHub) + ' on Whish not booked' : ''}`)}
@@ -334,7 +335,7 @@ function renderTotal() {
     ${row('+ Patrick Hokayem, first contractor', pat, '', `${esc(P.bills.map(b => b.name + ' ' + b.ref).join(', '))} · ${f(m3P, 0)} m³${P.open ? ' · ' + f(P.open) + ' still open' : ' · paid'}`)}
     ${row('Total excavation cost', all, 'tot', `${f(m3, 0)} m³`)}
     ${row('of which the extra Anthony received', extra, 'bad', `paid above his certificates — he is not coming back, so it stays a cost`)}
-    ${row('= the work at the agreed prices', r2(all - extra), '', `Georges' bills ${f(T.bills)} + Patrick ${f(pat)}${Math.abs(gap) > 0.5 ? ` · ${f(gap)} rounding` : ''}`)}
+    ${row('= the work at the agreed prices', r2(all - extra), '', `Georges' bills ${f(T.bills)} + Patrick ${f(pat)}`)}
   </tbody></table>
   <table class="prov" style="margin-top:10px"><thead><tr><th>Unit price</th><th class="n">m³</th><th class="n">$/m³</th></tr></thead><tbody>
     <tr><td>Georges EL Hajj, all in <span class="muted small">· incl. commission, diesel, day rate and Anthony's extra</span></td><td class="n">${f(m3G, 0)}</td><td class="n">${pm(geo, m3G)}</td></tr>
@@ -349,7 +350,7 @@ async function saveProv() {
   const v = +document.getElementById('prov-a').value || 0;
   try { await Admin.api('PATCH', '/api/ajaltoun/excavation/provision', { anthony: v, note: (D.provision || {}).note || 'requested to continue' }); D.provision = { ...(D.provision || {}), anthony: v }; renderProv(); } catch (e) { alert('Not saved: ' + e.message); }
 }
-function renderLists() { renderTotal(); renderProv(); renderStatement(); renderBills(); renderPays(); for (const id of ['stmt', 'bills', 'pays']) applyCols(id); }
+function renderLists() { renderTotal(); renderStatement(); renderBills(); renderPays(); for (const id of ['stmt', 'bills', 'pays']) applyCols(id); }
 const f = (n, d = 2) => (+n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 // the page opens with the full Ajaltoun key or with 'excavation' alone (a partner sees this dashboard and nothing else of the project)
 Admin.require(['ajaltoun', 'excavation'], me => {

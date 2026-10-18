@@ -209,7 +209,7 @@ function compute() {
   const equip = lines.filter(isEq);                  // reusable: prefab, scaffolding
   const sum = a => a.reduce((x, l) => x + l.amount, 0);
   // Mario pays every Ajaltoun bill from the project cash he holds, so money out = every cost booked
-  const paidOut = sum(lines);
+  const paidOut = sum(lines.filter(l => !l.pending));   // a pending line (still to pay, not in Odoo) is a cost, not money out yet
   const owed = (D.owed || []).reduce((x, o) => x + o.amount, 0);
   const st = s => lines.filter(l => stOf(l) === s);
   const approved = sum(lines.filter(l => l.review && l.review.approved)), approvedN = lines.filter(l => l.review && l.review.approved).length;
@@ -219,7 +219,9 @@ function compute() {
   const received = inv ? inv.received.reduce((x, p) => x + p.amount, 0) : 0;
   const nextDue = inv ? inv.schedule.find(s => s.residual > 0.005) : null;
   // by section
-  const bySec = D.sections.map(s => ({ ...s, amount: sum(lines.filter(l => l.section === s.id)), n: lines.filter(l => l.section === s.id).length })).filter(s => s.n);
+  // the part not paid yet per section (Mario, 2026-10-18): bills Odoo marks not paid + pending lines still to pay
+  const unpaidOf = l => l.amount > 0 && (l.pending || l.paid === 'not_paid');
+  const bySec = D.sections.map(s => ({ ...s, amount: sum(lines.filter(l => l.section === s.id)), unpaid: sum(lines.filter(l => l.section === s.id && unpaidOf(l))), n: lines.filter(l => l.section === s.id).length })).filter(s => s.n);
   // by villa (shared cost only): common ÷ 6 lands on every villa
   const common = sum(cost.filter(l => l.villa === 'Common'));
   const villas = VILLA_ORDER.filter(v => v !== 'Common').map(v => { const own = sum(cost.filter(l => l.villa === v)); return { v, own, common: common / 6, total: own + common / 6 }; });
@@ -254,7 +256,7 @@ function renderAccounts(app) {
       <thead><tr><th>Section</th><th class="n">Lines</th><th class="n">Amount</th><th class="n">Qty done</th><th class="n">$ / unit</th><th class="n">BOQ rate</th><th>Share</th><th class="n">% of cost</th></tr></thead>
       <tbody>${c.bySec.map(s => { const q = (D.qtyDone || {})[s.id], boq = boqRate(s.id), unit = (q && q.unit) || (boq && boq.unit) || '';
         const perUnit = q && q.qty ? s.amount / q.qty : null, open = OPEN_SEC.has(s.id);
-        return `<tr class="srow ${s.equipment ? 'eq' : ''}" onclick="toggleSec(event, '${s.id}')"><td><span class="chev">${open ? '▾' : '▸'}</span>${esc(s.name)}${s.equipment ? ' <span class="pill eq">equipment</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${usd2(s.amount)}</td>
+        return `<tr class="srow ${s.equipment ? 'eq' : ''}" onclick="toggleSec(event, '${s.id}')"><td><span class="chev">${open ? '▾' : '▸'}</span>${esc(s.name)}${s.equipment ? ' <span class="pill eq">equipment</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${usd2(s.amount)}${s.unpaid > 0.5 ? `<div class="small" style="color:var(--red,#f38ba8)" title="bills not paid + money still to pay that is not in Odoo yet">${usd2(s.unpaid)} not paid</div>` : ''}</td>
         <td class="n qin" onclick="event.stopPropagation()">${D.admin ? `<input type="number" step="any" value="${q ? q.qty : ''}" placeholder="qty" onchange="setQty('${s.id}', this.value, this.nextElementSibling.value)"><input value="${esc(unit)}" placeholder="unit" style="width:52px" onchange="setQty('${s.id}', this.previousElementSibling.value, this.value)">` : (q ? `${q.qty.toLocaleString('en-US')} ${esc(unit)}` : '<span class="muted">—</span>')}</td>
         <td class="n ${perUnit != null && boq && boq.rate ? (perUnit <= boq.rate ? 'ok' : 'flag') : ''}">${perUnit != null ? usd2(perUnit) : '—'}</td>
         <td class="n muted">${boq && boq.rate ? usd2(boq.rate) + '/' + esc(boq.unit) : '—'}</td>
@@ -359,6 +361,7 @@ function secLinesTable(id) {
 }
 // the BILL cell: the Odoo bill number, "payment · no bill", or "not in Odoo" linking to the hub ledger line
 function billCell(l) {
+  if (l.pending) return `<span class="pill notpaid" title="Still to pay, not in Odoo yet — it leaves this list the moment the payment is booked">to pay · not in Odoo</span>${l.moveName ? `<div class="muted small">on ${esc(l.moveName)}</div>` : ''}`;
   if (l.hub) return `<span class="pill hub" title="A line of the hub ledger (${esc(l.paidBy || '')}) tagged Ajaltoun 4193 — not booked in Odoo yet"><a href="${esc(l.ledgerUrl || '#')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">not in Odoo ↗</a></span>${D.admin && l.accId && l.txId ? ` <a href="#" class="edit" onclick="event.stopPropagation();LineSheet.open('${esc(l.accId)}', '${esc(l.txId)}', { onChange: () => load() });return false;" title="Note, extra expenses (transport 25$), partner, company, division, accept, book in Odoo — the same sheet as the accounts grid">edit ▸</a>` : ''}`;
   const odoo = l.moveId ? `<a href="${ODOO_MOVE}${l.moveId}${ODOO_MOVE_Q}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open this entry in Odoo">${esc(l.moveName)} ↗</a>` : esc(l.moveName);
   return `${l.payment ? `<span class="pill pay" title="Paid to the supplier, bill not booked in Odoo yet. Book/match the bill and this line becomes the bill's own analytic line.">payment · no bill</span> ` : ''}${odoo}`;
@@ -395,7 +398,7 @@ function months(c) {
   const m = {};
   const at = k => (m[k] = m[k] || { k, inn: 0, out: 0, ins: [], secs: {} });
   for (const p of (c.inv ? c.inv.received : [])) { const x = at(p.date.slice(0, 7)); x.inn += p.amount; x.ins.push(p); }
-  for (const l of c.lines) { const x = at(l.date.slice(0, 7)); x.out += l.amount; x.secs[l.section] = (x.secs[l.section] || 0) + l.amount; }
+  for (const l of c.lines) { if (l.pending) continue; const x = at(l.date.slice(0, 7)); x.out += l.amount; x.secs[l.section] = (x.secs[l.section] || 0) + l.amount; }
   const list = Object.values(m).sort((a, b) => a.k.localeCompare(b.k));
   let bal = 0; for (const x of list) { bal += x.inn - x.out; x.bal = bal; }
   return list;

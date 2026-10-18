@@ -347,4 +347,20 @@ async function handle(req, res, url, user, ctx) {
   }
   return false;
 }
-module.exports = { handle };
+// Dib's fills not paid yet, the light way (no Firestore): the same rule as build() — a diesel-bill line "d-m diesel …" that no
+// Dib / IPT payment memo names as "filled d-m-yyyy". For the Ajaltoun cost pages, as money still to pay (Mario, 2026-10-18)
+async function unpaidFills(odooCall) {
+  const [bills, pays] = await Promise.all([
+    odooCall('account.move', 'search_read', [[['partner_id', '=', PARTNER], ['company_id', '=', COMPANY], ['move_type', '=', 'in_invoice'], ['state', '=', 'posted']]], { fields: ['name', 'ref', 'invoice_line_ids'], context: CTX }),
+    odooCall('account.payment', 'search_read', [[['partner_id', '=', PARTNER], ['company_id', '=', COMPANY], ['state', 'in', ['paid', 'in_process', 'posted']], ['memo', 'ilike', 'filled']]], { fields: ['memo'], context: CTX }),
+  ]);
+  const db = bills.filter(b => isDiesel(b.ref)), ids = db.flatMap(b => b.invoice_line_ids || []);
+  const dl = ids.length ? await odooCall('account.move.line', 'read', [ids, ['name', 'quantity', 'price_unit', 'move_id']], { context: CTX }) : [];
+  const memos = pays.map(p => String(p.memo || '')).filter(m => /dib|ipt|diesel/i.test(m)), out = [];
+  for (const l of dl) { const d = (l.name || '').match(/^(\d{1,2})-(\d{1,2})/); if (!d || /paid to IPT/i.test(l.name || '')) continue;
+    if (memos.some(m => new RegExp('filled ' + (+d[1]) + '-' + (+d[2]) + '-').test(m))) continue;
+    const m = (l.name || '').match(/L\s*\*\s*-?([\d.]+)/i), L = +l.quantity || 0, perL = m ? +m[1] : (+l.price_unit + 0.8);
+    out.push({ day: +d[1], month: +d[2], litres: L, perL, amount: Math.round(L * perL), bill: l.move_id ? l.move_id[1].split(' ')[0] : '' }); }
+  return out;
+}
+module.exports = { handle, unpaidFills };

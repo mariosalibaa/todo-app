@@ -36,6 +36,7 @@
 // apart and left out of the cost the partners share (Mario, 2026-09-12).
 
 const plan = require('./ajaltoun-plan');   // budget (BOQ) + cashflow plan
+const excavation = require('./excavation');   // Dib's unpaid diesel fills, money still to pay
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); return true; };
 const now = () => new Date().toISOString();
 const CTX = { allowed_company_ids: [2, 4, 7, 8, 9, 10] };
@@ -204,14 +205,28 @@ async function pullCosts(odooCall) {
     { fields: ['name', 'date', 'memo', 'partner_id', 'amount_company_currency_signed', 'company_id', 'journal_id', 'x_studio_project'], context: CTX, limit: 2000, order: 'date, id' });
   const pAtts = pays.length ? await odooCall('ir.attachment', 'search_read', [[['res_model', '=', 'account.payment'], ['res_id', 'in', pays.map(p => p.id)]]], { fields: ['res_id', 'name', 'mimetype'], context: CTX, limit: 2000 }) : [];
   const pAttsOf = {}; for (const a of pAtts) (pAttsOf[a.res_id] = pAttsOf[a.res_id] || []).push({ id: a.id, name: a.name, mime: a.mimetype });
+  // a payment partly matched to a bill counts only for what is still open — the matched part is already inside the bill's line
+  // (Mario, 2026-10-18: PCSH2/2026/00055 $600, 107.49 on BILL1/2026/09/0004, was counted twice)
+  const pml = pays.length ? await odooCall('account.move.line', 'search_read', [[['payment_id', 'in', pays.map(p => p.id)], ['account_id.account_type', 'in', ['liability_payable', 'asset_receivable']]]],
+    { fields: ['payment_id', 'amount_residual'], context: CTX, limit: 5000 }) : [];
+  const openOf = {}; for (const l of pml) openOf[l.payment_id[0]] = (openOf[l.payment_id[0]] || 0) + l.amount_residual;
   for (const p of pays) {
-    lines.push({ id: PAY_ID_BASE + p.id, payment: true, date: p.date, name: p.memo || p.name, amount: -p.amount_company_currency_signed,
+    const full = -p.amount_company_currency_signed, open = openOf[p.id] == null ? full : Math.sign(full) * Math.min(Math.abs(full), Math.abs(openOf[p.id]));
+    if (Math.abs(open) < 0.005) continue;
+    lines.push({ id: PAY_ID_BASE + p.id, payment: true, date: p.date, name: (p.memo || p.name) + (Math.abs(open - full) > 0.005 ? ` · ${(+(full - open).toFixed(2)).toLocaleString('en-US')} of ${full.toLocaleString('en-US')} already on a bill` : ''), amount: +open.toFixed(2),
       partner: p.partner_id ? p.partner_id[1] : '', partnerId: p.partner_id ? p.partner_id[0] : null,
       account: 'Payment, bill not booked yet', company: p.company_id ? p.company_id[1] : '', companyId: p.company_id ? p.company_id[0] : null,
       villa: VILLAS[p.x_studio_project[0]] || p.x_studio_project[1], moveId: null, moveName: p.name, moveRef: p.journal_id ? p.journal_id[1] : '',
       paid: 'paid', paidBy: p.journal_id ? p.journal_id[1] : '', files: pAttsOf[p.id] || [] });
   }
-  lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id);
+  // 4. money still to pay that Odoo does not hold yet: Dib's diesel fills not paid (Mario, 2026-10-18: "add payment pending so i
+  // know my cost per division") — full price, as the excavation page counts them; it leaves the moment the Whish payment is booked
+  const fills = await excavation.unpaidFills(odooCall).catch(() => []), yr = new Date().getFullYear();
+  for (const f of fills) lines.push({ id: `pend:dib:${f.day}-${f.month}`, pending: true, date: `${yr}-${String(f.month).padStart(2, '0')}-${String(f.day).padStart(2, '0')}`,
+    name: `Dib Mokhtar · diesel filled ${f.day}-${f.month} · ${f.litres} L × $${f.perL}/L = $${f.amount} · not paid yet`, amount: f.amount,
+    partner: 'Georges EL Hajj', partnerId: 313, account: 'To pay, not in Odoo yet', odooSection: 'excavation', company: 'SHIFT DEVELOPMENT', companyId: 10, villa: 'Common',
+    moveId: null, moveName: f.bill, moveRef: '', paid: 'not_paid', paidBy: '', files: [] });
+  lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.id).localeCompare(String(b.id), 'en', { numeric: true }));
   return { lines };
 }
 
