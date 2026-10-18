@@ -48,15 +48,20 @@ async function build(ctx) {
     const hub = byMove[p.move_id ? p.move_id[0] : 0] || byName[p.name] || null;
     const memo = String(p.memo || '');
     // who collected: the hub line's phone when tied; else the memo's word (diesel = Dib Mokhtar, anthony = Anthony); else cash to Georges
-    const collector = hub && hub.collector ? hub.collector : /^ipt/i.test(memo) ? 'IPT Saint Nicolas (Whish)' : /dib mokhtar/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony khalil \(cash\)/i.test(memo) ? CASH_COLLECTOR : /anthony khalil/i.test(memo) ? 'Anthony Khalil (Whish)' : /diesel/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony|whish ms/i.test(memo) ? 'Anthony Khalil (Whish)' : CASH_COLLECTOR;
+    // paid TO IPT on Anthony's behalf (benzine at the IPT station): IPT collected it, still counted to Anthony (Mario, 2026-10-18: "350$ paid to IPT")
+    const forAnthony = /\bat IPT\b/i.test(memo) && /anthony/i.test(memo);
+    const collector = forAnthony ? 'IPT Saint Nicolas (Whish)' : hub && hub.collector ? hub.collector : /^ipt/i.test(memo) ? 'IPT Saint Nicolas (Whish)' : /dib mokhtar/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony khalil \(cash\)/i.test(memo) ? CASH_COLLECTOR : /anthony khalil/i.test(memo) ? 'Anthony Khalil (Whish)' : /diesel/i.test(memo) ? 'Dib Mokhtar (Whish)' : /anthony|whish ms/i.test(memo) ? 'Anthony Khalil (Whish)' : CASH_COLLECTOR;
     // money back from the collector (an inbound payment) counts against what was collected (Mario, 2026-09-13: 33,472 vs 35,608)
     return { id: p.id, name: p.name, date: p.date, amount: r2(p.payment_type === 'inbound' ? -p.amount : p.amount), memo, journal: p.journal_id ? p.journal_id[1] : '', journalId: p.journal_id ? p.journal_id[0] : null,
-      reconciled: !!(p.reconciled_bill_ids || []).length, bills: (p.reconciled_bill_ids || []).length, collector, hubLine: hub ? hub.id : null, project: p.x_studio_project ? p.x_studio_project[1] : '' };
+      reconciled: !!(p.reconciled_bill_ids || []).length, bills: (p.reconciled_bill_ids || []).length, collector, forAnthony, hubLine: hub ? hub.id : null, project: p.x_studio_project ? p.x_studio_project[1] : '' };
   });
   const pending = lines.filter(l => !l.moveId && !byName[l.payName]).filter(l => !pays.some(p => p.name === l.payName));
   const sum = arr => r2(arr.reduce((s, x) => s + x.amount, 0));
   const group = (arr, key) => { const g = {}; for (const x of arr) (g[x[key]] ||= { key: x[key], amount: 0, n: 0, reconciled: 0 }).amount = r2((g[x[key]].amount) + x.amount), g[x[key]].n++, g[x[key]].reconciled += x.reconciled ? x.amount : 0; return Object.values(g).sort((a, b) => b.amount - a.amount); };
   const collectors = group(payments, 'collector');
+  // one Whish transfer = one payment on the card, however Odoo splits it (Mario, 2026-10-18: "keep payment 350$, allocate 50$ to anthony and 300$ to diesel")
+  for (const c of collectors) { const ps = payments.filter(p => p.collector === c.key), a = r2(ps.filter(p => p.forAnthony).reduce((t, p) => t + p.amount, 0));
+    c.n = new Set(ps.map(p => (p.memo.match(/WHISH-(\d+)/) || [])[1] || p.name)).size; if (a) c.alloc = { anthony: a, diesel: r2(c.amount - a) }; }
   for (const c of collectors) { const pend = pending.filter(l => l.collector === c.key); c.pending = sum(pend); c.pendingN = pend.length; }
   for (const c of pending.filter(l => !collectors.some(c => c.key === l.collector))) collectors.push({ key: c.collector, amount: 0, n: 0, reconciled: 0, pending: sum(pending.filter(l => l.collector === c.collector)), pendingN: pending.filter(l => l.collector === c.collector).length });
   const journals = group(payments, 'journal');
@@ -136,8 +141,8 @@ async function build(ctx) {
     const inCyc = payments.filter(p => p.date > prevDate && p.date <= upTo);
     const paid = r2(inCyc.reduce((t, p) => t + p.amount, 0));
     // who Shift paid in the cycle: Anthony (his price) and Dib (the diesel) — Mario, 2026-09-13
-    const paidAnthony = r2(inCyc.filter(p => /anthony/i.test(p.collector)).reduce((t, p) => t + p.amount, 0)), paidDib = r2(paid - paidAnthony);
-    const anthonyPays = inCyc.filter(p => /anthony/i.test(p.collector) && !/mistake/i.test(p.memo || '')).map(p => ({ date: p.date, amount: p.amount }));   // the 636 sent and returned by mistake nets to zero: not a line for him
+    const paidAnthony = r2(inCyc.filter(p => /anthony/i.test(p.collector) || p.forAnthony).reduce((t, p) => t + p.amount, 0)), paidDib = r2(paid - paidAnthony);
+    const anthonyPays = inCyc.filter(p => (/anthony/i.test(p.collector) || p.forAnthony) && !/mistake/i.test(p.memo || '')).map(p => ({ date: p.date, amount: p.amount }));   // the 636 sent and returned by mistake nets to zero: not a line for him
     // the day-rate bill falls in the cycle its date belongs to, so the table ends on the ledger's open figure (Mario, 2026-09-13)
     const days = r2(B.filter(b => b.kind === 'days' && b.date > prevDate && b.date <= upTo).reduce((t, b) => t + b.total, 0));
     // Dib still to be paid for fills of this cycle (an unpaid fill dated inside the cycle window; the open cycle takes the rest)

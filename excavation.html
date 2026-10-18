@@ -171,7 +171,7 @@ function grouped(cols) {
   for (const c of cols) {
     const m = c.key.match(/^(.*?)\s*\((.*)\)$/), who = m ? m[1] : c.key, how = m ? m[2] : '';
     const x = (g[who] ||= { key: who, amount: 0, n: 0, pending: 0, pendingN: 0, parts: [] });
-    x.amount += c.amount; x.n += c.n; x.pending += c.pending || 0; x.pendingN += c.pendingN || 0; x.parts.push({ ...c, how });
+    x.amount += c.amount; x.n += c.n; if (c.alloc) x.alloc = c.alloc; x.pending += c.pending || 0; x.pendingN += c.pendingN || 0; x.parts.push({ ...c, how });
   }
   return Object.values(g).sort((a, b) => b.amount - a.amount);
 }
@@ -411,9 +411,10 @@ function render() {
   const T = D.totals;
   document.getElementById('status').textContent = '';
   document.getElementById('at').textContent = 'Odoo read ' + new Date(D.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+  const viaIpt = D.payments.filter(p => p.forAnthony).reduce((t, p) => t + p.amount, 0);
   document.getElementById('kpis').innerHTML = `
     ${K('cash', '$ ' + f(T.collected), 'total', 'Total payment by Shift', `${f(T.paidOdoo)} booked in Odoo${T.pendingHub ? ` + ${f(T.pendingHub)} on Whish not yet booked` : ''}${T.dueDib ? ` · <span class="bad">${f(T.dueDib)} due to Dib, may be transferred any time</span>` : ''}`)}
-    ${grouped(D.collectors).map(g => K('in', '$ ' + f(g.amount + g.pending), 'by-' + g.key.toLowerCase().replace(/[^a-z]+/g, '-'), 'by ' + g.key, `${g.n} payment${g.n === 1 ? '' : 's'}${g.pending ? ` + ${g.pendingN} pending (${f(g.pending)})` : ''}${g.parts.length > 1 ? '<br>' + g.parts.map(c => `${esc(c.how)} ${f(c.amount + (c.pending || 0))} (${c.n + (c.pendingN || 0)})`).join(' · ') : ''}`)).join('')}
+    ${grouped(D.collectors).map(g => K('in', '$ ' + f(g.amount + g.pending), 'by-' + g.key.toLowerCase().replace(/[^a-z]+/g, '-'), 'by ' + g.key, `${g.n} payment${g.n === 1 ? '' : 's'}${g.pending ? ` + ${g.pendingN} pending (${f(g.pending)})` : ''}${g.parts.length > 1 ? '<br>' + g.parts.map(c => `${esc(c.how)} ${f(c.amount + (c.pending || 0))} (${c.n + (c.pendingN || 0)})`).join(' · ') : ''}${g.alloc ? `<br>${f(g.alloc.diesel)} diesel + ${f(g.alloc.anthony)} benzine for Anthony` : ''}${/anthony/i.test(g.key) && viaIpt ? `<br>+ ${f(viaIpt)} benzine paid through IPT = ${f(g.amount + g.pending + viaIpt)} counted to him` : ''}`)).join('')}
     ${K('out', '$ ' + f(T.bills), 'bills', 'His bills so far', `excavation ${f(T.excavation)} + commission ${f(T.retention)} + diesel difference ${f(T.diesel)}${T.days ? ` + day rate ${f(T.days)}` : ''}`)}
     ${T.dueDib ? K('out', '$ ' + f(T.dueDib), 'duedib', 'Due to Dib — may be transferred any time', `diesel filled, not yet paid: ${esc(T.unpaidFills.map(x => 'fill ' + x.date + ' · ' + f(x.litres, 0) + ' L × $' + x.perL + ' = $' + f(x.amount)).join(' + '))} — the rest of the open ${f(T.open)} is Anthony / Georges: ${f(T.open - T.dueDib)}`) : ''}
     ${(D.provision || {}).anthony ? K('out', '$ ' + f(D.provision.anthony), 'provanthony', D.provision.sentOn ? 'Requested by Anthony — sent on Whish ' + D.provision.sentOn.slice(8) + '-' + D.provision.sentOn.slice(5, 7) + ', not in Odoo yet' : 'Requested by Anthony — not paid yet', `${esc(D.provision.note || 'asked to continue')} · a provision, nothing booked; after it he is ${(() => { const v = anthonyRows().reduce((t, c) => t + c.left, 0) - D.provision.anthony; return v < -0.5 ? f(-v) + ' paid ahead' : v > 0.5 ? f(v) + ' still due to him' : 'settled'; })()} — see the Provision below`) : ''}
