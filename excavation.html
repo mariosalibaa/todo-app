@@ -72,7 +72,6 @@
   <div id="v-exc">
   <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
   <div id="status" class="small muted">Loading…</div>
-  <div class="kpis" id="kpis"></div>
   <div id="totcost"></div>
   <div id="odoo-match"></div>
   <div id="cost"></div>
@@ -413,7 +412,8 @@ function render() {
   document.getElementById('status').textContent = '';
   document.getElementById('at').textContent = 'Odoo read ' + new Date(D.at).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '');
   const viaIpt = D.payments.filter(p => p.forAnthony).reduce((t, p) => t + p.amount, 0);
-  document.getElementById('kpis').innerHTML = `
+  // the top cards are off the page (Mario, 2026-10-18: "remove these"); the Total excavation cost box says it all
+  (document.getElementById('kpis') || {}).innerHTML = `
     ${K('cash', '$ ' + f(T.collected), 'total', 'Total payment by Shift', `${f(T.paidOdoo)} booked in Odoo${T.pendingHub ? ` + ${f(T.pendingHub)} on Whish not yet booked` : ''}${T.dueDib ? ` · <span class="bad">${f(T.dueDib)} due to Dib, may be transferred any time</span>` : ''}`)}
     ${grouped(D.collectors).map(g => K('in', '$ ' + f(g.amount + g.pending), 'by-' + g.key.toLowerCase().replace(/[^a-z]+/g, '-'), 'by ' + g.key, `${g.n} payment${g.n === 1 ? '' : 's'}${g.pending ? ` + ${g.pendingN} pending (${f(g.pending)})` : ''}${g.parts.length > 1 ? '<br>' + g.parts.map(c => `${esc(c.how)} ${f(c.amount + (c.pending || 0))} (${c.n + (c.pendingN || 0)})`).join(' · ') : ''}${g.alloc ? `<br>${f(g.alloc.diesel)} diesel + ${f(g.alloc.anthony)} benzine for Anthony` : ''}${/anthony/i.test(g.key) && viaIpt ? `<br>+ ${f(viaIpt)} benzine paid through IPT = ${f(g.amount + g.pending + viaIpt)} counted to him` : ''}`)).join('')}
     ${K('out', '$ ' + f(T.bills), 'bills', 'His bills so far', `excavation ${f(T.excavation)} + commission ${f(T.retention)} + diesel difference ${f(T.diesel)}${T.days ? ` + day rate ${f(T.days)}` : ''}`)}
