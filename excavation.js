@@ -158,7 +158,9 @@ async function build(ctx) {
       note: c.n === 1 ? 'diesel paid by Anthony (at or below $0.80/L)' : !c.diesel ? 'no fills in this cycle' : '' }; });
   // Match with Odoo (Mario, 2026-09-13): the partner ledger as Odoo sums it — every posted payable / receivable line of
   // Georges in every company — so the hub shows the same debit, credit and balance as Reporting → Partner Ledger.
-  const ll = await odooCall('account.move.line', 'search_read', [[['partner_id', '=', PARTNER], ['account_id.account_type', 'in', ['liability_payable', 'asset_receivable']], ['parent_state', '=', 'posted']]],
+  // the diesel rounding entry and its reversal (MISC/2026/10/0001 + 0002, Mario 2026-10-18: "so rounding become zero") net to nothing: left out
+  const ll = await odooCall('account.move.line', 'search_read', [[['partner_id', '=', PARTNER], ['account_id.account_type', 'in', ['liability_payable', 'asset_receivable']], ['parent_state', '=', 'posted'],
+    '!', ['move_id.ref', 'ilike', 'DIESEL-ROUNDING'], '!', ['move_id.ref', 'ilike', 'Reversal of: MISC/2026/10/0001']]],
     { fields: ['date', 'debit', 'credit', 'move_id', 'company_id', 'account_id', 'name'], order: 'date, id', context: { allowed_company_ids: [2, 4, 7, 8, 9, 10] } });
   const known = new Set([...bills.map(b => b.id), ...pays.map(p => p.move_id ? p.move_id[0] : 0)]);
   const sumL = arr => ({ debit: r2(arr.reduce((t, l) => t + l.debit, 0)), credit: r2(arr.reduce((t, l) => t + l.credit, 0)) });

@@ -155,10 +155,12 @@ let D = null, ME = null, F = { section: '', villa: '', q: '', review: '', cols: 
 // line ids are STRINGS on the page (Odoo analytic ids as '12345', hub lines 'hub:<acc>:<tx>'); this quotes one for an inline handler
 const idA = id => "'" + String(id).replace(/[^\w:.-]/g, '') + "'";
 const lineById = id => D.lines.find(x => x.id === String(id));
-const counted = l => l.paid !== 'proposal';   // a WhatsApp/site proposal waits for Mario's ✓: listed, never counted
+const counted = l => l.paid !== 'proposal';
+// a line's part not paid yet (Mario, 2026-10-18): all of a pending line (still to pay, not in Odoo); of a bill line, its share of the bill still open
+const unpaidOf = l => l.amount <= 0 ? 0 : l.pending ? l.amount : l.amount * (l.openShare != null ? l.openShare : (l.paid === 'not_paid' ? 1 : 0));   // a WhatsApp/site proposal waits for Mario's ✓: listed, never counted
 // tabs (Mario, 2026-10-17): Dashboard · Cash flow · Cost per division · Cost per villa · Detail · BOQ · Cashflow plan; the old #accounts opens the dashboard
 // (2026-10-18: the cash flow table and the Detail list + review log moved off the other tabs into their own)
-const TABS = [['dashboard', 'Dashboard'], ['cashflow', 'Cash flow'], ['division', 'Cost per division'], ['villas', 'Cost per villa'], ['detail', 'Detail'], ['budget', 'BOQ'], ['plan', 'Cashflow plan']];
+const TABS = [['dashboard', 'Dashboard'], ['cashflow', 'Cash flow'], ['division', 'Cost per division'], ['suppliers', 'Cost per supplier'], ['villas', 'Cost per villa'], ['detail', 'Detail'], ['budget', 'BOQ'], ['plan', 'Cashflow plan']];
 let TAB = ({ accounts: 'dashboard' })[(location.hash || '').replace('#', '')] || (location.hash || '').replace('#', '') || 'dashboard';
 if (!TABS.some(t => t[0] === TAB)) TAB = 'dashboard';
 const HASH0 = (location.hash || '').replace('#', '');   // the tab asked for in the link, if any
@@ -220,8 +222,7 @@ function compute() {
   const nextDue = inv ? inv.schedule.find(s => s.residual > 0.005) : null;
   // by section
   // the part not paid yet per section (Mario, 2026-10-18): bills Odoo marks not paid + pending lines still to pay
-  const unpaidOf = l => l.amount > 0 && (l.pending || l.paid === 'not_paid');
-  const bySec = D.sections.map(s => ({ ...s, amount: sum(lines.filter(l => l.section === s.id)), unpaid: sum(lines.filter(l => l.section === s.id && unpaidOf(l))), n: lines.filter(l => l.section === s.id).length })).filter(s => s.n);
+  const bySec = D.sections.map(s => ({ ...s, amount: sum(lines.filter(l => l.section === s.id)), unpaid: lines.filter(l => l.section === s.id).reduce((x, l) => x + unpaidOf(l), 0), n: lines.filter(l => l.section === s.id).length })).filter(s => s.n);
   // by villa (shared cost only): common ÷ 6 lands on every villa
   const common = sum(cost.filter(l => l.villa === 'Common'));
   const villas = VILLA_ORDER.filter(v => v !== 'Common').map(v => { const own = sum(cost.filter(l => l.villa === v)); return { v, own, common: common / 6, total: own + common / 6 }; });
@@ -256,7 +257,7 @@ function renderAccounts(app) {
       <thead><tr><th>Section</th><th class="n">Lines</th><th class="n">Amount</th><th class="n">Qty done</th><th class="n">$ / unit</th><th class="n">BOQ rate</th><th>Share</th><th class="n">% of cost</th></tr></thead>
       <tbody>${c.bySec.map(s => { const q = (D.qtyDone || {})[s.id], boq = boqRate(s.id), unit = (q && q.unit) || (boq && boq.unit) || '';
         const perUnit = q && q.qty ? s.amount / q.qty : null, open = OPEN_SEC.has(s.id);
-        return `<tr class="srow ${s.equipment ? 'eq' : ''}" onclick="toggleSec(event, '${s.id}')"><td><span class="chev">${open ? '▾' : '▸'}</span>${esc(s.name)}${s.equipment ? ' <span class="pill eq">equipment</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${usd2(s.amount)}${s.unpaid > 0.5 ? `<div class="small" style="color:var(--red,#f38ba8)" title="bills not paid + money still to pay that is not in Odoo yet">${usd2(s.unpaid)} not paid</div>` : ''}</td>
+        return `<tr class="srow ${s.equipment ? 'eq' : ''}" onclick="toggleSec(event, '${s.id}')"><td><span class="chev">${open ? '▾' : '▸'}</span>${esc(s.name)}${s.equipment ? ' <span class="pill eq">equipment</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${usd2(s.amount)}${s.unpaid > 0.5 ? `<div class="small" style="color:var(--red,#f38ba8)" title="${esc(unpaidWhy(s.id))}">${usd2(s.unpaid)} not paid</div>` : ''}</td>
         <td class="n qin" onclick="event.stopPropagation()">${D.admin ? `<input type="number" step="any" value="${q ? q.qty : ''}" placeholder="qty" onchange="setQty('${s.id}', this.value, this.nextElementSibling.value)"><input value="${esc(unit)}" placeholder="unit" style="width:52px" onchange="setQty('${s.id}', this.previousElementSibling.value, this.value)">` : (q ? `${q.qty.toLocaleString('en-US')} ${esc(unit)}` : '<span class="muted">—</span>')}</td>
         <td class="n ${perUnit != null && boq && boq.rate ? (perUnit <= boq.rate ? 'ok' : 'flag') : ''}">${perUnit != null ? usd2(perUnit) : '—'}</td>
         <td class="n muted">${boq && boq.rate ? usd2(boq.rate) + '/' + esc(boq.unit) : '—'}</td>
@@ -306,7 +307,7 @@ function renderAccounts(app) {
     ${TAB === 'cashflow' ? `<h2>Cash flow <span class="r muted">in − out = remaining · click a month for its lines</span></h2>
     <div class="card">${cashflowBlock(c)}</div>` : ''}
 
-    ${TAB === 'division' ? DIVISION : ''}${TAB === 'villas' ? VILLAS_HTML : ''}
+    ${TAB === 'division' ? DIVISION : ''}${TAB === 'suppliers' ? suppliersHtml(c) : ''}${TAB === 'villas' ? VILLAS_HTML : ''}
     ${TAB === 'detail' ? `<h2>Detail <span class="r muted">${c.lines.length} lines${D.hubLines ? ` · ${D.hubLines} from the hub ledgers not in Odoo` : ''} · Odoo as of ${esc(fmtWhen(D.cachedAt))}${D.stale ? ' · refreshing…' : ''}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">pull now</a>` : ''}</span></h2>
     <div class="filters">
       <span class="combo" id="secfilter"></span>
@@ -358,6 +359,31 @@ function secLinesTable(id) {
   return `<table><thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>
     ${body || '<tr><td colspan="7" class="muted">No lines.</td></tr>'}
     <tr class="tot"><td colspan="6">${ls.length} lines${props.length ? ` · ${props.length} proposal${props.length > 1 ? 's' : ''} waiting for Mario's ✓ (not counted)` : ''}</td><td class="n">${usd2(secTot)}</td></tr></tbody></table>`;
+}
+// what a section's "not paid" is made of, on hover: supplier · amount (Mario, 2026-10-18)
+function unpaidWhy(id) {
+  const g = {}; for (const l of D.lines.filter(l => l.section === id && counted(l))) { const u = unpaidOf(l); if (u > 0.005) g[l.partner || '—'] = (g[l.partner || '—'] || 0) + u; }
+  return Object.entries(g).sort((a, b) => b[1] - a[1]).map(([p, v]) => `${p} ${usd2(v)}`).join(' · ');
+}
+// ── Cost per supplier (Mario, 2026-10-18: "add cost by partner tab"): one row per supplier — cost, paid, not paid, sections; click for the lines
+const OPEN_SUPP = new Set();
+function toggleSupp(k) { const key = decodeURIComponent(k); if (OPEN_SUPP.has(key)) OPEN_SUPP.delete(key); else OPEN_SUPP.add(key); render(); }
+function suppliersHtml(c) {
+  const g = {};
+  for (const l of c.cost) { const x = (g[l.partner || '—'] ||= { p: l.partner || '—', amount: 0, unpaid: 0, n: 0, secs: {}, lines: [] }); x.amount += l.amount; x.unpaid += unpaidOf(l); x.n++; x.secs[l.section] = (x.secs[l.section] || 0) + l.amount; x.lines.push(l); }
+  const rows = Object.values(g).sort((a, b) => b.amount - a.amount), tot = rows.reduce((t, r) => ({ a: t.a + r.amount, u: t.u + r.unpaid }), { a: 0, u: 0 });
+  const lineRow = l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(secName(l.section))}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}${unpaidOf(l) > 0.005 && unpaidOf(l) < l.amount - 0.005 ? `<div class="small" style="color:var(--red,#f38ba8)">${usd2(unpaidOf(l))} not paid</div>` : ''}</td></tr>`;
+  return `<h2>Cost per supplier <span class="r muted">${rows.length} suppliers · click one for its lines · without equipment</span></h2>
+    <div class="card"><div class="wrap"><table>
+      <thead><tr><th>Supplier</th><th class="n">Lines</th><th>Sections</th><th class="n">Cost</th><th class="n">Paid</th><th class="n">Not paid</th><th>Share</th><th class="n">% of cost</th></tr></thead>
+      <tbody>${rows.map(r => { const k = encodeURIComponent(r.p).replace(/'/g, '%27'), op = OPEN_SUPP.has(r.p);
+        return `<tr class="srow" onclick="toggleSupp('${k}')"><td><span class="chev">${op ? '▾' : '▸'}</span>${esc(r.p)}</td><td class="n">${r.n}</td><td class="small muted">${Object.entries(r.secs).sort((a, b) => b[1] - a[1]).map(([s]) => esc(secName(s))).join(', ')}</td>
+          <td class="n">${usd2(r.amount)}</td><td class="n">${usd2(r.amount - r.unpaid)}</td><td class="n" style="${r.unpaid > 0.5 ? 'color:var(--red,#f38ba8)' : ''}">${r.unpaid > 0.5 ? usd2(r.unpaid) : '—'}</td>
+          <td><div class="bar"><i style="width:${Math.min(100, 100 * r.amount / Math.max(1, c.costTotal))}%"></i></div></td><td class="n">${pct(r.amount, c.costTotal)}</td></tr>
+          ${op ? `<tr class="sdet"><td colspan="8"><table><thead><tr><th>Date</th><th>Section</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>${r.lines.slice().sort((a, b) => b.date.localeCompare(a.date)).map(lineRow).join('')}</tbody></table></td></tr>` : ''}`; }).join('')}
+      <tr class="tot"><td>All suppliers</td><td class="n">${c.cost.length}</td><td></td><td class="n">${usd2(tot.a)}</td><td class="n">${usd2(tot.a - tot.u)}</td><td class="n">${usd2(tot.u)}</td><td></td><td class="n">100%</td></tr>
+      </tbody></table></div></div>
+    <div class="note">Not paid = a bill's part still open in Odoo, plus money still to pay that is not in Odoo yet (Dib's diesel fills). Paid = cost − not paid.</div>`;
 }
 // the BILL cell: the Odoo bill number, "payment · no bill", or "not in Odoo" linking to the hub ledger line
 function billCell(l) {

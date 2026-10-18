@@ -169,7 +169,7 @@ async function pullCosts(odooCall) {
   const moveOf = new Map(mls.map(m => [m.id, m.move_id]));
   const moveIds = [...new Set(mls.map(m => m.move_id && m.move_id[0]).filter(Boolean))];
   const [moves, atts] = moveIds.length ? await Promise.all([
-    odooCall('account.move', 'read', [moveIds, ['name', 'ref', 'invoice_date', 'date', 'payment_state', 'amount_total', 'journal_id']], { context: CTX }),
+    odooCall('account.move', 'read', [moveIds, ['name', 'ref', 'invoice_date', 'date', 'payment_state', 'amount_total', 'amount_residual', 'journal_id']], { context: CTX }),
     odooCall('ir.attachment', 'search_read', [[['res_model', '=', 'account.move'], ['res_id', 'in', moveIds]]], { fields: ['res_id', 'name', 'mimetype'], context: CTX, limit: 5000 }),
   ]) : [[], []];
   const moveById = new Map(moves.map(m => [m.id, m]));
@@ -194,7 +194,9 @@ async function pullCosts(odooCall) {
       account: gacc, company: l.company_id ? l.company_id[1] : '', companyId: l.company_id ? l.company_id[0] : null,
       villa: VILLAS[l.account_id[0]] || l.account_id[1], moveId: move ? move.id : null, moveName: move ? move.name : '', moveRef: move ? move.ref : '',
       mlId: l.move_line_id ? l.move_line_id[0] : null, odooSection: l[DIV_FIELD] ? divCode.get(l[DIV_FIELD][0]) || '' : '',
-      paid: move ? move.payment_state : '', paidBy: move ? (paidByOf[move.id] || []).join(' + ') : '', files: move ? (attsOf[move.id] || []) : [] });
+      paid: move ? move.payment_state : '', paidBy: move ? (paidByOf[move.id] || []).join(' + ') : '', files: move ? (attsOf[move.id] || []) : [],
+      // the share of the bill still open, so a line knows its own part not paid (Mario, 2026-10-18: "details about amount not paid")
+      openShare: move && move.amount_total && ['not_paid', 'partial'].includes(move.payment_state) ? Math.min(1, Math.abs(move.amount_residual / move.amount_total)) : 0 });
   }
   // 3. payments tagged with an Ajaltoun project (payment field "Project", x_studio_project) that are not yet
   // matched to a bill: money already out for a bill that does not exist in Odoo yet, so it is a real cost the
