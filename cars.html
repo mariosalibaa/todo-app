@@ -18,7 +18,9 @@
   .next { background:var(--soft); border-left:4px solid var(--amber); border-radius:12px; padding:12px 16px; margin-bottom:18px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow-x:auto; }
   table { border-collapse:collapse; width:100%; font-size:14px; }
-  th, td { border-bottom:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; white-space:nowrap; }
+  th, td { border-bottom:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  td small { display:block; color:var(--muted); font-size:12px; }
+  td.nw { white-space:nowrap; }
   th { background:var(--soft); font-weight:600; font-size:13px; }
   tr:last-child td { border-bottom:none; }
   td.n, th.n { text-align:right; }
@@ -49,7 +51,7 @@
 
   <div class="card">
     <table>
-      <thead><tr><th>Car</th><th>Plate</th><th>Insured name</th><th>Obligatory (bodily)</th><th>Third party (material)</th><th>Status</th><th class="n">Premium</th><th>Mécanique on file</th></tr></thead>
+      <thead><tr><th>Car</th><th>Insured name</th><th>Expires</th><th>Status</th><th class="n">Premium</th><th>Mécanique</th></tr></thead>
       <tbody id="cars"></tbody>
     </table>
   </div>
@@ -81,7 +83,7 @@ const CARS = [
   ['BMW 320', 2007, '421956B', 'Miladeh Raef Matar', '2027-07-31', '2027-07-31', 80, 2025],
   ['BMW 318', 1995, '310944B', 'Miladeh Matar & Mario Saliba', '2027-08-19', '2027-08-19', 80, 2025],
 ];
-const LIC = [['Dad', '2027-12-12'], ['Mum', '2030-09-23']];
+const LIC = [['Mario', '2035-11-05'], ['Youssef (dad)', '2027-12-12'], ['Mileda (mum)', '2030-09-23'], ['Therese', null], ['Georges Matar', null]];
 
 // today in Beirut, as yyyy-mm-dd (never toISOString)
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Beirut' }).format(new Date());
@@ -96,14 +98,12 @@ const pill = n => n < 0 ? `<span class="pill late">expired ${-n} d ago</span>`
 const rows = CARS.map(c => ({ c, first: c[4] < c[5] ? c[4] : c[5] })).sort((a, b) => a.first.localeCompare(b.first));
 const year = +today.slice(0, 4);
 document.getElementById('cars').innerHTML = rows.map(({ c, first }) => `<tr>
-  <td data-l="Car"><b>${c[0]} ${c[1]}</b></td>
-  <td data-l="Plate">${c[2]}</td>
+  <td data-l="Car"><b>${c[0]} ${c[1]}</b><small>${c[2]}</small></td>
   <td data-l="Insured">${c[3]}</td>
-  <td data-l="Obligatory">${fmt(c[4])}</td>
-  <td data-l="Material">${fmt(c[5])}</td>
-  <td>${pill(left(first))}</td>
-  <td class="n" data-l="Premium">${c[6].toFixed(2)}$</td>
-  <td data-l="Mécanique">${c[7]} paid${c[7] < year ? ` <span class="pill soon">${year} due</span>` : ''}</td>
+  <td class="nw" data-l="Expires">${c[4] === c[5] ? fmt(c[4]) : `${fmt(c[4])}<small>material ${fmt(c[5])}</small>`}</td>
+  <td class="nw">${pill(left(first))}</td>
+  <td class="n nw" data-l="Premium">${c[6].toFixed(2)}$</td>
+  <td class="nw" data-l="Mécanique">${c[7]} paid${c[7] < year ? `<small><span class="pill soon">${year} due</span></small>` : ''}</td>
 </tr>`).join('');
 
 const due = rows.filter(r => left(r.first) <= 90);
@@ -111,7 +111,7 @@ document.getElementById('next').innerHTML = due.length
   ? `<b>Renew next:</b> ${due.map(r => `${r.c[0]} ${r.c[1]} — ${fmt(r.first)} (${left(r.first)} days)`).join(' · ')}`
   : `<b>Nothing expires in the next 90 days.</b> Next: ${rows[0].c[0]} ${rows[0].c[1]} on ${fmt(rows[0].first)}.`;
 
-document.getElementById('lic').innerHTML = LIC.map(([who, d]) => `<tr><td data-l="Who"><b>${who}</b></td><td data-l="Expires">${fmt(d)}</td><td>${pill(left(d))}</td></tr>`).join('');
+document.getElementById('lic').innerHTML = LIC.map(([who, d]) => `<tr><td data-l="Who"><b>${who}</b></td><td data-l="Expires">${d ? fmt(d) : '—'}</td><td>${d ? pill(left(d)) : '<span class="muted">not on file — scan the card (back side) into 0. CARS\00. DRIVING LICENSE</span>'}</td></tr>`).join('');
 </script>
 </body>
 </html>
