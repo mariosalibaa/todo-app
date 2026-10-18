@@ -708,7 +708,7 @@ const longDate = d => /^\d{4}-\d{2}-\d{2}/.test(d || '') ? new Date(d.slice(0, 1
 // today / yesterday, from the local calendar — never toISOString(), Beirut is UTC+3
 const localYmd = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 const dayTag = d => { const now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1); return d === localYmd(now) ? 'today' : d === localYmd(y) ? 'yesterday' : ''; };
-const ODOO = 'https://shift2.odoo.com/odoo/account.move/', ODOO_Q = '';   // short /odoo/<model>/<id> link (Mario, 2026-10-18): Odoo app uninstalled so it opens a tab; Odoo switches to the record company by itself
+const ODOO = 'https://shift2.odoo.com/odoo/bills/', ODOO_Q = '';   // /odoo/<action path>/<id> link (Mario, 2026-10-18): through the Accounting action so Odoo opens with its menu bar; Odoo switches to the record company by itself
 const SAME_CAP = 60;   // one number's repeats may go together; a crowd may not
 let accounts = [], acc = null, account = null, tx = [], contacts = {}, partners = [], companies = [], analytic = [], rules = []
 let plans = [], journals = [], budgetAccounts = [];

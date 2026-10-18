@@ -83,9 +83,11 @@
 <script>
 const esc = Admin.esc;
 const fmt = n => (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// short /odoo/<model>/<id> link (Mario, 2026-10-18): Odoo app uninstalled so it opens a tab; Odoo switches to the record company by itself
+// /odoo/<action path>/<id> link (Mario, 2026-10-18): through the Accounting action so Odoo opens with its menu bar; Odoo switches to the record company by itself
 const ODOO = 'https://shift2.odoo.com/odoo/';
-const odoo = (model, id, label) => id ? `<a class="od" href="${ODOO}${model}/${id}" target="_blank" rel="noopener">${esc(label)}</a>` : esc(label);
+// through the Accounting action's path (/odoo/bills/<id>…) so the record opens with Odoo's menu bar (Mario 2026-10-18)
+const ODOO_PATH = { 'account.move': 'bills', 'account.payment': 'vendor-payments', 'res.partner': 'vendors' };
+const odoo = (model, id, label) => id ? `<a class="od" href="${ODOO}${ODOO_PATH[model] || model}/${id}" target="_blank" rel="noopener">${esc(label)}</a>` : esc(label);
 let LIST = [], CUR = null, ME = null, F = { kind: 'all', company: '' };
 const say = (t, cls) => { const m = document.getElementById('msg'); m.textContent = t || ''; m.style.color = cls === 'err' ? 'var(--red)' : ''; };
 

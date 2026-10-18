@@ -75,7 +75,7 @@
     const lockAll = (booked && !rebook) || odoo, lock = lockAll && !monthLine;
     o.querySelector('.ls').innerHTML = `
     <div class="ls-head"><b>${esc(t.account ? t.account.name : S.acc)}</b> · ${esc(t.date)}${when(t) ? ' ' + esc(when(t)) : ''}<span class="ls-bal" id="ls-bal">${S.bal ? ' · balance ' + A.money(S.bal.balance) : ''}</span><span class="ls-state ${booked ? 'booked' : cancelled ? 'cancelled' : accepted ? 'accepted' : 'waiting'}">${stateTxt}</span>
-      <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/odoo/account.move/${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
+      <div class="ls-links"><a href="/accounting/accounts?id=${esc(S.acc)}" target="_blank" rel="noopener">open on the ledger ↗</a>${t.bookedMove && t.bookedMove.id ? ` · <a href="https://shift2.odoo.com/odoo/bills/${+t.bookedMove.id}" target="_blank" rel="noopener">open in Odoo ↗</a>` : ''}</div></div>
     <label>Description<input id="ls-desc" value="${esc(t.description || '')}" ${lock ? 'disabled' : ''}></label>
     <div class="ls-row"><label>Amount<input id="ls-amt" type="number" step="0.01" inputmode="decimal" value="${amt}" ${lock ? 'disabled' : ''}></label>
       <label>Money<select id="ls-side" ${lock ? 'disabled' : ''}><option value="debit" ${side === 'debit' ? 'selected' : ''}>out (paid)</option><option value="credit" ${side === 'credit' ? 'selected' : ''}>in (received)</option></select></label></div>
@@ -193,6 +193,7 @@
     const acc = accId || S.acc;
     const t = await A.api('GET', `/api/accounting/accounts/${acc}/tx/${txId}`);
     if (t.bookedMove) return t.bookedMove.name || '';
+    if (t.booked && t.booked.move) return t.booked.move;   // booked by the Pay path before 2026-10-08 (no bookedMove then), same entry
     const byRow = async () => { const r = await A.api('POST', `/api/accounting/accounts/${acc}/book-row`, { txId }); return r.move || ''; };
     const byPay = async () => {
       // an official SARL bill that was refused for a missing project must NOT slip out as a plain payment

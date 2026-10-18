@@ -327,7 +327,7 @@ function renderAccounts(app) {
 }
 // ── the section rows fold open on their lines (Mario, 2026-09-23) ──
 const OPEN_SEC = new Set();
-const ODOO_MOVE = 'https://shift2.odoo.com/odoo/account.move/', ODOO_MOVE_Q = '';   // short /odoo/<model>/<id> link (Mario, 2026-10-18): Odoo app uninstalled so it opens a tab; Odoo switches to the record company by itself
+const ODOO_MOVE = 'https://shift2.odoo.com/odoo/bills/', ODOO_MOVE_Q = '';   // /odoo/<action path>/<id> link (Mario, 2026-10-18): through the Accounting action so Odoo opens with its menu bar; Odoo switches to the record company by itself
 function toggleSec(e, id) {
   if (e.target.closest('input, select, button, a')) return;
   if (OPEN_SEC.has(id)) OPEN_SEC.delete(id); else OPEN_SEC.add(id);

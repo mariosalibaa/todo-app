@@ -464,6 +464,8 @@ function lineBlock(p, L, i) {
     // the ✓ itself, here on the card (Mario 2026-10-08: "allow a check approval in Shift WhatsApp") — same write as the ledger's ✓
     me.admin && L.state === 'waiting' ? `<a href="#" class="ok" onclick="acceptEntry('${key}');return false;">✓ accept</a>` : '',
     me.admin && L.state === 'waiting' && (!L.partnerName || !L.company || !L.analyticName) && L.autoSugAt ? `<a href="#" onclick="resuggest('${key}');return false;">✦ suggest again</a>` : '',
+    // accepted but the booking failed (or was never tried): book it from the card, no need to open the sheet
+    me.admin && L.state === 'accepted' ? `<a href="#" class="ok" onclick="bookEntry('${key}');return false;">📗 book in Odoo</a>` : '',
     me.admin ? `<a href="#" onclick="lineSheet('${key}');return false;">edit ▸</a>` : '',
     (!i && (p.kind === 'photo' || p.kind === 'doc') && L.state !== 'booked') ? `<a href="#" onclick="flip('${esc(p.id)}');return false;">not a receipt</a>` : '',
     // cancel takes the line off the ledger and out of the balance; the photo and the message stay (Mario, 2026-09-24)
@@ -727,6 +729,13 @@ async function acceptEntry(key) {
   try { await LineSheet.bookOne(L.txId, '', L.accountId); } catch (e) { why = e.message; }
   await loadPosts(); await loadBalances(true);
   if (why) alert('Accepted on the ledger, but not in Odoo yet: ' + why + String.fromCharCode(10,10) + 'Open "edit ▸" to fix it, then ✓ Book in Odoo.');
+}
+async function bookEntry(key) {
+  const { L } = lineAt(key); if (!L) return;
+  let why = '';
+  try { await LineSheet.bookOne(L.txId, '', L.accountId); } catch (e) { why = e.message; }
+  await loadPosts(); await loadBalances(true);
+  if (why) alert('Not in Odoo yet: ' + why + String.fromCharCode(10,10) + 'Open "edit ▸" to fix it, then book again.');
 }
 // ✦ suggest again: fills the blank partner / company / project of a waiting line from history and Claude
 async function resuggest(key) {
