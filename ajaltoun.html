@@ -161,6 +161,7 @@ const counted = l => l.paid !== 'proposal';   // a WhatsApp/site proposal waits 
 const TABS = [['dashboard', 'Dashboard'], ['cashflow', 'Cash flow'], ['division', 'Cost per division'], ['villas', 'Cost per villa'], ['detail', 'Detail'], ['budget', 'BOQ'], ['plan', 'Cashflow plan']];
 let TAB = ({ accounts: 'dashboard' })[(location.hash || '').replace('#', '')] || (location.hash || '').replace('#', '') || 'dashboard';
 if (!TABS.some(t => t[0] === TAB)) TAB = 'dashboard';
+const HASH0 = (location.hash || '').replace('#', '');   // the tab asked for in the link, if any
 // the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
 const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
 let LOG = null, logAll = false;
@@ -189,6 +190,8 @@ async function load(fresh) {
   try {
     [D] = await Promise.all([Admin.api('GET', '/api/ajaltoun/data' + (fresh ? '?fresh=1' : '')), Plan.load()]); normIds(D); window.D = D;
     if (D.canVerify && F.review === '' && !F._touched) F.review = 'approved';   // the partner opens on what waits for him
+    if (D.canVerify && !HASH0 && !load.done) TAB = 'detail';   // (2026-10-18) …on the Detail tab, unless the link names another
+    load.done = true;
     render();
     if (D.stale && !fresh) { try { D = await Admin.api('GET', '/api/ajaltoun/data?refresh=1'); normIds(D); window.D = D; render(); } catch (e) { console.warn('refresh failed', e); } }
   }
