@@ -9,7 +9,7 @@
 // the hub's Whish line says WHO COLLECTED (the phone). A Whish line matched to its Odoo payment ties the two.
 // Whish lines not yet booked in Odoo are listed as pending, so the dashboard never hides money already sent.
 
-const PARTNER = 313, COMPANY = 10;
+const PARTNER = 313, PATRICK = 312, COMPANY = 10;
 // Mario, 2026-09-13: Whish lines are named by the phone that received them; cash out of the Neo / Mario boxes goes to Anthony in hand
 const COLLECTORS = { '96171800980': 'Anthony Khalil (Whish)', '96171324324': 'Dib Mokhtar (Whish)' };
 const CASH_COLLECTOR = 'Anthony Khalil (cash)';
@@ -202,7 +202,17 @@ async function build(ctx) {
     if (paid) Object.assign(provision, { asked: provision.anthony, anthony: 0, paidBy: paid.name, paidOn: paid.date });
     else { const sent = pending.find(l => /anthony/i.test(l.collector) && same(l)); if (sent) provision.sentOn = sent.date; }
   }
-  return { provision, layout, at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, text };
+  // Patrick Hokayem, the first contractor before Georges (BILL1/2025/11/0001, 700 m³ × $5): his part of the total excavation cost (Mario, 2026-10-18)
+  const [pb, pp] = await Promise.all([
+    odooCall('account.move', 'search_read', [[['partner_id', '=', PATRICK], ['company_id', '=', COMPANY], ['move_type', '=', 'in_invoice'], ['state', '=', 'posted']]], { fields: ['name', 'ref', 'date', 'amount_total', 'amount_residual', 'invoice_line_ids'], context: CTX }),
+    odooCall('account.payment', 'search_read', [[['partner_id', '=', PATRICK], ['company_id', '=', COMPANY], ['state', 'in', ['paid', 'in_process', 'posted']]]], { fields: ['amount', 'payment_type'], context: CTX }),
+  ]);
+  const pl = pb.length ? await odooCall('account.move.line', 'read', [pb.flatMap(b => b.invoice_line_ids || []), ['quantity', 'price_unit', 'price_subtotal']], { context: CTX }) : [];
+  const patrick = { bills: pb.map(b => ({ id: b.id, name: b.name, ref: b.ref || '', date: b.date, total: r2(b.amount_total), residual: r2(b.amount_residual) })),
+    billed: r2(pb.reduce((t, b) => t + b.amount_total, 0)), open: r2(pb.reduce((t, b) => t + b.amount_residual, 0)),
+    paid: r2(pp.reduce((t, p) => t + (p.payment_type === 'inbound' ? -p.amount : p.amount), 0)),
+    m3: pl.filter(l => l.quantity > 1).reduce((t, l) => t + l.quantity, 0) };
+  return { provision, layout, at: new Date().toISOString(), partner: 'Georges EL Hajj', company: 'SHIFT DEVELOPMENT', project: 'Ajaltoun 4193', payments, pending, collectors, journals, bills: B, totals, cost, cycles, odooMatch, patrick, text };
 }
 
 // Diesel fills, one row per fill, newest first (Mario, 2026-10-14): date, supplier (Dib / IPT), litres, $/L, amount,

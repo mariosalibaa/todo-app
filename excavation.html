@@ -38,6 +38,7 @@
   table{width:100%;border-collapse:collapse;font-size:.82rem;} th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
   td{padding:6px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;} td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   tr.tot td{font-weight:600;background:rgba(242,169,59,.10);color:var(--amber);}
+  tr.sub td{font-weight:600;border-top:1px solid var(--surface1);}
   .bar{height:6px;background:var(--surface0);border-radius:3px;overflow:hidden;min-width:100px;} .bar i{display:block;height:100%;background:var(--amber);}
   .muted{color:var(--overlay0);} .small{font-size:.74rem;}
   table.cyc{font-size:.7rem;} table.cyc th,table.cyc td{padding:4px 3px;white-space:nowrap;} table.cyc th{font-size:.56rem;letter-spacing:.02em;white-space:normal;line-height:1.15;vertical-align:bottom;} table.cyc td .of{color:var(--overlay0);font-size:.64rem;} table.cyc td .i{cursor:help;color:var(--amber);margin-left:3px;} .ok{color:var(--green);} .warn{color:var(--amber);} .bad{color:var(--red);}
@@ -72,6 +73,7 @@
   <p class="lead">What Georges has collected for the excavation, who collected it (Anthony Khalil or Dib Mokhtar through Whish, or Anthony Khalil in cash from the Neo and Mario boxes), which cash or bank account it left, and how it stands against his certificates. Odoo is read live; Whish lines not yet booked in Odoo are counted as pending so nothing already sent goes missing.</p>
   <div id="status" class="small muted">Loading…</div>
   <div class="kpis" id="kpis"></div>
+  <div id="totcost"></div>
   <div id="prov"></div>
   <div id="odoo-match"></div>
   <div id="cost"></div>
@@ -314,11 +316,41 @@ function renderProv() {
     <tr><td>Georges' ledger in Odoo — open now $ ${f(open)}</td><td class="n">after: <b>$ ${f(after)}</b> <span class="muted small">= commission ${f(T.retentionOpen)} held ${side < 0 ? '− ' + f(-side) + ' paid ahead on the Anthony / Georges side' : '+ ' + f(side) + ' due'}</span></td></tr>
   </tbody></table><p class="small muted" style="margin:6px 0 0">A provision only: nothing is booked. The diesel is already counted to Anthony at $0.80/L, so paying Dib moves Georges' ledger, not Anthony's balance.</p>${paidNote}</div>`;
 }
+// Total excavation cost (Mario, 2026-10-18): what Shift paid + the commission and Dib's fills still to pay + Patrick's part;
+// what Anthony got above his certificates is a cost too — he is not coming back to dig it off — then the $/m³ of it all
+function renderTotal() {
+  const T = D.totals, C = D.cost || {}, P = D.patrick || { paid: 0, open: 0, m3: 0, bills: [] }, el = document.getElementById('totcost');
+  const prov = +((D.provision || {}).anthony) || 0, left = anthonyRows().reduce((t, c) => t + c.left, 0) - prov;
+  const extra = Math.max(0, Math.round(-left * 100) / 100), r2 = x => Math.round(x * 100) / 100;
+  const geo = r2(T.collected + prov + T.retentionOpen + T.dueDib), pat = r2(P.paid + P.open), all = r2(geo + pat);
+  const m3G = C.m3 || 0, m3P = P.m3 || 0, m3 = m3G + m3P, pm = (v, q) => q ? '$ ' + f(v / q) + ' /m³' : '—';
+  const gap = r2(geo - T.bills - extra);
+  const row = (label, v, cls = '', note = '') => `<tr${cls ? ` class="${cls}"` : ''}><td>${label}${note ? ` <span class="muted small">· ${note}</span>` : ''}</td><td class="n">$ ${f(v)}</td></tr>`;
+  el.innerHTML = `<h2>Total excavation cost <span class="r muted">paid + still to pay, Georges and Patrick</span></h2><div class="card"><table class="prov"><tbody>
+    ${row('Paid by Shift to the Georges side', T.collected, '', `${f(T.paidOdoo)} in Odoo${T.pendingHub ? ' + ' + f(T.pendingHub) + ' on Whish not booked' : ''}`)}
+    ${prov ? row('+ asked by Anthony, not paid yet', prov) : ''}
+    ${row("+ Georges' commission (retention) to be paid", T.retentionOpen, '', 'released at project end')}
+    ${row('+ diesel to be paid to Dib', T.dueDib, '', esc((T.unpaidFills || []).map(x => x.date + ' ' + f(x.litres, 0) + ' L').join(', ')))}
+    ${row('= Georges EL Hajj (Anthony + Dib + commission)', geo, 'sub', `${f(m3G, 0)} m³`)}
+    ${row('+ Patrick Hokayem, first contractor', pat, '', `${esc(P.bills.map(b => b.name + ' ' + b.ref).join(', '))} · ${f(m3P, 0)} m³${P.open ? ' · ' + f(P.open) + ' still open' : ' · paid'}`)}
+    ${row('Total excavation cost', all, 'tot', `${f(m3, 0)} m³`)}
+    ${row('of which the extra Anthony received', extra, 'bad', `paid above his certificates — he is not coming back, so it stays a cost`)}
+    ${row('= the work at the agreed prices', r2(all - extra), '', `Georges' bills ${f(T.bills)} + Patrick ${f(pat)}${Math.abs(gap) > 0.5 ? ` · ${f(gap)} rounding` : ''}`)}
+  </tbody></table>
+  <table class="prov" style="margin-top:10px"><thead><tr><th>Unit price</th><th class="n">m³</th><th class="n">$/m³</th></tr></thead><tbody>
+    <tr><td>Georges EL Hajj, all in <span class="muted small">· incl. commission, diesel, day rate and Anthony's extra</span></td><td class="n">${f(m3G, 0)}</td><td class="n">${pm(geo, m3G)}</td></tr>
+    <tr><td>&nbsp;&nbsp;of which Anthony's extra</td><td class="n">${f(m3G, 0)}</td><td class="n">${pm(extra, m3G)}</td></tr>
+    <tr><td>&nbsp;&nbsp;without the extra</td><td class="n">${f(m3G, 0)}</td><td class="n">${pm(geo - extra, m3G)}</td></tr>
+    <tr><td>Patrick Hokayem</td><td class="n">${f(m3P, 0)}</td><td class="n">${pm(pat, m3P)}</td></tr>
+    <tr class="tot"><td>Whole excavation</td><td class="n">${f(m3, 0)}</td><td class="n">${pm(all, m3)}</td></tr>
+    <tr><td>&nbsp;&nbsp;without Anthony's extra</td><td class="n">${f(m3, 0)}</td><td class="n">${pm(all - extra, m3)}</td></tr>
+  </tbody></table></div>`;
+}
 async function saveProv() {
   const v = +document.getElementById('prov-a').value || 0;
   try { await Admin.api('PATCH', '/api/ajaltoun/excavation/provision', { anthony: v, note: (D.provision || {}).note || 'requested to continue' }); D.provision = { ...(D.provision || {}), anthony: v }; renderProv(); } catch (e) { alert('Not saved: ' + e.message); }
 }
-function renderLists() { renderProv(); renderStatement(); renderBills(); renderPays(); for (const id of ['stmt', 'bills', 'pays']) applyCols(id); }
+function renderLists() { renderTotal(); renderProv(); renderStatement(); renderBills(); renderPays(); for (const id of ['stmt', 'bills', 'pays']) applyCols(id); }
 const f = (n, d = 2) => (+n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 // the page opens with the full Ajaltoun key or with 'excavation' alone (a partner sees this dashboard and nothing else of the project)
 Admin.require(['ajaltoun', 'excavation'], me => {

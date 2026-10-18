@@ -156,8 +156,9 @@ let D = null, ME = null, F = { section: '', villa: '', q: '', review: '', cols: 
 const idA = id => "'" + String(id).replace(/[^\w:.-]/g, '') + "'";
 const lineById = id => D.lines.find(x => x.id === String(id));
 const counted = l => l.paid !== 'proposal';   // a WhatsApp/site proposal waits for Mario's ✓: listed, never counted
-// tabs (Mario, 2026-10-17): Dashboard · Cost per division · Cost per villa · BOQ · Cashflow plan; the old #accounts opens the dashboard
-const TABS = [['dashboard', 'Dashboard'], ['division', 'Cost per division'], ['villas', 'Cost per villa'], ['budget', 'BOQ'], ['plan', 'Cashflow plan']];
+// tabs (Mario, 2026-10-17): Dashboard · Cash flow · Cost per division · Cost per villa · Detail · BOQ · Cashflow plan; the old #accounts opens the dashboard
+// (2026-10-18: the cash flow table and the Detail list + review log moved off the other tabs into their own)
+const TABS = [['dashboard', 'Dashboard'], ['cashflow', 'Cash flow'], ['division', 'Cost per division'], ['villas', 'Cost per villa'], ['detail', 'Detail'], ['budget', 'BOQ'], ['plan', 'Cashflow plan']];
 let TAB = ({ accounts: 'dashboard' })[(location.hash || '').replace('#', '')] || (location.hash || '').replace('#', '') || 'dashboard';
 if (!TABS.some(t => t[0] === TAB)) TAB = 'dashboard';
 // the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
@@ -245,7 +246,7 @@ function renderAccounts(app) {
   const inv = c.inv;
   const remaining = c.received - c.paidOut;
   const DIVISION = `
-    <h2>Costs by work section <span class="r muted">click a section for its lines</span></h2>
+    <h2>Costs by work section <span class="r muted"><label style="cursor:pointer"><input type="checkbox" ${BY_SUP ? 'checked' : ''} onchange="setBySup(this.checked)"> group by supplier</label> · click a section for its lines</span></h2>
     <div class="card"><div class="wrap"><table>
       <thead><tr><th>Section</th><th class="n">Lines</th><th class="n">Amount</th><th class="n">Qty done</th><th class="n">$ / unit</th><th class="n">BOQ rate</th><th>Share</th><th class="n">% of cost</th></tr></thead>
       <tbody>${c.bySec.map(s => { const q = (D.qtyDone || {})[s.id], boq = boqRate(s.id), unit = (q && q.unit) || (boq && boq.unit) || '';
@@ -296,13 +297,12 @@ function renderAccounts(app) {
       <div class="kpi"><div class="v"><span class="ap">${usd(c.approved)}</span> <span class="small muted">/ ${usd(c.paidOut)}</span></div><div class="l">approved by Mario · ${c.bookedN} lines (${usd(c.booked)}) still to approve</div></div>
       <div class="kpi"><div class="v"><span class="ok">${usd(c.verified)}</span> <span class="small muted">/ ${usd(c.approved)}</span></div><div class="l">verified by the partner · ${c.waitN} lines (${usd(c.wait)}) waiting for him${c.flaggedN ? ` · <span class="flag">${c.flaggedN} flagged</span>` : ''}</div></div>
       <div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>
-    </div>
-
-    <h2>Cash flow <span class="r muted">in − out = remaining · click a month for its lines</span></h2>
+    </div>` : ''}
+    ${TAB === 'cashflow' ? `<h2>Cash flow <span class="r muted">in − out = remaining · click a month for its lines</span></h2>
     <div class="card">${cashflowBlock(c)}</div>` : ''}
 
     ${TAB === 'division' ? DIVISION : ''}${TAB === 'villas' ? VILLAS_HTML : ''}
-    <h2>Detail <span class="r muted">${c.lines.length} lines${D.hubLines ? ` · ${D.hubLines} from the hub ledgers not in Odoo` : ''} · Odoo as of ${esc(fmtWhen(D.cachedAt))}${D.stale ? ' · refreshing…' : ''}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">pull now</a>` : ''}</span></h2>
+    ${TAB === 'detail' ? `<h2>Detail <span class="r muted">${c.lines.length} lines${D.hubLines ? ` · ${D.hubLines} from the hub ledgers not in Odoo` : ''} · Odoo as of ${esc(fmtWhen(D.cachedAt))}${D.stale ? ' · refreshing…' : ''}${D.admin ? ` · <a href="#" style="color:var(--amber)" onclick="load(true);return false;">pull now</a>` : ''}</span></h2>
     <div class="filters">
       <span class="combo" id="secfilter"></span>
       <select onchange="F.villa=this.value;pageNo=0;renderDetail()"><option value="">All villas</option>${VILLA_ORDER.map(v => `<option ${F.villa === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -315,11 +315,12 @@ function renderAccounts(app) {
     <div class="dsplit ${PV.on ? 'on' : ''}"><div class="card"><div class="wrap" id="detail"></div></div><aside class="card" id="prev"></aside></div>
 
     <h2>Review log <span class="r muted" id="log-sub"></span></h2>
-    <div class="card"><div class="wrap" id="log"><p class="muted small">Loading…</p></div></div>
+    <div class="card"><div class="wrap" id="log"><p class="muted small">Loading…</p></div></div>` : ''}
     ${(D.owed || []).length ? `<div class="note">Still owed to suppliers (net, from the payables ledger): ${D.owed.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ')}.${(D.prepaid || []).length ? ' Paid ahead of the bill: ' + D.prepaid.map(o => `${esc(o.partner)} ${usd2(o.amount)}`).join(' · ') + '.' : ''}</div>` : ''}
     <div class="note">What this shows: the bills and cash lines tagged to Ajaltoun 4193 in Odoo (S DEV, SARL, S LB), plus the lines tagged Ajaltoun on the hub's own ledgers (Mario cash, the workers' cash, Whish) that are not in Odoo yet — marked "not in Odoo"; a WhatsApp / site proposal waits for Mario's ✓ and is not counted. Not yet in it: worker hours before August 2026, design fees, land and permits — so this is the gross build cost to date, not the full cost of the project.</div>`;
   // the "All sections" combobox: type to filter, ↑↓ Enter, click
   const secItems = () => [{ id: '', name: 'All sections' }, ...D.sections.map(s => ({ id: s.id, name: s.name, cls: s.equipment ? 'eq' : '', hint: s.equipment ? 'equipment' : '' }))];
+  if (TAB !== 'detail') { if (keepY) requestAnimationFrame(() => window.scrollTo(0, keepY)); return; }
   combo(document.getElementById('secfilter'), { items: secItems, value: F.section, placeholder: 'All sections', onPick: it => { F.section = it.id; pageNo = 0; renderDetail(); } });
   renderDetail();
   loadLog();
@@ -333,12 +334,25 @@ function toggleSec(e, id) {
   if (OPEN_SEC.has(id)) OPEN_SEC.delete(id); else OPEN_SEC.add(id);
   render();
 }
+// group a section's lines by supplier (Mario, 2026-10-18), optional — the tick is remembered on this browser; a supplier row opens its lines
+let BY_SUP = (() => { try { return localStorage.getItem('ajBySup') === '1'; } catch { return false; } })();
+const OPEN_SUP = new Set();
+function setBySup(on) { BY_SUP = on; try { localStorage.setItem('ajBySup', on ? '1' : '0'); } catch {} render(); }
+function toggleSup(k) { const key = decodeURIComponent(k); if (OPEN_SUP.has(key)) OPEN_SUP.delete(key); else OPEN_SUP.add(key); render(); }
 function secLinesTable(id) {
   const ls = D.lines.filter(l => l.section === id && counted(l)).sort((a, b) => b.date.localeCompare(a.date));
   const props = D.lines.filter(l => l.section === id && !counted(l));
+  const lineRow = l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`;
+  const secTot = ls.reduce((x, l) => x + l.amount, 0);
+  let body;
+  if (BY_SUP) {
+    const g = {}; for (const l of ls) (g[l.partner || '—'] ||= []).push(l);
+    body = Object.entries(g).map(([p, xs]) => ({ p, xs, t: xs.reduce((x, l) => x + l.amount, 0) })).sort((a, b) => b.t - a.t).map(({ p, xs, t }) => { const key = id + '|' + p, op = OPEN_SUP.has(key);
+      return `<tr class="srow" style="cursor:pointer" onclick="toggleSup('${encodeURIComponent(key).replace(/'/g, '%27')}')"><td colspan="2"><span class="chev">${op ? '▾' : '▸'}</span><b>${esc(p)}</b></td><td class="muted">${xs.length} line${xs.length > 1 ? 's' : ''} · ${pct(t, secTot)}</td><td colspan="3"></td><td class="n"><b>${usd2(t)}</b></td></tr>${op ? xs.map(lineRow).join('') : ''}`; }).join('');
+  } else body = ls.map(lineRow).join('');
   return `<table><thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>
-    ${ls.map(l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No lines.</td></tr>'}
-    <tr class="tot"><td colspan="6">${ls.length} lines${props.length ? ` · ${props.length} proposal${props.length > 1 ? 's' : ''} waiting for Mario's ✓ (not counted)` : ''}</td><td class="n">${usd2(ls.reduce((x, l) => x + l.amount, 0))}</td></tr></tbody></table>`;
+    ${body || '<tr><td colspan="7" class="muted">No lines.</td></tr>'}
+    <tr class="tot"><td colspan="6">${ls.length} lines${props.length ? ` · ${props.length} proposal${props.length > 1 ? 's' : ''} waiting for Mario's ✓ (not counted)` : ''}</td><td class="n">${usd2(secTot)}</td></tr></tbody></table>`;
 }
 // the BILL cell: the Odoo bill number, "payment · no bill", or "not in Odoo" linking to the hub ledger line
 function billCell(l) {
@@ -704,12 +718,13 @@ async function openFile(id, name, mime, url) {
 }
 
 // ── the preview pane (Mario, 2026-09-12): click a line, its scan shows on the right; ↑↓ walk the list, A approves, V verifies ──
-const PV = { on: (() => { try { return localStorage.getItem('ajPreview') === '1'; } catch { return false; } })(), line: null, idx: 0, rows: [] };
-function togglePreview() { PV.on = !PV.on; try { localStorage.setItem('ajPreview', PV.on ? '1' : '0'); } catch {} render(); }
+// (2026-10-18) the page always opens with the preview off — no longer remembered from the last visit
+const PV = { on: false, line: null, idx: 0, rows: [] };
+function togglePreview() { PV.on = !PV.on; render(); }
 function rowClick(e, id) {
   if (e.target.closest('button, a, input, select, .secbtn, #secpop')) return;
   if (window.getSelection && String(window.getSelection()).length) return;   // the user was selecting text, not picking a line
-  if (!PV.on) { PV.on = true; try { localStorage.setItem('ajPreview', '1'); } catch {} PV.line = id; render(); return; }   // first click opens the pane
+  if (!PV.on) { PV.on = true; PV.line = id; render(); return; }   // first click opens the pane
   selectLine(id);
 }
 function selectLine(id) {
@@ -734,7 +749,7 @@ function showPreview() {
   renderFile(body, f.id, f.mime, Math.max(200, body.clientWidth - 24), f.url);
 }
 document.addEventListener('keydown', e => {
-  if (!PV.on || !D || document.getElementById('secpop') || document.getElementById('viewer').classList.contains('on')) return;
+  if (!PV.on || !D || TAB !== 'detail' || document.getElementById('secpop') || document.getElementById('viewer').classList.contains('on')) return;
   if (e.target.closest('input, select, textarea')) return;
   const n = PV.rows.length; if (!n) return;
   const i = PV.rows.indexOf(PV.line);
