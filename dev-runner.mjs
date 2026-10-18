@@ -69,7 +69,8 @@ ${deploy
 function runClaude(it, resume) {
   return new Promise(resolve => {
     const args = ['-p', '--output-format', 'json', '--permission-mode', 'bypassPermissions', ...(resume ? ['--resume', resume] : [])];
-    const child = spawn(CLAUDE, args, { cwd: repoDir(it.repo), windowsHide: true, env: { ...process.env, SHIFT_DEV_RUNNER: '1' } });
+    // no ANTHROPIC_API_KEY in the child: it runs on Mario's Max subscription (claude.ai login), never on paid API credit
+    const child = spawn(CLAUDE, args, { cwd: repoDir(it.repo), windowsHide: true, env: (({ ANTHROPIC_API_KEY, ...e }) => ({ ...e, SHIFT_DEV_RUNNER: '1' }))(process.env) });
     try { os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch {}
     let out = '', err = '';
     child.stdout.on('data', d => out += d); child.stderr.on('data', d => err += d);
@@ -105,7 +106,7 @@ async function tick() {
   log('end', it.id, r.ok ? 'ok' : 'FAILED', r.cost != null ? '$' + r.cost.toFixed(2) : '', r.session || '');
   await say(it.thread || 'shift', (r.ok ? '✅ ' : '❌ ') + r.result);
   const commit = (String(r.result).match(/\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,12}\b/) || [''])[0];   // a hash, not a plain number
-  await call('PATCH', `/api/dev-requests/${it.id}`, { status: r.ok ? 'done' : 'dropped', result: r.result, commit, notes: `laptop run · session ${r.session || '?'}${r.cost != null ? ' · $' + r.cost.toFixed(2) : ''}${r.ok ? '' : ' · failed'}` }).catch(e => log('close:', e.message));
+  await call('PATCH', `/api/dev-requests/${it.id}`, { status: r.ok ? 'done' : 'dropped', result: r.result, commit, notes: `laptop run · session ${r.session || '?'}${r.cost != null ? ' · ~$' + r.cost.toFixed(2) + ' API-equivalent (Max plan, not billed)' : ''}${r.ok ? '' : ' · failed'}` }).catch(e => log('close:', e.message));
   await beat(false, '');
 }
 
