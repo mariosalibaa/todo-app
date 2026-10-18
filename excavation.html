@@ -309,7 +309,6 @@ function renderProv() {
   if (!a && !dib && !(ME && ME.admin)) { el.innerHTML = ''; return; }
   const paidNote = P.paidBy ? `<p class="small muted" style="margin:6px 0 0">The $${f(P.asked)} Anthony asked was paid on ${esc(P.paidOn)} (${esc(P.paidBy)}): it is in the figures now, no longer a provision.</p>` : '';
   el.innerHTML = `<h2>Provision — where we stand after paying what is asked</h2><div class="card"><table class="prov"><tbody>
-    <tr><td>Anthony asks, to go on${P.note ? ` <span class="muted small">· ${esc(P.note)}</span>` : ''}</td><td class="n">${ME && ME.admin ? `$ <input id="prov-a" type="number" min="0" step="50" value="${a || ''}" style="width:90px" onchange="saveProv()">` : '$ ' + f(a)}</td></tr>
     <tr><td>Dib, the fills not yet paid${(T.unpaidFills || []).length ? ` <span class="muted small">· ${esc(T.unpaidFills.map(x => x.date + ' ' + f(x.litres, 0) + ' L').join(', '))}</span>` : ''}</td><td class="n">$ ${f(dib)}</td></tr>
     <tr class="tot"><td>To pay</td><td class="n">$ ${f(a + dib)}</td></tr>
     <tr><td>Anthony — now ${st(left)}</td><td class="n">after: <b>${st(left - a)}</b>${left - a < -0.5 ? ` <span class="muted small">≈ ${f(-(left - a) / price, 0)} m³ at $${price}</span>` : ''}</td></tr>
