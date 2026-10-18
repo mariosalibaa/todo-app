@@ -83,9 +83,9 @@
 <script>
 const esc = Admin.esc;
 const fmt = n => (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// the /web# form on purpose: outside the Odoo app's scope, so Chrome opens a TAB, not the installed Odoo app (Mario, 2026-10-05)
-const ODOO = 'https://shift2.odoo.com/web#cids=2-7-10-8-4-9&view_type=form&model=';
-const odoo = (model, id, label) => id ? `<a class="od" href="${ODOO}${model}&id=${id}" target="_blank" rel="noopener">${esc(label)}</a>` : esc(label);
+// /odoo/web/<model>/<id>: Mario asked for /web (opens clean in his Chrome); Odoo app uninstalled 2026-10-18 so it opens a tab; Odoo switches to the record company by itself
+const ODOO = 'https://shift2.odoo.com/odoo/web/';
+const odoo = (model, id, label) => id ? `<a class="od" href="${ODOO}${model}/${id}" target="_blank" rel="noopener">${esc(label)}</a>` : esc(label);
 let LIST = [], CUR = null, ME = null, F = { kind: 'all', company: '' };
 const say = (t, cls) => { const m = document.getElementById('msg'); m.textContent = t || ''; m.style.color = cls === 'err' ? 'var(--red)' : ''; };
 
