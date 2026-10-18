@@ -31,8 +31,9 @@
   .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px;} .kpi .v{font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums;} .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;} .kpi .l .eq{font-variant-numeric:tabular-nums;color:var(--text);} .kpi .l .t{color:var(--text);} .kpi .tnote{margin-top:4px;color:var(--amber);} .kpi .pen{margin-left:6px;color:var(--overlay0);text-decoration:none;opacity:.5;} .kpi:hover .pen{opacity:1;}
   .kpi.in .v{color:var(--green);} .kpi.out .v{color:var(--red);} .kpi.cash .v{color:var(--amber);} .kpi.eq .v{color:var(--blue);}
   .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:14px 16px;overflow-x:auto;}
-  .fillsbox{overflow:visible;padding-top:0;} .fillsbox thead th{position:sticky;top:var(--hdr,0px);z-index:2;background:var(--mantle);padding-top:10px;box-shadow:inset 0 -1px 0 var(--surface0);}   /* the page scrolls; the fills' header row sticks under the top bar once it reaches it (Mario, 2026-10-16) */
-  @media (max-width:900px){.fillsbox{overflow-x:auto;}}
+  /* the fills table stays inside its card (Mario, 2026-10-18): the page widens for it, and if the window is still too narrow the card
+     scrolls sideways; the header row is kept on screen by the hub-wide sticky-head.js */
+  body.diesel main{max-width:1480px;} .fillsbox{overflow-x:auto;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;} @media(max-width:800px){.grid2{grid-template-columns:1fr;}}
   table{width:100%;border-collapse:collapse;font-size:.82rem;} th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
   td{padding:6px 8px;border-bottom:1px solid var(--surface0);vertical-align:top;} td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
@@ -328,6 +329,7 @@ Admin.require(['ajaltoun', 'excavation'], me => {
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
   // two tabs on one page (Mario, 2026-10-14): /ajaltoun/excavation and /ajaltoun/excavation/diesel — each loads only its own data
   const isDiesel = /\/diesel\/?$/.test(location.pathname);
+  document.body.classList.toggle('diesel', isDiesel);
   document.getElementById('vt-' + (isDiesel ? 'diesel' : 'exc')).classList.add('on');
   document.getElementById('v-exc').hidden = isDiesel; document.getElementById('v-diesel').hidden = !isDiesel;
   if (isDiesel) { document.title = 'Diesel fills · Excavation · Shift Hub'; loadDiesel(); } else load();
