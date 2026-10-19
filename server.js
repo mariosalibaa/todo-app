@@ -170,6 +170,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'public/rent-law/cas-82-inflation-2013-2022.pdf'));
   fs.readFileSync(path.join(__dirname, 'mechanical.html'));
   fs.readFileSync(path.join(__dirname, 'cars.html'));
+  fs.readFileSync(path.join(__dirname, 'heater.html'));
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
   fs.readFileSync(path.join(__dirname, 'contacts.html'));
@@ -760,6 +761,7 @@ const handler = async (req, res) => {
     'cpr-dynamic.html': path.join(__dirname, 'cpr-dynamic.html'),
     'mahab.html': path.join(__dirname, 'mahab.html'),
     'tohme.html': path.join(__dirname, 'tohme.html'),
+    'heater.html': path.join(__dirname, 'heater.html'),
     'khoder.html': path.join(__dirname, 'khoder.html'),
     'wa-outbox.html': path.join(__dirname, 'wa-outbox.html'),
     'makhlouf.html': path.join(__dirname, 'makhlouf.html'),
@@ -781,6 +783,7 @@ const handler = async (req, res) => {
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
     '/cars': 'cars.html',   // the cars' insurance + driving licences, expiry and days left; reminders from tools CarsWatch (Mario 2026-10-18)
+    '/heater': 'heater.html',   // the water heater's Tuya controller — temperature, the two channels, on/off; admins; HeaterWatch alerts (Mario 2026-10-19)
     '/usa': 'usa.html',   // Youssef's well pump (Maryland): order of work + photos of the sand fixes; PUBLIC, nothing private (Mario 2026-10-06)
     '/contacts': 'contacts.html',   // business cards → Mario's Google Contacts (Mario, 2026-10-18)
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
@@ -1163,6 +1166,38 @@ const handler = async (req, res) => {
     try { const v = await require('./plants').check({ db, TEAM_ID }, send); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(v)); }
     catch (e) { console.error('plants check error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
+  }
+  // /api/heater — the water heater's Tuya controller (heater.js). GET status + POST /set {code,value}: hub admins
+  // (the session cookie, as cprAccess reads it). /check: the laptop task HeaterWatch every 10 min (ACCOUNTING_API_KEY)
+  // or a cron (CRON_SECRET) — Telegram through the hub's bot, like /api/plants/check. (Mario 2026-10-19)
+  if (url.split('?')[0].startsWith('/api/heater')) {
+    const json = (code, v) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); };
+    const heater = require('./heater');
+    const p = url.split('?')[0];
+    if (p === '/api/heater/check' && req.method === 'POST') {
+      const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (!(given.length >= 16 && (given === process.env.CRON_SECRET || given === process.env.ACCOUNTING_API_KEY))) return json(401, { error: 'unauthorized' });
+      const send = async text => {
+        const token = process.env.TELEGRAM_BOT_TOKEN, chat = process.env.TELEGRAM_CHAT_ID || process.env.ACCOUNTING_CHAT_ID;
+        if (!token || !chat) return;
+        const tg = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text: text.slice(0, 4000), disable_web_page_preview: true }) });
+        if (!tg.ok) console.error('heater telegram failed:', tg.status, await tg.text());
+      };
+      try { return json(200, await heater.check({ db, TEAM_ID }, send)); }
+      catch (e) { console.error('heater check error:', e); return json(500, { error: e.message }); }
+    }
+    const acc = await cprAccess();
+    if (!acc.isAdmin) return json(401, { error: 'admin' });
+    const limits = { onHours: +process.env.HEATER_ON_HOURS || 2, maxTemp: +process.env.HEATER_MAX_TEMP || 70 };
+    try {
+      if (p === '/api/heater' && req.method === 'GET') return json(200, { ...(await heater.status()), limits });
+      if (p === '/api/heater/set' && req.method === 'POST') {
+        let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }
+        const { code, value } = JSON.parse(b || '{}');
+        return json(200, { ...(await heater.set(String(code), !!value)), limits });
+      }
+    } catch (e) { console.error('heater error:', e); return json(500, { error: e.message }); }
+    return json(404, { error: 'not found' });
   }
   // /api/wa-link — the WhatsApp daemon's link state, shared with the Telegram agent bot (ACCOUNTING_API_KEY both sides).
   // Daemon: { need: true } when the 03 line is unlinked, { need: false } once linked. Bot: { want: true } when Mario
