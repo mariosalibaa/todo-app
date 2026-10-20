@@ -42,14 +42,15 @@
   .tl .lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px;}
   .tl .r{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:8px;margin:3px 0;}
   .tl .r>span{font-size:.72rem;color:var(--sub);white-space:nowrap;}
-  .tl .b{position:relative;height:18px;background:var(--base);border-radius:4px;overflow:hidden;}
+  .tl .b{position:relative;height:30px;background:var(--base);border-radius:4px;overflow:hidden;}
   .tl .b i{position:absolute;top:0;bottom:0;}
   .tl .b u{position:absolute;top:0;bottom:0;border-left:1px dashed rgba(166,173,200,.18);}
   .tl .ax{position:relative;height:14px;font-size:.6rem;color:var(--overlay0);}
   .tl .ax s{position:absolute;transform:translateX(-50%);text-decoration:none;}
-  .tl .b.tall{height:26px;}
-  .tl .b svg{position:absolute;inset:2px 0;width:100%;height:calc(100% - 4px);pointer-events:none;}
-  .tl .b polyline{fill:none;stroke:#f9e2af;stroke-width:2;vector-effect:non-scaling-stroke;}
+  .tl .b.tall{height:40px;}
+  .tl .b i{display:flex;flex-direction:column;justify-content:center;overflow:hidden;padding:0 4px;box-shadow:inset -1px 0 0 rgba(30,30,46,.35);}
+  .tl .b i b{display:block;font-style:normal;font-size:.6rem;font-weight:600;line-height:1.25;color:#1e1e2e;white-space:nowrap;overflow:hidden;text-overflow:clip;position:relative;z-index:1;}
+  .tl .b i b.sc{font-weight:700;}
   td small.spans em.soc{font-style:normal;color:#f9e2af;}
   td small.spans em.io{font-style:normal;color:var(--overlay0);}
   .s-gen1{background:var(--red);} .s-gen2{background:#cba6f7;} .s-edl{background:var(--blue);} .s-off{background:var(--surface1);}
@@ -252,14 +253,16 @@
     const pos = m => (m / 1440 * 100).toFixed(3) + '%', hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
     const grid = [3, 6, 9, 12, 15, 18, 21].map(h => `<u style="left:${pos(h * 60)}"></u>`).join('');
     const ax = `<div class="r"><span></span><div class="ax">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => `<s style="left:${pos(h * 60)}">${h}</s>`).join('')}</div></div>`;
-    let h = `<div class="lg">${['gen1', 'gen2', 'edl'].map(k => `<span><i class="s-${k}"></i>${SRCN[k]}</span>`).join('')}<span><i class="s-off"></i>no source</span>${showSoc ? '<span><i style="background:#f9e2af;height:3px;vertical-align:3px"></i>battery SOC (0–100 %)</span>' : ''}</div>` + ax;
+    let h = `<div class="lg">${['gen1', 'gen2', 'edl'].map(k => `<span><i class="s-${k}"></i>${SRCN[k]}</span>`).join('')}<span><i class="s-off"></i>no source</span>${showSoc ? '<span>on each stretch: kWh in · out, battery SOC start→end</span>' : '<span>on each stretch: kWh in · out</span>'}</div>` + ax;
     for (const d of ds) {
       const bar = S.days[d].bar || [], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
-      // SOC line over the bar (0 % bottom, 100 % top) when the 🔋 button is on; the tap tip carries the SOC either way
+      // SOC as numbers on each stretch when 🔋 is on (Mario 2026-10-20: "soc number not graph"); the tap tip carries it either way
       const soc = S.days[d].soc || [], at = m => { let v = null; for (const [t, x] of soc) { if (t > m) break; v = x; } return v; };
-      const line = showSoc && soc.length ? `<svg viewBox="0 0 1440 100" preserveAspectRatio="none"><polyline points="${soc.map(([t, x]) => `${t},${100 - x}`).join(' ')}"/></svg>` : '';
       h += `<div class="r"><span>${dd}</span><div class="b${showSoc ? ' tall' : ''}">${grid}${bar.map(([k, a, b, io, ou]) =>
-        `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd} · ${SRCN[k]} ${hm(a)}–${hm(b)}${io != null ? ` · in ${io} · out ${ou} kWh` : ''}${at(a) != null ? ` · battery ${at(a)} → ${at(b - 1)} %` : ''}"></i>`).join('')}${line}</div></div>`;
+        `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd} · ${SRCN[k]} ${hm(a)}–${hm(b)}${io != null ? ` · in ${io} · out ${ou} kWh` : ''}${at(a) != null ? ` · battery ${at(a)} → ${at(b - 1)} %` : ''}">` +
+        // written on the stretch itself (Mario 2026-10-20): in / out kWh, and the SOC start → end when 🔋 is on; clipped when too narrow
+        `<b>${io == null ? '' : io < 0.05 && ou < 0.05 ? '0 kWh' : [io >= 0.05 ? 'in ' + io : '', ou >= 0.05 ? 'out ' + ou : ''].filter(Boolean).join(' · ')}</b>` +
+        `${showSoc && at(a) != null ? `<b class="sc">${at(a)}→${at(b - 1)}%</b>` : ''}</i>`).join('')}</div></div>`;
     }
     $('srcTime').innerHTML = h + ax;
     $('srcTabs').hidden = false;
