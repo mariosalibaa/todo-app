@@ -20,7 +20,8 @@ async function request(method, p, body, auth = true) {
     tok = r.access_token; tokExp = Date.now() + (r.expire_time - 60) * 1000;
   }
   const t = Date.now().toString(), bodyStr = body ? JSON.stringify(body) : '';
-  const sign = hmac(ID() + (auth ? tok : '') + t + [method, sha256(bodyStr), '', p].join('\n'));
+  const [p0, q0] = p.split('?'), sortedPath = q0 ? p0 + '?' + q0.split('&').sort().join('&') : p0;   // Tuya signs the query with its keys sorted
+  const sign = hmac(ID() + (auth ? tok : '') + t + [method, sha256(bodyStr), '', sortedPath].join('\n'));
   const headers = { client_id: ID(), sign, t, sign_method: 'HMAC-SHA256', 'Content-Type': 'application/json' };
   if (auth) headers.access_token = tok;
   const res = await fetch(EP() + p, { method, headers, body: bodyStr || undefined });
@@ -64,7 +65,7 @@ async function check(ctx, send) {
   const hhmm = ms => new Date(ms).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' });
   if (s) {
     st.lastError = null; st.last = { at: s.at, temp: s.temp, sw: s.switches, online: s.online };
-    if (s.online && s.temp != null) { try { await record(ctx, now, s.temp); } catch (e) { console.error('heater record:', e.message); } }
+    try { await sync(ctx, 16); } catch (e) { console.error('heater sync:', e.message); }   // the graph's points, from Tuya's own report log
     // (no "channel on too long" watch: nothing is wired to the module's relays — the heater is on the Sonoff, Mario 2026-10-20;
     //  HEATER_ON_HOURS=0 by default keeps it off; set it when a relay carries a load again)
     if (ON_H > 0) for (const ch of ['ch1', 'ch2']) {
@@ -97,23 +98,63 @@ async function check(ctx, send) {
   }
   st.at = new Date().toISOString();
   await ref.set(st);
-  if (msgs.length && send) await send(msgs.join('\n\n') + '\n\nhttps://hub.shift-group.co/tuya');
+  if (msgs.length && send) await send(msgs.join('\n\n') + '\n\nhttps://hub.shift-group.co/energy/tuya');
   return { ok: !!s, sent: msgs.length, temp: s && s.temp, switches: s && s.switches, error: st.lastError || undefined };
 }
 
-// the temperature series for the graph: one point per HeaterWatch run (10 min), kept KEEP_DAYS, in one small doc
-// (14 d × 144 = ~2,000 points). Tuya's free tier keeps no history, so the line starts the day the watch started.
-const KEEP_DAYS = 14;
+// The temperature series for the graph comes from Tuya's own report log (GET /v2.0/cloud/thing/{id}/report-logs,
+// ~1,300 reports a day, 7-day windows, 100 per page, rate-limited). The probe is noisy — a −28, a −7.4, a 19 between
+// 28s — so each 10-minute bucket keeps the MEDIAN of its readings in 0–110 °C. Buckets live in one Firestore doc
+// (meta/heaterTemps: pts [{t,c}], syncedTo, backTo), KEEP_DAYS back; sync() pulls what is new (and, a few pages a run,
+// what is older) so a page view only reads the doc.
+const KEEP_DAYS = 14, BUCKET = 10 * 60e3, PAGE = 100;
 const tempsRef = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('meta').doc('heaterTemps');
-async function record(ctx, t, c) {
-  const ref = tempsRef(ctx), d = (await ref.get()).data() || {};
-  const pts = (d.pts || []).filter(p => t - p.t < KEEP_DAYS * 864e5);
-  if (!pts.length || t - pts[pts.length - 1].t >= 5 * 60e3) pts.push({ t, c });   // two runs inside 5 min (log-on + schedule) = one point
-  await ref.set({ pts, at: new Date(t).toISOString() });
+const ok = c => c >= 0 && c <= 110;
+// newest first; stops at maxPages or the rate limit — returns what it got and whether the window was finished
+async function pullLogs(start, end, maxPages) {
+  const out = []; let key = '', done = false;
+  for (let i = 0; i < maxPages; i++) {
+    let r;
+    try { r = await request('GET', `/v2.0/cloud/thing/${DEV()}/report-logs?codes=temp_current&end_time=${end}&size=${PAGE}&start_time=${start}${key ? '&last_row_key=' + key : ''}`); }
+    catch (e) { if (/frequent/i.test(e.message)) break; throw e; }
+    for (const l of r.logs || []) out.push({ t: +l.event_time, c: +l.value / 10 });
+    if (!r.has_more) { done = true; break; }
+    key = r.last_row_key;
+  }
+  return { logs: out, done };
+}
+function bucketise(logs, into) {
+  const by = {};
+  for (const l of logs) if (ok(l.c)) (by[Math.floor(l.t / BUCKET) * BUCKET] ||= []).push(l.c);
+  for (const [t, vs] of Object.entries(by)) { vs.sort((a, b) => a - b); into[t] = vs[Math.floor(vs.length / 2)]; }
+}
+async function sync(ctx, maxPages = 16) {
+  const ref = tempsRef(ctx), d = (await ref.get()).data() || {}, now = Date.now(), floor = now - KEEP_DAYS * 864e5;
+  const map = {}; for (const p of d.pts || []) if (p.t >= floor && ok(p.c)) map[p.t] = p.c;
+  let syncedTo = d.syncedTo || 0, backTo = d.backTo || 0, pages = 0;
+  // forward: from the last synced bucket (re-read, it may have been half full) to now, 7 days at most per Tuya window
+  const fwdStart = Math.max(syncedTo ? syncedTo - BUCKET : now - 864e5, now - 7 * 864e5 + 1);
+  const f = await pullLogs(fwdStart, now, Math.max(2, Math.ceil(maxPages / 2)));
+  bucketise(f.logs, map); pages += Math.ceil(f.logs.length / PAGE) || 1;
+  if (f.done) syncedTo = now; else if (f.logs.length) syncedTo = Math.min(...f.logs.map(l => l.t));   // newest-first pages: the oldest fetched is where we stopped
+  if (!backTo) backTo = fwdStart;
+  // backward: older history, a few pages a run, down to KEEP_DAYS (Tuya keeps about a week)
+  const left = maxPages - pages;
+  if (left > 0 && backTo > floor) {
+    const end = backTo - 1, start = Math.max(floor, end - 7 * 864e5 + 1);
+    const b = await pullLogs(start, end, left);
+    bucketise(b.logs, map);
+    if (b.done) backTo = start; else if (b.logs.length) backTo = Math.min(...b.logs.map(l => l.t));
+    if (!b.logs.length) backTo = start;   // nothing older in that window — Tuya's retention ends here
+  }
+  const pts = Object.keys(map).map(t => ({ t: +t, c: map[t] })).sort((a, b) => a.t - b.t);
+  await ref.set({ pts, syncedTo, backTo, at: new Date(now).toISOString() });
+  return { points: pts.length, syncedTo, backTo };
 }
 async function history(ctx, days = 1) {
   const d = (await tempsRef(ctx).get()).data() || {}, from = Date.now() - Math.min(days, KEEP_DAYS) * 864e5;
-  return (d.pts || []).filter(p => p.t >= from);
+  const pts = (d.pts || []).filter(p => p.t >= from && ok(p.c));
+  return { pts, syncedTo: d.syncedTo || 0, backTo: d.backTo || 0 };
 }
 
-module.exports = { status, set, check, history, record };
+module.exports = { status, set, check, history, sync };

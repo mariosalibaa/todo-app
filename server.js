@@ -787,7 +787,8 @@ const handler = async (req, res) => {
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
     '/cars': 'cars.html',   // the cars' insurance + driving licences, expiry and days left; reminders from tools CarsWatch (Mario 2026-10-18)
-    '/tuya': 'heater.html',   // the Tuya devices — the MOES probe in the water heater's box: temperature now + graph, the (unwired) relays; admins; HeaterWatch alerts (Mario 2026-10-19; /heater → /tuya 2026-10-20)
+    '/energy': 'hub.html',   // the Energy folder on its own link (Mario 2026-10-20: a folder's pages live under its path)
+    '/energy/tuya': 'heater.html',   // the Tuya devices — the MOES probe in the water heater's box: temperature now + graph, the (unwired) relays; admins; HeaterWatch alerts (Mario 2026-10-19; /heater → /tuya → /energy/tuya 2026-10-20)
     '/links': 'links.html',   // the register of every hub link — icon, path, who may open it (Mario 2026-10-20)
     '/usa': 'usa.html',   // Youssef's well pump (Maryland): order of work + photos of the sand fixes; PUBLIC, nothing private (Mario 2026-10-06)
     '/contacts': 'contacts.html',   // business cards → Mario's Google Contacts (Mario, 2026-10-18)
@@ -957,7 +958,7 @@ const handler = async (req, res) => {
   const AJ = [[/^\/ajaltoun4193\/accounting(\/[a-z]+)?\/?$/, '/ajaltoun'], [/^\/ajaltoun4193\/partners\/?$/, '/partners'], [/^\/ajaltoun4193\/excavation(\/.*)?$/, '/ajaltoun/excavation$1'], [/^\/ajaltoun4193\/cameras(\/.*)?$/, '/ajaltoun/machines$1']];
   let pu = url;
   for (const [re, to] of AJ) if (re.test(pu)) { pu = pu.replace(re, to); break; }
-  if (url.split('?')[0] === '/heater') { res.writeHead(301, { Location: '/tuya' }); res.end(); return; }   // renamed 2026-10-20
+  if (/^\/(heater|tuya)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy/tuya' }); res.end(); return; }   // renamed 2026-10-20
   const OLD = pu === '/ajaltoun' ? '/ajaltoun4193/accounting' : pu === '/partners' ? '/ajaltoun4193/partners' : /^\/ajaltoun\/excavation/.test(pu) ? pu.replace('/ajaltoun/excavation', '/ajaltoun4193/excavation') : /^\/ajaltoun\/machines/.test(pu) ? pu.replace('/ajaltoun/machines', '/ajaltoun4193/cameras') : '';
   if (OLD && pu === url && PAGES[pu]) { res.writeHead(301, { Location: OLD + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const page = PAGES[pu] || (pu === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
@@ -1215,7 +1216,8 @@ const handler = async (req, res) => {
         ['/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
         ['/whatsapp', '🗄️', 'WhatsApp Archive', 'admin', 'through the laptop gateway'],
         ['/app/<name>', '💻', 'Laptop apps', 'admin', 'photo-map, lead-hub, invoice-renamer, power-analyzer — wake the laptop'],
-        ['/heater', '🌡️', '(old) → /tuya', 'admin', 'redirects'],
+        ['/energy', '📁', 'Energy folder', 'signed-in', 'the folder tile on its own link'],
+        ['/heater', '🌡️', '(old) → /energy/tuya', 'admin', '/tuya redirects too'],
         ['/links', '🔗', 'This register', 'admin', ''],
       ];
       return json(200, { tiles, extra, apps: APPS });
@@ -1246,9 +1248,10 @@ const handler = async (req, res) => {
     try {
       if (p === '/api/heater' && req.method === 'GET') {
         const days = Math.max(1, Math.min(14, +(new URL(req.url, 'http://x').searchParams.get('days') || 1)));
-        const [s, history] = await Promise.all([heater.status(), heater.history({ db, TEAM_ID }, days).catch(() => [])]);
-        if (s.online && s.temp != null) { try { await heater.record({ db, TEAM_ID }, Date.now(), s.temp); } catch {} }   // a page view is a reading too
-        return json(200, { ...s, limits, history, days });
+        let h = await heater.history({ db, TEAM_ID }, days).catch(() => ({ pts: [] }));
+        if (Date.now() - (h.syncedTo || 0) > 20 * 60e3) { try { await heater.sync({ db, TEAM_ID }, 6); h = await heater.history({ db, TEAM_ID }, days); } catch {} }   // stale (laptop off) → a short pull now
+        const s = await heater.status();
+        return json(200, { ...s, limits, history: h.pts, historyFrom: h.backTo, days });
       }
       if (p === '/api/heater/set' && req.method === 'POST') {
         let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }

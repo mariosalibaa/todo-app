@@ -83,7 +83,7 @@
       <div class="tabs"><button data-d="1" class="on">24 h</button><button data-d="3">3 d</button><button data-d="7">7 d</button><button data-d="14">14 d</button></div>
     </div>
     <div class="cwrap"><svg id="chart" viewBox="0 0 640 220" preserveAspectRatio="none" role="img" aria-label="water temperature over time"></svg></div>
-    <div class="cnote" id="cnote">A point every 10 minutes from HeaterWatch, kept 14 days.</div>
+    <div class="cnote" id="cnote">10-minute medians of the probe's reports, from Tuya's log.</div>
   </div>
 
   <details class="card" id="switches">
@@ -127,7 +127,7 @@ let days = 1, maxT = 70;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function chart(pts) {
   const svg = $('chart'), W = 640, H = 220, L = 38, R = 10, T = 12, B = 26;
-  if (!pts || pts.length < 2) { svg.innerHTML = `<text class="lbl" x="${W / 2}" y="${H / 2}" text-anchor="middle">${pts && pts.length === 1 ? 'one reading so far — the line starts with the next one' : 'no readings yet — HeaterWatch adds one every 10 minutes'}</text>`; return; }
+  if (!pts || pts.length < 2) { svg.innerHTML = `<text class="lbl" x="${W / 2}" y="${H / 2}" text-anchor="middle">${pts && pts.length === 1 ? 'one point so far — the line starts with the next one' : 'no points yet — the next HeaterWatch run pulls them from Tuya'}</text>`; return; }
   const t0 = Date.now() - days * 864e5, t1 = Date.now();
   const cs = pts.map(p => p.c), lo = Math.floor(Math.min(...cs) / 5) * 5 - 5, hi = Math.ceil(Math.max(...cs, Math.min(maxT, Math.max(...cs) + 10)) / 5) * 5;
   const x = t => L + (t - t0) / (t1 - t0) * (W - L - R), y = c => T + (hi - c) / (hi - lo) * (H - T - B);
@@ -154,7 +154,7 @@ function chart(pts) {
   g += `<circle class="dot" cx="${x(last.t)}" cy="${y(last.c)}" r="3.5"/>`;
   svg.innerHTML = g;
   const min = Math.min(...cs), max = Math.max(...cs);
-  $('cnote').textContent = `${pts.length} readings · low ${min.toFixed(1)} °C · high ${max.toFixed(1)} °C · a point every 10 minutes from HeaterWatch, kept 14 days`;
+  $('cnote').textContent = `${pts.length} points · low ${min.toFixed(1)} °C · high ${max.toFixed(1)} °C · each point = the median of the probe's reports in a 10-minute slot (the probe also throws stray values, which are dropped) · from Tuya's report log, kept 14 days`;
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { days = +b.dataset.d; document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); load(); }));
 async function load() {

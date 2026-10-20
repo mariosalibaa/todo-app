@@ -159,7 +159,7 @@ const APPS = [
   { id: 'mahab', in: 'energy', ico: '☀', name: 'Mahab', desc: 'Taan / Machmouchi 25 kWp plant — kWh per month from solar, EDL and the generators (DeyeCloud)', href: '/mahab', admin: true },
   { id: 'tohme', in: 'energy', ico: '☀', name: 'Tohme', desc: 'Villa Tohme 40.7 kWp plant — kWh per month from solar, EDL and the generator since the install (DeyeCloud)', href: '/tohme', admin: true },
   { id: 'plants', in: 'energy', ico: '🔆', name: 'Plants', desc: 'Every DeyeCloud and Solarman plant — online / offline, power now, kWh today, month and year', href: '/plants', admin: true },
-  { id: 'tuya', in: 'energy', ico: '🌡️', name: 'Tuya', desc: 'The Smart Life devices — the MOES probe in the water heater\'s box: water temperature now and its graph; Telegram if the water gets too hot or the probe drops offline', href: '/tuya', admin: true },
+  { id: 'tuya', in: 'energy', ico: '🌡️', name: 'Tuya', desc: 'The Smart Life devices — the MOES probe in the water heater\'s box: water temperature now and its graph; Telegram if the water gets too hot or the probe drops offline', href: '/energy/tuya', admin: true },
   { id: 'makhlouf', in: 'energy', ico: '⚡', name: 'Makhlouf', desc: 'Maison M Naccache generator — load, peak demand and kWh from the power logger', href: '/makhlouf', admin: true },
   { id: 'links', ico: '🔗', name: 'Hub links', desc: 'Every link on the hub in one table — its icon, path, folder and which member credential opens it (admin, app key, share key, public)', href: '/links', admin: true },
   { id: 'dev', ico: '🛠️', name: 'Dev requests', desc: 'What the ✦ assistant could not do because it needs code — queued for Claude Code, drained from VS Code with /hub-dev-queue', href: '/dev', admin: true },
@@ -172,11 +172,11 @@ const APPS = [
   { id: 'whatsapp-archive', ico: '🗄️', name: 'WhatsApp', desc: 'Every line in one page — 03 165 168, 70 165 168 and the hub chats as the internal line; tick any of them; every chat since 2013 with photos and voice notes, read and reply', href: '/whatsapp', admin: true },
   { id: 'site', ico: `<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#25D366"/><path fill="#fff" d="M12 4.6a7.3 7.3 0 0 0-6.3 11l-1 3.7 3.8-1a7.3 7.3 0 1 0 3.5-13.7zm0 1.3a6 6 0 1 1-3.1 11.2l-.2-.1-2.2.6.6-2.1-.2-.3A6 6 0 0 1 12 5.9zm-2.4 2.6c-.2 0-.5.1-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 5 4.3 2.5 1 3 .8 3.5.7.5 0 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.4-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2 0-.4 0-.5L10.4 9c-.2-.5-.4-.5-.6-.5h-.2z"/></svg>`, name: 'Shift WhatsApp', desc: 'The site chat: text, photos, a voice note — receipts become ledger lines. Start and Finish with your location.', href: '/site' },
 ];
-const FOLDERS = { 'ajaltoun-4193': { ico: '📁', name: 'Ajaltoun 4193', path: '/ajaltoun4193' }, energy: { ico: '📁', name: 'Energy' } };
+const FOLDERS = { 'ajaltoun-4193': { ico: '📁', name: 'Ajaltoun 4193', path: '/ajaltoun4193' }, energy: { ico: '📁', name: 'Energy', path: '/energy' } };   // a page in a folder lives under the folder's path (/energy/tuya) — Mario 2026-10-20
 const esc = Admin.esc;
 // Mario, 2026-09-12: an app id isn't always its own URL (daily lives under /accounting/daily) —
 // the one-app redirect used to just prepend '/', which sent a daily-only member to the wrong page
-const APP_HREF = { decisions: '/decide', todo: '/todo', accounting: '/accounting', partners: '/partners', ajaltoun: '/ajaltoun', daily: '/accounting/daily', site: '/site', reports: '/reports', excavation: '/ajaltoun/excavation', crm: '/crm' };
+const APP_HREF = { decisions: '/decide', todo: '/todo', accounting: '/accounting', partners: '/ajaltoun4193/partners', ajaltoun: '/ajaltoun', daily: '/accounting/daily', site: '/site', reports: '/reports', excavation: '/ajaltoun4193/excavation', crm: '/crm' };
 
 // the bell: 🔔 on, 🔕 off, greyed when the browser refuses (Mario 2026-09-23: push notifications in the PWA)
 async function drawBell() {
