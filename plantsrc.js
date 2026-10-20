@@ -3,7 +3,7 @@
 //
 //   Bookstop   SOLARMAN 2596285, 3 × 12 kW Deye in parallel. EDL, the small generator (80 kW) and the big one (150 kW)
 //              come in on the GRID port through an ATS; each has its own frequency (memory bookstop-kaslique-solarman):
-//              EDL ≈ 50.0 Hz steady · big gen 48.3–49.4 Hz steady (≈ 218 V, the inverters take ≈ 24 kW from it) ·
+//              EDL ≈ 50.0 Hz steady · the big gen 49.3 Hz at its 24 kW, rising toward 50.5 Hz as the load drops ·
 //              small gen idles at 51.6–51.8 Hz and the inverters REFUSE it (import ≈ 0, the battery drains — 3 Oct 2026),
 //              loaded it hunts 48–50.7 Hz. Mario 2026-10-20: the refused one is the small gen; no kWh meters on site.
 //   McKinsey   DeyeCloud 61438093, 2 × 50 kW (M1 + S2). No EDL. One generator on the GEN port — 30 kVA now; history
@@ -21,7 +21,7 @@ const PLANTS = {
   bookstop: {
     name: 'Bookstop Kaslique', src: 'solarman', id: 2596285, kwp: 44.85, from: '2026-10-01', port: 'grid',
     lead: '3 × 12 kW Deye in parallel · EDL and two generators on one input through the ATS',
-    classes: { e: 'EDL', b: 'Big generator 150 kW', s: 'Small generator 80 kW', r: 'Small generator — refused' },
+    classes: { e: 'EDL', g: 'Generator (big or small)', r: 'Small generator — refused' },
   },
   mckinsey: {
     name: 'McKinsey Electronics', src: 'deye', id: 61438093, kwp: 120, from: '2026-10-01', port: 'gen',
@@ -50,11 +50,11 @@ function classify(key, rows) {
     if (r.v < 150) return 'o';
     if (r.hz > 51.3) return 'r';
     const w = rows.slice(Math.max(0, i - 2), i + 3).filter(x => x.v > 150 && x.hz > 40).map(x => x.hz).sort((a, b) => a - b);
-    if (!w.length) return 's';
-    const med = w[w.length >> 1], spread = w[w.length - 1] - w[0];
+    if (!w.length) return 'g';
     if (w.every(h => h >= 49.8 && h <= 50.2)) return 'e';
-    if (med >= 48.3 && med <= 49.4 && spread < 0.6) return 'b';
-    return 's';
+    // a generator's frequency follows its load (the big one: 49.3 Hz at 24 kW, 50.5 Hz at 4 kW) and the voltages overlap
+    // (218–231 V for both), so the two running generators are not told apart — one class (checked 2026-10-20, 1–20 Oct)
+    return 'g';
   }).join('');
 }
 
@@ -76,8 +76,9 @@ async function readDay(ctx, key, ymd) {
 }
 
 // one stored day → the figures the page shows
-function summary(key, d) {
+function summary(key, raw) {
   const cls = Object.keys(PLANTS[key].classes);
+  const d = key === 'bookstop' ? { ...raw, c: raw.c.replace(/[bs]/g, 'g') } : raw;   // days stored before 2026-10-20 split big / small
   const o = { pv: 0, load: 0, socMin: null, socMax: null, full: 0, n: d.t.length, src: {} };
   for (const k of cls) o.src[k] = { h: 0, in: 0, out: 0 };
   const dt = i => Math.min(600, (d.t[i + 1] || d.t[i] + 300) - d.t[i]) / 3600;   // hours this sample stands for (≤ 10 min)

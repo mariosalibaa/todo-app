@@ -42,7 +42,7 @@
   .note b{color:var(--text);font-weight:600;}
   .err{color:var(--red);font-size:.85rem;margin:10px 0;}
   .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
-  .c-e{background:#89b4fa;} .c-b{background:#cba6f7;} .c-s{background:#f38ba8;} .c-r{background:#fab387;} .c-g{background:#f38ba8;} .c-o{background:var(--surface1);}
+  .c-e{background:#89b4fa;} .c-b{background:#cba6f7;} .c-s{background:#f38ba8;} .c-g{background:#cba6f7;} .c-r{background:#fab387;} .c-o{background:var(--surface1);}
   /* the time view: one 24 h bar per day */
   .tl{padding:12px 14px 10px;max-height:560px;overflow-y:auto;}
   .tl .lg{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--sub);margin-bottom:10px;}
@@ -192,7 +192,8 @@
 
     $('note').innerHTML = (D.key === 'bookstop'
       ? `<b>How each source is recognised.</b> EDL and both generators reach the inverters through the ATS on one input; the inverter logs that input's voltage and frequency. ` +
-        `<b>EDL</b> holds a steady 50.0 Hz · the <b>big generator (150 kW)</b> a steady 48.3–49.4 Hz, and the inverters take up to about 24 kW from it · the <b>small generator (80 kW)</b> hunts between about 48 and 50.7 Hz when it is loaded, and with no load it runs fast, at 51.6–51.8 Hz — ` +
+        `<b>EDL</b> holds a steady 50.0 Hz, whatever the load. A <b>generator</b>'s frequency follows its load (the big one: about 49.3 Hz when the inverters take their 24 kW, rising toward 50.5 Hz as they take less), and the two generators' voltages overlap, so a running generator is shown as one — big or small. ` +
+        `The <b>small generator (80 kW)</b> has one clear mark: with no load it runs fast, at 51.6–52.4 Hz, and ` +
         `the inverters <b>refuse</b> it then (nothing comes in, the battery keeps draining). That is the orange stretch and the table above; the fix is the small generator's speed (governor), not a setting on the inverters.<br>`
       : `<b>The generator.</b> No EDL on this site; the generator is on the inverters' generator input, so every hour it ran and every kWh it gave is counted directly. ${D.history || ''}<br>`) +
       `<b>Battery full, sun up</b> = hours the battery sat at 99–100 % while the panels produced: the inverters hold the solar back then, because there is nowhere to put it. ` +
