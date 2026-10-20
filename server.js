@@ -171,6 +171,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'mechanical.html'));
   fs.readFileSync(path.join(__dirname, 'cars.html'));
   fs.readFileSync(path.join(__dirname, 'heater.html'));
+  fs.readFileSync(path.join(__dirname, 'links.html'));
   fs.readFileSync(path.join(__dirname, 'public/heater/moes-ms-103.jpg'));
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
@@ -764,6 +765,7 @@ const handler = async (req, res) => {
     'mahab.html': path.join(__dirname, 'mahab.html'),
     'tohme.html': path.join(__dirname, 'tohme.html'),
     'heater.html': path.join(__dirname, 'heater.html'),
+    'links.html': path.join(__dirname, 'links.html'),
     'khoder.html': path.join(__dirname, 'khoder.html'),
     'wa-outbox.html': path.join(__dirname, 'wa-outbox.html'),
     'makhlouf.html': path.join(__dirname, 'makhlouf.html'),
@@ -785,7 +787,8 @@ const handler = async (req, res) => {
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
     '/cars': 'cars.html',   // the cars' insurance + driving licences, expiry and days left; reminders from tools CarsWatch (Mario 2026-10-18)
-    '/heater': 'heater.html',   // the water heater's Tuya controller — temperature, the two channels, on/off; admins; HeaterWatch alerts (Mario 2026-10-19)
+    '/tuya': 'heater.html',   // the Tuya devices — the MOES probe in the water heater's box: temperature now + graph, the (unwired) relays; admins; HeaterWatch alerts (Mario 2026-10-19; /heater → /tuya 2026-10-20)
+    '/links': 'links.html',   // the register of every hub link — icon, path, who may open it (Mario 2026-10-20)
     '/usa': 'usa.html',   // Youssef's well pump (Maryland): order of work + photos of the sand fixes; PUBLIC, nothing private (Mario 2026-10-06)
     '/contacts': 'contacts.html',   // business cards → Mario's Google Contacts (Mario, 2026-10-18)
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
@@ -949,7 +952,15 @@ const handler = async (req, res) => {
       icons: [{ src: '/icons/hub-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icons/hub-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }] }));
     return;
   }
-  const page = PAGES[url] || (url === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
+  // everything Ajaltoun lives under /ajaltoun4193 (Mario, 2026-10-18): accounting/<tab>, partners, excavation, cameras.
+  // The pages keep their old keys above; an old link (/ajaltoun#budget, /partners, /ajaltoun/machines/loads) is sent to the new one.
+  const AJ = [[/^\/ajaltoun4193\/accounting(\/[a-z]+)?\/?$/, '/ajaltoun'], [/^\/ajaltoun4193\/partners\/?$/, '/partners'], [/^\/ajaltoun4193\/excavation(\/.*)?$/, '/ajaltoun/excavation$1'], [/^\/ajaltoun4193\/cameras(\/.*)?$/, '/ajaltoun/machines$1']];
+  let pu = url;
+  for (const [re, to] of AJ) if (re.test(pu)) { pu = pu.replace(re, to); break; }
+  if (url.split('?')[0] === '/heater') { res.writeHead(301, { Location: '/tuya' }); res.end(); return; }   // renamed 2026-10-20
+  const OLD = pu === '/ajaltoun' ? '/ajaltoun4193/accounting' : pu === '/partners' ? '/ajaltoun4193/partners' : /^\/ajaltoun\/excavation/.test(pu) ? pu.replace('/ajaltoun/excavation', '/ajaltoun4193/excavation') : /^\/ajaltoun\/machines/.test(pu) ? pu.replace('/ajaltoun/machines', '/ajaltoun4193/cameras') : '';
+  if (OLD && pu === url && PAGES[pu]) { res.writeHead(301, { Location: OLD + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
+  const page = PAGES[pu] || (pu === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
   if (page) {
     const html = withViewer(fs.readFileSync(FILE[page] || path.join(__dirname, page), 'utf8'), url === '/' ? '/' : url);
     res.writeHead(200, {
@@ -1168,6 +1179,47 @@ const handler = async (req, res) => {
     try { const v = await require('./plants').check({ db, TEAM_ID }, send); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(v)); }
     catch (e) { console.error('plants check error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
+  }
+  // /api/hub-links — the register behind /links: every tile of hub.html (its APPS array, read from the file so there is
+  // one list), plus the pages that have no tile (public hand-outs, share links) with the credential each one needs. Admins.
+  if (url.split('?')[0] === '/api/hub-links' && req.method === 'GET') {
+    const json = (code, v) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); };
+    const acc = await cprAccess();
+    if (!acc.isAdmin) return json(401, { error: 'admin' });
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'hub.html'), 'utf8');
+      const m = /const APPS = (\[[\s\S]*?\n\]);/.exec(html);
+      const tiles = m ? require('vm').runInNewContext('(' + m[1] + ')', {}) : [];
+      // pages that are not a tile: [path, icon, name, credential, note]
+      const extra = [
+        ['/', '🏠', 'Hub', 'signed-in', 'the tiles each member may open'],
+        ['/members', '👥', 'Members & access', 'admin', 'same file as the hub'],
+        ['/ask', '✅', 'Decisions desk', 'admin', "Mario's side of Decisions"],
+        ['/decide', '✅', 'Decisions', 'signed-in', 'a member sees only the questions put to him'],
+        ['/ajaltoun4193', '🏗️', 'Ajaltoun 4193 folder', 'signed-in', 'the folder tile on its own link'],
+        ['/ajaltoun4193/accounting', '🏗️', 'Ajaltoun accounting', 'key: ajaltoun', 'tabs: /dashboard /cashflow /cost /lines /boq …'],
+        ['/ajaltoun4193/excavation', '⛏️', 'Excavation', 'key: ajaltoun or excavation', '/diesel, /summary'],
+        ['/ajaltoun4193/cameras', '🚜', 'Cameras', 'key: ajaltoun or excavation', '/loads /diesel /flags /georges /bmw /tacoma /cars /plates /daily'],
+        ['/accounting/whish', '🧾', 'Whish grid', 'key: accounting', 'also /accounts /statements /transfers /wise /budget /dashboard /trial-balance'],
+        ['/naccache', '🏠', 'Naccache 900/4', 'public', 'hand-out for Maya, papers under /public/naccache'],
+        ['/rent-law', '⚖️', 'Rent law', 'public', 'papers under /public/rent-law'],
+        ['/usa', '🇺🇸', "Youssef's well pump", 'public', 'order of work + photos'],
+        ['/bonvin/shop', '🏪', 'Bonvin shop', 'public', "the renter's page: plans, photos"],
+        ['/cpr', '⚡', 'CPR energy', 'public (or CPR_PASSWORD)', 'no hub bar'],
+        ['/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
+        ['/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
+        ['/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in'],
+        ['/mahab', '☀', 'Mahab plant', 'admin or MAHAB_PASSWORD', ''],
+        ['/plants', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
+        ['/khoder', '👷', 'Khoder × Walid', 'share key ?k=', ''],
+        ['/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
+        ['/whatsapp', '🗄️', 'WhatsApp Archive', 'admin', 'through the laptop gateway'],
+        ['/app/<name>', '💻', 'Laptop apps', 'admin', 'photo-map, lead-hub, invoice-renamer, power-analyzer — wake the laptop'],
+        ['/heater', '🌡️', '(old) → /tuya', 'admin', 'redirects'],
+        ['/links', '🔗', 'This register', 'admin', ''],
+      ];
+      return json(200, { tiles, extra, apps: APPS });
+    } catch (e) { console.error('hub-links error:', e); return json(500, { error: e.message }); }
   }
   // /api/heater — the water heater's Tuya controller (heater.js). GET status + POST /set {code,value}: hub admins
   // (the session cookie, as cprAccess reads it). /check: the laptop task HeaterWatch every 10 min (ACCOUNTING_API_KEY)

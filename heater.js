@@ -35,7 +35,8 @@ async function status() {
   const s = Object.fromEntries((Array.isArray(st) ? st : d.status || []).map(x => [x.code, x.value]));
   return {
     id: d.id, name: d.name || 'Water Heater', online: !!d.online, product: d.product_name,
-    temp: typeof s.temp_current === 'number' ? s.temp_current / 10 : null,
+    // a reading outside 0–110 °C is a probe glitch (a −28.0 showed once on 2026-10-20 between two 28.0s) — shown as unknown, never stored
+    temp: typeof s.temp_current === 'number' && s.temp_current >= 0 && s.temp_current <= 1100 ? s.temp_current / 10 : null,
     humidity: s.humidity_value > 0 ? s.humidity_value : null,
     switches: { all: !!s.switch_all, ch1: !!s.switch_1, ch2: !!s.switch_2 },
     fault: s.fault || 0, raw: s,
@@ -96,7 +97,7 @@ async function check(ctx, send) {
   }
   st.at = new Date().toISOString();
   await ref.set(st);
-  if (msgs.length && send) await send(msgs.join('\n\n') + '\n\nhttps://hub.shift-group.co/heater');
+  if (msgs.length && send) await send(msgs.join('\n\n') + '\n\nhttps://hub.shift-group.co/tuya');
   return { ok: !!s, sent: msgs.length, temp: s && s.temp, switches: s && s.switches, error: st.lastError || undefined };
 }
 

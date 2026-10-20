@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Hub links · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root { --bg:#f7f5f0; --card:#fff; --ink:#1f1f1f; --muted:#666; --amber:#F2A93B; --line:#e6e2da; --soft:#fdf6e9; --red:#c0392b; --redbg:#fdecea; --green:#1e8449; --greenbg:#eafaf1; --blue:#1f5fa8; --bluebg:#e8f0fb; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Segoe UI",Tahoma,Arial,sans-serif; font-size:15px; line-height:1.5; }
+  .wrap { max-width:1100px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:18px; margin:28px 0 10px; }
+  .sub { color:var(--muted); font-size:14px; margin-bottom:18px; }
+  .hback { display:inline-block; color:var(--amber); text-decoration:none; font-size:14px; font-weight:600; padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); margin-bottom:14px; }
+  .tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  input[type=search] { padding:7px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; min-width:240px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { border-bottom:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--soft); font-weight:600; font-size:13px; white-space:nowrap; }
+  tr:last-child td { border-bottom:none; }
+  td.ico { font-size:22px; line-height:1; width:40px; text-align:center; } td.ico svg { width:26px; height:26px; }
+  td a { color:var(--blue); text-decoration:none; } td a:hover { text-decoration:underline; }
+  td small { display:block; color:var(--muted); font-size:12px; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
+  .admin { background:var(--redbg); color:var(--red); } .key { background:var(--bluebg); color:var(--blue); } .pub { background:var(--greenbg); color:var(--green); } .share { background:var(--soft); color:#8a6d1f; } .member { background:#eee; color:#444; }
+  .n { color:var(--muted); font-size:13px; }
+  @media (max-width:640px) {
+    thead { display:none; } table, tbody, tr, td { display:block; width:100%; }
+    tr { border-bottom:1px solid var(--line); padding:8px 4px; } td { border:none; padding:3px 10px; }
+    td.ico { text-align:left; width:auto; } td[data-l]::before { content:attr(data-l) " · "; color:var(--muted); font-size:12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="hback" href="/">‹ Back to the hub</a>
+  <h1>Hub links</h1>
+  <div class="sub">Every link on hub.shift-group.co with its icon and the member credential that opens it. Tiles come straight from the hub page's own list, so a new tile shows here on its own; the pages without a tile are listed underneath.</div>
+  <div class="tools"><input type="search" id="q" placeholder="filter by name, path or credential" oninput="draw()"><span class="n" id="count"></span></div>
+
+  <h2>Tiles</h2>
+  <div class="card"><table>
+    <thead><tr><th></th><th>Name</th><th>Link</th><th>Folder</th><th>Who may open it</th><th>What it is</th></tr></thead>
+    <tbody id="tiles"></tbody>
+  </table></div>
+
+  <h2>Pages without a tile</h2>
+  <div class="card"><table>
+    <thead><tr><th></th><th>Name</th><th>Link</th><th>Who may open it</th><th>Note</th></tr></thead>
+    <tbody id="extra"></tbody>
+  </table></div>
+  <p class="n">Credentials: <span class="pill admin">admin</span> hub admins only · <span class="pill key">key</span> a member given that app in Members &amp; access · <span class="pill member">signed-in</span> any member · <span class="pill share">share key</span> a link with its key, no sign-in · <span class="pill pub">public</span> anyone.</p>
+</div>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let DATA = null;
+// the same rule as the hub's renderTiles: admin:true → admins; key:[…] → any of those app keys; only → that key without the full app;
+// everyone → every signed-in member; otherwise the tile's own id is the app key
+function cred(t) {
+  if (t.admin) return ['admin', 'admin'];
+  if (t.everyone) return ['member', 'signed-in'];
+  const keys = t.key || [t.id];
+  return ['key', 'key: ' + keys.join(' or ') + (t.only ? ' (only)' : '')];
+}
+function pillOf(text) {
+  const c = /^admin/.test(text) ? 'admin' : /^key/.test(text) ? 'key' : /^share/.test(text) ? 'share' : /^public/.test(text) ? 'pub' : 'member';
+  return `<span class="pill ${c}">${esc(text)}</span>`;
+}
+function icon(t) { return typeof t === 'string' && t.trim().startsWith('<svg') ? t : esc(t || '—'); }
+function draw() {
+  if (!DATA) return;
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const hit = s => !q || s.toLowerCase().includes(q);
+  let folder = '', n = 0;
+  const rows = [];
+  for (const t of DATA.tiles) {
+    if (t.folder) { folder = t.folder; continue; }
+    const [, c] = cred(t), link = t.href || '', alt = t.adminHref ? ` <small>admins: ${esc(t.adminHref)}</small>` : '';
+    if (!hit(`${t.name} ${link} ${c} ${t.desc || ''} ${t.in || ''}`)) continue;
+    n++;
+    rows.push(`<tr><td class="ico">${icon(t.ico)}</td><td data-l="Name"><b>${esc(t.name)}</b></td><td data-l="Link"><a href="${esc(link)}">${esc(link)}</a>${alt}</td><td data-l="Folder">${esc(t.in || '')}</td><td data-l="Who">${pillOf(c)}</td><td class="n">${esc(t.desc || '')}</td></tr>`);
+  }
+  document.getElementById('tiles').innerHTML = rows.join('') || '<tr><td colspan="6" class="n">nothing matches</td></tr>';
+  const ex = DATA.extra.filter(([p, , name, c, note]) => hit(`${name} ${p} ${c} ${note}`));
+  document.getElementById('extra').innerHTML = ex.map(([p, ico, name, c, note]) => `<tr><td class="ico">${icon(ico)}</td><td data-l="Name"><b>${esc(name)}</b></td><td data-l="Link"><a href="${esc(p)}">${esc(p)}</a></td><td data-l="Who">${pillOf(c)}</td><td class="n">${esc(note)}</td></tr>`).join('') || '<tr><td colspan="5" class="n">nothing matches</td></tr>';
+  document.getElementById('count').textContent = `${n} tiles · ${ex.length} other pages`;
+}
+fetch('/api/hub-links', { credentials: 'same-origin' }).then(async r => {
+  if (r.status === 401) { document.getElementById('tiles').innerHTML = '<tr><td colspan="6">Sign in to the Shift Hub first (admins only) — <a href="/">open the hub</a>.</td></tr>'; return; }
+  DATA = await r.json(); draw();
+}).catch(e => { document.getElementById('tiles').innerHTML = `<tr><td colspan="6">${esc(e.message)}</td></tr>`; });
+</script>
+<script src="/phone-preview.js"></script>
+</body>
+</html>
