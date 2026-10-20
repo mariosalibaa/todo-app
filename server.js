@@ -174,6 +174,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'heater.html'));
   fs.readFileSync(path.join(__dirname, 'links.html'));
   fs.readFileSync(path.join(__dirname, 'ewelink.html'));
+  fs.readFileSync(path.join(__dirname, 'graph-hover.js'));
   fs.readFileSync(path.join(__dirname, 'public/heater/moes-ms-103.jpg'));
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
@@ -1000,7 +1001,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/plant-crumbs.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js', '/sticky-head.js', '/theme.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/plant-crumbs.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js', '/sticky-head.js', '/theme.js', '/graph-hover.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url) || /^\/public\/heater\/[\w.-]+\.jpg$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {

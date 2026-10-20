@@ -99,7 +99,8 @@ function chartSvg(pts, daily) {
     const ds = daily.filter(d => d.t + 864e5 >= t0);
     const top = ds.map((d, i) => `${i ? 'L' : 'M'}${x(d.t + 432e5).toFixed(1)},${y(d.max).toFixed(1)}`).join(''), bot = ds.slice().reverse().map(d => `L${x(d.t + 432e5).toFixed(1)},${y(d.min).toFixed(1)}`).join('');
     g += `<path class="area" style="opacity:.25" d="${top}${bot}Z"/><path class="line" d="${top}"/><path class="line" style="stroke:var(--blue)" d="${ds.map((d, i) => `${i ? 'L' : 'M'}${x(d.t + 432e5).toFixed(1)},${y(d.min).toFixed(1)}`).join('')}"/>`;
-    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${g}</svg>`;
+    const hp = ds.map(d => [x(d.t + 432e5), y(d.max), `${new Date(d.t + 432e5).toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', weekday: 'short', day: 'numeric', month: 'short' })}<br>max <b>${d.max.toFixed(1)} °C</b> · min <b>${d.min.toFixed(1)} °C</b>`]);
+    return `<svg class="g-hover" data-vb="${W} ${H}" data-pts='${JSON.stringify(hp).replace(/'/g, '&#39;')}' viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${g}</svg>`;
   }
   const x = t => L + (t - t0) / (t1 - t0) * (W - L - R), y = c => T + (hi - c) / (hi - lo) * (H - T - B);
   let g = ''; const step = hi - lo > 40 ? 10 : 5;
@@ -120,7 +121,8 @@ function chartSvg(pts, daily) {
   }
   const last = pts[pts.length - 1];
   g += `<circle class="dot" cx="${x(last.t)}" cy="${y(last.c)}" r="3.5"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${g}</svg>`;
+  const hp = pts.map(p => [+x(p.t).toFixed(1), +y(p.c).toFixed(1), `${when(p.t)}<br><b>${p.c.toFixed(1)} °C</b>`]);
+  return `<svg class="g-hover" data-vb="${W} ${H}" data-pts='${JSON.stringify(hp).replace(/'/g, '&#39;')}' viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${g}</svg>`;
 }
 function paintGraphs() {
   const probed = DEVS.filter(d => d.temp != null || d.sensor || (HIST[d.id] || []).length || CLOUD[d.id]);
@@ -133,6 +135,7 @@ function paintGraphs() {
       : (pts.length ? `${pts.length} points · low ${Math.min(...cs).toFixed(1)} °C · high ${Math.max(...cs).toFixed(1)} °C · last ${when(pts[pts.length - 1].t)} · hourly from eWeLink's history, then our 10-min samples` : '');
     return `<div class="gcard"><h3>${esc(d.name)}<small>${esc(d.sensor || '')}${d.temp != null ? ' · now ' + d.temp.toFixed(1) + ' °C' : ''}</small></h3>${chartSvg(pts, ds)}<div class="gnote">${note}</div></div>`;
   }).join('') || '<div class="gnote">No device with a probe.</div>';
+  if (window.GraphHover) GraphHover.attachAll($('graphs'));
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { days = +b.dataset.d; document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); load(); }));
 async function load() {
@@ -164,6 +167,7 @@ load(); setInterval(() => { if (!busy && !document.hidden) load(); }, 30000);
 setInterval(() => { const n = $('next'); if (n) n.textContent = Math.max(0, 30 - Math.round((Date.now() - lastRead) / 1000)); }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 </script>
+<script src="/graph-hover.js"></script>
 <script src="/phone-preview.js"></script>
 </body>
 </html>

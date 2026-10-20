@@ -153,6 +153,10 @@ function chart(pts) {
   const last = pts[pts.length - 1];
   g += `<circle class="dot" cx="${x(last.t)}" cy="${y(last.c)}" r="3.5"/>`;
   svg.innerHTML = g;
+  const hhmm = t => new Date(t).toLocaleString('en-GB', { timeZone: 'Asia/Beirut', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  svg.classList.add('g-hover'); svg.dataset.vb = `${W} ${H}`;
+  svg.dataset.pts = JSON.stringify(pts.map(p => [+x(p.t).toFixed(1), +y(p.c).toFixed(1), `${hhmm(p.t)}<br><b>${p.c.toFixed(1)} °C</b>`]));
+  if (window.GraphHover) GraphHover.attach(svg);
   const min = Math.min(...cs), max = Math.max(...cs);
   $('cnote').textContent = `${pts.length} points · low ${min.toFixed(1)} °C · high ${max.toFixed(1)} °C · each point = the median of the probe's reports in a 10-minute slot (the probe also throws stray values, which are dropped) · from Tuya's report log, kept 14 days`;
 }
@@ -183,6 +187,7 @@ document.querySelectorAll('button[data-c]').forEach(b => b.addEventListener('cli
 load(); setInterval(() => { if (!busy && !document.hidden) load(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 </script>
+<script src="/graph-hover.js"></script>
 <script src="/phone-preview.js"></script>
 </body>
 </html>
