@@ -146,6 +146,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'dashboard.html'));
   fs.readFileSync(path.join(__dirname, 'ledgers.js'));
   fs.readFileSync(path.join(__dirname, 'admin-shared.js'));
+  fs.readFileSync(path.join(__dirname, 'plant-crumbs.js'));
   fs.readFileSync(path.join(__dirname, 'media-viewer.js'));
   fs.readFileSync(path.join(__dirname, 'install.js'));
   fs.readFileSync(path.join(__dirname, 'sticky-head.js'));
@@ -802,17 +803,17 @@ const handler = async (req, res) => {
     '/bonvin/shop': 'bonvin-shop.html',   // the same shop for a renter: plans, photos, office layout — PUBLIC, nothing private
     '/energy/plants': 'hub.html',   // the Plants folder inside Energy (Mario 2026-10-20) — the master list is /energy/plants/all
     '/energy/plants/all': 'plants.html',   // every plant (was /plants, then /energy/plants); ?src=&id=&k= = one plant, read-only share link   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
-    '/energy/makhlouf': 'makhlouf.html',   // (was /makhlouf)   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
+    '/energy/plants/makhlouf': 'makhlouf.html',   // (was /makhlouf)   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
     '/whatsapp-outbox': 'wa-outbox.html',   // WhatsApp messages queued while the laptop is off (Mario 2026-10-07)
     '/dev': 'dev.html',   // the dev queue: what the ✦ assistant could not do because it needs code; Claude Code drains it (Mario 2026-10-07)
     '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
     '/energy/plants/mahab/report': 'mahab-report.html',   // one month on two A4 pages for the owners + the generator supplier, ?m=YYYY-MM — PUBLIC like the page (Mario 2026-10-20)
     '/energy/plants/mahab': 'mahab.html',   // (was /mahab, then /energy/mahab; inside Plants since 2026-10-20 — Mario: "place mahab inside plants, adjust the link") Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
-    '/energy/tohme': 'tohme.html',   // (was /tohme)   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025; PUBLIC, no sign-in (Mario 2026-10-13)
-    '/energy/cpr': 'cpr.html',   // (was /cpr)   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
+    '/energy/plants/tohme': 'tohme.html',   // (was /tohme)   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025; PUBLIC, no sign-in (Mario 2026-10-13)
+    '/energy/plants/cpr': 'cpr.html',   // (was /cpr)   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
-    '/energy/cpr/dynamic': 'cpr-dynamic.html',   // (was /cpr/dynamic)   // big generator fuel vs Cummins datasheet — PUBLIC snapshot for the supplier, no prices (Mario 2026-10-03)
-    '/energy/cpr/diesel': 'cpr-fuel.html' };   // (was /cpr/diesel)   // Kamal's diesel fills (private link: /cpr/diesel?k=CPR_FUEL_KEY)   // CPR energy — kWh per building / source per month; PUBLIC, no sign-in, no hub bar (Mario, 2026-09-26: "open for everyone")
+    '/energy/plants/cpr/dynamic': 'cpr-dynamic.html',   // (was /cpr/dynamic)   // big generator fuel vs Cummins datasheet — PUBLIC snapshot for the supplier, no prices (Mario 2026-10-03)
+    '/energy/plants/cpr/diesel': 'cpr-fuel.html' };   // (was /cpr/diesel)   // Kamal's diesel fills (private link: /cpr/diesel?k=CPR_FUEL_KEY)   // CPR energy — kWh per building / source per month; PUBLIC, no sign-in, no hub bar (Mario, 2026-09-26: "open for everyone")
   // /whatsapp — the WhatsApp Archive (whatsapp-local on Mario's laptop, 2013 → today, refreshed from
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
   // the archive-daemon heartbeat (meta/whatsappArchive) and the short-lived token it gets is signed
@@ -966,10 +967,10 @@ const handler = async (req, res) => {
   let pu = url;
   for (const [re, to] of AJ) if (re.test(pu)) { pu = pu.replace(re, to); break; }
   if (/^\/(heater|tuya)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy/tuya' }); res.end(); return; }   // renamed 2026-10-20
-  // the Energy folder's pages moved under /energy on 2026-10-20 (folder rule) — the flat links, share links included (?k=, ?src=&id=&k=), go on working
-  if (/^\/(cpr|cpr\/dynamic|cpr\/diesel|tohme|makhlouf|makhlouf\/offer\.pdf)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy' + req.url }); res.end(); return; }
-  // Mahab lives in the Plants folder (2026-10-20): /mahab and /energy/mahab (+ /report) go on working
-  { const m = /^\/(?:energy\/)?mahab(\/report)?$/.exec(url.split('?')[0]); if (m) { res.writeHead(301, { Location: '/energy/plants/mahab' + (m[1] || '') + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; } }
+  // every plant lives in Energy › Plants (Mario 2026-10-20: "all the plants should be under this link, ex /energy/plants/cpr");
+  // the older links — /cpr, /energy/cpr, /mahab, /energy/mahab, /tohme, /makhlouf… with their sub-pages and share queries — go on working
+  { const m = /^\/(?:energy\/)?(cpr(?:\/dynamic|\/diesel)?|tohme|makhlouf(?:\/offer\.pdf)?|mahab(?:\/report)?)$/.exec(url.split('?')[0]);
+    if (m) { res.writeHead(301, { Location: '/energy/plants/' + m[1] + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; } }
   // /plants (and /energy/plants with a share query) → the master list at /energy/plants/all; bare /energy/plants is the folder
   if (url.split('?')[0] === '/plants' || (url.split('?')[0] === '/energy/plants' && /[?&](src|id|k|s)=/.test(req.url))) { res.writeHead(301, { Location: '/energy/plants/all' + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const OLD = pu === '/ajaltoun' ? '/ajaltoun4193/accounting' : pu === '/partners' ? '/ajaltoun4193/partners' : /^\/ajaltoun\/excavation/.test(pu) ? pu.replace('/ajaltoun/excavation', '/ajaltoun4193/excavation') : /^\/ajaltoun\/machines/.test(pu) ? pu.replace('/ajaltoun/machines', '/ajaltoun4193/cameras') : '';
@@ -988,7 +989,7 @@ const handler = async (req, res) => {
   // /makhlouf/offer.pdf — the offer to Maison M: rev 2, 14 Oct 2026, generator carries the EDL hours too (public/makhlouf/offer-20261014.pdf;
   // rev 1 of 13 Oct with EDL 4.8 h/day kept as offer-20261013.pdf). Admins only,
   // by the session cookie like /app/<key>; sits before the static whitelist, which would 404 it.
-  if (url.split('?')[0] === '/energy/makhlouf/offer.pdf' && req.method === 'GET') {
+  if (url.split('?')[0] === '/energy/plants/makhlouf/offer.pdf' && req.method === 'GET') {
     const u = await verifyToken(req);
     const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
     if (!acc || !acc.admin) { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Sign in to the Shift Hub first (admins only).'); return; }
@@ -999,7 +1000,7 @@ const handler = async (req, res) => {
   // Static files — an explicit whitelist: the folder also holds the Firebase
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
-    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js', '/sticky-head.js', '/theme.js']);
+    const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/plant-crumbs.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js', '/sticky-head.js', '/theme.js']);
     const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url) || /^\/public\/heater\/[\w.-]+\.jpg$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
@@ -1219,16 +1220,16 @@ const handler = async (req, res) => {
         ['/rent-law', '⚖️', 'Rent law', 'public', 'papers under /public/rent-law'],
         ['/usa', '🇺🇸', "Youssef's well pump", 'public', 'order of work + photos'],
         ['/bonvin/shop', '🏪', 'Bonvin shop', 'public', "the renter's page: plans, photos"],
-        ['/energy/cpr', '⚡', 'CPR energy', 'public (or CPR_PASSWORD)', 'no hub bar; /cpr redirects'],
-        ['/energy/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
-        ['/energy/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
-        ['/energy/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
+        ['/energy/plants/cpr', '⚡', 'CPR energy', 'public (or CPR_PASSWORD)', 'no hub bar; /cpr redirects'],
+        ['/energy/plants/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
+        ['/energy/plants/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
+        ['/energy/plants/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
         ['/energy/plants/mahab', '☀', 'Mahab plant', 'public', 'no sign-in since 2026-10-20; /mahab and /energy/mahab redirect'],
         ['/energy/plants/mahab/report', '📄', 'Mahab month report (A4 / PDF)', 'public', '?m=YYYY-MM; owners + generator supplier'],
         ['/energy/plants', '📁', 'Plants folder (inside Energy)', 'signed-in', 'Mahab, Tohme, CPR, Makhlouf, All plants'],
         ['/energy/plants/all', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
         ['/khoder', '👷', 'Khoder × Walid', 'share key ?k=', ''],
-        ['/energy/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
+        ['/energy/plants/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
         ['/whatsapp', '🗄️', 'WhatsApp Archive', 'admin', 'through the laptop gateway'],
         ['/app/<name>', '💻', 'Laptop apps', 'admin', 'photo-map, lead-hub, invoice-renamer, power-analyzer — wake the laptop'],
         ['/energy', '📁', 'Energy folder', 'signed-in', 'the folder tile on its own link'],
@@ -1364,7 +1365,7 @@ const handler = async (req, res) => {
     return;
   }
   if (url.split('?')[0] === '/api/mahab' && req.method === 'GET') {
-    // PUBLIC, no sign-in, no password (Mario 2026-10-20: "remove the password" → anyone with the link, like /energy/tohme);
+    // PUBLIC, no sign-in, no password (Mario 2026-10-20: "remove the password" → anyone with the link, like /energy/plants/tohme);
     // isAdmin only shows the Hub link. MAHAB_PASSWORD and /api/mahab/login are no longer used.
     const acc = await cprAccess();
     try { const v = await require('./mahab').days({ db, TEAM_ID }); v.isAdmin = acc.isAdmin; res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }

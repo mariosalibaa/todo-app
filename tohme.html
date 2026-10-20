@@ -103,7 +103,7 @@
   async function load() {
     const r = await fetch('/api/tohme', { credentials: 'same-origin' });
     D = await r.json();
-    if (D.isAdmin) $('hubLink').hidden = false;
+    if (D.isAdmin && !document.getElementById('plantCrumbs')) $('hubLink').hidden = false;
     $('app').hidden = false;
     if (D.error) $('err').textContent = 'DeyeCloud not reachable right now (' + D.error + ') — showing the stored days.';
     const ys = [...new Set(D.days.map(d => d.slice(0, 4)))];
@@ -267,5 +267,6 @@
 })();
 </script>
 <script src="/phone-preview.js"></script>   <!-- the 📱 button on a laptop (Shift+P); nothing on a phone -->
+<script src="/plant-crumbs.js" data-name="Tohme"></script>
 </body>
 </html>
