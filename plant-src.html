@@ -92,8 +92,8 @@
     <div class="card tl" id="time"></div>
     <p class="lead noprint" id="tip"></p>
     </div>
-    <h2 class="mh">Day by day</h2>
-    <div class="card"><table id="dayT"></table></div>
+    <div id="dayBox"><h2 class="mh">Day by day</h2>
+    <div class="card"><table id="dayT"></table></div></div>
     <div class="note" id="note"></div>
   </div>
 </main>
@@ -186,7 +186,8 @@
     }
     $('time').innerHTML = tl + ax;
 
-    // day by day
+    // day by day — not for McKinsey either (Mario 2026-10-20: "remove for mckinsey")
+    $('dayBox').hidden = D.key === 'mckinsey';
     let dt = `<tr><th>Day</th><th>Solar</th><th>Load</th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>h · in${D.port === 'grid' ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>min–max %</small></th><th>Full<small>h</small></th></tr>`;
     for (const d of days.slice().reverse()) { const s = D.days[d];
       dt += `<tr><td>${dd(d)}${d === D.today ? '<small>so far</small>' : ''}${s.n < 250 && d !== D.today ? '<small>' + s.n + ' readings</small>' : ''}</td><td>${f1(s.pv)}</td><td>${f1(s.load)}</td>` +
