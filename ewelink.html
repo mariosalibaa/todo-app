@@ -31,6 +31,7 @@
   .tg::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:left .2s;}
   .tg.on{background:var(--amber);} .tg.on::after{left:27px;} .tg:disabled{opacity:.5;cursor:default;}
   .msg{color:var(--red);font-size:.82rem;margin:8px 0 12px;min-height:1.2em;}
+  .upd{color:var(--sub);font-size:.78rem;margin:-6px 0 10px;} .upd b{color:var(--text);font-weight:600;}
   .chead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:18px 0 8px;}
   .chead h2{font-size:.95rem;font-weight:600;margin:0;}
   .tabs{display:flex;gap:4px;} .tabs button{background:var(--base);color:var(--sub);border:1px solid var(--surface0);border-radius:999px;padding:4px 11px;font-size:.75rem;font-family:inherit;cursor:pointer;}
@@ -53,6 +54,7 @@
 <main>
   <h1>eWeLink — the Sonoff devices</h1>
   <p class="lead">Every Sonoff on the eWeLink account, live: its switch, and the water temperature where a probe is fitted (THR316D / TH16). Admins only. The MOES probe on the water heater is on the <a href="/energy/tuya">Tuya page</a>.</p>
+  <div class="upd" id="upd">—</div>
   <div class="card" id="list"><div id="signin">Sign in to the Shift Hub first (admins only) — <a href="/">open the hub</a>.</div></div>
   <div class="msg" id="msg"></div>
   <div class="chead"><h2>Temperature history</h2><div class="tabs"><button data-d="1" class="on">24 h</button><button data-d="3">3 d</button><button data-d="7">7 d</button><button data-d="14">14 d</button></div></div>
@@ -62,14 +64,18 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let busy = false, DEVS = [];
+let busy = false, DEVS = [], HIST = {};
+// Beirut time; adds the day when it is not today
+const when = ms => { const d = new Date(ms), o = { timeZone: 'Asia/Beirut' }; const today = new Date().toLocaleDateString('en-GB', o) === d.toLocaleDateString('en-GB', o);
+  return d.toLocaleTimeString('en-GB', { ...o, hour: '2-digit', minute: '2-digit' }) + (today ? '' : ' on ' + d.toLocaleDateString('en-GB', { ...o, day: 'numeric', month: 'short' })); };
 function row(d) {
   const t = d.temp == null ? '' : `<div class="temp">${d.temp.toFixed(1)}°<small>${esc(d.sensor || 'probe')}${d.humidity != null ? ' · ' + d.humidity + '%' : ''}</small></div>`;
   const sw = d.switch == null ? '' : `<span class="state ${d.switch ? 'on' : ''}">${d.switch ? 'ON' : 'OFF'}</span><button class="tg ${d.switch ? 'on' : ''}" data-id="${esc(d.id)}" role="switch" aria-checked="${d.switch}" aria-label="${esc(d.name)}" ${d.online ? '' : 'disabled'}></button>`;
-  return `<div class="dev" style="${d.online ? '' : 'opacity:.55'}"><div class="n">${esc(d.name)}<small>${esc(d.model || '')}${d.shared ? ' · shared with me' : ''}${d.online ? '' : ' · <span class="pill off">OFFLINE</span>'}</small></div><div class="right">${t}${sw}</div></div>`;
+  const h = HIST[d.id] || [], lastSeen = !d.online && h.length ? ' · last reading ' + when(h[h.length - 1].t) : '';
+  return `<div class="dev" style="${d.online ? '' : 'opacity:.55'}"><div class="n">${esc(d.name)}<small>${esc(d.model || '')}${d.shared ? ' · shared with me' : ''}${d.online ? '' : ' · <span class="pill off">OFFLINE</span>' + lastSeen}</small></div><div class="right">${t}${sw}</div></div>`;
 }
 function paint() { $('list').innerHTML = DEVS.map(row).join('') || '<div class="dev">No devices on this eWeLink account.</div>'; }
-let days = 1, HIST = {};
+let days = 1;
 function chartSvg(pts) {
   const W = 640, H = 170, L = 38, R = 10, T = 10, B = 24;
   if (!pts || pts.length < 2) return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><text class="lbl" x="${W / 2}" y="${H / 2}" text-anchor="middle">${pts && pts.length === 1 ? 'one sample so far — the line starts with the next one' : 'no samples yet — HeaterWatch adds one every 10 minutes'}</text></svg>`;
@@ -100,7 +106,7 @@ function paintGraphs() {
   const probed = DEVS.filter(d => d.temp != null || (HIST[d.id] || []).length);
   $('graphs').innerHTML = probed.map(d => {
     const pts = HIST[d.id] || [], cs = pts.map(p => p.c);
-    const note = pts.length ? `${pts.length} samples · low ${Math.min(...cs).toFixed(1)} °C · high ${Math.max(...cs).toFixed(1)} °C` : '';
+    const note = pts.length ? `${pts.length} samples · low ${Math.min(...cs).toFixed(1)} °C · high ${Math.max(...cs).toFixed(1)} °C · last sample ${when(pts[pts.length - 1].t)}` : '';
     return `<div class="gcard"><h3>${esc(d.name)}<small>${esc(d.sensor || '')}${d.temp != null ? ' · now ' + d.temp.toFixed(1) + ' °C' : ''}</small></h3>${chartSvg(pts)}<div class="gnote">${note}</div></div>`;
   }).join('') || '<div class="gnote">No device with a probe.</div>';
 }
@@ -112,6 +118,8 @@ async function load() {
     const v = await r.json();
     if (v.error) { $('msg').textContent = v.error; return; }
     $('msg').textContent = ''; DEVS = v.devices; HIST = v.history || {}; paint(); paintGraphs();
+    const on = DEVS.filter(d => d.online).length;
+    $('upd').innerHTML = `Last read from the eWeLink cloud at <b>${when(new Date(v.at).getTime())}</b> · ${on} of ${DEVS.length} online · the cloud gives no per-device time, so an offline device shows its last stored reading`;
   } catch (e) { $('msg').textContent = 'Could not reach eWeLink: ' + e.message; }
 }
 $('list').addEventListener('click', async e => {
