@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taan · Machmouchi — monthly energy report · Shift Group</title>
+<link rel="icon" href="/icons/hub-192.png">
+<!-- One month of the Taan / Machmouchi plant on two A4 pages, for the owners and the generator supplier
+     (Mario 2026-10-20: "prepare a summary page per month; pdf so I can share it"). Same look as the May–Aug report
+     (Dropbox …\mahab machmouche\20260903 Taan-Machmouchi solar report May-Aug 2026.pdf). Reads the public /api/mahab;
+     ?m=YYYY-MM picks the month (default: this month, finished days only). Print → PDF from the browser or headless Edge. -->
+<style>
+  :root{--navy:#1f3864;--amber:#F2A93B;--ink:#1f2328;--sub:#5f6670;--line:#d9dde3;--soft:#f5f6f8;--g1:#e0607e;--g2:#9d7ad6;--edl:#4a8fd9;--sol:#F2A93B;}
+  @page{size:A4;margin:14mm 14mm 12mm;}
+  *{box-sizing:border-box;}
+  html,body{background:#fff;}
+  body{margin:0;color:var(--ink);font-family:"Century Gothic",CenturyGothic,AppleGothic,"Segoe UI",system-ui,sans-serif;font-size:10.5pt;line-height:1.45;}
+  .bar{position:sticky;top:0;background:#15181C;color:#fff;padding:8px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.85rem;z-index:5;}
+  .bar select,.bar button{font:inherit;padding:5px 10px;border-radius:6px;border:1px solid #444;background:#222;color:#fff;cursor:pointer;}
+  .bar button{background:var(--amber);color:#15181C;border-color:var(--amber);font-weight:600;}
+  .bar a{color:var(--amber);text-decoration:none;margin-left:auto;}
+  .page{max-width:182mm;margin:0 auto;padding:16px 0 30px;}
+  .sheet+.sheet{page-break-before:always;break-before:page;margin-top:28px;}
+  .rule{height:4px;background:var(--amber);margin-bottom:12px;}
+  h1{color:var(--navy);font-size:19pt;margin:0 0 4px;line-height:1.15;}
+  .meta{color:var(--sub);font-size:9pt;margin-bottom:12px;}
+  h2{color:var(--navy);font-size:10.5pt;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 6px;}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:4px 0 6px;}
+  .kpi{border:1px solid var(--line);border-top:3px solid var(--amber);padding:7px 9px;}
+  .kpi b{display:block;color:var(--navy);font-size:15pt;line-height:1.1;}
+  .kpi span{font-size:7.2pt;color:var(--sub);text-transform:uppercase;letter-spacing:.03em;}
+  table{width:100%;border-collapse:collapse;font-size:8.8pt;}
+  th{background:var(--navy);color:#fff;font-weight:600;text-align:right;padding:5px 6px;}
+  th small{display:block;font-weight:400;font-size:6.8pt;opacity:.85;}
+  td{padding:4px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+  th:first-child,td:first-child{text-align:left;}
+  td:first-child{color:var(--navy);font-weight:600;}
+  tr.tot td{font-weight:700;background:var(--soft);border-top:2px solid var(--navy);}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0;}
+  p{margin:5px 0;}
+  .note{font-size:8.6pt;color:#333;}
+  .note li{margin:2px 0;}
+  .daily td,.daily th{padding:2.5px 4px;font-size:7.6pt;}
+  .daily td:first-child{font-weight:600;}
+  .daily .g1{color:#b5344f;} .daily .g2{color:#6c47ad;} .daily .ed{color:#2a69ad;}
+  .tl{margin-top:4px;}
+  .tl .r{display:grid;grid-template-columns:44px 1fr;gap:6px;align-items:center;margin:1.5px 0;font-size:7pt;color:var(--sub);}
+  .tl .b{position:relative;height:9px;background:#eef0f3;}
+  .tl .b i{position:absolute;top:0;bottom:0;}
+  .tl .ax{position:relative;height:11px;font-size:6.5pt;color:var(--sub);}
+  .tl .ax s{position:absolute;transform:translateX(-50%);text-decoration:none;}
+  .s-gen1{background:var(--g1);} .s-gen2{background:var(--g2);} .s-edl{background:var(--edl);} .s-off{background:#c9ccd2;}
+  .foot{display:flex;justify-content:space-between;color:var(--sub);font-size:7.5pt;border-top:1px solid var(--line);padding-top:5px;margin-top:12px;}
+  .err{color:#b00020;padding:20px;}
+  @media print{ .bar{display:none;} .page{padding:0;max-width:none;} .sheet+.sheet{margin-top:0;} }
+  @media (max-width:640px){ .kpis{grid-template-columns:1fr 1fr;} .page{padding:12px 16px;} table{font-size:8pt;} }
+</style>
+</head>
+<body>
+<div class="bar"><span>Month</span><select id="m"></select><button id="pr">Print / save as PDF</button><a href="/energy/mahab">‹ Plant page</a></div>
+<div class="page" id="out"><p style="color:#5f6670">Loading…</p></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const MO = MONTHS.map(m => m.slice(0, 3));
+  const n0 = v => v == null ? '' : Math.round(v).toLocaleString('en-US');
+  const n1 = v => v == null ? '' : (Math.round(v * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const dday = d => `${+d.slice(8, 10)} ${MO[+d.slice(5, 7) - 1]}`;
+  const SRC = [['gen1', 'Generator 1', 'meter 0717'], ['gen2', 'Generator 2', 'meter 0719 (A)'], ['edl', 'EDL', 'meter 426955']];
+
+  $('pr').onclick = () => window.print();
+  fetch('/api/mahab').then(r => r.json()).then(render).catch(e => { $('out').innerHTML = `<p class="err">Could not load the plant data (${e.message}).</p>`; });
+
+  function render(D) {
+    const S = D.sources; if (!S) { $('out').innerHTML = '<p class="err">The source split is not available right now — try again in a minute.</p>'; return; }
+    const today = D.today, months = [...new Set(Object.keys(S.days).filter(d => d < today).map(d => d.slice(0, 7)))].sort().reverse();
+    const want = new URLSearchParams(location.search).get('m'), m = months.includes(want) ? want : months[0];
+    $('m').innerHTML = months.map(k => `<option value="${k}"${k === m ? ' selected' : ''}>${MONTHS[+k.slice(5) - 1]} ${k.slice(0, 4)}</option>`).join('');
+    $('m').onchange = () => { location.search = '?m=' + $('m').value; };
+    const fi = D.fields.reduce((o, f, i) => (o[f] = i, o), {});
+    const days = Object.keys(S.days).filter(d => d.startsWith(m) && d < today).sort();
+    const plant = d => { const i = D.days.indexOf(d), a = i >= 0 ? D.data[i] : null; return a ? { pv: a[fi.pv], use: a[fi.use], dis: a[fi.discharge], n: a[fi.n] } : {}; };
+    const T = { pv: 0, use: 0, gen1: { h: 0, in: 0, out: 0 }, gen2: { h: 0, in: 0, out: 0 }, edl: { h: 0, in: 0, out: 0 } };
+    for (const d of days) { const p = plant(d); T.pv += p.pv || 0; T.use += p.use || 0; for (const [k] of SRC) for (const f of ['h', 'in', 'out']) T[k][f] += S.days[d][k][f]; }
+    const tin = T.gen1.in + T.gen2.in + T.edl.in, tout = T.gen1.out + T.gen2.out + T.edl.out, nd = days.length;
+    const first = days[0], last = days[days.length - 1], partialStart = first === S.from;
+    const monthName = `${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}`, complete = last === m + '-' + String(new Date(+m.slice(0, 4), +m.slice(5), 0).getDate()).padStart(2, '0');
+    const period = `${+first.slice(8)}–${+last.slice(8)} ${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}`;
+    const compiled = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'long', year: 'numeric' });
+    const solarShare = T.pv + tin > 0 ? Math.round(T.pv / (T.pv + tin) * 100) : 0;
+    document.title = `${monthName} — Taan · Machmouchi solar report · Shift Group`;
+
+    // per-source table
+    let src = `<tr><th>Source</th><th>Hours on<small>in the period</small></th><th>Per day<small>average</small></th><th>Into the plant<small>kWh taken from the source</small></th><th>Out of the plant<small>kWh solar sent back on its line</small></th></tr>`;
+    for (const [k, name, meter] of SRC) { const t = T[k];
+      src += `<tr><td><span class="dot s-${k}"></span>${name} <span style="font-weight:400;color:#5f6670;font-size:7.5pt">${meter}</span></td><td>${n0(t.h)} h</td><td>${n1(t.h / nd)} h</td><td>${n1(t.in)}</td><td>${n1(t.out)}</td></tr>`; }
+    src += `<tr class="tot"><td>Total</td><td>${n0(T.gen1.h + T.gen2.h + T.edl.h)} h</td><td></td><td>${n1(tin)}</td><td>${n1(tout)}</td></tr>`;
+
+    // meter readings inside the month, each against its own source's share of Deye over the same window
+    const M = (D.meters || []).filter((x, i, a) => i > 0 && x.at.slice(0, 7) === m && x.split);
+    let met = '';
+    if (M.length) {
+      met = `<tr><th>Reading</th><th>Generator 1<small>meter · Deye in + out</small></th><th>Generator 2<small>meter · Deye in + out</small></th><th>EDL<small>meter · Deye in (out)</small></th></tr>`;
+      for (const x of M) { const p = D.meters[D.meters.indexOf(x) - 1], s = x.split, c = k => `+${x[k] - p[k]} · ${n1(s[k].in + s[k].out)}`;
+        met += `<tr><td>${dday(p.at)} ${p.at.slice(11)} → ${dday(x.at)} ${x.at.slice(11)}</td><td>${c('gen1')}</td><td>${c('gen2')}</td><td>+${x.edl - p.edl} · ${n1(s.edl.in)} (${n1(s.edl.out)})</td></tr>`; }
+    }
+
+    // when each generator usually runs: the most common source per hour of the day
+    const votes = Array.from({ length: 24 }, () => ({}));
+    for (const d of days) for (const [k, a, b] of S.days[d].bar || []) for (let h = Math.floor(a / 60); h < Math.ceil(b / 60) && h < 24; h++) votes[h][k] = (votes[h][k] || 0) + Math.min(b, (h + 1) * 60) - Math.max(a, h * 60);
+    const top = votes.map(v => Object.entries(v).sort((x, y) => y[1] - x[1])[0]?.[0] || 'off');
+    const blocks = []; top.forEach((k, h) => { const l = blocks[blocks.length - 1]; if (l && l.k === k) l.b = h + 1; else blocks.push({ k, a: h, b: h + 1 }); });
+    const pat = k => blocks.filter(x => x.k === k).map(x => `${String(x.a).padStart(2, '0')}:00–${String(x.b).padStart(2, '0')}:00`).join(', ') || '—';
+    // EDL never holds an hour on most days, so: the hours it was on for 30 min or more on at least a quarter of the days
+    const edlDays = Array(24).fill(0);
+    for (const d of days) { const per = Array(24).fill(0); for (const [k, a, b] of S.days[d].bar || []) if (k === 'edl') for (let h = Math.floor(a / 60); h < Math.ceil(b / 60) && h < 24; h++) per[h] += Math.min(b, (h + 1) * 60) - Math.max(a, h * 60); per.forEach((x, h) => { if (x >= 30) edlDays[h]++; }); }
+    const eb = []; edlDays.forEach((c, h) => { if (c >= Math.max(2, nd / 4)) { const l = eb[eb.length - 1]; if (l && l.b === h) l.b = h + 1; else eb.push({ a: h, b: h + 1 }); } });
+    const edlPat = eb.map(x => `${String(x.a).padStart(2, '0')}:00–${String(x.b).padStart(2, '0')}:00`).join(', ');
+
+    // daily table + timeline
+    let dl = `<tr><th>Day</th><th>Solar</th><th>Load</th><th>Gen 1<small>h · in · out</small></th><th>Gen 2<small>h · in · out</small></th><th>EDL<small>h · in · out</small></th><th>Battery<small>min–max %</small></th></tr>`;
+    let tl = '';
+    const pos = x => (x / 1440 * 100).toFixed(3) + '%';
+    for (const d of days) { const p = plant(d), s = S.days[d], soc = (s.soc || []).map(x => x[1]);
+      const c = (k, cls) => `<td class="${cls}">${n1(s[k].h)} · ${n1(s[k].in)} · ${n1(s[k].out)}</td>`;
+      dl += `<tr><td>${dday(d)}${d === S.from ? '*' : ''}</td><td>${n1(p.pv)}</td><td>${n1(p.use)}</td>${c('gen1', 'g1')}${c('gen2', 'g2')}${c('edl', 'ed')}<td>${soc.length ? Math.min(...soc) + '–' + Math.max(...soc) : ''}</td></tr>`;
+      tl += `<div class="r"><span>${dday(d)}</span><div class="b">${(s.bar || []).map(([k, a, b]) => `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}"></i>`).join('')}</div></div>`;
+    }
+    dl += `<tr class="tot"><td>Total</td><td>${n0(T.pv)}</td><td>${n0(T.use)}</td><td>${n0(T.gen1.h)} h · ${n1(T.gen1.in)} · ${n1(T.gen1.out)}</td><td>${n0(T.gen2.h)} h · ${n1(T.gen2.in)} · ${n1(T.gen2.out)}</td><td>${n0(T.edl.h)} h · ${n1(T.edl.in)} · ${n1(T.edl.out)}</td><td></td></tr>`;
+    const ax = `<div class="r"><span></span><div class="ax">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => `<s style="left:${pos(h * 60)}${h === 0 ? ';transform:none' : h === 24 ? ';transform:translateX(-100%)' : ''}">${String(h).padStart(2, '0')}:00</s>`).join('')}</div></div>`;
+    const legend = SRC.map(([k, name]) => `<span style="margin-right:12px"><span class="dot s-${k}"></span>${name}</span>`).join('') + '<span><span class="dot s-off"></span>no source</span>';
+    const foot = pg => `<div class="foot"><span>Shift Group · www.shift-group.co · Make the Shift</span><span>${monthName} · page ${pg} of 2</span></div>`;
+
+    $('out').innerHTML = `
+<div class="sheet">
+  <div class="rule"></div>
+  <h1>Solar plant energy report — ${monthName}${complete ? '' : ' (to date)'}</h1>
+  <div class="meta">Dr Nazih Taan &amp; Dr Mahab Machmouchi · 25 kWp · ${period}, ${nd} days · source: DeyeCloud, inverter readings every 2 minutes · compiled ${compiled}</div>
+  <div class="kpis">
+    <div class="kpi"><b>${n0(T.pv)}</b><span>kWh solar produced</span></div>
+    <div class="kpi"><b>${n0(T.use)}</b><span>kWh used by the plant's load</span></div>
+    <div class="kpi"><b>${n0(T.gen1.in + T.gen2.in)}</b><span>kWh taken from the generators</span></div>
+    <div class="kpi"><b>${n0(T.edl.in)}</b><span>kWh taken from EDL</span></div>
+    <div class="kpi"><b>${n0(tout)}</b><span>kWh solar sent out to the building</span></div>
+  </div>
+  <p class="note">The plant covered its load ${solarShare}% from the sun over the period (solar ÷ solar + everything taken from the generators and EDL).</p>
+
+  <h2>Energy by source</h2>
+  <table>${src}</table>
+  <p class="note"><b>Into the plant</b> is what the inverter drew from that source (load and battery charging when the sun and the battery were not enough). <b>Out of the plant</b> is solar surplus the inverter pushed back on the same line while that source was on — energy the rest of the building used instead of asking it from the generator (or EDL).</p>
+
+  <h2>When each source runs</h2>
+  <p class="note"><span class="dot s-gen1"></span><b>Generator 1</b> mostly ${pat('gen1')} · <span class="dot s-gen2"></span><b>Generator 2</b> mostly ${pat('gen2')} · <span class="dot s-edl"></span><b>EDL</b> about ${n1(T.edl.h / nd)} h a day, at changing times${edlPat ? ` — most often ${edlPat}` : ''}. The change-overs happen on the hour.</p>
+  ${met ? `<h2>Site meters against the inverter</h2><table>${met}</table>
+  <p class="note">Generator 1 and Generator 2 meters count energy in both directions, so each one is compared with in + out. EDL's meter is an older disc meter: no solar went out while EDL was on during this period, so how it treats export is not yet known.</p>` : ''}
+
+  <h2>How each source is recognised</h2>
+  <p class="note">Since 2 October 2026 EDL and both generators reach the inverter through the change-over switches on one input. The inverter logs that input's voltage and frequency every 2 minutes, and each source has its own signature: <b>Generator 1</b> ≈ 230 V, a steady 50.00 Hz · <b>Generator 2</b> ≈ 221 V, a steady 50.00 Hz · <b>EDL</b> frequency wandering between about 48.8 and 50.7 Hz. The split was checked against the three site meters (3 → 19 October: Generator 1 263 kWh vs meter +277, Generator 2 368 vs +378, EDL 11 vs +12).</p>
+  ${foot(1)}
+</div>
+<div class="sheet">
+  <div class="rule"></div>
+  <h2 style="margin-top:0">Day by day — which source was on</h2>
+  <div style="font-size:7.5pt;color:#5f6670;margin-bottom:3px">${legend}</div>
+  <div class="tl">${ax}${tl}</div>
+  <h2>Daily figures (kWh, hours)</h2>
+  <table class="daily">${dl}</table>
+  <ul class="note" style="padding-left:16px;margin-top:6px">
+    ${partialStart ? `<li>* ${dday(S.from)}: the sources were moved to the inverter's grid input that morning; the source split starts at 09:09.</li>` : ''}
+    <li>kWh = each reading's power × the time to the next reading (2 minutes), summed. A missing reading counts as nothing, so a day with gaps is slightly under, never averaged up.</li>
+    <li>Solar and load are DeyeCloud's 5-minute power profile, integrated the same way. Battery min–max is the state of charge over the day.</li>
+    ${complete ? '' : `<li>The month is not finished: this report covers the finished days up to ${dday(last)}.</li>`}
+  </ul>
+  ${foot(2)}
+</div>`;
+  }
+})();
+</script>
+</body>
+</html>
