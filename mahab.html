@@ -80,6 +80,9 @@
     <div class="tabs" id="years"></div>
     <div class="kpis" id="kpis"></div>
     <div class="card"><table id="tbl"></table></div>
+    <h2 class="mh" id="srcH" hidden>Which source — Gen 1 · Gen 2 · EDL</h2>
+    <p class="lead" id="srcNow"></p>
+    <div class="card" id="srcCard" hidden style="max-height:420px;overflow-y:auto"><table id="src"></table></div>
     <h2 class="mh" id="metersH" hidden>Meter readings on site</h2>
     <div class="card" id="metersCard" hidden><table id="meters"></table></div>
     <div class="err" id="err"></div>
@@ -161,12 +164,14 @@
     }
     rows += line('tot', 'Total ' + year, T);
     $('tbl').innerHTML = head + rows;
+    renderSources();
     renderMeters();
     $('note').innerHTML =
       `<b>How it is wired.</b> Until 1 July 2026 EDL came into the inverter on its grid port and there was no generator. ` +
-      `Since 2 July EDL and the two generators go through ATSs into <b>one</b> input, the inverter's generator port (site sketch "20260704 mahab gen control"). ` +
-      `From that day DeyeCloud measures EDL and the generators <b>together</b> — the purple column — and cannot say how much of it was EDL. ` +
-      `Splitting it needs a meter on the generator side of the ATS, or the ATS position logged.<br>` +
+      `From 2 July to 1 October EDL and the two generators went through ATSs into the inverter's generator port (site sketch "20260704 mahab gen control") — the purple column, all three together. ` +
+      `Since the morning of 2 October they come in on the <b>grid port</b> (the blue column, and the export now goes back out through it). ` +
+      `<b>Which source.</b> From 2 October each one is recognised by its voltage and frequency: Gen 1 ≈ 230 V and Gen 2 ≈ 221 V, both a steady 50.00 Hz; EDL's frequency wanders (48.8–50.7 Hz). ` +
+      `Checked against the site meters, 3 → 19 Oct: Gen 1 263 kWh vs meter +277, Gen 2 368 vs +378, EDL 11 vs +12.<br>` +
       `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
       `Checked against DeyeCloud's own Excel export. Tap a month for its days.`;
   }
@@ -183,12 +188,36 @@
       const dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
       const dm = p ? m.sum - p.sum : null, z = m.deye ? m.deye.gridIn + m.deye.gridOut : null;
       const gap = dm != null && z != null ? dm - z : null, bad = gap != null && Math.abs(gap) > Math.max(2, z * 0.1);
-      rows += `<tr title="${(m.note || '').replace(/"/g, '&quot;')}"><td>${dd} <small>${t || ''}</small></td><td>${m.gen1}</td><td>${m.gen2}</td><td>${m.edl}</td>` +
+      // each meter against its own source's share of Deye (in + out) over the same window — server: mahab.js tally()
+      const S = m.split, own = k => {
+        if (!p) return '';
+        const d1 = m[k] - p[k], s = S && S[k];
+        if (!s) return `<small>+${d1}</small>`;
+        return `<small>+${d1} · Deye ${fmt1(s.in + s.out)}${k === 'edl' ? ` (in ${fmt1(s.in)} · out ${fmt1(s.out)})` : ''}</small>`;
+      };
+      rows += `<tr title="${(m.note || '').replace(/"/g, '&quot;')}"><td>${dd} <small>${t || ''}</small></td><td>${m.gen1}${own('gen1')}</td><td>${m.gen2}${own('gen2')}</td><td>${m.edl}${own('edl')}</td>` +
         `<td><b>${m.sum}</b></td><td>${p ? dm : '<small>first reading</small>'}</td>` +
         `<td class="mix">${z != null ? fmt1(z) + `<small>import ${fmt1(m.deye.gridIn)} · export ${fmt1(m.deye.gridOut)}</small>` : (p ? '<small>reading DeyeCloud…</small>' : '')}</td>` +
         `<td${bad ? ' style="color:var(--red)"' : ''}>${gap != null ? (gap > 0 ? '+' : '') + (Math.round(gap * 10) / 10) : ''}</td></tr>`;
     });
     $('meters').innerHTML = rows;
+  }
+
+  // Gen 1 / Gen 2 / EDL per day, told apart by the grid port's voltage and frequency (server: mahab.js sources())
+  const SRCN = { gen1: 'Gen 1', gen2: 'Gen 2', edl: 'EDL', off: 'nothing' };
+  function renderSources() {
+    const S = D.sources, ds = S ? Object.keys(S.days).sort().reverse() : [];
+    $('srcH').hidden = $('srcCard').hidden = !ds.length;
+    if (!ds.length) return;
+    const n = S.now, at = n ? new Date(n.at * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }) : '';
+    $('srcNow').innerHTML = n ? `Now (${at}): <b>${SRCN[n.src]}</b> — ${n.v} V · ${n.hz} Hz` : '';
+    const cell = (s, cls) => `<td class="${cls}">${fmt1(s.h)} h<small>in ${fmt1(s.in)} · out ${fmt1(s.out)}</small></td>`;
+    let rows = `<tr><th>Day</th><th>Gen 1<small>≈ 230 V, 50.00 Hz</small></th><th>Gen 2<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
+    for (const d of ds) {
+      const s = S.days[d], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
+      rows += `<tr><td>${dd}${d === D.today ? ' <small>so far</small>' : ''}</td>${cell(s.gen1, 'gen')}${cell(s.gen2, 'mix')}${cell(s.edl, 'edl')}</tr>`;
+    }
+    $('src').innerHTML = rows;
   }
 
   $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; load(); });

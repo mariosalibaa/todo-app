@@ -66,11 +66,81 @@ async function days(ctx) {
     out.error = String(e.message || e);
     console.error('mahab:', out.error);
   }
+  // which source fed the plant, per day (Mario 2026-10-20) — see sources() below
+  let src = null;
+  try { const s = await sources(ctx); src = s.docs; delete s.docs; out.sources = s; }
+  catch (e) { out.sources = null; console.error('mahab sources:', e.message); }
   // site meter readings (Mario 2026-10-03: "record the meters reading … gen1, gen2, EDL, sum of all 3") — Firestore
   // mahabMeters/<yyyy-mm-dd_hhmm>, Beirut time, photos in Dropbox "00. PARTNER\mahab machmouche\meter readings"
-  try { out.meters = await meters(ctx); }
+  try { out.meters = await meters(ctx, src); }
   catch (e) { out.meters = []; console.error('mahab meters:', e.message); }
   return out;
+}
+
+// ── Gen 1 / Gen 2 / EDL from the grid port's voltage and frequency (Mario 2026-10-20) ──────────────────────────
+// Since the morning of 2 Oct 2026 all three sources reach the inverter on its GRID port (wirePower), one at a time
+// through the ATSs. Each has its own fingerprint in the inverter's 2-minute series (G_V_L1..3, PG_F1):
+//   Gen 2 (meter 0719, "A")  ≈ 221 V, 50.00 Hz steady      Gen 1 (meter 0717)  ≈ 230 V, 50.00 Hz steady
+//   EDL                     frequency wanders 48.8–50.7 Hz
+// Rule: Hz off 50 by > 0.15 in ≥ 4 of the 11 samples around → EDL (a lone 50.25 is noise); else mean V < 226.5 → Gen 2,
+// else Gen 1; V < 150 → nothing. Checked 3 → 19 Oct against the site meters: Gen 2 367.8 vs +378, Gen 1 263.1 vs +277,
+// EDL 11.3 vs +12. Each finished day is kept in Firestore mahabSources/<day> (t, class, W per sample) so meter
+// windows are summed without reading DeyeCloud again; today is read live, kept 10 min.
+const INVERTER = 10243707, SRC_FROM = '2026-10-02', SRC = { 1: 'gen1', 2: 'gen2', e: 'edl', o: 'off' };
+const srcCol = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('mahabSources');
+let srcToday = { at: 0, day: null, v: null };
+
+async function srcDay(ctx, ymd) {   // → { day, t: [unix], c: '12eo…', p: [W, + import] }
+  const r = await fetch(`https://www.deyecloud.com/device-s/device/${INVERTER}/stats/day?day=${ymd.replace(/-/g, '%2F')}&lan=en`,
+    { headers: { Authorization: 'bearer ' + await deye.token(ctx), Accept: 'application/json' } });
+  if (!r.ok) throw new Error('DeyeCloud ' + r.status);
+  const S = {};
+  for (const p of await r.json()) if (['G_V_L1', 'G_V_L2', 'G_V_L3', 'PG_F1', 'PG_Pt1'].includes(p.storageName))
+    S[p.storageName] = new Map((p.detailList || []).map(x => [+x.collectionTime, +x.value]));
+  const g = (k, t) => (S[k] && S[k].get(t)) || 0;
+  const rows = [...(S.G_V_L1 || new Map()).keys()].sort((a, b) => a - b)
+    .map(t => ({ t, v: (g('G_V_L1', t) + g('G_V_L2', t) + g('G_V_L3', t)) / 3, hz: g('PG_F1', t), p: Math.round(g('PG_Pt1', t)) }));
+  const c = rows.map((r, i) => {
+    if (r.v < 150) return 'o';
+    const off = rows.slice(Math.max(0, i - 5), i + 6).filter(x => x.v > 150 && Math.abs(x.hz - 50) > 0.15).length;
+    return off >= 4 ? 'e' : r.v < 226.5 ? '2' : '1';
+  }).join('');
+  const L = rows[rows.length - 1];
+  return { day: ymd, t: rows.map(r => r.t), c, p: rows.map(r => r.p), last: L ? { v: Math.round(L.v * 10) / 10, hz: L.hz } : null };
+}
+
+// samples → { gen1: { h, in, out }, gen2, edl, off } between two unix times (each sample held ≤ 4 min)
+function tally(docs, from = 0, to = Infinity) {
+  const o = { gen1: { h: 0, in: 0, out: 0 }, gen2: { h: 0, in: 0, out: 0 }, edl: { h: 0, in: 0, out: 0 }, off: { h: 0, in: 0, out: 0 } };
+  for (const d of docs) for (let i = 0; i < d.t.length; i++) {
+    const t = d.t[i]; if (t < from || t >= to) continue;
+    const dt = Math.min(240, (d.t[i + 1] || t + 120) - t) / 3600, k = o[SRC[d.c[i]]];
+    k.h += dt; if (d.p[i] > 0) k.in += d.p[i] * dt / 1000; else k.out -= d.p[i] * dt / 1000;
+  }
+  for (const k in o) for (const f in o[k]) o[k][f] = Math.round(o[k][f] * 10) / 10;
+  return o;
+}
+
+// finished days from Firestore (at most `max` read from DeyeCloud per call) + today live
+async function srcDocs(ctx, max = 3) {
+  const today = beirutToday(), have = {};
+  (await srcCol(ctx).get()).forEach(d => { have[d.id] = d.data(); });
+  let n = 0;
+  for (let d = SRC_FROM; d < today && n < max; d = addDays(d, 1)) {
+    if (have[d]) continue;
+    have[d] = await srcDay(ctx, d); n++;
+    if (have[d].t.length) await srcCol(ctx).doc(d).set(have[d]);
+    await sleep(1100);
+  }
+  if (!(srcToday.day === today && Date.now() - srcToday.at < 10 * 60000)) srcToday = { at: Date.now(), day: today, v: await srcDay(ctx, today) };
+  have[today] = srcToday.v;
+  return have;
+}
+async function sources(ctx) {
+  const docs = await srcDocs(ctx), days = {};
+  for (const d of Object.keys(docs).sort()) days[d] = tally([docs[d]]);
+  const t = srcToday.v, i = t ? t.t.length - 1 : -1;
+  return { from: SRC_FROM, days, now: i >= 0 ? { src: SRC[t.c[i]], at: t.t[i], ...t.last } : null, docs };
 }
 
 // Mario's check (2026-10-03): what the three site meters (Gen 1 + Gen 2 + EDL) advance between two readings must
@@ -78,7 +148,7 @@ async function days(ctx) {
 // Each reading after the first gets that window integrated from the 5-min series and kept on its doc (`deye`), so
 // it is read from DeyeCloud once. Windows over 31 days are skipped (too many day reads for one page load).
 const toSec = at => new Date(at.replace(' ', 'T') + ':00+03:00').getTime() / 1000;
-async function meters(ctx) {
+async function meters(ctx, src) {
   const ref = ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('mahabMeters');
   const docs = (await ref.get()).docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.at < b.at ? -1 : 1);
   for (let i = 1; i < docs.length; i++) {
@@ -95,7 +165,16 @@ async function meters(ctx) {
     m.deye = { from: p.at, gridIn: v.gridIn, gridOut: v.gridOut, gen: v.gen, genOut: v.genOut, n: v.n };
     await ref.doc(m.id).set({ deye: m.deye }, { merge: true });
   }
+  // the same window split by source (V + Hz above) — each meter against its own share of Deye
+  if (src) for (let i = 1; i < docs.length; i++) {
+    const p = docs[i - 1], m = docs[i];
+    if (!m.deye || (m.split && m.split.from === p.at) || p.at.slice(0, 10) < SRC_FROM) continue;
+    const ds = []; for (let d = p.at.slice(0, 10); d <= m.at.slice(0, 10); d = addDays(d, 1)) ds.push(d);
+    if (ds.some(d => !src[d] || d === beirutToday())) continue;   // wait until every day of the window is stored
+    m.split = { from: p.at, ...tally(ds.map(d => src[d]), toSec(p.at), toSec(m.at)) };
+    await ref.doc(m.id).set({ split: m.split }, { merge: true });
+  }
   return docs;
 }
 
-module.exports = { days, fill, STATION };
+module.exports = { days, fill, srcDocs, STATION };
