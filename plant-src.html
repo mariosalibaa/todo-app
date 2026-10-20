@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Plant · Shift Group</title>
+<link rel="icon" href="/icons/hub-192.png">
+<!-- One page for the plants whose sources are told apart from the inverter's own readings — Bookstop Kaslique and
+     McKinsey Electronics (Mario 2026-10-20, same idea as /energy/plants/mahab). The plant comes from the path
+     (/energy/plants/<key>); data from /api/plant-src?p=<key> (plantsrc.js). PUBLIC: the owners and the generator
+     supplier get the link. Print = a light A4 version (the controls drop out). -->
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--blue:#89b4fa;--red:#f38ba8;}
+  *{box-sizing:border-box;}
+  html,body{background:var(--base);}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  main{max-width:1100px;margin:0 auto;padding:20px 16px 60px;}
+  h1{font-size:1.25rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.82rem;margin:0 0 12px;line-height:1.5;}
+  button,a.btn{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:999px;padding:6px 12px;font-size:.8rem;font-family:inherit;cursor:pointer;text-decoration:none;}
+  button:hover{border-color:var(--amber);} button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:600;}
+  .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .row .sp{margin-left:auto;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;}
+  .kpi b{display:block;font-size:1.3rem;font-variant-numeric:tabular-nums;} .kpi span{font-size:.66rem;color:var(--overlay0);text-transform:uppercase;letter-spacing:.06em;}
+  .kpi small{display:block;color:var(--sub);font-size:.7rem;margin-top:2px;}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;}
+  th{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--overlay0);font-weight:600;text-align:right;padding:8px;border-bottom:1px solid var(--surface0);white-space:nowrap;}
+  th small{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:.62rem;}
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:7px 8px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  td small{display:block;color:var(--overlay0);font-size:.64rem;}
+  td .z{color:var(--surface1);}
+  tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);background:rgba(242,169,59,.08);}
+  .mh{font-size:.95rem;margin:22px 0 8px;font-weight:600;}
+  .note{background:var(--mantle);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 14px;font-size:.78rem;color:var(--sub);line-height:1.55;margin-top:14px;}
+  .note b{color:var(--text);font-weight:600;}
+  .err{color:var(--red);font-size:.85rem;margin:10px 0;}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+  .c-e{background:#89b4fa;} .c-b{background:#cba6f7;} .c-s{background:#f38ba8;} .c-r{background:#fab387;} .c-g{background:#f38ba8;} .c-o{background:var(--surface1);}
+  /* the time view: one 24 h bar per day */
+  .tl{padding:12px 14px 10px;max-height:560px;overflow-y:auto;}
+  .tl .lg{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--sub);margin-bottom:10px;}
+  .tl .r{display:grid;grid-template-columns:56px 1fr;align-items:center;gap:8px;margin:3px 0;}
+  .tl .r>span{font-size:.72rem;color:var(--sub);white-space:nowrap;}
+  .tl .b{position:relative;height:44px;background:var(--base);border-radius:4px;overflow:hidden;}
+  .tl .b.tall{height:58px;}
+  .tl .b i{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden;padding:0 2px;box-shadow:inset -1px 0 0 rgba(30,30,46,.35);}
+  .tl .b i b{display:block;font-style:normal;font-size:.56rem;font-weight:600;line-height:1.2;color:#1e1e2e;white-space:normal;overflow-wrap:anywhere;overflow:hidden;}
+  .tl .b u{position:absolute;top:0;bottom:0;border-left:1px dashed rgba(166,173,200,.18);}
+  .tl .ax{position:relative;height:14px;font-size:.6rem;color:var(--overlay0);}
+  .tl .ax s{position:absolute;transform:translateX(-50%);text-decoration:none;}
+  #tip{min-height:1.2em;margin:6px 0 0;}
+  @media (max-width:640px){ header{padding:12px 16px;} main{padding:14px 12px 40px;} .kpis{grid-template-columns:1fr 1fr;gap:8px;} table{font-size:.74rem;} th{padding:7px 4px;font-size:.54rem;} td{padding:7px 4px;} }
+  /* print: light, A4, no controls — the page itself is the report for the owner and the generator supplier */
+  @page{size:A4;margin:12mm;}
+  @media print{
+    :root{--base:#fff;--mantle:#fff;--surface0:#d9dde3;--surface1:#c9ccd2;--text:#1f2328;--sub:#444;--overlay0:#5f6670;}
+    header{border-bottom:3px solid var(--amber);} .noprint,#plantCrumbs{display:none !important;}
+    .card,.kpi{break-inside:avoid;} .tl{max-height:none;overflow:visible;} .tl .b{background:#eef0f3;}
+    main{max-width:none;padding:8px 0;} h1{color:#1f3864;} .mh{color:#1f3864;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">SHIFT <span>GROUP</span><small>MAKE THE SHIFT</small></div>
+  <a class="btn noprint" href="/" id="hubLink" hidden>Hub</a>
+</header>
+<main>
+  <h1 id="title">Loading…</h1>
+  <p class="lead" id="lead"></p>
+  <div class="err" id="err"></div>
+  <div id="app" hidden>
+    <p class="lead" id="nowLine"></p>
+    <div class="row noprint"><span id="months"></span><button class="sp" onclick="print()">📄 Print / PDF</button></div>
+    <div class="kpis" id="kpis"></div>
+    <h2 class="mh">Month by month</h2>
+    <div class="card"><table id="monthT"></table></div>
+    <div id="refusedBox" hidden>
+      <h2 class="mh">Generator refused by the inverters</h2>
+      <div class="card"><table id="refT"></table></div>
+    </div>
+    <h2 class="mh">Which source, hour by hour</h2>
+    <div class="row noprint"><button id="socBtn" title="Battery state of charge at the start → end of each stretch">🔋 Battery SOC</button></div>
+    <div class="card tl" id="time"></div>
+    <p class="lead noprint" id="tip"></p>
+    <h2 class="mh">Day by day</h2>
+    <div class="card"><table id="dayT"></table></div>
+    <div class="note" id="note"></div>
+  </div>
+</main>
+<script src="/plant-crumbs.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const MO = MONTHS.map(m => m.slice(0, 3));
+  const f0 = v => v == null ? '' : Math.abs(v) < 0.05 ? '<span class="z">0</span>' : Math.round(v).toLocaleString('en-US');
+  const f1 = v => v == null ? '' : Math.abs(v) < 0.05 ? '<span class="z">0</span>' : (Math.round(v * 10) / 10).toLocaleString('en-US');
+  const dd = d => `${+d.slice(8)} ${MO[+d.slice(5, 7) - 1]}`;
+  const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  const key = location.pathname.replace(/\/$/, '').split('/').pop();
+  let D = null, month = null, showSoc = false;
+  try { showSoc = localStorage.getItem('plantSrcSoc') === '1'; } catch {}
+
+  fetch('/api/plant-src?p=' + encodeURIComponent(key)).then(r => r.json()).then(j => {
+    if (j.error) throw new Error(j.error);
+    D = j; document.title = `${D.name} · Shift Group`;
+    if (D.isAdmin && window.PlantCrumbs) PlantCrumbs.show(D.name.split(' ')[0]);
+    const ms = [...new Set(Object.keys(D.days).map(d => d.slice(0, 7)))].sort();
+    month = new URLSearchParams(location.search).get('m') || ms[ms.length - 1];
+    $('months').innerHTML = ms.map(m => `<button data-m="${m}">${MO[+m.slice(5) - 1]} ${m.slice(0, 4)}</button>`).join(' ');
+    $('months').onclick = e => { const b = e.target.closest('button'); if (b) { month = b.dataset.m; render(); } };
+    $('socBtn').onclick = () => { showSoc = !showSoc; try { localStorage.setItem('plantSrcSoc', showSoc ? '1' : '0'); } catch {} render(); };
+    $('time').onclick = e => { const i = e.target.closest('.b i'); $('tip').textContent = i ? i.title : ''; };
+    $('app').hidden = false; render();
+  }).catch(e => { $('title').textContent = 'Plant'; $('err').textContent = 'Could not load the plant (' + e.message + ').'; });
+
+  function render() {
+    const C = D.classes, K = Object.keys(C);
+    $('title').textContent = `${D.name} — ${D.kwp} kWp`;
+    $('lead').textContent = `${D.lead} · read from ${D.src === 'solarman' ? 'SOLARMAN' : 'DeyeCloud'}, the inverters' own readings every 5 minutes`;
+    const n = D.now;
+    if (n) {
+      const at = new Date(n.at * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' });
+      $('nowLine').innerHTML = `Now (${at}): <b>${n.src === 'o' ? 'no source — on battery and sun' : C[n.src]}</b>${n.hz && n.src !== 'o' ? ' · ' + n.hz + ' Hz' : ''} · battery ${n.soc} % · solar ${f1(n.pv / 1000)} kW · load ${f1(n.l / 1000)} kW`;
+    }
+    $('months').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === month));
+    $('socBtn').classList.toggle('on', showSoc);
+    const days = Object.keys(D.days).filter(d => d.startsWith(month)).sort();
+    const T = { pv: 0, load: 0, full: 0, socMin: null, src: {}, ref: 0 };
+    for (const k of K) T.src[k] = { h: 0, in: 0, out: 0 };
+    for (const d of days) { const s = D.days[d]; T.pv += s.pv; T.load += s.load; T.full += s.full; if (s.socMin != null) T.socMin = T.socMin == null ? s.socMin : Math.min(T.socMin, s.socMin);
+      for (const k of K) for (const f of ['h', 'in', 'out']) T.src[k][f] += s.src[k][f]; T.ref += s.refused.length; }
+    const tin = K.reduce((a, k) => a + T.src[k].in, 0), mName = `${MONTHS[+month.slice(5) - 1]} ${month.slice(0, 4)}`;
+    $('kpis').innerHTML =
+      `<div class="kpi"><span>Solar · ${mName}</span><b style="color:var(--amber)">${f0(T.pv)} kWh</b><small>${days.length} days${days.includes(D.today) ? ', today so far' : ''}</small></div>` +
+      `<div class="kpi"><span>Load</span><b>${f0(T.load)} kWh</b></div>` +
+      `<div class="kpi"><span>From ${K.length > 1 ? 'the sources' : 'the generator'}</span><b style="color:var(--red)">${f0(tin)} kWh</b><small>${K.filter(k => k !== 'r').map(k => `${C[k].replace(/ —.*/, '')} ${f0(T.src[k].h)} h`).join(' · ')}</small></div>` +
+      `<div class="kpi"><span>Battery lowest</span><b style="color:${T.socMin != null && T.socMin < 20 ? 'var(--red)' : 'var(--green)'}">${T.socMin ?? '—'} %</b><small>${days.filter(d => D.days[d].socMin != null && D.days[d].socMin < 20).length} days under 20 %</small></div>` +
+      `<div class="kpi"><span>Battery full, sun up</span><b>${f0(T.full)} h</b><small>solar held back — nowhere to put it</small></div>` +
+      (C.r ? `<div class="kpi"><span>Generator refused</span><b style="color:${T.ref ? '#fab387' : 'var(--green)'}">${T.ref}×</b><small>${f0(T.src.r.h)} h in ${mName.split(' ')[0]}</small></div>` : '');
+
+    // month by month
+    const months = [...new Set(Object.keys(D.days).map(d => d.slice(0, 7)))].sort().reverse();
+    let mt = `<tr><th>Month</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>hours · kWh in${D.port === 'grid' ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>lowest %</small></th><th>Full, sun up<small>hours</small></th></tr>`;
+    for (const m of months) {
+      const ds = Object.keys(D.days).filter(d => d.startsWith(m)), t = { pv: 0, load: 0, full: 0, low: null, src: {} };
+      for (const k of K) t.src[k] = { h: 0, in: 0, out: 0 };
+      for (const d of ds) { const s = D.days[d]; t.pv += s.pv; t.load += s.load; t.full += s.full; if (s.socMin != null) t.low = t.low == null ? s.socMin : Math.min(t.low, s.socMin); for (const k of K) for (const f of ['h', 'in', 'out']) t.src[k][f] += s.src[k][f]; }
+      mt += `<tr><td>${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}<small>${ds.length} days${ds.includes(D.today) ? ', to today' : ''}</small></td><td>${f0(t.pv)}</td><td>${f0(t.load)}</td>` +
+        K.map(k => `<td>${f0(t.src[k].h)} h · ${f0(t.src[k].in)}${D.port === 'grid' ? ' · ' + f0(t.src[k].out) : ''}</td>`).join('') + `<td>${t.low ?? ''}</td><td>${f0(t.full)}</td></tr>`;
+    }
+    $('monthT').innerHTML = mt;
+
+    // the refused generator (Bookstop)
+    $('refusedBox').hidden = !C.r;
+    if (C.r) {
+      let rt = `<tr><th>Day</th><th>From – to</th><th>Minutes</th><th>Frequency<small>highest, Hz</small></th><th>Battery<small>start → end (lowest) %</small></th></tr>`;
+      const all = days.flatMap(d => D.days[d].refused.map(x => ({ d, ...x }))).reverse();
+      for (const x of all) rt += `<tr><td>${dd(x.d)}</td><td>${x.a} – ${x.b}</td><td>${x.min}</td><td>${x.hz ?? ''}</td><td>${x.s0} → ${x.s1} (${x.sMin})</td></tr>`;
+      if (!all.length) rt += `<tr><td colspan="5" style="text-align:left;color:var(--green)">No refused stretch in ${mName}.</td></tr>`;
+      $('refT').innerHTML = rt;
+    }
+
+    // time view
+    const pos = m => (m / 1440 * 100).toFixed(3) + '%';
+    const grid = [3, 6, 9, 12, 15, 18, 21].map(h => `<u style="left:${pos(h * 60)}"></u>`).join('');
+    const ax = `<div class="r"><span></span><div class="ax">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => `<s style="left:${pos(h * 60)}">${h}</s>`).join('')}</div></div>`;
+    let tl = `<div class="lg">${K.map(k => `<span><span class="dot c-${k}"></span>${C[k]}</span>`).join('')}<span><span class="dot c-o"></span>no source (battery + sun)</span><span>on each stretch: kWh in${D.port === 'grid' ? ' · out' : ''}${showSoc ? ', battery start→end' : ''}</span></div>` + ax;
+    for (const d of days.slice().reverse()) {
+      const bar = D.days[d].bar || [];
+      tl += `<div class="r"><span>${dd(d)}</span><div class="b${showSoc ? ' tall' : ''}">${grid}${bar.map(([k, a, b, io, ou, s0, s1]) =>
+        `<i class="c-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd(d)} · ${C[k]} ${hm(a)}–${hm(b)} · in ${io}${D.port === 'grid' ? ' · out ' + ou : ''} kWh · battery ${s0} → ${s1} %">` +
+        (io < 0.05 && ou < 0.05 ? '<b>0</b>' : (io >= 0.05 ? `<b>in ${io}</b>` : '') + (ou >= 0.05 ? `<b>out ${ou}</b>` : '')) +
+        (showSoc ? `<b>${s0}→${s1}%</b>` : '') + `</i>`).join('')}</div></div>`;
+    }
+    $('time').innerHTML = tl + ax;
+
+    // day by day
+    let dt = `<tr><th>Day</th><th>Solar</th><th>Load</th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>h · in${D.port === 'grid' ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>min–max %</small></th><th>Full<small>h</small></th></tr>`;
+    for (const d of days.slice().reverse()) { const s = D.days[d];
+      dt += `<tr><td>${dd(d)}${d === D.today ? '<small>so far</small>' : ''}${s.n < 250 && d !== D.today ? '<small>' + s.n + ' readings</small>' : ''}</td><td>${f1(s.pv)}</td><td>${f1(s.load)}</td>` +
+        K.map(k => `<td>${f1(s.src[k].h)} · ${f1(s.src[k].in)}${D.port === 'grid' ? ' · ' + f1(s.src[k].out) : ''}</td>`).join('') + `<td>${s.socMin ?? ''}–${s.socMax ?? ''}</td><td>${f1(s.full)}</td></tr>`; }
+    $('dayT').innerHTML = dt;
+
+    $('note').innerHTML = (D.key === 'bookstop'
+      ? `<b>How each source is recognised.</b> EDL and both generators reach the inverters through the ATS on one input; the inverter logs that input's voltage and frequency. ` +
+        `<b>EDL</b> holds a steady 50.0 Hz · the <b>big generator (150 kW)</b> a steady 48.3–49.4 Hz, and the inverters take up to about 24 kW from it · the <b>small generator (80 kW)</b> hunts between about 48 and 50.7 Hz when it is loaded, and with no load it runs fast, at 51.6–51.8 Hz — ` +
+        `the inverters <b>refuse</b> it then (nothing comes in, the battery keeps draining). That is the orange stretch and the table above; the fix is the small generator's speed (governor), not a setting on the inverters.<br>`
+      : `<b>The generator.</b> No EDL on this site; the generator is on the inverters' generator input, so every hour it ran and every kWh it gave is counted directly. ${D.history || ''}<br>`) +
+      `<b>Battery full, sun up</b> = hours the battery sat at 99–100 % while the panels produced: the inverters hold the solar back then, because there is nowhere to put it. ` +
+      `<b>Method.</b> kWh = each reading's power × the time to the next one (about 5 minutes), summed; the inverters in parallel are added together. A day with missing readings is under-counted, never averaged up.`;
+  }
+})();
+</script>
+</body>
+</html>

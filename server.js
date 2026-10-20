@@ -184,6 +184,8 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'cpr-dynamic.html'));
   fs.readFileSync(path.join(__dirname, 'mahab.html'));
   fs.readFileSync(path.join(__dirname, 'mahab-report.html'));
+  fs.readFileSync(path.join(__dirname, 'plant-src.html'));
+  require('./plantsrc');
   fs.readFileSync(path.join(__dirname, 'tohme.html'));
   fs.readFileSync(path.join(__dirname, 'khoder.html'));
   fs.readFileSync(path.join(__dirname, 'wa-outbox.html'));
@@ -768,6 +770,7 @@ const handler = async (req, res) => {
     'cpr-dynamic.html': path.join(__dirname, 'cpr-dynamic.html'),
     'mahab.html': path.join(__dirname, 'mahab.html'),
     'mahab-report.html': path.join(__dirname, 'mahab-report.html'),
+    'plant-src.html': path.join(__dirname, 'plant-src.html'),
     'tohme.html': path.join(__dirname, 'tohme.html'),
     'heater.html': path.join(__dirname, 'heater.html'),
     'links.html': path.join(__dirname, 'links.html'),
@@ -810,6 +813,8 @@ const handler = async (req, res) => {
     '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
     '/energy/plants/mahab/report': 'mahab-report.html',   // one month on two A4 pages for the owners + the generator supplier, ?m=YYYY-MM — PUBLIC like the page (Mario 2026-10-20)
     '/energy/plants/mahab': 'mahab.html',   // (was /mahab, then /energy/mahab; inside Plants since 2026-10-20 — Mario: "place mahab inside plants, adjust the link") Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
+    '/energy/plants/bookstop': 'plant-src.html',   // Bookstop Kaslique — EDL / big gen / small gen (refused) by frequency, battery; PUBLIC (Mario 2026-10-20)
+    '/energy/plants/mckinsey': 'plant-src.html',   // McKinsey Electronics — the generator on the gen input, battery; PUBLIC (Mario 2026-10-20)
     '/energy/plants/tohme': 'tohme.html',   // (was /tohme)   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025; PUBLIC, no sign-in (Mario 2026-10-13)
     '/energy/plants/cpr': 'cpr.html',   // (was /cpr)   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
@@ -1225,6 +1230,8 @@ const handler = async (req, res) => {
         ['/energy/plants/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
         ['/energy/plants/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
         ['/energy/plants/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
+        ['/energy/plants/bookstop', '☀', 'Bookstop Kaslique plant', 'public', 'EDL / big gen / small gen refused, battery'],
+        ['/energy/plants/mckinsey', '☀', 'McKinsey Electronics plant', 'public', 'generator on the gen input, battery'],
         ['/energy/plants/mahab', '☀', 'Mahab plant', 'public', 'no sign-in since 2026-10-20; /mahab and /energy/mahab redirect'],
         ['/energy/plants/mahab/report', '📄', 'Mahab month report (A4 / PDF)', 'public', '?m=YYYY-MM; owners + generator supplier'],
         ['/energy/plants', '📁', 'Plants folder (inside Energy)', 'signed-in', 'Mahab, Tohme, CPR, Makhlouf, All plants'],
@@ -1371,6 +1378,19 @@ const handler = async (req, res) => {
     const acc = await cprAccess();
     try { const v = await require('./mahab').days({ db, TEAM_ID }); v.isAdmin = acc.isAdmin; res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
     catch (e) { console.error('mahab error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+  // /api/plant-src?p=bookstop|mckinsey — which source fed the plant, per day (plantsrc.js). PUBLIC like the pages (Mario 2026-10-20).
+  // /api/plant-src/fill?p=&max= — back-fill more finished days at once; the laptop's key only (Bearer ACCOUNTING_API_KEY).
+  if (url.split('?')[0] === '/api/plant-src' || url.split('?')[0] === '/api/plant-src/fill') {
+    const q = new URL(req.url, 'http://x').searchParams, fill = url.startsWith('/api/plant-src/fill');
+    const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (fill && !(bearer.length >= 16 && bearer === process.env.ACCOUNTING_API_KEY)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"key"}'); return; }
+    try {
+      const v = await require('./plantsrc').page({ db, TEAM_ID }, q.get('p') || '', fill ? Math.min(20, +q.get('max') || 5) : 2);
+      v.isAdmin = (await cprAccess()).isAdmin;
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v));
+    } catch (e) { console.error('plantsrc error:', e); res.writeHead(e.message === 'unknown plant' ? 404 : 500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   // /api/tohme — Villa Tohme per day (tohme.js). PUBLIC, no sign-in (Mario 2026-10-13: "make it without password"); isAdmin only shows the Hub link.

@@ -172,7 +172,7 @@ async function devices(ctx, src, id) { return src === 'solarman' ? smDevices(id)
 //   Solarman   no featureData on its device list: the day series of every inverter (5-min, ~1.4 MB each)
 // Parallel inverters: power and today's kWh = the sum of the inverters; SOC, grid V and Hz = the master (M1 / M01).
 // Read-only: nothing here ever writes to an inverter.
-const SERIES_KEYS = new Set(['S_P_T', 'E_Puse_t1', 'PG_Pt1', 'G_V_L1', 'PG_F1', 'B_left_cap1', 'B_P1', 'GEN_P_T',
+const SERIES_KEYS = new Set(['S_P_T', 'E_Puse_t1', 'PG_Pt1', 'G_V_L1', 'PG_F1', 'B_left_cap1', 'B_P1', 'GEN_P_T', 'GEN_V_L1',
   'Etdy_ge1', 'Etdy_use1', 'Etdy_pu1', 'E_B_D', 'Etdy_cg1', 'Etdy_dcg1', 'GEN_P_D']);
 const beirutDay = (t = Date.now()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Beirut', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
 const seriesMem = new Map();   // src:device:day → { at, v } — 5 min
@@ -361,4 +361,4 @@ async function watching(ctx) {
   return d.source || { 'solarman:2596285': true };
 }
 
-module.exports = { list, devices, detail, alarms, check, shareKey, setWatch, watching, sourceHealth };
+module.exports = { list, devices, detail, alarms, check, shareKey, setWatch, watching, sourceHealth, daySeries };   // daySeries: plantsrc.js (Bookstop, McKinsey)
