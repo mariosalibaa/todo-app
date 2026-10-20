@@ -36,6 +36,18 @@
   td.mix{color:#cba6f7;} td.edl{color:var(--blue);} td.gen{color:var(--red);} td.sol{color:var(--amber);} td.exp{color:var(--green,#a6e3a1);}
   td .z{color:var(--surface1);}
   td small.spans{color:var(--sub);margin-top:3px;line-height:1.45;}
+  /* the time view: one 24 h bar per day, coloured by source */
+  .tl{padding:12px 14px 10px;max-height:520px;overflow-y:auto;}
+  .tl .lg{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--sub);margin-bottom:10px;}
+  .tl .lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px;}
+  .tl .r{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:8px;margin:3px 0;}
+  .tl .r>span{font-size:.72rem;color:var(--sub);white-space:nowrap;}
+  .tl .b{position:relative;height:18px;background:var(--base);border-radius:4px;overflow:hidden;}
+  .tl .b i{position:absolute;top:0;bottom:0;}
+  .tl .b u{position:absolute;top:0;bottom:0;border-left:1px dashed rgba(166,173,200,.18);}
+  .tl .ax{position:relative;height:14px;font-size:.6rem;color:var(--overlay0);}
+  .tl .ax s{position:absolute;transform:translateX(-50%);text-decoration:none;}
+  .s-gen1{background:var(--red);} .s-gen2{background:#cba6f7;} .s-edl{background:var(--blue);} .s-off{background:var(--surface1);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
   tr.day td{background:rgba(49,50,68,.35);font-size:.74rem;}
   tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);background:rgba(242,169,59,.08);}
@@ -83,6 +95,9 @@
     <div class="card"><table id="tbl"></table></div>
     <h2 class="mh" id="srcH" hidden>Which source — Gen 1 · Gen 2 · EDL</h2>
     <p class="lead" id="srcNow"></p>
+    <div class="tabs" id="srcTabs" hidden><button data-v="time">Time view</button><button data-v="table">Table</button></div>
+    <div class="card tl" id="srcTime" hidden></div>
+    <p class="lead" id="srcTip" style="margin:6px 0 0;min-height:1.2em"></p>
     <div class="card" id="srcCard" hidden style="max-height:420px;overflow-y:auto"><table id="src"></table></div>
     <h2 class="mh" id="metersH" hidden>Meter readings on site</h2>
     <div class="card" id="metersCard" hidden><table id="meters"></table></div>
@@ -220,7 +235,33 @@
       rows += `<tr><td>${dd}${d === D.today ? ' <small>so far</small>' : ''}</td>${cell(s.gen1, 'gen')}${cell(s.gen2, 'mix')}${cell(s.edl, 'edl')}</tr>`;
     }
     $('src').innerHTML = rows;
+    renderTime(S, ds);
   }
+
+  // the time view (Mario 2026-10-20): each day a 24 h bar, Gen 1 / Gen 2 / EDL as coloured stretches; tap = the hours
+  let srcView = 'time'; try { srcView = localStorage.getItem('mahabSrcView') || 'time'; } catch {}
+  function renderTime(S, ds) {
+    const pos = m => (m / 1440 * 100).toFixed(3) + '%', hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const grid = [3, 6, 9, 12, 15, 18, 21].map(h => `<u style="left:${pos(h * 60)}"></u>`).join('');
+    const ax = `<div class="r"><span></span><div class="ax">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => `<s style="left:${pos(h * 60)}">${h}</s>`).join('')}</div></div>`;
+    let h = `<div class="lg">${['gen1', 'gen2', 'edl'].map(k => `<span><i class="s-${k}"></i>${SRCN[k]}</span>`).join('')}<span><i class="s-off"></i>no source</span></div>` + ax;
+    for (const d of ds) {
+      const bar = S.days[d].bar || [], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
+      h += `<div class="r"><span>${dd}</span><div class="b">${grid}${bar.map(([k, a, b]) =>
+        `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd} · ${SRCN[k]} ${hm(a)}–${hm(b)}"></i>`).join('')}</div></div>`;
+    }
+    $('srcTime').innerHTML = h + ax;
+    $('srcTabs').hidden = false;
+    $('srcTabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === srcView));
+    $('srcTime').hidden = srcView !== 'time'; $('srcCard').hidden = srcView !== 'table';
+  }
+  $('srcTabs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    srcView = b.dataset.v; try { localStorage.setItem('mahabSrcView', srcView); } catch {}
+    renderSources();
+  });
+  // tap a stretch on the phone (no hover): show its hours under the bar's day
+  $('srcTime').addEventListener('click', e => { const i = e.target.closest('.b i'); $('srcTip').textContent = i ? i.title : ''; });
 
   $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; load(); });
   $('tbl').addEventListener('click', e => { const tr = e.target.closest('tr.row'); if (!tr) return; open[tr.dataset.m] = !open[tr.dataset.m]; render(); });

@@ -135,7 +135,13 @@ function spans(d) {
     const list = out[r.k] = out[r.k] || [], last = list[list.length - 1];
     if (last && r.a - last.b < 600) last.b = r.b; else list.push({ a: r.a, b: r.b });
   }
+  // the time view (Mario 2026-10-20): every run as [source, from minute, to minute] of the Beirut day, 0–1440
+  const min = t => { const [h, m] = hhmm(t).split(':'); return +h * 60 + +m; };
+  const bar = [];
+  for (const k in out) for (const r of out[k]) { const a = min(r.a), b = min(r.b); bar.push([k, a, b < a ? 1440 : b]); }
+  bar.sort((x, y) => x[1] - y[1]);
   for (const k in out) out[k] = out[k].map(r => { const a = hhmm(r.a), b = hhmm(r.b); return `${a}–${b < a ? '24:00' : b}`; });
+  out.bar = bar;
   return out;
 }
 
@@ -158,7 +164,9 @@ async function sources(ctx) {
   const docs = await srcDocs(ctx), days = {};
   for (const d of Object.keys(docs).sort()) {
     days[d] = tally([docs[d]]);
-    for (const [k, list] of Object.entries(spans(docs[d]))) if (days[d][k]) days[d][k].spans = list;
+    const sp = spans(docs[d]);
+    for (const [k, list] of Object.entries(sp)) if (days[d][k]) days[d][k].spans = list;
+    days[d].bar = sp.bar;
   }
   const t = srcToday.v, i = t ? t.t.length - 1 : -1;
   return { from: SRC_FROM, days, now: i >= 0 ? { src: SRC[t.c[i]], at: t.t[i], ...t.last } : null, docs };
