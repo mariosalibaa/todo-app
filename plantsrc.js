@@ -72,7 +72,7 @@ async function readDay(ctx, key, ymd) {
   const rows = clock.map(t => ({ t, v: +near(m[vKey], t) || 0, hz: +near(m.PG_F1, t) || 0, p: Math.round(sum(pKey, t)),
     pv: Math.round(sum('S_P_T', t)), l: Math.round(sum('E_Puse_t1', t)), s: Math.round(+near(m.B_left_cap1, t) || 0) }));
   return { day: ymd, t: rows.map(r => r.t), c: classify(key, rows), p: rows.map(r => r.p), pv: rows.map(r => r.pv),
-    l: rows.map(r => r.l), s: rows.map(r => r.s), hz: rows.map(r => Math.round(r.hz * 100) / 100) };
+    l: rows.map(r => r.l), s: rows.map(r => r.s), hz: rows.map(r => Math.round(r.hz * 100) / 100), v: rows.map(r => Math.round(r.v * 10) / 10) };
 }
 
 // one stored day → the figures the page shows
