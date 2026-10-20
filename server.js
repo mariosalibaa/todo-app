@@ -1244,7 +1244,18 @@ const handler = async (req, res) => {
     if (p === '/api/ewelink/check' && req.method === 'POST') {
       const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
       if (!(given.length >= 16 && (given === process.env.CRON_SECRET || given === process.env.ACCOUNTING_API_KEY))) return json(401, { error: 'unauthorized' });
-      try { return json(200, await ew.sample({ db, TEAM_ID })); } catch (e) { console.error('ewelink check error:', e); return json(500, { error: e.message }); }
+      const send = async text => {
+        const token = process.env.TELEGRAM_BOT_TOKEN, chat = process.env.TELEGRAM_CHAT_ID || process.env.ACCOUNTING_CHAT_ID;
+        if (!token || !chat) return;
+        const tg = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text: text.slice(0, 4000), disable_web_page_preview: true }) });
+        if (!tg.ok) console.error('ewelink telegram failed:', tg.status, await tg.text());
+      };
+      try {
+        const s = await ew.sample({ db, TEAM_ID });
+        const probes = (await ew.list({ db, TEAM_ID })).filter(x => x.temp != null || x.sensor).map(x => x.id);
+        const cloud = await ew.cloudHistory({ db, TEAM_ID }, probes, send);   // keeps eWeLink's own hourly history warm + warns when the web token dies
+        return json(200, { ...s, cloud: Object.keys(cloud).filter(k => cloud[k]).length });
+      } catch (e) { console.error('ewelink check error:', e); return json(500, { error: e.message }); }
     }
     const acc = await cprAccess();
     if (!acc.isAdmin) return json(401, { error: 'admin' });
@@ -1253,7 +1264,9 @@ const handler = async (req, res) => {
         const days = Math.max(1, Math.min(14, +(new URL(req.url, 'http://x').searchParams.get('days') || 1)));
         let h = await ew.history({ db, TEAM_ID }, days).catch(() => ({ pts: {}, at: null }));
         if (!h.at || Date.now() - new Date(h.at).getTime() > 20 * 60e3) { try { await ew.sample({ db, TEAM_ID }); h = await ew.history({ db, TEAM_ID }, days); } catch {} }   // stale (laptop off) → sample now
-        return json(200, { devices: await ew.list({ db, TEAM_ID }), history: h.pts, days, at: new Date().toISOString() });
+        const devices = await ew.list({ db, TEAM_ID });
+        const cloud = await ew.cloudHistory({ db, TEAM_ID }, devices.filter(x => x.temp != null || x.sensor).map(x => x.id)).catch(() => ({}));
+        return json(200, { devices, history: h.pts, cloud, days, at: new Date().toISOString() });
       }
       if (p === '/api/ewelink/set' && req.method === 'POST') {
         let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }

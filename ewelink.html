@@ -57,9 +57,9 @@
   <div class="upd" id="upd">—</div>
   <div class="card" id="list"><div id="signin">Sign in to the Shift Hub first (admins only) — <a href="/">open the hub</a>.</div></div>
   <div class="msg" id="msg"></div>
-  <div class="chead"><h2>Temperature history</h2><div class="tabs"><button data-d="1" class="on">24 h</button><button data-d="3">3 d</button><button data-d="7">7 d</button><button data-d="14">14 d</button></div></div>
+  <div class="chead"><h2>Temperature history</h2><div class="tabs"><button data-d="1" class="on">24 h</button><button data-d="3">3 d</button><button data-d="8">8 d</button><button data-d="30">30 d</button></div></div>
   <div id="graphs"></div>
-  <p class="foot">A grey device is offline: eWeLink has not heard from it, so it cannot be switched. Refreshes every 30 s. History: eWeLink's cloud keeps no temperature readings, so HeaterWatch on the laptop samples every probe every 10 minutes (kept 14 days) — the lines start on 20-10-2026.</p>
+  <p class="foot">A grey device is offline: eWeLink has not heard from it, so it cannot be switched. Refreshes every 30 s. History: hourly values for the last 8 days and daily min/max for 30 days come from eWeLink's own records (the same ones the app draws); HeaterWatch on the laptop adds a 10-minute sample on top.</p>
 </main>
 <script>
 const $ = id => document.getElementById(id);
@@ -76,11 +76,31 @@ function row(d) {
 }
 function paint() { $('list').innerHTML = DEVS.map(row).join('') || '<div class="dev">No devices on this eWeLink account.</div>'; }
 let days = 1;
-function chartSvg(pts) {
+let CLOUD = {};
+// the series for one device: eWeLink's hourly history (24 h + 7 days) plus our own 10-minute samples where they are
+// newer than the last hourly point; 30 d = the daily min–max band from eWeLink (no hourly that far back)
+function series(id) {
+  const c = CLOUD[id] || {}, hourly = c.hourly || [], mine = HIST[id] || [];
+  const lastH = hourly.length ? hourly[hourly.length - 1].t : 0;
+  const pts = hourly.concat(mine.filter(p => p.t > lastH + 3600e3)).sort((a, b) => a.t - b.t);
+  return { pts: pts.length ? pts : mine, daily: c.daily || [] };
+}
+function chartSvg(pts, daily) {
   const W = 640, H = 170, L = 38, R = 10, T = 10, B = 24;
-  if (!pts || pts.length < 2) return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><text class="lbl" x="${W / 2}" y="${H / 2}" text-anchor="middle">${pts && pts.length === 1 ? 'one sample so far — the line starts with the next one' : 'no samples yet — HeaterWatch adds one every 10 minutes'}</text></svg>`;
-  const t0 = Date.now() - days * 864e5, t1 = Date.now(), cs = pts.map(p => p.c);
+  const band = days >= 30 && daily && daily.length > 1;
+  if (!band && (!pts || pts.length < 2)) return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><text class="lbl" x="${W / 2}" y="${H / 2}" text-anchor="middle">${pts && pts.length === 1 ? 'one point so far — the line starts with the next one' : 'no history for this device yet'}</text></svg>`;
+  const t0 = Date.now() - days * 864e5, t1 = Date.now(), cs = band ? daily.flatMap(d => [d.min, d.max]) : pts.map(p => p.c);
   const lo = Math.floor(Math.min(...cs) / 5) * 5 - 5, hi = Math.ceil(Math.max(...cs) / 5) * 5 + 5;
+  if (band) {
+    const x = t => L + (t - t0) / (t1 - t0) * (W - L - R), y = c => T + (hi - c) / (hi - lo) * (H - T - B);
+    let g = ''; const step = hi - lo > 40 ? 10 : 5;
+    for (let c = lo; c <= hi; c += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(c)}" y2="${y(c)}"/><text class="lbl" x="${L - 6}" y="${y(c) + 4}" text-anchor="end">${c}°</text>`;
+    for (let i = 0; i <= 5; i++) { const t = t0 + (t1 - t0) * i / 5; g += `<text class="lbl" x="${x(t)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === 5 ? 'end' : 'middle'}">${new Date(t).toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short' })}</text>`; }
+    const ds = daily.filter(d => d.t + 864e5 >= t0);
+    const top = ds.map((d, i) => `${i ? 'L' : 'M'}${x(d.t + 432e5).toFixed(1)},${y(d.max).toFixed(1)}`).join(''), bot = ds.slice().reverse().map(d => `L${x(d.t + 432e5).toFixed(1)},${y(d.min).toFixed(1)}`).join('');
+    g += `<path class="area" style="opacity:.25" d="${top}${bot}Z"/><path class="line" d="${top}"/><path class="line" style="stroke:var(--blue)" d="${ds.map((d, i) => `${i ? 'L' : 'M'}${x(d.t + 432e5).toFixed(1)},${y(d.min).toFixed(1)}`).join('')}"/>`;
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${g}</svg>`;
+  }
   const x = t => L + (t - t0) / (t1 - t0) * (W - L - R), y = c => T + (hi - c) / (hi - lo) * (H - T - B);
   let g = ''; const step = hi - lo > 40 ? 10 : 5;
   for (let c = lo; c <= hi; c += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(c)}" y2="${y(c)}"/><text class="lbl" x="${L - 6}" y="${y(c) + 4}" text-anchor="end">${c}°</text>`;
@@ -91,7 +111,7 @@ function chartSvg(pts) {
     g += `<text class="lbl" x="${x(t)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === ticks ? 'end' : 'middle'}">${lab}</text>`;
   }
   const segs = []; let cur = [];
-  for (const p of pts) { if (cur.length && p.t - cur[cur.length - 1].t > 40 * 60e3) { segs.push(cur); cur = []; } cur.push(p); }
+  for (const p of pts) { if (cur.length && p.t - cur[cur.length - 1].t > 2 * 3600e3) { segs.push(cur); cur = []; } cur.push(p); }
   if (cur.length) segs.push(cur);
   for (const s of segs) {
     const d = s.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.c).toFixed(1)}`).join('');
@@ -103,11 +123,15 @@ function chartSvg(pts) {
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${g}</svg>`;
 }
 function paintGraphs() {
-  const probed = DEVS.filter(d => d.temp != null || (HIST[d.id] || []).length);
+  const probed = DEVS.filter(d => d.temp != null || d.sensor || (HIST[d.id] || []).length || CLOUD[d.id]);
+  const from = Date.now() - days * 864e5;
   $('graphs').innerHTML = probed.map(d => {
-    const pts = HIST[d.id] || [], cs = pts.map(p => p.c);
-    const note = pts.length ? `${pts.length} samples · low ${Math.min(...cs).toFixed(1)} °C · high ${Math.max(...cs).toFixed(1)} °C · last sample ${when(pts[pts.length - 1].t)}` : '';
-    return `<div class="gcard"><h3>${esc(d.name)}<small>${esc(d.sensor || '')}${d.temp != null ? ' · now ' + d.temp.toFixed(1) + ' °C' : ''}</small></h3>${chartSvg(pts)}<div class="gnote">${note}</div></div>`;
+    const s = series(d.id), pts = s.pts.filter(p => p.t >= from), cs = pts.map(p => p.c);
+    const ds = s.daily.filter(x => x.t + 864e5 >= from);
+    const note = days >= 30
+      ? (ds.length ? `${ds.length} days · lowest ${Math.min(...ds.map(x => x.min)).toFixed(1)} °C · highest ${Math.max(...ds.map(x => x.max)).toFixed(1)} °C · daily min (blue) and max (amber) from eWeLink's history` : '')
+      : (pts.length ? `${pts.length} points · low ${Math.min(...cs).toFixed(1)} °C · high ${Math.max(...cs).toFixed(1)} °C · last ${when(pts[pts.length - 1].t)} · hourly from eWeLink's history, then our 10-min samples` : '');
+    return `<div class="gcard"><h3>${esc(d.name)}<small>${esc(d.sensor || '')}${d.temp != null ? ' · now ' + d.temp.toFixed(1) + ' °C' : ''}</small></h3>${chartSvg(pts, ds)}<div class="gnote">${note}</div></div>`;
   }).join('') || '<div class="gnote">No device with a probe.</div>';
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { days = +b.dataset.d; document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); load(); }));
@@ -117,9 +141,10 @@ async function load() {
     if (r.status === 401) { $('list').innerHTML = ''; $('list').appendChild(Object.assign(document.createElement('div'), { id: 'signin', innerHTML: 'Sign in to the Shift Hub first (admins only) — <a href="/">open the hub</a>.', style: 'display:block;padding:14px 0' })); return; }
     const v = await r.json();
     if (v.error) { $('msg').textContent = v.error; return; }
-    $('msg').textContent = ''; DEVS = v.devices; HIST = v.history || {}; paint(); paintGraphs();
+    $('msg').textContent = ''; DEVS = v.devices; HIST = v.history || {}; CLOUD = v.cloud || {}; paint(); paintGraphs();
     const on = DEVS.filter(d => d.online).length;
-    $('upd').innerHTML = `Last read from the eWeLink cloud at <b>${when(new Date(v.at).getTime())}</b> · ${on} of ${DEVS.length} online · the cloud gives no per-device time, so an offline device shows its last stored reading`;
+    lastRead = Date.now();
+    $('upd').innerHTML = `Last read from the eWeLink cloud at <b>${when(new Date(v.at).getTime())}</b> · refreshes every 30 s, next in <b id="next">30</b> s · ${on} of ${DEVS.length} online · the cloud gives no per-device time, so an offline device shows its last stored reading`;
   } catch (e) { $('msg').textContent = 'Could not reach eWeLink: ' + e.message; }
 }
 $('list').addEventListener('click', async e => {
@@ -134,7 +159,9 @@ $('list').addEventListener('click', async e => {
   } catch (err) { $('msg').textContent = err.message; }
   busy = false; document.querySelectorAll('button.tg').forEach(x => { const d = DEVS.find(k => k.id === x.dataset.id); x.disabled = !(d && d.online); });
 });
+let lastRead = Date.now();
 load(); setInterval(() => { if (!busy && !document.hidden) load(); }, 30000);
+setInterval(() => { const n = $('next'); if (n) n.textContent = Math.max(0, 30 - Math.round((Date.now() - lastRead) / 1000)); }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 </script>
 <script src="/phone-preview.js"></script>
