@@ -101,7 +101,7 @@
     const M = (D.meters || []).filter((x, i, a) => i > 0 && x.at.slice(0, 7) === m && x.split);
     let met = '';
     if (M.length) {
-      met = `<tr><th>Reading</th><th>Generator 1<small>meter · Deye in + out</small></th><th>Generator 2<small>meter · Deye in + out</small></th><th>EDL<small>meter · Deye in (out)</small></th></tr>`;
+      met = `<tr><th>Reading</th><th>Generator 1 · B<small>meter · Deye in + out</small></th><th>Generator 2 · A<small>meter · Deye in + out</small></th><th>EDL<small>meter · Deye in (out)</small></th></tr>`;
       for (const x of M) { const p = D.meters[D.meters.indexOf(x) - 1], s = x.split, c = k => `+${x[k] - p[k]} · ${n1(s[k].in + s[k].out)}`;
         met += `<tr><td>${dday(p.at)} ${p.at.slice(11)} → ${dday(x.at)} ${x.at.slice(11)}</td><td>${c('gen1')}</td><td>${c('gen2')}</td><td>+${x.edl - p.edl} · ${n1(s.edl.in)} (${n1(s.edl.out)})</td></tr>`; }
     }
@@ -119,7 +119,7 @@
     const edlPat = eb.map(x => `${String(x.a).padStart(2, '0')}:00–${String(x.b).padStart(2, '0')}:00`).join(', ');
 
     // daily table + timeline
-    let dl = `<tr><th>Day</th><th>Solar</th><th>Load</th><th>Gen 1<small>h · in · out</small></th><th>Gen 2<small>h · in · out</small></th><th>EDL<small>h · in · out</small></th><th>Battery<small>min–max %</small></th></tr>`;
+    let dl = `<tr><th>Day</th><th>Solar</th><th>Load</th><th>Gen 1 · B<small>h · in · out</small></th><th>Gen 2 · A<small>h · in · out</small></th><th>EDL<small>h · in · out</small></th><th>Battery<small>min–max %</small></th></tr>`;
     let tl = '';
     const pos = x => (x / 1440 * 100).toFixed(3) + '%';
     for (const d of days) { const p = plant(d), s = S.days[d], soc = (s.soc || []).map(x => x[1]);
@@ -151,7 +151,7 @@
   <p class="note"><b>Into the plant</b> is what the inverter drew from that source (load and battery charging when the sun and the battery were not enough). <b>Out of the plant</b> is solar surplus the inverter pushed back on the same line while that source was on — energy the rest of the building used instead of asking it from the generator (or EDL).</p>
 
   <h2>When each source runs</h2>
-  <p class="note"><span class="dot s-gen1"></span><b>Generator 1</b> mostly ${pat('gen1')} · <span class="dot s-gen2"></span><b>Generator 2</b> mostly ${pat('gen2')} · <span class="dot s-edl"></span><b>EDL</b> about ${n1(T.edl.h / nd)} h a day, at changing times${edlPat ? ` — most often ${edlPat}` : ''}. The change-overs happen on the hour.</p>
+  <p class="note"><span class="dot s-gen1"></span><b>Generator 1 (block B)</b> mostly ${pat('gen1')} · <span class="dot s-gen2"></span><b>Generator 2 (block A)</b> mostly ${pat('gen2')} · <span class="dot s-edl"></span><b>EDL</b> about ${n1(T.edl.h / nd)} h a day, at changing times${edlPat ? ` — most often ${edlPat}` : ''}. The change-overs happen on the hour.</p>
   ${met ? `<h2>Site meters against the inverter</h2><table>${met}</table>
   <p class="note">Generator 1 and Generator 2 meters count energy in both directions, so each one is compared with in + out. EDL's meter is an older disc meter: no solar went out while EDL was on during this period, so how it treats export is not yet known.</p>` : ''}
 
