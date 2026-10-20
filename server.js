@@ -171,6 +171,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'mechanical.html'));
   fs.readFileSync(path.join(__dirname, 'cars.html'));
   fs.readFileSync(path.join(__dirname, 'heater.html'));
+  fs.readFileSync(path.join(__dirname, 'public/heater/moes-ms-103.jpg'));
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
   fs.readFileSync(path.join(__dirname, 'contacts.html'));
@@ -703,6 +704,7 @@ const MIME = {
   '.css':  'text/css',
   '.json': 'application/json',
   '.png':  'image/png',
+  '.jpg':  'image/jpeg',
   '.svg':  'image/svg+xml',
   '.ico':  'image/x-icon',
   '.pdf':  'application/pdf',
@@ -973,7 +975,7 @@ const handler = async (req, res) => {
   // service-account key, backups and logs, none of which may ever be served.
   if (!url.startsWith('/api/')) {
     const STATIC_OK = new Set(['/manifest.json', '/hub-manifest.json', '/sw.js', '/admin-shared.js', '/phone-preview.js', '/dictate.js', '/hub-history.js', '/ajaltoun-plan-ui.js', '/emoji-picker.js', '/line-sheet.js', '/scan-editor.js', '/ask.js', '/media-viewer.js', '/install.js', '/sticky-head.js', '/theme.js']);
-    const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url));
+    const ok = !url.includes('..') && (STATIC_OK.has(url) || /^\/icons\/[\w.-]+$/.test(url) || /^\/public\/(naccache|rent-law)\/[\w.-]+\.pdf$/.test(url) || /^\/public\/heater\/[\w.-]+\.jpg$/.test(url));
     const filePath = ok ? path.join(__dirname, url) : null;
     if (filePath && fs.existsSync(filePath)) {
       const ext = path.extname(filePath);

@@ -40,6 +40,9 @@
   .foot{color:var(--overlay0);font-size:.72rem;line-height:1.5;} .foot a{color:var(--amber);}
   .msg{color:var(--red);font-size:.82rem;margin:8px 0 0;min-height:1.2em;}
   #signin{display:none;} #signin a{color:var(--amber);}
+  .wiring h2{font-size:.95rem;font-weight:600;margin:0 0 10px;}
+  .wiring img{display:block;width:100%;max-width:420px;height:auto;border-radius:10px;border:1px solid var(--surface0);margin:0 auto 12px;}
+  .wiring ul{margin:0;padding-left:18px;color:var(--sub);font-size:.8rem;line-height:1.55;} .wiring li{margin:4px 0;} .wiring b{color:var(--text);}
   @media (max-width:480px){ .sw{flex-wrap:wrap;} .btns{width:100%;justify-content:flex-end;} }
 </style>
 </head>
@@ -67,6 +70,16 @@
     <div class="sw"><div class="n">Channel 1<small>switch_1</small></div><div class="btns"><span class="state" id="s_ch1">—</span><button class="tg" id="t_ch1" data-c="switch_1" data-k="ch1" role="switch" aria-checked="false" aria-label="Channel 1"></button></div></div>
     <div class="sw"><div class="n">Channel 2<small>switch_2</small></div><div class="btns"><span class="state" id="s_ch2">—</span><button class="tg" id="t_ch2" data-c="switch_2" data-k="ch2" role="switch" aria-checked="false" aria-label="Channel 2"></button></div></div>
     <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="card wiring">
+    <h2>The module</h2>
+    <img src="/public/heater/moes-ms-103.jpg" alt="MOES MS-103 temperature and humidity smart switch module, wired in the heater's box" loading="lazy">
+    <ul>
+      <li><b>MOES MS-103</b> — Temperature and Humidity Smart Switch Module, 90–250 V AC, 15 A per gang (15 A total), Wi-Fi 2.4 GHz.</li>
+      <li>Terminals left to right: <b>L2</b> and <b>L1</b> are the two relay outputs (channel 2 and channel 1 on this page), <b>G</b> earth, <b>L</b> and <b>N</b> the supply.</li>
+      <li>The temperature probe plugs into the jack on the left; the blue LED is Wi-Fi, the round button resets the pairing.</li>
+    </ul>
   </div>
 
   <p class="foot">Alerts: a channel on for over <b id="onH">2</b> h · water over <b id="maxT">70</b> °C · controller offline for an hour · the free Tuya IoT Core trial 15 days before it expires. Device <span id="devid"></span> · refreshes every 30 s · <a href="/plants">Plants</a></p>
