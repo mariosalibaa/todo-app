@@ -32,7 +32,10 @@ const DEFAULT_SETTINGS = {
   siteYear: 2026,                 // excavation, stone walls, site works: done once for the whole plot
   land: 650000,                   // agreed value between the partners (D3 agreement)
   d3LandHalf: 54167,              // Antoine's half of the D3 land, received by Mario in kind at signing
-  fee: { total: 364350, startYear: 2026, phasing: [0.318, 0.153, 0.153, 0.153, 0.153, 0.07] },   // Shift's services fee, earned by year
+  // Mario's engineer fee (Mario, 2026-10-18): 10.41% of every payment the project receives, earned as the money comes in;
+  // out of it he pays Antoine's half of the D3 land (settled the year of signing) and all of D3's construction.
+  // total/startYear/phasing stay only as the reference of the services contract ($364,350 on $3.5M = 10.41%)
+  fee: { rate: 0.1041, landYear: 2026, total: 364350, startYear: 2026, phasing: [0.318, 0.153, 0.153, 0.153, 0.153, 0.07] },
   villas: {
     U1: { type: 'U', status: 'expected', price: 700000, saleYear: 2027, payYears: 6 },
     U2: { type: 'U', status: 'sold', structureYear: 2026, finishYear: 2027 },

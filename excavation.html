@@ -48,6 +48,11 @@
   .ms-r{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px dashed var(--surface0);} .ms-r b{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:500;} .ms-t b{font-weight:700;}
   .ms-h{font-weight:600;margin:10px 0 4px;color:var(--amber);} .ms-i{padding-left:18px;} .ms-sep{border-top:1px solid var(--surface1);margin:10px 0;}
   .ms-o{border:1.5px solid var(--sub);border-radius:999px;padding:1px 8px;}
+  .md{display:grid;grid-template-columns:180px 180px 1fr;gap:12px;margin:10px 0 16px;} .md>div{border:1px solid var(--surface0);border-radius:12px;padding:12px 14px;}
+  .md-k{display:flex;flex-direction:column;gap:2px;} .md-k i{font-style:normal;color:var(--sub);font-size:.8rem;} .md-k b{font-size:1.45rem;color:var(--amber);font-variant-numeric:tabular-nums;} .md-k span{font-size:.78rem;}
+  .md-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;margin-bottom:6px;}
+  .md-r{display:flex;justify-content:space-between;gap:10px;font-size:.85rem;padding:2px 0;} .md-r b{font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap;} .md-r s{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;}
+  @media (max-width:760px){.md{grid-template-columns:1fr 1fr;} .md-p{grid-column:1/-1;}}
   .ms-l{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:5px 10px;text-align:right;margin-bottom:6px;font-variant-numeric:tabular-nums;} .ms-l>span{text-align:left;} .ms-l i{font-style:normal;color:var(--sub);font-size:.8rem;} .ms-l b{font-weight:500;}
   .hl-g{border-bottom:3px solid #8fd18f;font-weight:700;} .hl-p{border-bottom:3px solid #f5a0c0;font-weight:700;} .hl-b{border-bottom:3px solid #6aa8ff;font-weight:700;}
   @media (max-width:760px){.ms{grid-template-columns:1fr;} .ms-r{flex-wrap:wrap;} .ms-r b{margin-left:auto;}}
@@ -62,12 +67,12 @@
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a href="/ajaltoun#dashboard">Dashboard</a><a href="/ajaltoun#division">Cost per division</a><a href="/ajaltoun#villas">Cost per villa</a><a href="/ajaltoun#budget">BOQ</a><a href="/ajaltoun#plan">Cashflow plan</a><a class="on" href="/ajaltoun/excavation">Excavation</a></nav>
+  <nav class="tabs"><a href="/ajaltoun4193/accounting/dashboard">Dashboard</a><a href="/ajaltoun4193/accounting/division">Cost per division</a><a href="/ajaltoun4193/accounting/villas">Cost per villa</a><a href="/ajaltoun4193/accounting/budget">BOQ</a><a href="/ajaltoun4193/accounting/plan">Cashflow plan</a><a class="on" href="/ajaltoun4193/excavation">Excavation</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
   <h1>Excavation — Georges EL Hajj · Ajaltoun 4193</h1>
-  <div class="vtabs"><a id="vt-exc" href="/ajaltoun/excavation">Excavation</a><a id="vt-diesel" href="/ajaltoun/excavation/diesel">Diesel fills</a><a id="vt-sum" href="/ajaltoun/excavation/mario">Summary</a></div>
+  <div class="vtabs"><a id="vt-exc" href="/ajaltoun4193/excavation">Excavation</a><a id="vt-diesel" href="/ajaltoun4193/excavation/diesel">Diesel fills</a><a id="vt-sum" href="/ajaltoun4193/excavation/mario">Summary</a></div>
   <div id="v-sum" hidden><div id="sstatus" class="small muted">Loading…</div><div id="msum"></div></div>
   <div id="v-diesel" hidden>
     <p class="lead">Every diesel fill, newest first. Litres, price and the bill come from the fill lines on Odoo's diesel bills (read live). Litres per machine and hours since the previous fill come from the site cameras. The diesel up to $0.80/L is inside Anthony's price, and Mario pays what is above it. The payment is the Odoo payment that paid that fill: by the date in its memo, or (≈) by the same amount when the memo does not say.</p>
@@ -107,7 +112,7 @@
   <div class="card"><table id="pays" class="folded"></table></div>
   <div class="note" id="foot"></div>
   <h2>One-page summary <span class="r muted">built from the figures above each time it opens — print it or save it as PDF</span></h2>
-  <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><a class="btn" href="/ajaltoun/excavation/summary" target="_blank" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📄 Open the one-page summary</a><a href="/api/ajaltoun/excavation/doc/mario-summary-2026-10-18.jpg" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📝 Mario's summary on paper (18-10-2026)</a><span class="small muted">the same page Antoine sees: headline figures, the deal, the partner ledger reconciled, who was paid from which account, cycle by cycle, cost per m³</span></div>
+  <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><a class="btn" href="/ajaltoun4193/excavation/summary" target="_blank" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📄 Open the one-page summary</a><a href="/api/ajaltoun/excavation/doc/mario-summary-2026-10-18.jpg" style="text-decoration:none;padding:8px 14px;border:1px solid var(--surface1);border-radius:8px;color:var(--amber)">📝 Mario's summary on paper (18-10-2026)</a><span class="small muted">the same page Antoine sees: headline figures, the deal, the partner ledger reconciled, who was paid from which account, cycle by cycle, cost per m³</span></div>
   </div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -330,7 +335,8 @@ function renderTotal() {
   const geo = r2(T.collected + prov + T.retentionOpen + T.dueDib), pat = r2(P.paid + P.open), all = r2(geo + pat);
   // the extra = all he gets (paid + still to pay) above his bills, to the cent (Mario, 2026-10-18: "why we have rounding"); the
   // per-cycle Anthony table counts the diesel at $0.80/L in whole dollars, so it reads ~3.49 more
-  const extra = Math.max(0, r2(geo - T.bills));
+  const cert = r2(T.bills - (T.closing || 0));   // the certificates; the closing bill (Anthony above them, 2026-10-18) is the extra itself, booked
+  const extra = Math.max(0, r2(geo - cert));
   const m3G = C.m3 || 0, m3P = P.m3 || 0, m3 = m3G + m3P, pm = (v, q) => q ? '$ ' + f(v / q) + ' /m³' : '—';
   const row = (label, v, cls = '', note = '') => `<tr${cls ? ` class="${cls}"` : ''}><td>${label}${note ? ` <span class="muted small">· ${note}</span>` : ''}</td><td class="n">$ ${f(v)}</td></tr>`;
   el.innerHTML = `<h2>Total excavation cost <span class="r muted">paid + still to pay, Georges and Patrick</span></h2><div class="card"><table class="prov"><tbody>
@@ -341,8 +347,8 @@ function renderTotal() {
     ${row('= Georges EL Hajj (Anthony + Dib + commission)', geo, 'sub', `${f(m3G, 0)} m³`)}
     ${row('+ Patrick Hokayem, first contractor', pat, '', `${esc(P.bills.map(b => b.name + ' ' + b.ref).join(', '))} · ${f(m3P, 0)} m³${P.open ? ' · ' + f(P.open) + ' still open' : ' · paid'}`)}
     ${row('Total excavation cost', all, 'tot', `${f(m3, 0)} m³`)}
-    ${row('of which the extra Anthony received', extra, 'bad', `paid above his certificates — he is not coming back, so it stays a cost`)}
-    ${row('= the work at the agreed prices', r2(all - extra), '', `Georges' bills ${f(T.bills)} + Patrick ${f(pat)}`)}
+    ${row('of which the extra Anthony received', extra, 'bad', `paid above his certificates — he is not coming back, so it stays a cost${T.closing ? ` · booked as the closing bill ${f(T.closing)}` : ''}`)}
+    ${row('= the work at the agreed prices', r2(all - extra), '', `Georges' certificates ${f(cert)} + Patrick ${f(pat)}`)}
   </tbody></table>
   <table class="prov" style="margin-top:10px"><thead><tr><th>Unit price</th><th class="n">m³</th><th class="n">$/m³</th></tr></thead><tbody>
     <tr><td>Georges EL Hajj, all in <span class="muted small">· incl. commission, diesel, day rate and Anthony's extra</span></td><td class="n">${f(m3G, 0)}</td><td class="n">${pm(geo, m3G)}</td></tr>
@@ -362,11 +368,24 @@ function renderMario() {
   const viaIpt = r2(D.payments.filter(p => p.forAnthony).reduce((t, p) => t + p.amount, 0));
   const who = re => r2(D.payments.filter(p => re.test(p.collector) && !p.forAnthony).reduce((t, p) => t + p.amount, 0) + D.pending.filter(l => re.test(l.collector)).reduce((t, l) => t + l.amount, 0));
   const anth = r2(who(/anthony/i) + viaIpt), dib = who(/dib/i), ipt = who(/ipt/i), paid = r2(T.collected);
-  const geo = r2(T.collected + T.retentionOpen + T.dueDib), extra = r2(geo - T.bills), pat = r2(P.paid + P.open), all = r2(geo + pat), m3All = m3 + (P.m3 || 0);
+  const cert = r2(T.bills - (T.closing || 0));   // the certificates; the closing bill (Anthony above them) is shown on its own line
+  const geo = r2(T.collected + T.retentionOpen + T.dueDib), extra = r2(geo - cert), pat = r2(P.paid + P.open), all = r2(geo + pat), m3All = m3 + (P.m3 || 0);
   const refunds = D.payments.filter(p => p.amount < 0).map(p => -p.amount), ref = refunds.reduce((t, x) => t + x, 0);
   const n0 = v => f(v, 0), $ = v => f(v) + ' $', R = (l, v, c = '') => `<div class="ms-r ${c}"><span>${l}</span><b>${v}</b></div>`;
   const hl = (v, k) => `<span class="hl-${k}">${v}</span>`, O = v => `<span class="ms-o">${v}</span>`;   // his highlighters: green = Georges' bills, pink = paid, blue = all in; circled = a total
-  document.getElementById('msum').innerHTML = `<div class="ms">
+  // small dashboard on top (Mario, 2026-10-18): total cost, unit price, and what each $/m³ is made of — the parts add up to the total
+  const hajj = r2(T.excavation + T.retention), parts = [
+    ['Patrick', `${f(P.m3 ? pat / P.m3 : 0)} $ × ${n0(P.m3)} m³`, pat, 'var(--sub)'],
+    ['Georges EL Hajj', `${f(m3 ? hajj / m3 : 0)} $ × ${n0(m3)} m³`, hajj, 'var(--amber)'],
+    ...(T.days ? [['days', `300 $ × ${f(days, days % 1 ? 1 : 0)}`, T.days, 'var(--overlay0)']] : []),
+    ['Anthony above bills', `${f(m3 ? extra / m3 : 0)} $ × ${n0(m3)} m³`, extra, '#f38ba8'],
+    ['diesel above 0.8 $/L', `${f(m3 ? T.diesel / m3 : 0)} $/m³ · avg ${f(perL, 3)} $/L`, T.diesel, '#89b4fa']];
+  const dash = `<div class="md">
+    <div class="md-k"><i>Total cost</i><b>${$(all)}</b><span class="muted">${n0(m3All)} m³</span></div>
+    <div class="md-k"><i>Unit price</i><b>${f(m3All ? all / m3All : 0, 3)} $/m³</b><span class="muted">${f(all)} ÷ ${n0(m3All)}</span></div>
+    <div class="md-p"><div class="md-bar">${parts.map(p => `<span style="flex:${p[2]};background:${p[3]}" title="${p[0]} ${$(p[2])}"></span>`).join('')}</div>
+      ${parts.map(p => `<div class="md-r"><span><s style="background:${p[3]}"></s>${p[0]} <span class="muted">${p[1]}</span></span><b>${$(p[2])}</b></div>`).join('')}</div></div>`;
+  document.getElementById('msum').innerHTML = dash + `<div class="ms">
   <div class="ms-col">
     ${R(`• Patrick Hokayem — ${n0(P.m3)} m³ × ${f(P.m3 ? pat / P.m3 : 0, 0)} $`, O($(pat)))}
     <div class="ms-h">• Georges EL Hajj</div>
@@ -374,7 +393,7 @@ function renderMario() {
     ${R(`− ${n0(T.retention / 0.5)} m³ × 0.5 $ <span class="muted">(commission)</span>`, $(T.retention))}${T.days ? R(`− 300 $ × ${f(days, days % 1 ? 1 : 0)} days`, $(T.days)) : ''}
     ${R(`<span class="muted">${f(sub)} + ${f(T.retention)} =</span>`, O($(contract)), 'ms-t')}
     ${R(`− ${n0(C.litres)} L × (price − 0.8 $/L) <span class="muted">⇒ average ${f(perL, 3)} $/L</span>`, O($(T.diesel)))}
-    ${R(`⇒ ${f(m3 ? T.bills / m3 : 0)} $/m³ × ${n0(m3)} m³ average <span class="muted">· invoice Georges EL Hajj</span>`, hl($(T.bills), 'g'), 'ms-t')}
+    ${R(`⇒ ${f(m3 ? cert / m3 : 0)} $/m³ × ${n0(m3)} m³ average <span class="muted">· invoice Georges EL Hajj</span>`, hl($(cert), 'g'), 'ms-t')}
     <div class="ms-sep"></div>
     ${R('① retention', $(T.retentionOpen))}
     ${R(`② payment${T.pendingHub ? ` <span class="muted">(incl. ${f(T.pendingHub)} on Whish not booked)</span>` : ''}`, hl($(paid), 'p'))}
@@ -383,7 +402,8 @@ function renderMario() {
     ${R('③ diesel not paid', $(T.dueDib))}
     ${(T.unpaidFills || []).map(x => R(`<span class="ms-i">${esc(x.date)} · ${f(x.litres, 0)} L × ${x.perL} $/L</span>`, `<span class="muted">${$(x.amount)}</span>`)).join('')}
     ${R('① + ② + ③', hl($(geo), 'b'), 'ms-t')}
-    ${R(`⇒ ${f(geo)} − ${f(T.bills)} =`, O($(extra)), 'ms-t')}
+    ${R(`⇒ ${f(geo)} − ${f(cert)} =`, O($(extra)), 'ms-t')}
+    ${T.closing ? R(`<span class="muted">booked as the closing bill ${esc((D.bills.find(b => b.kind === 'closing') || {}).name || '')} · ${f(cert)} + ${f(T.closing)} =</span>`, hl($(T.bills), 'g')) : ''}
   </div>
   <div class="ms-col">
     <div class="ms-h">Partner ledger Georges EL Hajj</div>
@@ -395,11 +415,11 @@ function renderMario() {
     ${R('', hl($(geo), 'b'), 'ms-t')}
     <div class="ms-sep"></div>
     <div class="ms-h">Total excavation</div>
-    ${R(`• invoice ${f(pat, 0)} + ${f(T.bills)}`, $(r2(pat + T.bills)))}
+    ${R(`• invoice ${f(pat, 0)} + ${f(cert)}`, $(r2(pat + cert)))}
     ${R('• paid <span class="muted">(Georges)</span>', $(paid))}
     ${R(`• to pay · diesel ${f(T.dueDib)} + retention ${f(T.retentionOpen)}`, $(r2(T.dueDib + T.retentionOpen)))}
     ${R('<span class="muted">Georges, paid + to pay</span>', hl($(geo), 'b'), 'ms-t')}
-    ${R(`• amount received by Anthony above his bills <span class="muted">— he is not coming back, a cost</span>`, O($(extra)))}
+    ${R(`• amount received by Anthony above his bills <span class="muted">— he is not coming back, a cost${T.closing ? ' · billed' : ''}</span>`, O($(extra)))}
     <div class="ms-sep"></div>
     ${R(`⇒ exc ${f(geo)} ÷ ${n0(m3)} m³`, f(m3 ? geo / m3 : 0) + ' $/m³')}
     ${R(`+ ${f(pat)} ÷ ${n0(P.m3)} m³ <span class="muted">(Patrick)</span>`, f(P.m3 ? pat / P.m3 : 0) + ' $/m³')}
@@ -421,10 +441,10 @@ const f = (n, d = 2) => (+n || 0).toLocaleString('en-US', { minimumFractionDigit
 Admin.require(['ajaltoun', 'excavation'], me => {
   ME = me;
   const full = (me.apps || []).includes('ajaltoun');
-  Admin.crumbs(full ? [['Ajaltoun 4193', '/ajaltoun#dashboard'], ['Excavation']] : [['Ajaltoun 4193 — Excavation']]);
+  Admin.crumbs(full ? [['Ajaltoun 4193', '/ajaltoun4193'], ['Excavation']] : [['Ajaltoun 4193 — Excavation']]);
   if (!full) document.querySelector('nav.tabs').hidden = true;
   document.getElementById('who').innerHTML = `<span>${esc(me.name || me.email)}</span>` + (me.local ? '' : '<a href="#" onclick="Admin.signOut();return false;">Sign out</a>');
-  // two tabs on one page (Mario, 2026-10-14): /ajaltoun/excavation and /ajaltoun/excavation/diesel — each loads only its own data
+  // two tabs on one page (Mario, 2026-10-14): /ajaltoun4193/excavation and /ajaltoun4193/excavation/diesel — each loads only its own data
   const isDiesel = /\/diesel\/?$/.test(location.pathname), isSum = /\/mario\/?$/.test(location.pathname);   // + Summary, Mario's paper made live (2026-10-18)
   document.body.classList.toggle('diesel', isDiesel);
   document.getElementById('vt-' + (isDiesel ? 'diesel' : isSum ? 'sum' : 'exc')).classList.add('on');
@@ -504,7 +524,7 @@ function render() {
   // What is still open, split the way the bills are named (Mario, 2026-09-26): excavation (his m³ and the day
   // rate), diesel (Dib’s fills above $0.80/L) and the retention that is held to the end.
   const openByKind = (D.bills || []).reduce((g, b) => {
-    const k = b.kind === 'diesel' ? 'diesel' : b.kind === 'retention' ? 'retention' : 'excavation';
+    const k = b.kind === 'diesel' ? 'diesel' : b.kind === 'retention' ? 'retention' : b.kind === 'closing' ? 'closing' : 'excavation';
     g[k] = r2((g[k] || 0) + (b.residual || 0)); return g;
   }, {});
   const openLines = [
@@ -564,7 +584,7 @@ function render() {
   if (!document.getElementById('v-sum').hidden) renderMario();
   document.getElementById('foot').innerHTML = `<b>How to read it.</b> "Collected by" comes from the Whish line each payment is tied to (the phone that received it); a payment with no Whish line is cash handed to Anthony Khalil. "From which account" is the Odoo journal of the payment. Excavation and diesel-difference bills are settled oldest first; the retention bills stay open until the project ends. Pending = Whish lines from Anthony or Dib Mokhtar that are not yet booked in Odoo — book them from Accounting → Accounts (📗 Pay).`;
 }
-const KIND = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate' };
+const KIND = { excavation: 'Excavation', diesel: 'Diesel diff', retention: 'Commission (retention)', days: 'Day rate', closing: 'Closing (Anthony above the bills)' };
 const ODOO_BILL = 'https://shift2.odoo.com/odoo/vendor-bills/', ODOO_PAY = 'https://shift2.odoo.com/odoo/vendor-payments/';   // /odoo/<action path>/<id> link (Mario, 2026-10-18): through the Accounting action so Odoo opens with its menu bar; Odoo switches to the record company by itself
 function renderBills() {
   const rows = ordered(D.bills.filter(b => inPeriod(b.date)).map((b, i) => ({ ...b, seq: i })));

@@ -66,7 +66,8 @@ async function build(ctx) {
   for (const c of pending.filter(l => !collectors.some(c => c.key === l.collector))) collectors.push({ key: c.collector, amount: 0, n: 0, reconciled: 0, pending: sum(pending.filter(l => l.collector === c.collector)), pendingN: pending.filter(l => l.collector === c.collector).length });
   const journals = group(payments, 'journal');
   const B = bills.map(b => ({ id: b.id, name: b.name, ref: b.ref || '', date: b.date, due: b.invoice_date_due, total: r2(b.amount_total), residual: r2(b.amount_residual), state: b.payment_state,
-    kind: /retention/i.test(b.ref || '') ? 'retention' : isDiesel(b.ref) ? 'diesel' : /DAYS|day rate/i.test(b.ref || '') ? 'days' : 'excavation' }));
+    // 'closing' (Mario, 2026-10-18): the bill for what Anthony collected above the certificates — paid + retention + diesel to pay − bills
+    kind: /CLOSING/i.test(b.ref || '') ? 'closing' : /retention/i.test(b.ref || '') ? 'retention' : isDiesel(b.ref) ? 'diesel' : /DAYS|day rate/i.test(b.ref || '') ? 'days' : 'excavation' }));
   // the diesel bills carry one line per fill "d-m diesel <L>L*<$/L>" priced at ($/L − 0.80): litres and the real price come from there
   const dieselIds = bills.filter(b => isDiesel(b.ref)).flatMap(b => b.invoice_line_ids || []);
   const dl = dieselIds.length ? await odooCall('account.move.line', 'read', [dieselIds, ['name', 'quantity', 'price_unit', 'price_subtotal']], { context: CTX }) : [];
@@ -82,7 +83,7 @@ async function build(ctx) {
   const totals = {
     paidOdoo: sum(payments), pendingHub: sum(pending), collected: r2(sum(payments) + sum(pending)),
     bills: sum(B.map(b => ({ amount: b.total }))), excavation: sum(B.filter(b => b.kind === 'excavation').map(b => ({ amount: b.total }))), days: sum(B.filter(b => b.kind === 'days').map(b => ({ amount: b.total }))),
-    diesel: sum(B.filter(b => b.kind === 'diesel').map(b => ({ amount: b.total }))), retention: sum(B.filter(b => b.kind === 'retention').map(b => ({ amount: b.total }))),
+    diesel: sum(B.filter(b => b.kind === 'diesel').map(b => ({ amount: b.total }))), retention: sum(B.filter(b => b.kind === 'retention').map(b => ({ amount: b.total }))), closing: sum(B.filter(b => b.kind === 'closing').map(b => ({ amount: b.total }))),
     open: sum(B.filter(b => b.kind !== 'retention').map(b => ({ amount: b.residual }))),
     // the open amount split: what Dib is owed for fills not yet paid (the full price of the diesel, Anthony's share included,
     // since Shift pays Dib and holds Anthony's part back) and the rest, which is Anthony's / Georges' (Mario, 2026-09-13)
@@ -115,7 +116,7 @@ async function build(ctx) {
     (fillsOf[b.id] ||= []).push({ date: d ? `${+d[1]}-${+d[2]}` : '', litres: L, perL, amount: Math.round(L * perL), paid: !unpaidFills.some(u => d && u.date === `${+d[1]}-${+d[2]}`) });
   }
   for (const b of B) {
-    const c = cycOf(b.ref); if (!c) continue;
+    const c = cycOf(b.ref); if (!c || b.kind === 'closing') continue;
     const row = (cyc[c.n] ||= { n: c.n, till: '', m3: 0, totalM3: 0, contract: 0, retention: 0, diesel: 0, litres: 0, fills: '' });
     const mm = b.ref.match(/([\d,\.]+)\s*m3 of ([\d,\.]+)\s*m3/); if (mm) { row.m3 = +mm[1].replace(/,/g, ''); row.totalM3 = +mm[2].replace(/,/g, ''); }
     if (c.kind === 'D') { row.diesel += b.total; row.litres += litresOf[b.id] || 0; row.fillList = [...(row.fillList || []), ...(fillsOf[b.id] || [])]; row.fills = (b.ref.match(/\(([\d\-]+\.\.[\d\-]+)/) || [])[1] || ''; }
@@ -353,7 +354,7 @@ async function handle(req, res, url, user, ctx) {
 // Dib / IPT payment memo names as "filled d-m-yyyy". For the Ajaltoun cost pages, as money still to pay (Mario, 2026-10-18)
 async function unpaidFills(odooCall) {
   const [bills, pays] = await Promise.all([
-    odooCall('account.move', 'search_read', [[['partner_id', '=', PARTNER], ['company_id', '=', COMPANY], ['move_type', '=', 'in_invoice'], ['state', '=', 'posted']]], { fields: ['name', 'ref', 'invoice_line_ids'], context: CTX }),
+    odooCall('account.move', 'search_read', [[['partner_id', '=', PARTNER], ['company_id', '=', COMPANY], ['move_type', '=', 'in_invoice'], ['state', '=', 'posted']]], { fields: ['name', 'ref', 'invoice_line_ids', 'amount_residual'], context: CTX }),
     odooCall('account.payment', 'search_read', [[['partner_id', '=', PARTNER], ['company_id', '=', COMPANY], ['state', 'in', ['paid', 'in_process', 'posted']], ['memo', 'ilike', 'filled']]], { fields: ['memo'], context: CTX }),
   ]);
   const db = bills.filter(b => isDiesel(b.ref)), ids = db.flatMap(b => b.invoice_line_ids || []);
@@ -363,6 +364,10 @@ async function unpaidFills(odooCall) {
     if (memos.some(m => new RegExp('filled ' + (+d[1]) + '-' + (+d[2]) + '-').test(m))) continue;
     const m = (l.name || '').match(/L\s*\*\s*-?([\d.]+)/i), L = +l.quantity || 0, perL = m ? +m[1] : (+l.price_unit + 0.8);
     out.push({ day: +d[1], month: +d[2], litres: L, perL, amount: Math.round(L * perL), bill: l.move_id ? l.move_id[1].split(' ')[0] : '' }); }
-  return out;
+  // a closing bill (ref CLOSING, Mario 2026-10-18) already holds these fills as its open amount: Odoo has them, so they are not
+  // 'to pay, not in Odoo yet' any more — the latest fills first, up to what is still open on it
+  let closingOpen = bills.filter(b => /CLOSING/i.test(b.ref || '')).reduce((t, b) => t + (b.amount_residual || 0), 0);
+  out.sort((a, b) => (b.month - a.month) || (b.day - a.day));
+  return out.filter(f => { if (closingOpen + 0.01 >= f.amount) { closingOpen -= f.amount; return false; } return true; });
 }
 module.exports = { handle, unpaidFills };

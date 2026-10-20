@@ -84,7 +84,7 @@ td.foot{min-width:150px}
     <div class="wordmark">SHIFT <span>GROUP</span><small>AJALTOUN 4193</small></div>
     <span id="crumbs"></span>
   </div>
-  <nav class="tabs"><a id="t-daily" href="/ajaltoun/machines/daily">Day report</a><a id="t-days" href="/ajaltoun/machines">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun/machines/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun/machines/diesel">Diesel</a><a id="t-flags" href="/ajaltoun/machines/flags">Suspicious</a><a id="t-georges" href="/ajaltoun/machines/georges">RAV4</a><a id="t-bmw" href="/ajaltoun/machines/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun/machines/tacoma">Tacoma</a><a id="t-cars" href="/ajaltoun/machines/cars">All cars</a><a id="t-plates" href="/ajaltoun/machines/plates">Plates</a></nav>
+  <nav class="tabs"><a id="t-daily" href="/ajaltoun4193/cameras/daily">Day report</a><a id="t-days" href="/ajaltoun4193/cameras">Hours &amp; trucks</a><a id="t-loads" href="/ajaltoun4193/cameras/loads">Truck loads</a><a id="t-diesel" href="/ajaltoun4193/cameras/diesel">Diesel</a><a id="t-flags" href="/ajaltoun4193/cameras/flags">Suspicious</a><a id="t-georges" href="/ajaltoun4193/cameras/georges">RAV4</a><a id="t-bmw" href="/ajaltoun4193/cameras/bmw">BMW</a><a id="t-tacoma" href="/ajaltoun4193/cameras/tacoma">Tacoma</a><a id="t-cars" href="/ajaltoun4193/cameras/cars">All cars</a><a id="t-plates" href="/ajaltoun4193/cameras/plates">Plates</a></nav>
   <div class="who" id="who"></div>
 </header>
 <main>
@@ -159,7 +159,7 @@ td.foot{min-width:150px}
     <h2>Litres per machine-hour between fills</h2>
     <div class="card tcard"><table id="dint"><thead><tr><th>Fill</th><th class="n">Litres</th><th>Hours since previous fill</th><th class="n">Hitachi h</th><th class="n">Komatsu h</th><th class="n">L / h</th><th class="n">Expected L</th><th class="n">Delivered − expected</th></tr></thead><tbody></tbody></table></div>
     <div class="note" id="dexp"></div>
-    <h2>Every fill <a class="small" href="/ajaltoun/excavation/diesel" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400;color:var(--amber)">full table with bills and payments ›</a></h2>
+    <h2>Every fill <a class="small" href="/ajaltoun4193/excavation/diesel" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400;color:var(--amber)">full table with bills and payments ›</a></h2>
     <div class="card tcard"><table id="dfill"><thead><tr><th>Date</th><th class="n">Litres</th><th class="n">$/L</th><th class="n">Total $</th><th>Machine</th><th>Odoo</th><th>Dib paid</th></tr></thead><tbody></tbody></table></div>
   </section>
 </main>
@@ -231,7 +231,7 @@ function renderDays() {
         html += `<tr data-m="${m}" hidden class="part ${x.sun ? 'sun' : ''}"><td style="white-space:nowrap">${x.wd} ${x.day}${P.partial ? ' <span class="small muted">so far</span>' : ''}</td>
           <td class="n">${P.work ? tick : ''}</td><td class="n">${!P.work && !P.partial ? '●' : ''}</td><td class="n">${x.sun ? '●' : ''}</td><td class="n"></td>
           <td class="n muted" colspan="4">hours &amp; loads pending</td>
-          <td class="small foot">📱 phone events${P.first ? ` · pit active ${P.first}–${P.last}` : ' · no activity on the pit cameras'} · 🚚 ${P.vehicle} 🚶 ${P.person}<div class="muted">${esc((d.cams || []).join(' + ') || 'no camera events')}</div></td><td class="small muted"><a href="/ajaltoun/machines/daily" style="color:var(--amber)">day report ›</a></td></tr>`;
+          <td class="small foot">📱 phone events${P.first ? ` · pit active ${P.first}–${P.last}` : ' · no activity on the pit cameras'} · 🚚 ${P.vehicle} 🚶 ${P.person}<div class="muted">${esc((d.cams || []).join(' + ') || 'no camera events')}</div></td><td class="small muted"><a href="/ajaltoun4193/cameras/daily" style="color:var(--amber)">day report ›</a></td></tr>`;
         continue;
       }
       const x = dd(d.date), none = d.hitachi == null, part = /^from|until|mostly|pit camera/.test(d.footage || ''), work = isWork(d);

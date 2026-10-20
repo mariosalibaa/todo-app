@@ -390,7 +390,17 @@
     const back = [...full.slice(0, -1)].reverse().find(c => (c[1] || '').split(/[?#]/)[0].replace(/\/$/, '') !== here) || full[0];
     el.className = 'crumbs';
     el.innerHTML = `<a class="hback" href="${esc(back[1])}" title="Back to ${esc(back[0])}">&lsaquo; Back</a>` +
-      full.map((c, i) => (i ? '<span class="sep">›</span>' : '') + (i < full.length - 1 ? `<a href="${esc(c[1])}" title="${esc(c[0])}">${i === 0 ? '⌂ ' : ''}${esc(c[0])}</a>` : `<span class="cur">${esc(c[0])}</span>`)).join('');
+      full.map((c, i) => (i ? '<span class="sep">›</span>' : '') + (i < full.length - 1 ? `<a href="${esc(c[1])}" title="${esc(c[0])}"${samePage(c[1]) ? ` onclick="return Admin.crumbGo(this)" data-back="${esc(back[1])}"` : ''}>${i === 0 ? '⌂ ' : ''}${esc(c[0])}</a>` : `<span class="cur">${esc(c[0])}</span>`)).join('');
+  };
+  // a crumb on this same page ('/ajaltoun4193/accounting/dashboard') only changed the hash, so nothing happened (Mario, 2026-10-18:
+  // "when I press on Ajaltoun 4193 it should go back"): already on that view → go back like the Back button,
+  // another tab of the page → open that tab
+  const samePage = u => (u || '').split(/[?#]/)[0].replace(/\/$/, '') === location.pathname.replace(/\/$/, '');
+  A.crumbGo = function (a) {
+    const u = new URL(a.getAttribute('href'), location.href);
+    if (u.hash && u.hash !== location.hash && !(u.hash === '#dashboard' && !location.hash)) { location.href = u.href; location.reload(); }
+    else location.href = a.dataset.back;
+    return false;
   };
 
   // ── Phone layout for every hub page (Mario, 2026-09-13) ──────────────────────────────────────────────
@@ -459,7 +469,7 @@
       // then the ✦ AI button on/off (drag the button itself to move it)
       const NAV = [['/', '⌂ Hub', null], ['/site', '💬 Shift WhatsApp', 'site'], ['/whatsapp', '📱 WhatsApp archive', 'admin'], ['/accounting/accounts', '▦ Accounts', 'accounting'],
         ['/accounting/daily', '📋 Day report', 'daily'], ['/accounting/statements', '🧾 Statements', 'accounting'], ['/ajaltoun', '🏡 Ajaltoun', 'ajaltoun'],
-        ['/ajaltoun/excavation', '🚜 Excavation', 'excavation'], ['/partners', '🤝 Partners', 'partners'], ['/reports', '📊 Reports', 'reports'],
+        ['/ajaltoun4193/excavation', '🚜 Excavation', 'excavation'], ['/ajaltoun4193/partners', '🤝 Partners', 'partners'], ['/reports', '📊 Reports', 'reports'],
         ['/crm', '📇 CRM', 'crm'], ['/todo', '✅ To-Do', 'todo'], ['/mahab', '☀️ Mahab plant', 'admin'], ['/khoder', '👷 Khoder & Walid', 'admin']];
       const navHtml = () => { const me = A.me || {}, apps = me.apps || [], here = location.pathname.replace(/\/+$/, '') || '/';
         const items = NAV.filter(([h, , k]) => !k || (k === 'admin' ? me.admin : (me.admin || apps.includes(k))));

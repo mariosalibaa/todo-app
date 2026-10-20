@@ -27,6 +27,8 @@
   h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--overlay0);margin:30px 0 10px;font-weight:600;display:flex;align-items:center;gap:10px;}
   h2 .r{margin-left:auto;font-weight:400;letter-spacing:0;text-transform:none;font-size:.74rem;}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
+  .mtab tr.grp0 td{background:rgba(242,169,59,.08);font-weight:600;} .mtab tr.grp1 td{background:rgba(242,169,59,.04);font-weight:500;}
+  .kpi.hero{margin-bottom:10px;padding:18px 22px;} .kpi.hero .v{font-size:2.1rem;} .kpi.hero .l{font-size:.9rem;}
   .kpi{background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:14px 14px;}
   .kpi .v{font-size:1.35rem;font-weight:600;letter-spacing:-.01em;} .kpi .l{font-size:.72rem;color:var(--sub);margin-top:3px;line-height:1.35;}
   .kpi.in .v{color:var(--green);} .kpi.out .v{color:var(--red);} .kpi.cash .v{color:var(--amber);} .kpi.eq .v{color:var(--blue);}
@@ -83,7 +85,7 @@
   .stamp{font-size:.7rem;color:var(--overlay0);line-height:1.35;}
   .file{color:var(--amber);text-decoration:none;font-size:.78rem;margin-right:6px;} .file:hover{text-decoration:underline;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  @media (max-width:800px){.grid2{grid-template-columns:1fr;} header{padding:12px 14px;} main{padding:18px 12px;} .wrap{overflow-x:auto;}}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr;} .grid2>div{min-width:0;} header{padding:12px 14px;} main{padding:18px 12px;} .wrap{overflow-x:auto;}}
   /* the viewer, as on the Partners page */
   #viewer{position:fixed;inset:0;background:#0f0f17;z-index:500;display:none;flex-direction:column;} #viewer.on{display:flex;}
   .vbar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--mantle);border-bottom:1px solid var(--surface0);flex:none;}
@@ -98,6 +100,7 @@
   .tabs a{padding:8px 14px;color:var(--sub);text-decoration:none;font-size:.88rem;border-radius:8px;white-space:nowrap;}
   .tabs a.on{color:var(--amber);background:rgba(242,169,59,.1);font-weight:600;} .tabs a:hover{color:var(--text);}
   @media (max-width:700px){.tabs a{padding:6px 9px;font-size:.8rem;}}
+  .vtabs{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 14px;border-bottom:1px solid var(--surface0);} .vtabs a{padding:7px 14px;color:var(--sub);text-decoration:none;font-size:.84rem;border-bottom:2px solid transparent;margin-bottom:-1px;} .vtabs a.on{color:var(--amber);border-bottom-color:var(--amber);font-weight:600;}
   .lang button{background:none;border:1px solid var(--surface0);color:var(--sub);font-size:.75rem;padding:4px 11px;cursor:pointer;}
   .lang button:first-child{border-radius:6px 0 0 6px;} .lang button:last-child{border-radius:0 6px 6px 0;margin-left:-1px;} .lang button.on{background:var(--amber);border-color:var(--amber);color:var(--base);font-weight:600;}
   table.plan td:first-child{min-width:260px;} table.plan tr.grp td{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--overlay0);padding-top:14px;border-bottom:0;}
@@ -161,9 +164,15 @@ const unpaidOf = l => l.amount <= 0 ? 0 : l.pending ? l.amount : l.amount * (l.o
 // tabs (Mario, 2026-10-17): Dashboard · Cash flow · Cost per division · Cost per villa · Detail · BOQ · Cashflow plan; the old #accounts opens the dashboard
 // (2026-10-18: the cash flow table and the Detail list + review log moved off the other tabs into their own)
 const TABS = [['dashboard', 'Dashboard'], ['cashflow', 'Cash flow'], ['division', 'Cost per division'], ['suppliers', 'Cost per supplier'], ['villas', 'Cost per villa'], ['detail', 'Detail'], ['budget', 'BOQ'], ['plan', 'Cashflow plan']];
-let TAB = ({ accounts: 'dashboard' })[(location.hash || '').replace('#', '')] || (location.hash || '').replace('#', '') || 'dashboard';
+// the tab is in the path — /ajaltoun4193/accounting/<tab> (Mario, 2026-10-18: everything under /ajaltoun4193); an old /ajaltoun#<tab> link still lands
+const BASE = '/ajaltoun4193/accounting';
+const PATH_TAB = (location.pathname.match(/\/accounting\/([a-z]+)\/?$/) || [])[1] || '';
+let TAB = PATH_TAB || ({ accounts: 'dashboard' })[(location.hash || '').replace('#', '')] || (location.hash || '').replace('#', '') || 'dashboard';
 if (!TABS.some(t => t[0] === TAB)) TAB = 'dashboard';
-const HASH0 = (location.hash || '').replace('#', '');   // the tab asked for in the link, if any
+const HASH0 = PATH_TAB || (location.hash || '').replace('#', '');   // the tab asked for in the link, if any
+const goTab = id => { TAB = id; history.pushState(null, '', `${BASE}/${id}`); render(); };
+window.addEventListener('popstate', () => { const t = (location.pathname.match(/\/accounting\/([a-z]+)\/?$/) || [])[1]; if (t && TABS.some(x => x[0] === t)) { TAB = t; render(); } });
+if (!PATH_TAB) history.replaceState(null, '', `${BASE}/${TAB}`);
 // the chain: booked → approved (Mario) → verified (partner); a flag sits on top until Mario answers it
 const stOf = l => { const r = l.review; return !r ? 'booked' : r.flag ? 'flagged' : r.verified ? 'verified' : r.approved ? 'approved' : 'booked'; };
 let LOG = null, logAll = false;
@@ -211,8 +220,11 @@ function compute() {
   const equip = lines.filter(isEq);                  // reusable: prefab, scaffolding
   const sum = a => a.reduce((x, l) => x + l.amount, 0);
   // Mario pays every Ajaltoun bill from the project cash he holds, so money out = every cost booked
-  const paidOut = sum(lines.filter(l => !l.pending));   // a pending line (still to pay, not in Odoo) is a cost, not money out yet
-  const owed = (D.owed || []).reduce((x, o) => x + o.amount, 0);
+  const costBooked = sum(lines.filter(l => !l.pending));   // a pending line (still to pay, not in Odoo) is a cost, not money out yet
+  const owed = (D.owed || []).reduce((x, o) => x + o.amount, 0), prepaid = (D.prepaid || []).reduce((x, o) => x + o.amount, 0);
+  // money that really left the project cash (Mario, 2026-10-18: "this includes the 1,414 and 1,750?" — they are booked, not paid):
+  // booked − still owed to suppliers + paid ahead of a bill
+  const paidOut = costBooked - owed + prepaid;
   const st = s => lines.filter(l => stOf(l) === s);
   const approved = sum(lines.filter(l => l.review && l.review.approved)), approvedN = lines.filter(l => l.review && l.review.approved).length;
   const verified = sum(st('verified')), verifiedN = st('verified').length, flaggedN = st('flagged').length;
@@ -229,15 +241,15 @@ function compute() {
   // the partners: D3 100% Mario, the other five 50/50 (agreement art. 4)
   let mario = 0, antoine = 0;
   for (const x of villas) { if (x.v === 'D3') mario += x.total; else { mario += x.total / 2; antoine += x.total / 2; } }
-  return { lines, cost, equip, sum, paidOut, owed, approved, approvedN, verified, verifiedN, flaggedN, bookedN, booked, waitN, wait, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
+  return { lines, cost, equip, sum, costBooked, paidOut, owed, prepaid, approved, approvedN, verified, verifiedN, flaggedN, bookedN, booked, waitN, wait, inv, received, nextDue, bySec, common, villas, mario, antoine, costTotal: sum(cost), equipTotal: sum(equip) };
 }
 
 let keepY = 0;
 function render() {
   keepY = window.scrollY;   // the page redraws whole; the reader keeps his place (a section opened, a filter typed)
   const root = document.getElementById('app');
-  Admin.crumbs([['Ajaltoun 4193', '/ajaltoun#dashboard'], [(TABS.find(t => t[0] === TAB) || [, TAB])[1]]]);
-  document.getElementById('tabs').innerHTML = TABS.map(([id, n]) => `<a href="#${id}" class="${TAB === id ? 'on' : ''}" onclick="TAB='${id}';render();return false;">${n}</a>`).join('') + '<a href="/ajaltoun/excavation" title="Georges EL Hajj: what was collected, by whom, from which account, against his certificates">Excavation</a>';
+  Admin.crumbs([['Ajaltoun 4193', '/ajaltoun4193'], ['Accounting', BASE + '/dashboard'], [(TABS.find(t => t[0] === TAB) || [, TAB])[1]]]);
+  document.getElementById('tabs').innerHTML = TABS.map(([id, n]) => `<a href="${BASE}/${id}" class="${TAB === id ? 'on' : ''}" onclick="goTab('${id}');return false;">${n}</a>`).join('') + '<a href="/ajaltoun4193/excavation" title="Georges EL Hajj: what was collected, by whom, from which account, against his certificates">Excavation</a>';
   root.innerHTML = `<div id="tab"></div>`;
   history.replaceState(null, '', '#' + TAB);
   const app = document.getElementById('tab');
@@ -251,6 +263,10 @@ function renderAccounts(app) {
   const c = compute();
   const inv = c.inv;
   const remaining = c.received - c.paidOut;
+  // Mario's engineer account (2026-10-18): 10.41% of what came in, minus Antoine's half of the D3 land and D3's cost so far
+  const PS = window.Plan && Plan.P ? Plan.P.settings : null, feeRate = PS ? PS.fee.rate : 0;
+  // the D3 land half is fee earned by the design work and settled in kind at signing — in and out the same day, so it does not move the balance
+  const d3Land = PS ? PS.d3LandHalf || 0 : 0, feeIn = feeRate * c.received, feeEarned = feeIn + d3Land, d3Cost = (c.villas.find(x => x.v === 'D3') || {}).total || 0, feeBal = feeEarned - d3Land - d3Cost;
   const DIVISION = `
     <h2>Costs by work section <span class="r muted"><label style="cursor:pointer"><input type="checkbox" ${BY_SUP ? 'checked' : ''} onchange="setBySup(this.checked)"> group by supplier</label> · click a section for its lines</span></h2>
     <div class="card"><div class="wrap"><table>
@@ -263,9 +279,9 @@ function renderAccounts(app) {
         <td class="n muted">${boq && boq.rate ? usd2(boq.rate) + '/' + esc(boq.unit) : '—'}</td>
         <td><div class="bar"><i style="width:${Math.min(100, 100 * s.amount / Math.max(1, c.costTotal))}%"></i></div></td><td class="n">${s.equipment ? '—' : pct(s.amount, c.costTotal)}</td></tr>
         ${open ? `<tr class="sdet"><td colspan="8">${secLinesTable(s.id)}</td></tr>` : ''}`; }).join('')}
-      <tr class="tot"><td>Project cost to date (without equipment)</td><td class="n">${c.cost.length}</td><td class="n">${usd2(c.costTotal)}</td><td colspan="3"></td><td></td><td class="n">100%</td></tr>
+      <tr class="tot"><td>Project cost to date${c.equip.length ? ' (without equipment)' : ''}</td><td class="n">${c.cost.length}</td><td class="n">${usd2(c.costTotal)}</td><td colspan="3"></td><td></td><td class="n">100%</td></tr>
       </tbody></table></div>
-      <div class="note">Prefab and scaffolding are bought once and can serve the next project, so they are shown as equipment and left out of the cost the partners share. Whether Ajaltoun should bear a usage charge for them is still to be agreed.</div>
+      ${c.equip.length ? `<div class="note">Prefab and scaffolding are bought once and can serve the next project, so they are shown as equipment and left out of the cost the partners share. Whether Ajaltoun should bear a usage charge for them is still to be agreed.</div>` : ''}
     </div>
 
 `;
@@ -295,14 +311,17 @@ function renderAccounts(app) {
 
 `;
   app.innerHTML = `
-    ${TAB === 'dashboard' ? `<div class="kpis">
+    ${TAB === 'dashboard' ? `<div class="kpi cash hero"><div class="v">${usd(remaining)}</div><div class="l">actually remaining — project cash held by Mario · ${usd(c.received)} received − ${usd(c.paidOut)} actually paid out</div></div>
+    <div class="kpis">
       <div class="kpi in"><div class="v">${usd(c.received)}</div><div class="l">received from ${inv ? esc(inv.partner) : 'the buyer'} · ${inv ? inv.received.length : 0} instalments of ${inv ? usd(inv.total) : ''}</div></div>
-      <div class="kpi out"><div class="v">${usd(c.paidOut)}</div><div class="l">paid for Ajaltoun to date${c.owed > 0.5 ? ` · still owed to suppliers ${usd(c.owed)}` : ''}</div></div>
-      <div class="kpi cash"><div class="v">${usd(remaining)}</div><div class="l">remaining project cash — held by Mario</div></div>
+      <div class="kpi out"><div class="v">${usd(c.paidOut)}</div><div class="l">actually paid out <span class="muted">· booked ${usd(c.costBooked)} − not paid yet ${usd(c.owed)}${c.prepaid > 0.5 ? ` + paid ahead ${usd(c.prepaid)}` : ''}</span></div></div>
+      <div class="kpi"><div class="v" style="color:var(--red)">${usd(c.owed)}</div><div class="l">remaining to pay · ${(D.owed || []).map(o => `${esc(o.partner)} ${usd(o.amount)}`).join(' · ') || 'nothing'}</div></div>
+      <div class="kpi cash"><div class="v">${usd(remaining - c.owed)}</div><div class="l">remaining cash after that payment</div></div>
       <div class="kpi"><div class="v">${inv ? usd(inv.residual) : '—'}</div><div class="l">still to come from the sale${c.nextDue ? ` · next ${usd(c.nextDue.amount)} on ${esc(c.nextDue.due)}` : ''}</div></div>
-      <div class="kpi"><div class="v"><span class="ap">${usd(c.approved)}</span> <span class="small muted">/ ${usd(c.paidOut)}</span></div><div class="l">approved by Mario · ${c.bookedN} lines (${usd(c.booked)}) still to approve</div></div>
+      <div class="kpi"><div class="v"><span class="ap">${usd(c.approved)}</span> <span class="small muted">/ ${usd(c.costBooked)}</span></div><div class="l">approved by Mario · ${c.bookedN} lines (${usd(c.costBooked)}) still to approve</div></div>
       <div class="kpi"><div class="v"><span class="ok">${usd(c.verified)}</span> <span class="small muted">/ ${usd(c.approved)}</span></div><div class="l">verified by the partner · ${c.waitN} lines (${usd(c.wait)}) waiting for him${c.flaggedN ? ` · <span class="flag">${c.flaggedN} flagged</span>` : ''}</div></div>
-      <div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>
+      ${c.equip.length ? `<div class="kpi eq"><div class="v">${usd(c.equipTotal)}</div><div class="l">equipment bought (prefab, scaffolding) — reusable, not a project cost</div></div>` : ''}
+      ${PS ? `<div class="kpi ${feeBal < -0.5 ? 'out' : 'in'}"><div class="v">${feeBal < -0.5 ? '− ' : ''}${usd(Math.abs(feeBal))}</div><div class="l">Mario, engineer · fee ${(feeRate * 100).toFixed(2)}% of the money in = ${usd(feeIn)}, plus the design work ${usd(d3Land)} settled by Antoine’s half of the D3 land at signing · pays D3’s cost to date ${usd(d3Cost)} → ${feeBal < -0.5 ? 'Mario owes the project, covered by the next fees' : 'the project owes Mario'}</div></div>` : ''}
     </div>` : ''}
     ${TAB === 'cashflow' ? `<h2>Cash flow <span class="r muted">in − out = remaining · click a month for its lines</span></h2>
     <div class="card">${cashflowBlock(c)}</div>` : ''}
@@ -348,7 +367,7 @@ function toggleSup(k) { const key = decodeURIComponent(k); if (OPEN_SUP.has(key)
 function secLinesTable(id) {
   const ls = D.lines.filter(l => l.section === id && counted(l)).sort((a, b) => b.date.localeCompare(a.date));
   const props = D.lines.filter(l => l.section === id && !counted(l));
-  const lineRow = l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`;
+  const lineRow = l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span>${D.admin ? `<div style="margin-top:4px">${secBtn(l)}</div>` : ''}</td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`;
   const secTot = ls.reduce((x, l) => x + l.amount, 0);
   let body;
   if (BY_SUP) {
@@ -372,8 +391,8 @@ function suppliersHtml(c) {
   const g = {};
   for (const l of c.cost) { const x = (g[l.partner || '—'] ||= { p: l.partner || '—', amount: 0, unpaid: 0, n: 0, secs: {}, lines: [] }); x.amount += l.amount; x.unpaid += unpaidOf(l); x.n++; x.secs[l.section] = (x.secs[l.section] || 0) + l.amount; x.lines.push(l); }
   const rows = Object.values(g).sort((a, b) => b.amount - a.amount), tot = rows.reduce((t, r) => ({ a: t.a + r.amount, u: t.u + r.unpaid }), { a: 0, u: 0 });
-  const lineRow = l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(secName(l.section))}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}${unpaidOf(l) > 0.005 && unpaidOf(l) < l.amount - 0.005 ? `<div class="small" style="color:var(--red,#f38ba8)">${usd2(unpaidOf(l))} not paid</div>` : ''}</td></tr>`;
-  return `<h2>Cost per supplier <span class="r muted">${rows.length} suppliers · click one for its lines · without equipment</span></h2>
+  const lineRow = l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${D.admin ? secBtn(l) : esc(secName(l.section))}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}${unpaidOf(l) > 0.005 && unpaidOf(l) < l.amount - 0.005 ? `<div class="small" style="color:var(--red,#f38ba8)">${usd2(unpaidOf(l))} not paid</div>` : ''}</td></tr>`;
+  return `<h2>Cost per supplier <span class="r muted">${rows.length} suppliers · click one for its lines${c.equip.length ? ' · without equipment' : ''}</span></h2>
     <div class="card"><div class="wrap"><table>
       <thead><tr><th>Supplier</th><th class="n">Lines</th><th>Sections</th><th class="n">Cost</th><th class="n">Paid</th><th class="n">Not paid</th><th>Share</th><th class="n">% of cost</th></tr></thead>
       <tbody>${rows.map(r => { const k = encodeURIComponent(r.p).replace(/'/g, '%27'), op = OPEN_SUPP.has(r.p);
@@ -450,7 +469,21 @@ function cashflowBlock(c) {
   const rows = [...M].reverse().map(x => `<tr class="mrow" onclick="toggleMonth('${x.k}')"><td class="muted small">${esc(x.k)}</td><td>${x.ins.map(p => `<span class="ok">▲ ${esc(c.inv.partner)} · ${esc(p.journal)}</span> `).join('')}${x.out ? `<span class="muted small">${Object.keys(x.secs).length} section${Object.keys(x.secs).length > 1 ? 's' : ''} · ${c.lines.filter(l => l.date.startsWith(x.k)).length} lines</span>` : ''}</td><td class="n ok">${x.inn ? usd2(x.inn) : ''}</td><td class="n flag">${x.out ? usd2(x.out) : ''}</td><td class="n">${usd2(x.bal)}</td></tr>
     <tr class="mdet" id="mdet-${x.k}" hidden><td colspan="5">${monthLinesTable(c, x.k)}</td></tr>`).join('');
   return `${facts}<div class="wrap" style="margin-top:10px"><table><thead><tr><th>Month</th><th></th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th></tr></thead><tbody>${rows}
-    <tr class="tot"><td></td><td>Remaining project cash</td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(remaining)}</td></tr></tbody></table></div>`;
+    <tr class="tot"><td></td><td>Remaining project cash <span class="small muted" style="font-weight:400">· booked ${usd2(c.costBooked)} − still to pay ${usd2(c.owed)} + paid ahead ${usd2(c.prepaid)} = ${usd2(c.paidOut)} out</span></td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(remaining)}</td></tr></tbody></table></div>
+    ${toPayTable(c, remaining)}`;
+}
+// what is still to be paid (Mario, 2026-10-18: "another table for payments to be paid"): one row per supplier from the payables
+// ledger (net of payments not yet matched), with the open bills behind it; the retention waits for the project end
+function toPayTable(c, remaining) {
+  const openOf = {};   // partner → { bill → open amount }
+  for (const l of c.lines) { const u = unpaidOf(l); if (u < 0.005 || l.hub) continue; const k = l.partner || '—'; (openOf[k] = openOf[k] || {})[l.moveName || '?'] = { open: ((openOf[k][l.moveName || '?'] || {}).open || 0) + u, ref: l.moveRef || '', pending: !!l.pending, moveId: l.moveId }; }
+  const when = r => /RETENTION/i.test(r.ref) ? 'at the end of the project' : r.pending ? 'not in Odoo yet' : 'on demand';
+  const rows = (D.owed || []).map(o => { const bills = Object.entries(openOf[o.partner] || {}).sort((a, b) => b[1].open - a[1].open); const sumB = bills.reduce((t, [, b]) => t + b.open, 0);
+    return `<tr><td>${esc(o.partner)}</td><td class="small">${bills.map(([n, b]) => `<div>${b.moveId ? `<a href="${ODOO_MOVE}${b.moveId}${ODOO_MOVE_Q}" target="_blank" rel="noopener">${esc(n)}</a>` : esc(n)} <span class="muted">${esc(b.ref.slice(0, 60))} · ${when(b)}</span> <b>${usd2(b.open)}</b></div>`).join('')}${Math.abs(sumB - o.amount) > 0.5 ? `<div class="muted">bills open ${usd2(sumB)} vs ledger ${usd2(o.amount)} — a payment not matched to its bill</div>` : ''}</td><td class="n flag">${usd2(o.amount)}</td></tr>`; }).join('');
+  const pre = (D.prepaid || []).map(o => `<tr class="muted"><td>${esc(o.partner)}</td><td class="small">paid ahead of the bill — comes off the next one</td><td class="n ok">− ${usd2(o.amount)}</td></tr>`).join('');
+  return `<h2 style="margin-top:22px">To be paid <span class="r muted">booked in Odoo, not paid yet · net from the payables ledger</span></h2>
+    <div class="wrap"><table><thead><tr><th>Supplier</th><th>Open bills</th><th class="n">To pay</th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="muted">Nothing to pay.</td></tr>'}${pre}
+      <tr class="tot"><td></td><td>Total to pay · cash remaining now ${usd2(remaining)} → <b>${usd2(remaining - c.owed)}</b> after paying it</td><td class="n">${usd2(c.owed)}</td></tr></tbody></table></div>`;
 }
 // the BOQ's average rate for a trade (Σ total / Σ qty over the priced lines, six villas), and its unit
 function boqRate(trade) {
@@ -472,11 +505,22 @@ function monthLinesTable(c, k) {
   const secName = id => (D.sections.find(s => s.id === id) || { name: id }).name;
   const ls = c.lines.filter(l => l.date.startsWith(k)).sort((a, b) => a.section === b.section ? b.date.localeCompare(a.date) : secName(a.section).localeCompare(secName(b.section)));
   const ins = (c.inv ? c.inv.received : []).filter(p => p.date.startsWith(k));
-  return `<table class="mtab"><thead><tr><th>Date</th><th>Section</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>
+  // the month's lines flat, or grouped by section then partner, or by partner (Mario, 2026-10-18) — a subtotal row heads each group
+  const row = l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${D.admin ? secBtn(l) : esc(secName(l.section))}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`;
+  const grp = (arr, key) => { const g = {}; for (const l of arr) (g[key(l)] = g[key(l)] || []).push(l); return Object.entries(g).sort((a, b) => sum2(b[1]) - sum2(a[1])); };
+  const sum2 = a => a.reduce((x, l) => x + l.amount, 0);
+  const head = (label, arr, lvl) => `<tr class="grp${lvl}"><td colspan="7" style="padding-left:${8 + lvl * 16}px">${label} <span class="muted small">· ${arr.length} line${arr.length > 1 ? 's' : ''}</span></td><td class="n">${usd2(sum2(arr))}</td></tr>`;
+  const body = MGROUP === 'partner' ? grp(ls, l => l.partner || '—').map(([p, a]) => head(esc(p), a, 0) + a.map(row).join('')).join('')
+    : MGROUP === 'section' ? grp(ls, l => l.section).map(([sid, a]) => head(esc(secName(sid)), a, 0) + grp(a, l => l.partner || '—').map(([p, b]) => head(esc(p), b, 1) + b.map(row).join('')).join('')).join('')
+    : ls.map(row).join('');
+  const bar = `<div class="small muted" style="margin:4px 0 6px">group by <span class="lang">${[['', 'none'], ['section', 'section › partner'], ['partner', 'partner']].map(([v, n]) => `<button class="${MGROUP === v ? 'on' : ''}" onclick="event.stopPropagation();setMGroup('${v}')">${n}</button>`).join('')}</span></div>`;
+  return `${bar}<table class="mtab"><thead><tr><th>Date</th><th>Section</th><th>Supplier</th><th>Description</th><th>Villa</th><th>Bill</th><th>Paid</th><th class="n">Amount</th></tr></thead><tbody>
     ${ins.map(p => `<tr><td class="muted" style="white-space:nowrap">${esc(p.date)}</td><td colspan="4" class="ok">▲ ${esc(c.inv.partner)} · ${esc(p.journal)}${p.memo ? ' · ' + esc(p.memo) : ''}</td><td></td><td></td><td class="n ok">${usd2(p.amount)}</td></tr>`).join('')}
-    ${ls.map(l => `<tr><td class="muted" style="white-space:nowrap">${esc(l.date)}</td><td>${esc(secName(l.section))}</td><td>${esc(l.partner || '—')}</td><td>${esc(l.name.replace(/^Ajaltoun 4193\s*/i, ''))}</td><td><span class="pill">${esc(l.villa)}</span></td><td class="small">${billCell(l)}<div>${fileLinks(l)}</div></td><td>${paidCell(l)}</td><td class="n">${usd2(l.amount)}</td></tr>`).join('')}
+    ${body}
     <tr class="tot"><td colspan="7">${ls.length} lines</td><td class="n">${usd2(ls.reduce((x, l) => x + l.amount, 0))}</td></tr></tbody></table>`;
 }
+let MGROUP = (() => { try { return localStorage.getItem('aj-mgroup') || ''; } catch { return ''; } })();
+function setMGroup(v) { MGROUP = v; try { localStorage.setItem('aj-mgroup', v); } catch {} const open = [...document.querySelectorAll('tr.mdet:not([hidden])')].map(e => e.id.replace('mdet-', '')); render(); for (const k of open) toggleMonth(k); }
 function toggleMonth(k) { const el = document.getElementById('mdet-' + k); if (el) el.hidden = !el.hidden; }
 function cashflowRows(c) {
   const ev = [];
@@ -488,7 +532,7 @@ function cashflowRows(c) {
   ev.sort((a, b) => a.date.localeCompare(b.date));
   let bal = 0;
   return ev.map(e => { bal += e.inn - e.out; return `<tr><td class="muted small">${esc(e.date.slice(0, 7))}</td><td>${esc(e.what)}</td><td class="n" style="color:var(--green)">${e.inn ? usd2(e.inn) : ''}</td><td class="n" style="color:var(--red)">${e.out ? usd2(e.out) : ''}</td><td class="n">${usd2(bal)}</td></tr>`; }).join('')
-    + `<tr class="tot"><td></td><td>Remaining project cash</td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(c.received - c.paidOut)}</td></tr>`;
+    + `<tr class="tot"><td></td><td>Remaining project cash <span class="small muted" style="font-weight:400">· booked ${usd2(c.costBooked)} − still to pay ${usd2(c.owed)} + paid ahead ${usd2(c.prepaid)}</span></td><td class="n">${usd2(c.received)}</td><td class="n">${usd2(c.paidOut)}</td><td class="n">${usd2(c.received - c.paidOut)}</td></tr>`;
 }
 
 // ── the column filters of the Detail table (Mario, 2026-09-23): one input under every title ──
@@ -620,7 +664,7 @@ function bulkBar() {
 }
 async function approve(ids, on) {
   try {
-    const r = await Admin.api('POST', '/api/ajaltoun/approve', { lineIds: ids, on });
+    const r = await Admin.api('POST', '/api/ajaltoun/approve', { lineIds: ids.flatMap(id => [id, ...((lineById(id) || {}).vatIds || [])]), on });   // + the bill's VAT folded into the line
     for (const id of ids) { const l = lineById(id); if (l) l.review = r.reviews[String(id)] || null; }
     SEL.clear(); render();
   } catch (e) { alert('Could not save: ' + e.message); }
@@ -674,6 +718,8 @@ function combo(host, o) {
 
 // ── the section picker: one shared popover holding the combobox ──
 let SP = { line: null, btn: null };
+// the section button, admin only — the same chooser everywhere (Cost per division, Cash flow month lines, Detail); Odoo is updated too
+const secBtn = l => D.admin ? `<button class="secbtn" onclick="event.stopPropagation();openSecPop(${idA(l.id)}, this)" title="Change the section — written to Odoo too"><span>${esc((D.sections.find(s => s.id === l.section) || { name: l.section }).name)}</span><i>▾</i></button>` : '';
 function openSecPop(lineId, btn) {
   lineId = String(lineId);
   if (SP.line === lineId && document.getElementById('secpop')) return closeSecPop();
@@ -706,7 +752,8 @@ async function setSection(lineId, section, forPartner) {
   try {
     await Admin.api('POST', '/api/ajaltoun/section', forPartner ? { section: sec, forPartner: l.partner } : { lineId, section: sec });
     if (forPartner) for (const x of D.lines) { if (x.partner === l.partner) x.section = sec; } else l.section = sec;
-    render();
+    const open = [...document.querySelectorAll('tr.mdet:not([hidden])')].map(e => e.id.replace('mdet-', ''));
+    render(); for (const k of open) toggleMonth(k);
   } catch (e) { alert('Could not save: ' + e.message); }
 }
 

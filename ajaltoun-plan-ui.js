@@ -102,9 +102,14 @@
       rowOf[key].byYear[p.y] = (rowOf[key].byYear[p.y] || 0) + p.amt;
     }
     out.push(...Object.values(rowOf).sort((a, b) => VILLAS.indexOf(a.v) - VILLAS.indexOf(b.v) || Object.keys(PHASES).indexOf(a.ph) - Object.keys(PHASES).indexOf(b.ph)));
-    // the D3 / fee mechanism: Shift's fee is earned by phase; D3's works settle it; anything above the fee earned so far is Mario's own money in
-    const fee = {}; S.fee.phasing.forEach((sh, k) => { fee[S.fee.startYear + k] = S.fee.total * sh; });
-    const d3 = {}; for (const r of out.filter(r => r.group === 'd3')) for (const [y, a] of Object.entries(r.byYear)) d3[y] = (d3[y] || 0) + a;
+    // the D3 / fee mechanism (Mario, 2026-10-18): Mario's fee is 10.41% of the sales value, earned as the payments come in. At the
+    // signing of D3, Antoine's half of the D3 land goes to Mario against the design and permit work already done — fee earned and
+    // settled in kind the same day, counted inside the 10.41%. D3's works are then charged against the fee; above it, Mario pays.
+    const landYear = S.fee.landYear || S.siteYear, land = { [landYear]: S.d3LandHalf || 0 };
+    const cap = S.fee.rate * sum(inflow.filter(r => r.group !== 'mario'), r => sum(years, y => r.byYear[y] || 0));   // 10.41% of the sales in this scenario
+    const fee = {}; let cumF = 0;
+    for (const y of years) { let f = S.fee.rate * sum(inflow.filter(r => r.group !== 'mario'), r => r.byYear[y] || 0) + (land[y] || 0); f = Math.min(f, Math.max(0, cap - cumF)); cumF += f; if (f) fee[y] = f; }
+    const d3 = { ...land }; for (const r of out.filter(r => r.group === 'd3')) for (const [y, a] of Object.entries(r.byYear)) d3[y] = (d3[y] || 0) + a;
     const contrib = {}; let cumFee = 0, cumD3 = 0, cumContrib = 0;
     for (const y of years) { cumFee += fee[y] || 0; cumD3 += d3[y] || 0; const need = Math.max(0, cumD3 - cumFee) - cumContrib; if (need > 0.5) { contrib[y] = need; cumContrib += need; } }
     if (Object.keys(contrib).length) inflow.push({ label: 'Mario — own money into D3 above the fee earned', group: 'mario', byYear: contrib });
@@ -113,10 +118,13 @@
     const net = {}, cum = {}; let c = 0;
     for (const y of years) { net[y] = tot(inflow, y) - tot(out, y); c += net[y]; cum[y] = c; }
     const gapYear = years.reduce((g, y) => cum[y] < cum[g] ? y : g, years[0]);
-    return { years, inflow, out, net, cum, fee, d3, contrib, gap: { year: gapYear, amount: cum[gapYear] }, tot };
+    return { years, inflow, out, net, cum, fee, land, d3, contrib, gap: { year: gapYear, amount: cum[gapYear] }, tot };
   }
 
   // ── Budget tab ───────────────────────────────────────────────────────────
+  // one sub-tab per table under the BOQ tab (Mario, 2026-10-18); the last one opened is remembered on this device
+  const SUBS = [['project', 'Project forecast'], ['villa', 'Per villa'], ['trade', 'Budget vs spent'], ['lines', 'BOQ lines']];
+  let sub = (() => { try { const v = localStorage.getItem('aj-boq-sub'); return SUBS.some(x => x[0] === v) ? v : 'project'; } catch { return 'project'; } })();
   function renderBudget(el) {
     const B = budget(); const S = P.settings;
     // Mario's order (2026-10-17: "allow me to arrange the order of items", excavation first); trades not placed yet follow, biggest budget first
@@ -131,6 +139,7 @@
     const items = B.byType[tab].filter(hit);
     const groups = []; for (const i of items) { const b = i.bill == null || i.bill === '' ? null : +i.bill; let g = groups.find(x => x.bill === b); if (!g) groups.push(g = { bill: b, items: [] }); g.items.push(i); }
     groups.sort((a, b) => (a.bill ?? 99) - (b.bill ?? 99));
+    const DF = doneForecast(B, rows);
     el.innerHTML = `
       <div class="kpis">
         <div class="kpi"><div class="v">${usd(B.perVilla.U)}</div><div class="l">budget per U villa (up 333) · ${B.byType.U.length} lines</div></div>
@@ -139,7 +148,8 @@
         <div class="kpi out"><div class="v">${usd(totS)}</div><div class="l">spent so far (Odoo) · ${(100 * totS / Math.max(1, totB)).toFixed(1)}% of the budget</div></div>
         <div class="kpi"><div class="v">${P.items.filter(i => i.review).length}</div><div class="l">lines still at 2022–2024 prices, to review</div></div>
       </div>
-      ${doneForecast(B, rows)}
+      <div class="vtabs">${SUBS.map(([k, n]) => `<a href="#budget" class="${sub === k ? 'on' : ''}" onclick="Plan.setSub('${k}');return false;">${n}</a>`).join('')}</div>
+      ${sub === 'project' ? DF.project : sub === 'villa' ? DF.villa : sub === 'trade' ? `
       <h2>Budget vs spent, by trade <span class="r muted">six villas · spent = Odoo lines classified in that trade</span></h2>
       <div class="card"><div class="wrap"><table>
         <thead><tr><th>Trade</th><th class="n">Budget</th><th class="n">Spent</th><th class="n">Remaining</th><th>Used</th><th class="n">%</th></tr></thead>
@@ -149,7 +159,7 @@
         ${equipRows.map(r => `<tr class="eq"><td>${esc(secName(r.id))} <span class="pill eq">equipment</span></td><td class="n">—</td><td class="n">${usd(r.s)}</td><td class="n">—</td><td></td><td></td></tr>`).join('')}
         </tbody></table></div>
         <div class="note">A trade with spend but no budget line (e.g. Topo, Site & general) shows a negative remaining — add a budget line for it, or reclassify the lines on the Accounts tab.</div>
-      </div>
+      </div>` : `
       <h2>BOQ lines${filtering ? ` <span class="small muted" style="font-weight:400">· ${items.length} of ${B.byType[tab].length} lines</span>` : ''} <span class="r"><span class="lang"><button class="${tab === 'U' ? 'on' : ''}" onclick="Plan.setTab('U')">Villa U — up 333</button><button class="${tab === 'D' ? 'on' : ''}" onclick="Plan.setTab('D')">Villa D — down</button></span> &nbsp; <button class="btn" onclick="Plan.foldAll(true)" title="Open every division">Expand all</button><button class="btn" onclick="Plan.foldAll(false)" title="Close every division">Collapse all</button>${P.admin ? ` &nbsp; <button class="btn ${showFanar ? 'on' : ''}" onclick="Plan.toggleFanar()" title="Show or hide the Fanar 212 reference rates and PDFs">${showFanar ? '👁 Fanar' : '👁‍🗨 Fanar off'}</button>` : ''}${P.admin ? ` &nbsp; <button class="btn ap" onclick="Plan.edit(null)">+ Add a line</button>` : ''}</span></h2>
       <div class="boqf"><input id="bf-q" placeholder="search item, note, trade, unit…" value="${esc(BF.q)}" oninput="Plan.filter({ q: this.value })">
         <select onchange="Plan.filter({ phase: this.value })"><option value="">All phases</option>${Object.entries(PHASES).map(([k, n]) => `<option value="${k}" ${BF.phase === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
@@ -170,7 +180,7 @@
       ${fanarOn() ? `<h2>Reference · Fanar 212 BOQ <span class="r muted">Sayed Saadeh, July 2026 — the rates in the “Jul 2026 ref” column come from here</span></h2>
       <div class="card"><div class="fanar">${FANAR.map((d, n) => `<a href="${fanarPdf(n)}" target="_blank">📄 <b>${String(n).padStart(2, '0')}</b> ${esc(d)}</a>`).join('')}<a href="/api/ajaltoun/plan/fanar/specs" target="_blank">📘 Specifications (7-22-2026)</a></div>
         <div class="note">One PDF per division; the same numbering as our bill column. Mario only — the links open in a new tab.</div>
-      </div>` : ''}`;
+      </div>` : ''}`}`;
     const first = el.querySelector('tr.editing input'); if (first) { first.focus(); first.select(); }
     else if (BF._focus) { const b = document.getElementById('bf-q'); if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); } BF._focus = false; }
   }
@@ -262,16 +272,17 @@
         </tbody></table></div>
         <div class="note">Past years show what Odoo has; the current year and beyond show the remaining budget placed by phase — site works in ${S.siteYear}, a villa's structure in its structure year, finishing over the two years after. Spend already booked in a trade is deducted from that trade's first planned amounts.</div>
       </div>
-      <h2>Shift’s services fee and Villa D3 <span class="r muted">the fee is settled by the project funding D3; above it, Mario pays</span></h2>
+      <h2>Mario’s engineer fee and Villa D3 <span class="r muted">${(S.fee.rate * 100).toFixed(2)}% of every payment in · pays Antoine’s half of the D3 land, then D3’s construction · above it, Mario pays</span></h2>
       <div class="card"><div class="wrap"><table class="plan">
         <thead><tr><th></th>${Y.map(y => `<th class="n">${y}</th>`).join('')}<th class="n">Total</th></tr></thead>
         <tbody>
-          <tr><td>Fee earned (${usd(S.fee.total)}, from ${S.fee.startYear}: ${S.fee.phasing.map(p => Math.round(p * 100) + '%').join(' / ')})</td>${Y.map(y => cell(R.fee[y] || 0)).join('')}<td class="n">${usd(sum(Y, y => R.fee[y] || 0))}</td></tr>
-          <tr><td>D3 works paid by the project (settling the fee)</td>${Y.map(y => cell(R.d3[y] || 0)).join('')}<td class="n">${usd(sum(Y, y => R.d3[y] || 0))}</td></tr>
+          <tr><td>Fee earned — ${(S.fee.rate * 100).toFixed(2)}% of the money in, plus the design work settled at signing</td>${Y.map(y => cell(R.fee[y] || 0)).join('')}<td class="n">${usd(sum(Y, y => R.fee[y] || 0))}</td></tr>
+          <tr class="sub"><td>of which design & permits, paid in kind by Antoine’s half of the D3 land</td>${Y.map(y => cell(R.land[y] || 0)).join('')}<td class="n">${usd(sum(Y, y => R.land[y] || 0))}</td></tr>
+          <tr><td>D3 works paid by the project (settling the fee)</td>${Y.map(y => cell((R.d3[y] || 0) - (R.land[y] || 0))).join('')}<td class="n">${usd(sum(Y, y => (R.d3[y] || 0) - (R.land[y] || 0)))}</td></tr>
           <tr class="sub"><td>Fee earned, not yet settled (cumulative)</td>${Y.map(y => { cf += R.fee[y] || 0; cd += (R.d3[y] || 0) - (R.contrib[y] || 0); return `<td class="n">${usd(cf - cd)}</td>`; }).join('')}<td></td></tr>
           <tr class="eq"><td>Mario’s own money into D3 (above the fee earned)</td>${Y.map(y => cell(R.contrib[y] || 0)).join('')}<td class="n">${usd(sum(Y, y => R.contrib[y] || 0))}</td></tr>
         </tbody></table></div>
-        <div class="note">At signing, Mario also receives Antoine’s half of the D3 land in kind — ${usd(S.d3LandHalf)} at the agreed land value of ${usd(S.land)} (D3 agreement, art. 3). Not a cash movement, so it is not in the table.</div>
+        <div class="note">Mario already owns half of the D3 land. At signing he receives Antoine’s half (${usd(S.d3LandHalf)} at the agreed land value of ${usd(S.land)}, D3 agreement art. 3) against the design and permit work already done — fee earned and settled the same day, inside the ${(S.fee.rate * 100).toFixed(2)}%. From then on the fee earned on each payment pays D3’s construction — its own works and its share of the common works. The services contract’s ${usd(S.fee.total)} is the same ${(S.fee.rate * 100).toFixed(2)}% on $3.5M of sales; the fee stops at that share of the sales in the scenario.</div>
       </div>
       <h2>Assumptions ${P.admin ? '<span class="r muted">edit and save — the plan recalculates</span>' : ''}</h2>
       <div class="card"><div class="wrap"><table>
@@ -283,8 +294,8 @@
         </tbody></table></div>
         <div class="filters" style="margin-top:10px">
           <label class="small muted">Site works year ${P.admin ? `<input id="s-siteYear" type="number" value="${S.siteYear}" style="width:80px">` : S.siteYear}</label>
-          <label class="small muted">Fee total ${P.admin ? `<input id="s-feeTotal" type="number" value="${S.fee.total}" style="width:110px">` : usd(S.fee.total)}</label>
-          <label class="small muted">Fee from ${P.admin ? `<input id="s-feeStart" type="number" value="${S.fee.startYear}" style="width:80px">` : S.fee.startYear}</label>
+          <label class="small muted">Fee % of money in ${P.admin ? `<input id="s-feeRate" type="number" step="0.01" value="${+(S.fee.rate * 100).toFixed(2)}" style="width:80px">` : (S.fee.rate * 100).toFixed(2) + '%'}</label>
+          <label class="small muted">D3 land settled in ${P.admin ? `<input id="s-landYear" type="number" value="${S.fee.landYear || S.siteYear}" style="width:80px">` : (S.fee.landYear || S.siteYear)}</label>
           <label class="small muted">D3 land half ${P.admin ? `<input id="s-d3LandHalf" type="number" value="${S.d3LandHalf}" style="width:100px">` : usd(S.d3LandHalf)}</label>
           ${P.admin ? '<button class="btn ap" onclick="Plan.saveSettings()">Save assumptions</button>' : ''}
         </div>
@@ -305,19 +316,19 @@
     const c = window.ajCompute ? window.ajCompute() : null;
     const vb = Object.fromEntries(VILLAS.map(v => [v, B.villaBudget(v)])), vbTot = sum(VILLAS, v => vb[v]);
     const V = VILLAS.map(v => { const s = c ? (c.villas.find(x => x.v === v) || {}).total || 0 : 0, rem = tr * vb[v] / Math.max(1, vbTot); return { v, b: vb[v], s, rem, fc: s + rem }; });
-    const varc = x => `<td class="n ${x > 0.5 ? 'flag' : x < -0.5 ? 'ok' : ''}">${x > 0.5 ? '+' : ''}${usd(x)}</td>`;
+    const varc = x => `<td class="n ${x > 0.5 ? 'flag' : x < -0.5 ? 'ok' : ''}">${x > 0.5 ? '+' : ''}${usd(Math.abs(x) < 0.5 ? 0 : x)}</td>`;   // cents → $0, never −$0
     const head = first => `<thead><tr><th>${first}</th><th class="n">Budget</th><th class="n">Done (real cost)</th><th class="n">Forecast remaining</th><th class="n">Forecast at completion</th><th class="n">vs budget</th><th class="n">% done</th></tr></thead>`;
-    return `
+    return { project: `
       <h2>Project — done and forecast <span class="r muted">done = real cost in Odoo · remaining = budget − done per trade, 0 once the trade is finished</span></h2>
       <div class="card"><div class="wrap"><table>${head('Trade')}<tbody>
-        ${T.map(r => `<tr><td>${esc(secName(r.id))}${r.done ? ' <span class="pill">finished</span>' : ''}</td><td class="n">${usd(r.b)}</td><td class="n">${usd0(r.s)}</td><td class="n">${usd0(r.rem)}</td><td class="n">${usd(r.fc)}</td>${varc(r.fc - r.b)}<td class="n">${r.fc ? (100 * r.s / r.fc).toFixed(0) + '%' : '—'}</td></tr>`).join('')}
+        ${T.map(r => `<tr><td>${esc(secName(r.id))}${r.done ? ' <span class="pill">finished · 100%</span>' : ''}</td><td class="n">${usd(r.b)}</td><td class="n">${usd0(r.s)}</td><td class="n">${usd0(r.rem)}</td><td class="n">${usd(r.fc)}</td>${varc(r.fc - r.b)}<td class="n">${r.fc ? (100 * r.s / r.fc).toFixed(0) + '%' : '—'}</td></tr>`).join('')}
         <tr class="tot"><td>Project (without equipment)</td><td class="n">${usd(tb)}</td><td class="n">${usd(ts)}</td><td class="n">${usd(tr)}</td><td class="n">${usd(tf)}</td>${varc(tf - tb)}<td class="n">${tf ? (100 * ts / tf).toFixed(0) + '%' : '—'}</td></tr>
-      </tbody></table></div></div>
+      </tbody></table></div></div>`, villa: `
       <h2>Per villa — done and forecast <span class="r muted">done = own works + 1/6 of the common works · remaining = the project's, shared by villa budget</span></h2>
       <div class="card"><div class="wrap"><table>${head('Villa')}<tbody>
         ${V.map(x => `<tr><td>${x.v}${x.v === 'D3' ? ' <span class="pill">Mario 100%</span>' : ''} <span class="small muted">${P.settings.villas[x.v].type === 'U' ? 'up 333' : 'down'}</span></td><td class="n">${usd(x.b)}</td><td class="n">${usd0(x.s)}</td><td class="n">${usd0(x.rem)}</td><td class="n">${usd(x.fc)}</td>${varc(x.fc - x.b)}<td class="n">${x.fc ? (100 * x.s / x.fc).toFixed(0) + '%' : '—'}</td></tr>`).join('')}
         <tr class="tot"><td>Six villas</td><td class="n">${usd(vbTot)}</td><td class="n">${usd(sum(V, x => x.s))}</td><td class="n">${usd(sum(V, x => x.rem))}</td><td class="n">${usd(sum(V, x => x.fc))}</td>${varc(sum(V, x => x.fc) - vbTot)}<td class="n"></td></tr>
-      </tbody></table></div></div>`;
+      </tbody></table></div></div>` };
   }
 
   function tradeOrder(B) {
@@ -337,14 +348,14 @@
     const villas = {};
     document.querySelectorAll('[data-v]').forEach(i => { const v = i.dataset.v, k = i.dataset.k; villas[v] = villas[v] || { ...P.settings.villas[v] }; villas[v][k] = i.type === 'number' ? (i.value === '' ? null : +i.value) : i.value; });
     const settings = { villas, siteYear: +document.getElementById('s-siteYear').value, d3LandHalf: +document.getElementById('s-d3LandHalf').value,
-      fee: { ...P.settings.fee, total: +document.getElementById('s-feeTotal').value, startYear: +document.getElementById('s-feeStart').value } };
+      fee: { ...P.settings.fee, rate: +document.getElementById('s-feeRate').value / 100, landYear: +document.getElementById('s-landYear').value } };
     try { await Admin.api('POST', '/api/ajaltoun/plan/settings', { settings }); await load(); rerender(); } catch (e) { alert('Could not save: ' + e.message); }
   }
 
   // planned money out per year in the current scenario (the Accounts tab's cash-flow facts use it)
   function yearOut() { if (!P) return null; const R = plan(); const o = {}; for (const y of R.years) o[y] = R.tot(R.out, y); return o; }
   window.Plan = { load, moveTrade, renderBudget, renderPlan, yearOut, get P() { return P; },
-    setTab: t => { tab = t; rerender(); }, setScenario: s => { scenario = s; rerender(); },
+    setTab: t => { tab = t; rerender(); }, setSub: k => { sub = k; try { localStorage.setItem('aj-boq-sub', k); } catch {} rerender(); }, setScenario: s => { scenario = s; rerender(); },
     edit: id => { editing = id || ''; rerender(); },
     filter: f => { Object.assign(BF, f); BF._focus = 'q' in f; rerender(); },
     toggleFanar: () => { showFanar = !showFanar; try { localStorage.setItem('aj-fanar', showFanar ? '1' : '0'); } catch {} rerender(); },

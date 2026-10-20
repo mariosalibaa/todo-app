@@ -1015,6 +1015,9 @@ async function moveFilesToMove(odooCall, account, t, move, companyId) {
 const SARL_OFFICIAL = { companyId: 2, journal: 20, tax: 151, raw: 1094, resale: 1082, marioJournal: 21, sett: 190 };
 const isOfficialSarl = t => !!(t && t.vat && (t.official || t.company === SARL_NAME) && t.debit > 0);
 const RESALE = /\b(ac|a\/c|split|unit|inverter|panel|module|pump|boiler|chiller)\b/i;
+// Suppliers whose VAT is an expense, not a purchase: 11% expenses (tax 9 → 442160), never 151 → 442110
+// (Mario, 2026-10-19). SANNINE water is reception (626431); B cart is other expenses (626990).
+const SARL_VENDOR_RULES = { 275: { account: 1162, tax: 9 }, 314: { account: 1188, tax: 9 } };
 
 async function postOfficialSarl(ctx, account, t, who) {
   const { txCol, odooCall } = ctx;
@@ -1032,8 +1035,8 @@ async function postOfficialSarl(ctx, account, t, who) {
     partner_id: v.id, invoice_date: t.date, date: t.date, ref,
     narration: 'Official invoice read on Shift WhatsApp' + (t.postId ? ' (post ' + t.postId + ')' : '') + '.' + (t.note ? ' Note: ' + t.note + '.' : '') + ' Made by Shift Hub.',
     invoice_line_ids: [[0, 0, { name: t.date + ' · ' + (t.description || v.name).slice(0, 80), quantity: 1, price_unit: ht,
-      account_id: RESALE.test(t.description || '') ? SARL_OFFICIAL.resale : SARL_OFFICIAL.raw,
-      tax_ids: [[6, 0, [SARL_OFFICIAL.tax]]], analytic_distribution: distOf(t, an) }]],
+      account_id: (SARL_VENDOR_RULES[v.id] || {}).account || (RESALE.test(t.description || '') ? SARL_OFFICIAL.resale : SARL_OFFICIAL.raw),
+      tax_ids: [[6, 0, [(SARL_VENDOR_RULES[v.id] || {}).tax || SARL_OFFICIAL.tax]]], analytic_distribution: distOf(t, an) }]],
   }], { context: C });
   await odooCall('account.move', 'action_post', [[id]], { context: C });
   let [bill] = await odooCall('account.move', 'read', [[id], ['id', 'name', 'state', 'payment_state', 'amount_total', 'amount_residual']], { context: C });

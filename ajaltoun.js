@@ -58,13 +58,15 @@ const SECTIONS = [
   { id: 'painting', name: 'Painting' },
   { id: 'ceilings', name: 'Suspended ceilings' },
   { id: 'plumbing', name: 'Plumbing & sanitary' },
-  { id: 'electrical', name: 'Electricity' },
+  { id: 'electrical', name: 'Electricity & solar' },   // solar merged in (Mario, 2026-10-18)
   { id: 'hvac', name: 'Heating & ventilation' },
   { id: 'landscape', name: 'Terraces, green & fencing' },
   { id: 'lift', name: 'Lift' },
   { id: 'pool', name: 'Pool' },
-  { id: 'prefab', name: 'Prefab', equipment: true },
-  { id: 'scaffolding', name: 'Scaffolding', equipment: true },
+  // prefab and scaffolding count inside the project cost like any other section (Mario, 2026-10-18: "include the 4,073 inside the cost");
+  // the 'equipment' flag stays supported for a section Mario adds later as reusable kit
+  { id: 'prefab', name: 'Prefab' },
+  { id: 'scaffolding', name: 'Scaffolding' },
   { id: 'topo', name: 'Topo & survey' },
   { id: 'design', name: 'Design & permits' },
   { id: 'general', name: 'Site & general' },
@@ -391,6 +393,28 @@ function sectionOf(l, m) {
   return r ? r.section : 'general';
 }
 
+// a bill's VAT line ("11% purchases" on 4421xx) is shown inside the line it taxes, not as a row of its own (Mario, 2026-10-18:
+// MRAD ELECTRIC cable 120 + VAT 13.20 = one line 133.20). Same bill + same villa; several taxed lines share it pro rata.
+// Display only: Odoo keeps both lines, totals do not move, the folded ids ride along (vatIds) so an approval covers them too.
+const isVatLine = l => !!l.moveId && /^4421\d* |vat paid/i.test(l.account || '');
+function foldVat(lines) {
+  const vat = lines.filter(isVatLine), out = lines.filter(l => !isVatLine(l));
+  for (const v of vat) {
+    const mains = out.filter(l => l.moveId === v.moveId && l.villa === v.villa && !l.payment);
+    if (!mains.length) { out.push(v); continue; }
+    const base = mains.reduce((t, l) => t + l.amount, 0), rate = (/(\d+(?:\.\d+)?)\s*%/.exec(v.name) || [])[1];
+    let left = v.amount;
+    mains.forEach((l, i) => {
+      const part = i === mains.length - 1 ? left : Math.round(v.amount * (base ? l.amount / base : 1 / mains.length) * 100) / 100;
+      left = Math.round((left - part) * 100) / 100;
+      l.amount = Math.round((l.amount + part) * 100) / 100; l.vat = Math.round(((l.vat || 0) + part) * 100) / 100;
+      l.vatIds = [...(l.vatIds || []), v.id];
+      l.name = l.name.replace(/ · incl\. .*VAT [\d.,]+$/, '') + ` · incl. ${rate ? rate + '% ' : ''}VAT ${l.vat.toFixed(2)}`;
+    });
+  }
+  return out;
+}
+
 async function handle(req, res, url, user, ctx) {
   const { db, TEAM_ID, odooCall, access } = ctx;
   let m;
@@ -413,7 +437,7 @@ async function handle(req, res, url, user, ctx) {
       hubLines(db, TEAM_ID).catch(e => { console.warn('ajaltoun: hub lines failed:', e.message); return []; })]);
     const ver = {}; for (const d of vsnap.docs) { const x = d.data(); ver[d.id] = x.state ? { approved: null, verified: x.state === 'verified' ? x : null, flag: x.state === 'flagged' ? x : null } : x; }   // (old one-field shape)
     // Odoo lines first, then the hub's own (not yet in Odoo) — the page sorts by date anyway
-    const lines = [...cache.data.lines, ...hub].map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null }));
+    const lines = foldVat([...cache.data.lines, ...hub].map(l => ({ ...l, section: sectionOf(l, mt), review: ver[l.id] || null })));
     return json(res, 200, { ...cache.data, lines, hubLines: hub.length, sections: allSections(mt), rules: mt.rules, cachedAt: new Date(cache.at).toISOString(), stale, admin: !!access.admin, canVerify: !access.admin, qtyDone: mt.qty });
   }
 

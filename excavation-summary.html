@@ -57,7 +57,7 @@
 </style>
 </head>
 <body>
-<div class="bar"><button onclick="window.print()">🖨 Print / Save as PDF</button><a href="/ajaltoun/excavation">← back to the dashboard</a><span id="at" style="margin-left:auto"></span></div>
+<div class="bar"><button onclick="window.print()">🖨 Print / Save as PDF</button><a href="/ajaltoun4193/excavation">← back to the dashboard</a><span id="at" style="margin-left:auto"></span></div>
 <div class="page" id="page"><p class="muted" style="text-align:center;margin-top:120px">Reading Odoo… this takes a few seconds.</p></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -84,7 +84,7 @@ Admin.require(['ajaltoun', 'excavation'], async me => {
   document.getElementById('page').innerHTML = `
 <div class="brand">SHIFT GROUP<small>AJALTOUN 4193</small></div>
 <h1>Excavation — where we stand</h1>
-<p class="sub">Georges EL Hajj (contract holder) · Anthony Khalil (excavator) · Dib Mokhtar (diesel) · figures from Odoo on ${at} · live at hub.shift-group.co/ajaltoun/excavation</p>
+<p class="sub">Georges EL Hajj (contract holder) · Anthony Khalil (excavator) · Dib Mokhtar (diesel) · figures from Odoo on ${at} · live at hub.shift-group.co/ajaltoun4193/excavation</p>
 <div class="kpis">
   <div class="kpi"><div class="v">${f0(C.m3)} m³</div><div class="l">contract volume · ${f0(closedM3)} m³ certified${lastClosed ? ' to ' + dm(lastClosed.till) : ''}${openCy.length ? `, the last ${f0(FC.m3Open)} m³ in progress (certificate ${openCy.map(c => c.n).join(', ')}, till ${openCy.map(c => dm(c.till)).join(', ')})` : ''}</div></div>
   <div class="kpi"><div class="v">$ ${f(T.bills)}</div><div class="l">total billed by Georges: excavation ${f0(T.excavation)} + commission ${f0(T.retention)} + diesel above $0.80 ${f(T.diesel)}${T.days ? ' + day rate ' + f0(T.days) : ''}</div></div>
