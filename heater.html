@@ -40,6 +40,18 @@
   .foot{color:var(--overlay0);font-size:.72rem;line-height:1.5;} .foot a{color:var(--amber);}
   .msg{color:var(--red);font-size:.82rem;margin:8px 0 0;min-height:1.2em;}
   #signin{display:none;} #signin a{color:var(--amber);}
+  .chart h2{font-size:.95rem;font-weight:600;margin:0;}
+  .chead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .tabs{display:flex;gap:4px;} .tabs button{background:var(--base);color:var(--sub);border:1px solid var(--surface0);border-radius:999px;padding:4px 11px;font-size:.75rem;font-family:inherit;cursor:pointer;}
+  .tabs button.on{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:700;}
+  .cwrap{width:100%;} #chart{display:block;width:100%;height:220px;}
+  #chart .grid{stroke:var(--surface0);stroke-width:1;} #chart .lbl{fill:var(--overlay0);font-size:11px;font-family:system-ui,sans-serif;}
+  #chart .line{fill:none;stroke:var(--amber);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;}
+  #chart .area{fill:var(--amber);opacity:.08;} #chart .lim{stroke:var(--red);stroke-dasharray:4 4;stroke-width:1;} #chart .dot{fill:var(--amber);}
+  .cnote{color:var(--overlay0);font-size:.72rem;margin-top:6px;}
+  details.card{padding:0;} details.card summary{cursor:pointer;padding:14px 16px;color:var(--sub);font-size:.82rem;list-style:none;}
+  details.card summary::before{content:"▸ ";color:var(--amber);} details[open].card summary::before{content:"▾ ";}
+  details.card .sw,details.card .msg{margin:0 16px;} details.card .msg{padding-bottom:12px;}
   .wiring h2{font-size:.95rem;font-weight:600;margin:0 0 10px;}
   .wiring img{display:block;width:100%;max-width:420px;height:auto;border-radius:10px;border:1px solid var(--surface0);margin:0 auto 12px;}
   .wiring ul{margin:0;padding-left:18px;color:var(--sub);font-size:.8rem;line-height:1.55;} .wiring li{margin:4px 0;} .wiring b{color:var(--text);}
@@ -53,7 +65,7 @@
 </header>
 <main>
   <h1>Water heater</h1>
-  <p class="lead">The Tuya two-channel controller on the water heater, read live from the Smart Life cloud. Admins only. HeaterWatch on the laptop checks every 10 minutes and sends a Telegram if a channel stays on too long or the water gets too hot.</p>
+  <p class="lead">The water temperature from the MOES probe in the heater's box, read live from the Smart Life cloud. The heater itself is switched by a Sonoff on eWeLink (joins this page once that link is approved). Admins only. HeaterWatch on the laptop checks every 10 minutes and sends a Telegram if the water gets too hot or the probe drops offline.</p>
 
   <div class="card" id="signin">Sign in to the Shift Hub first (admins only) — <a href="/">open the hub</a>, then come back.</div>
 
@@ -65,24 +77,34 @@
     </div>
   </div>
 
-  <div class="card" id="switches">
+  <div class="card chart">
+    <div class="chead">
+      <h2>Water temperature</h2>
+      <div class="tabs"><button data-d="1" class="on">24 h</button><button data-d="3">3 d</button><button data-d="7">7 d</button><button data-d="14">14 d</button></div>
+    </div>
+    <div class="cwrap"><svg id="chart" viewBox="0 0 640 220" preserveAspectRatio="none" role="img" aria-label="water temperature over time"></svg></div>
+    <div class="cnote" id="cnote">A point every 10 minutes from HeaterWatch, kept 14 days.</div>
+  </div>
+
+  <details class="card" id="switches">
+    <summary>Relays of the module — nothing is wired to them (the heater is on the Sonoff)</summary>
     <div class="sw"><div class="n">Master<small>switch_all — both channels follow it</small></div><div class="btns"><span class="state" id="s_all">—</span><button class="tg" id="t_all" data-c="switch_all" data-k="all" role="switch" aria-checked="false" aria-label="Master"></button></div></div>
     <div class="sw"><div class="n">Channel 1<small>switch_1</small></div><div class="btns"><span class="state" id="s_ch1">—</span><button class="tg" id="t_ch1" data-c="switch_1" data-k="ch1" role="switch" aria-checked="false" aria-label="Channel 1"></button></div></div>
     <div class="sw"><div class="n">Channel 2<small>switch_2</small></div><div class="btns"><span class="state" id="s_ch2">—</span><button class="tg" id="t_ch2" data-c="switch_2" data-k="ch2" role="switch" aria-checked="false" aria-label="Channel 2"></button></div></div>
     <div class="msg" id="msg"></div>
-  </div>
+  </details>
 
   <div class="card wiring">
     <h2>The module</h2>
     <img src="/public/heater/moes-ms-103.jpg" alt="MOES MS-103 temperature and humidity smart switch module, wired in the heater's box" loading="lazy">
     <ul>
       <li><b>MOES MS-103</b> — Temperature and Humidity Smart Switch Module, 90–250 V AC, 15 A per gang (15 A total), Wi-Fi 2.4 GHz.</li>
-      <li>Terminals left to right: <b>L2</b> and <b>L1</b> are the two relay outputs (channel 2 and channel 1 on this page), <b>G</b> earth, <b>L</b> and <b>N</b> the supply.</li>
+      <li>Terminals left to right: <b>L2</b> and <b>L1</b> are the two relay outputs (channel 2 and channel 1 above — unused here, the module only reads the probe), <b>G</b> earth, <b>L</b> and <b>N</b> the supply.</li>
       <li>The temperature probe plugs into the jack on the left; the blue LED is Wi-Fi, the round button resets the pairing.</li>
     </ul>
   </div>
 
-  <p class="foot">Alerts: a channel on for over <b id="onH">2</b> h · water over <b id="maxT">70</b> °C · controller offline for an hour · the free Tuya IoT Core trial 15 days before it expires. Device <span id="devid"></span> · refreshes every 30 s · <a href="/plants">Plants</a></p>
+  <p class="foot">Alerts: water over <b id="maxT">70</b> °C · probe module offline for an hour · the free Tuya IoT Core trial 15 days before it expires. Device <span id="devid"></span> · refreshes every 30 s · <a href="/plants">Plants</a></p>
 </main>
 <script>
 const $ = id => document.getElementById(id);
@@ -99,15 +121,51 @@ function paint(s) {
     st.textContent = v ? 'ON' : 'OFF'; st.className = 'state' + (v ? ' on' : '');
   }
   $('devid').textContent = s.id;
-  if (s.limits) { $('onH').textContent = s.limits.onHours; $('maxT').textContent = s.limits.maxTemp; }
+  if (s.limits) $('maxT').textContent = s.limits.maxTemp;
 }
+let days = 1, maxT = 70;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function chart(pts) {
+  const svg = $('chart'), W = 640, H = 220, L = 38, R = 10, T = 12, B = 26;
+  if (!pts || pts.length < 2) { svg.innerHTML = `<text class="lbl" x="${W / 2}" y="${H / 2}" text-anchor="middle">${pts && pts.length === 1 ? 'one reading so far — the line starts with the next one' : 'no readings yet — HeaterWatch adds one every 10 minutes'}</text>`; return; }
+  const t0 = Date.now() - days * 864e5, t1 = Date.now();
+  const cs = pts.map(p => p.c), lo = Math.floor(Math.min(...cs) / 5) * 5 - 5, hi = Math.ceil(Math.max(...cs, Math.min(maxT, Math.max(...cs) + 10)) / 5) * 5;
+  const x = t => L + (t - t0) / (t1 - t0) * (W - L - R), y = c => T + (hi - c) / (hi - lo) * (H - T - B);
+  let g = '';
+  const step = hi - lo > 40 ? 10 : 5;
+  for (let c = lo; c <= hi; c += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(c)}" y2="${y(c)}"/><text class="lbl" x="${L - 6}" y="${y(c) + 4}" text-anchor="end">${c}°</text>`;
+  const ticks = days <= 1 ? 6 : days <= 3 ? 3 : days;
+  for (let i = 0; i <= ticks; i++) {
+    const t = t0 + (t1 - t0) * i / ticks, d = new Date(t);
+    const lab = days <= 1 ? d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { timeZone: 'Asia/Beirut', day: 'numeric', month: 'short' });
+    g += `<text class="lbl" x="${x(t)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === ticks ? 'end' : 'middle'}">${lab}</text>`;
+  }
+  if (maxT >= lo && maxT <= hi) g += `<line class="lim" x1="${L}" x2="${W - R}" y1="${y(maxT)}" y2="${y(maxT)}"/>`;
+  // break the line where readings are more than 40 min apart (laptop off)
+  const segs = []; let cur = [];
+  for (const p of pts) { if (cur.length && p.t - cur[cur.length - 1].t > 40 * 60e3) { segs.push(cur); cur = []; } cur.push(p); }
+  if (cur.length) segs.push(cur);
+  for (const s of segs) {
+    const d = s.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.c).toFixed(1)}`).join('');
+    if (s.length > 1) g += `<path class="area" d="${d}L${x(s[s.length - 1].t).toFixed(1)},${y(lo)}L${x(s[0].t).toFixed(1)},${y(lo)}Z"/><path class="line" d="${d}"/>`;
+    else g += `<circle class="dot" cx="${x(s[0].t)}" cy="${y(s[0].c)}" r="2.5"/>`;
+  }
+  const last = pts[pts.length - 1];
+  g += `<circle class="dot" cx="${x(last.t)}" cy="${y(last.c)}" r="3.5"/>`;
+  svg.innerHTML = g;
+  const min = Math.min(...cs), max = Math.max(...cs);
+  $('cnote').textContent = `${pts.length} readings · low ${min.toFixed(1)} °C · high ${max.toFixed(1)} °C · a point every 10 minutes from HeaterWatch, kept 14 days`;
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { days = +b.dataset.d; document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); load(); }));
 async function load() {
   try {
-    const r = await fetch('/api/heater', { credentials: 'same-origin' });
+    const r = await fetch('/api/heater?days=' + days, { credentials: 'same-origin' });
     if (r.status === 401) { $('signin').style.display = 'block'; $('switches').style.display = 'none'; return; }
     const s = await r.json();
     if (s.error) { $('msg').textContent = s.error; return; }
     $('msg').textContent = ''; paint(s);
+    if (s.limits) maxT = s.limits.maxTemp;
+    if (s.history) chart(s.history);
   } catch (e) { $('msg').textContent = 'Could not read the controller: ' + e.message; }
 }
 document.querySelectorAll('button[data-c]').forEach(b => b.addEventListener('click', async () => {

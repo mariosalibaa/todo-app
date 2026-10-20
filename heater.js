@@ -56,15 +56,17 @@ async function set(code, value) {
 async function check(ctx, send) {
   const ref = ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('meta').doc('heaterWatch');
   const prev = (await ref.get()).data() || {}, now = Date.now(), msgs = [];
-  const ON_H = +process.env.HEATER_ON_HOURS || 2, MAX_T = +process.env.HEATER_MAX_TEMP || 70;
+  const ON_H = +process.env.HEATER_ON_HOURS || 0, MAX_T = +process.env.HEATER_MAX_TEMP || 70;
   const st = { ...prev };
   let s = null;
   try { s = await status(); } catch (e) { st.lastError = e.message; }
   const hhmm = ms => new Date(ms).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' });
   if (s) {
     st.lastError = null; st.last = { at: s.at, temp: s.temp, sw: s.switches, online: s.online };
-    // on-too-long, per channel (the master switch_all on by itself heats nothing)
-    for (const ch of ['ch1', 'ch2']) {
+    if (s.online && s.temp != null) { try { await record(ctx, now, s.temp); } catch (e) { console.error('heater record:', e.message); } }
+    // (no "channel on too long" watch: nothing is wired to the module's relays — the heater is on the Sonoff, Mario 2026-10-20;
+    //  HEATER_ON_HOURS=0 by default keeps it off; set it when a relay carries a load again)
+    if (ON_H > 0) for (const ch of ['ch1', 'ch2']) {
       const on = s.online && s.switches.all && s.switches[ch], k = 'on_' + ch, o = st[k] || {};
       if (on) {
         const since = o.since || now;
@@ -78,7 +80,7 @@ async function check(ctx, send) {
     else if (s.temp != null && s.temp <= MAX_T - 5 && hot.told) { msgs.push(`✅ Water heater — back to ${s.temp} °C`); st.hot = {}; }
     // offline for an hour
     const off = st.off || {};
-    if (!s.online) { const since = off.since || now; if (!off.told && now - since >= 3600e3) { msgs.push(`⚠ Water heater controller offline since ${hhmm(since)}`); st.off = { since, told: true }; } else st.off = { since, told: !!off.told }; }
+    if (!s.online) { const since = off.since || now; if (!off.told && now - since >= 3600e3) { msgs.push(`⚠ Water heater probe module offline since ${hhmm(since)}`); st.off = { since, told: true }; } else st.off = { since, told: !!off.told }; }
     else { if (off.told) msgs.push('✅ Water heater controller back online'); st.off = {}; }
     if (s.fault) { if (!st.faultTold) { msgs.push(`⚠ Water heater controller reports fault ${s.fault}`); st.faultTold = true; } } else st.faultTold = false;
   }
@@ -98,4 +100,19 @@ async function check(ctx, send) {
   return { ok: !!s, sent: msgs.length, temp: s && s.temp, switches: s && s.switches, error: st.lastError || undefined };
 }
 
-module.exports = { status, set, check };
+// the temperature series for the graph: one point per HeaterWatch run (10 min), kept KEEP_DAYS, in one small doc
+// (14 d × 144 = ~2,000 points). Tuya's free tier keeps no history, so the line starts the day the watch started.
+const KEEP_DAYS = 14;
+const tempsRef = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('meta').doc('heaterTemps');
+async function record(ctx, t, c) {
+  const ref = tempsRef(ctx), d = (await ref.get()).data() || {};
+  const pts = (d.pts || []).filter(p => t - p.t < KEEP_DAYS * 864e5);
+  if (!pts.length || t - pts[pts.length - 1].t >= 5 * 60e3) pts.push({ t, c });   // two runs inside 5 min (log-on + schedule) = one point
+  await ref.set({ pts, at: new Date(t).toISOString() });
+}
+async function history(ctx, days = 1) {
+  const d = (await tempsRef(ctx).get()).data() || {}, from = Date.now() - Math.min(days, KEEP_DAYS) * 864e5;
+  return (d.pts || []).filter(p => p.t >= from);
+}
+
+module.exports = { status, set, check, history, record };

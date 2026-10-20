@@ -1190,9 +1190,14 @@ const handler = async (req, res) => {
     }
     const acc = await cprAccess();
     if (!acc.isAdmin) return json(401, { error: 'admin' });
-    const limits = { onHours: +process.env.HEATER_ON_HOURS || 2, maxTemp: +process.env.HEATER_MAX_TEMP || 70 };
+    const limits = { onHours: +process.env.HEATER_ON_HOURS || 0, maxTemp: +process.env.HEATER_MAX_TEMP || 70 };
     try {
-      if (p === '/api/heater' && req.method === 'GET') return json(200, { ...(await heater.status()), limits });
+      if (p === '/api/heater' && req.method === 'GET') {
+        const days = Math.max(1, Math.min(14, +(new URL(req.url, 'http://x').searchParams.get('days') || 1)));
+        const [s, history] = await Promise.all([heater.status(), heater.history({ db, TEAM_ID }, days).catch(() => [])]);
+        if (s.online && s.temp != null) { try { await heater.record({ db, TEAM_ID }, Date.now(), s.temp); } catch {} }   // a page view is a reading too
+        return json(200, { ...s, limits, history, days });
+      }
       if (p === '/api/heater/set' && req.method === 'POST') {
         let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }
         const { code, value } = JSON.parse(b || '{}');
