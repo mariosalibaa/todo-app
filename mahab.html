@@ -52,6 +52,15 @@
   .tl .b i b{display:block;font-style:normal;font-size:.56rem;font-weight:600;line-height:1.2;color:#1e1e2e;white-space:normal;overflow-wrap:anywhere;overflow:hidden;position:relative;z-index:1;}
   .tl .b i b.sc{font-weight:700;}
   td small.spans em.soc{font-style:normal;color:#f9e2af;}
+  .row-exp{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:.8rem;color:var(--sub);} .row-exp .sp{margin-left:auto;}
+  .row-exp input,.row-exp select{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:5px 8px;font:inherit;}
+  .row-exp button{padding:4px 10px;} #expMonths button.on{background:var(--amber);color:#1e1e2e;}
+  .card.exp{padding:10px 12px;} .ch{width:100%;height:240px;display:block;}
+  .ch .gl{stroke:var(--surface0);stroke-width:1;vector-effect:non-scaling-stroke;} .ch .ty,.ch .tx{fill:var(--overlay0);font-size:11px;} .ch .ty{text-anchor:end;} .ch .tx{text-anchor:middle;}
+  .ch .l20{stroke:var(--amber);stroke-width:2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke;} .ch .t20{fill:var(--amber);font-size:12px;font-weight:600;}
+  .ch .db{cursor:pointer;}
+  .lgx{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--sub);margin-bottom:6px;} .lgx i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+  @media (max-width:640px){ .ch{height:180px;} }
   td small.spans em.io{font-style:normal;color:var(--overlay0);}
   .s-gen1{background:var(--red);} .s-gen2{background:#cba6f7;} .s-edl{background:var(--blue);} .s-off{background:var(--surface1);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
@@ -102,13 +111,22 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="card"><table id="tbl"></table></div>
-    <h2 class="mh" id="srcH" hidden>Which source — Gen 1 · Gen 2 · EDL <a href="/energy/plants/mahab/report" style="float:right;font-size:.78rem;font-weight:600;color:var(--amber);text-decoration:none;border:1px solid var(--surface0);border-radius:8px;padding:4px 10px">📄 Month report (PDF)</a></h2>
+    <h2 class="mh" id="srcH" hidden>Which source — Gen 1 (block B) · Gen 2 (block A) · EDL <a href="/energy/plants/mahab/report" style="float:right;font-size:.78rem;font-weight:600;color:var(--amber);text-decoration:none;border:1px solid var(--surface0);border-radius:8px;padding:4px 10px">📄 Month report (PDF)</a></h2>
     <p class="lead" id="srcNow"></p>
     <div class="card" id="srcMonth" hidden style="margin-bottom:12px"><table id="srcM"></table></div>
     <div class="tabs" id="srcTabs" hidden><button data-v="time">Time view</button><button data-v="table">Table</button><button data-soc title="Battery state of charge at the start → end of each stretch">🔋 Battery SOC</button></div>
     <div class="card tl" id="srcTime" hidden></div>
     <p class="lead" id="srcTip" style="margin:6px 0 0;min-height:1.2em"></p>
     <div class="card" id="srcCard" hidden style="max-height:420px;overflow-y:auto"><table id="src"></table></div>
+    <div id="expBox" hidden>
+      <h2 class="mh">Power sent back while a generator runs (kW)</h2>
+      <p class="lead">For the generator owner: the most solar power the plant pushed back onto the generator's line each day. Subtract it from the building's load to see the generator's own load — it should stay above 20 % of the generator's size.</p>
+      <div class="row-exp"><label>Generator size <input id="genKva" type="number" min="5" step="5" placeholder="kVA" style="width:90px"> kVA</label>
+        <span id="genLine"></span><span class="sp"></span><span id="expMonths"></span></div>
+      <div class="card exp"><div id="expBars"></div></div>
+      <div class="row-exp" style="margin-top:12px"><button id="dPrev">‹</button><select id="dSel"></select><button id="dNext">›</button><span id="dPeak" class="lead" style="margin:0"></span></div>
+      <div class="card exp"><div id="expDay"></div></div>
+    </div>
     <h2 class="mh" id="metersH" hidden>Meter readings on site</h2>
     <div class="card" id="metersCard" hidden><table id="meters"></table></div>
     <div class="err" id="err"></div>
@@ -196,7 +214,7 @@
       `<b>How it is wired.</b> Until 1 July 2026 EDL came into the inverter on its grid port and there was no generator. ` +
       `From 2 July to 1 October EDL and the two generators went through ATSs into the inverter's generator port (site sketch "20260704 mahab gen control") — the purple column, all three together. ` +
       `Since the morning of 2 October they come in on the <b>grid port</b> (the blue column, and the export now goes back out through it). ` +
-      `<b>Which source.</b> From 2 October each one is recognised by its voltage and frequency: Gen 1 ≈ 230 V and Gen 2 ≈ 221 V, both a steady 50.00 Hz; EDL's frequency wanders (48.8–50.7 Hz). ` +
+      `<b>Which source.</b> From 2 October each one is recognised by its voltage and frequency: Gen 1 (block B, meter 0717) ≈ 230 V and Gen 2 (block A, meter 0719) ≈ 221 V, both a steady 50.00 Hz; EDL's frequency wanders (48.8–50.7 Hz). ` +
       `Checked against the site meters, 3 → 19 Oct: Gen 1 263 kWh vs meter +277, Gen 2 368 vs +378, EDL 11 vs +12.<br>` +
       `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
       `Checked against DeyeCloud's own Excel export. Tap a month for its days.`;
@@ -208,7 +226,7 @@
     const M = D.meters || [];
     $('metersH').hidden = $('metersCard').hidden = !M.length;
     if (!M.length) return;
-    let rows = `<tr><th>Read on</th><th>Gen 1</th><th>Gen 2</th><th>EDL</th><th>Sum</th><th>Meters since last<small>kWh</small></th><th>Deye import + export<small>same time, kWh</small></th><th>Gap<small>meters − Deye</small></th></tr>`;
+    let rows = `<tr><th>Read on</th><th>Gen 1<small>block B · 0717</small></th><th>Gen 2<small>block A · 0719</small></th><th>EDL</th><th>Sum</th><th>Meters since last<small>kWh</small></th><th>Deye import + export<small>same time, kWh</small></th><th>Gap<small>meters − Deye</small></th></tr>`;
     M.forEach((m, i) => {
       const p = M[i - 1], [d, t] = m.at.split(' ');
       const dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
@@ -230,7 +248,7 @@
   }
 
   // Gen 1 / Gen 2 / EDL per day, told apart by the grid port's voltage and frequency (server: mahab.js sources())
-  const SRCN = { gen1: 'Gen 1', gen2: 'Gen 2', edl: 'EDL', off: 'nothing' };
+  const SRCN = { gen1: 'Gen 1 · block B', gen2: 'Gen 2 · block A', edl: 'EDL', off: 'nothing' };   // block A / B: Mario 2026-10-20
   function renderSources() {
     const S = D.sources, ds = S ? Object.keys(S.days).sort().reverse() : [];
     $('srcH').hidden = $('srcCard').hidden = !ds.length;
@@ -241,7 +259,7 @@
       `${(s.spans || []).length ? `<small class="spans">${s.spans.map(x => typeof x === 'string' ? x : x.t +
         (x.in != null ? ` <em class="io">in ${fmt1(x.in)} · out ${fmt1(x.out)}</em>` : '') +
         (showSoc && x.s0 != null ? ` <em class="soc">${x.s0}→${x.s1} %</em>` : '')).join('<br>')}</small>` : ''}</td>`;
-    let rows = `<tr><th>Day</th><th>Gen 1<small>≈ 230 V, 50.00 Hz</small></th><th>Gen 2<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
+    let rows = `<tr><th>Day</th><th>Gen 1 · block B<small>≈ 230 V, 50.00 Hz</small></th><th>Gen 2 · block A<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
     for (const d of ds) {
       const s = S.days[d], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
       rows += `<tr><td>${dd}${d === D.today ? ' <small>so far</small>' : ''}</td>${cell(s.gen1, 'gen')}${cell(s.gen2, 'mix')}${cell(s.edl, 'edl')}</tr>`;
@@ -249,6 +267,7 @@
     $('src').innerHTML = rows;
     renderSrcMonths(S, ds);
     renderTime(S, ds);
+    renderExport(S);
   }
 
   // per month, per source: hours, kWh in, kWh out (Mario 2026-10-20: "the summary for the in out per source per month")
@@ -260,7 +279,7 @@
       for (const k of ['gen1', 'gen2', 'edl']) { const s = S.days[d][k], t = m[k] = m[k] || { h: 0, in: 0, out: 0 }; t.h += s.h; t.in += s.in; t.out += s.out; }
     }
     const cell = (t, cls) => `<td class="${cls}">${fmt(t.in)}<small>${fmt(t.h)} h</small></td><td class="exp">${fmt(t.out)}</td>`;
-    let rows = `<tr><th>Month</th><th>Gen 1 in<small>kWh · hours</small></th><th>Gen 1 out</th><th>Gen 2 in</th><th>Gen 2 out</th><th>EDL in</th><th>EDL out</th><th>Total in</th><th>Total out</th></tr>`;
+    let rows = `<tr><th>Month</th><th>Gen 1 in<small>block B · kWh · hours</small></th><th>Gen 1 out</th><th>Gen 2 in<small>block A</small></th><th>Gen 2 out</th><th>EDL in</th><th>EDL out</th><th>Total in</th><th>Total out</th></tr>`;
     for (const k of Object.keys(M).sort().reverse()) {
       const m = M[k], [y, mo] = k.split('-'), tin = m.gen1.in + m.gen2.in + m.edl.in, tout = m.gen1.out + m.gen2.out + m.edl.out;
       rows += `<tr><td>${MONTHS[+mo - 1]} ${y}<small>${m.days} days${k === S.from.slice(0, 7) ? ' from ' + +S.from.slice(8) + ' ' + MONTHS[+mo - 1] : ''}${D.today && D.today.startsWith(k) ? ', to today' : ''}</small></td>` +
@@ -295,6 +314,78 @@
     $('srcTabs').querySelector('[data-soc]').classList.toggle('on', showSoc);
     $('srcTime').hidden = srcView !== 'time'; $('srcCard').hidden = srcView !== 'table';
   }
+  // ── power sent back to the generators (Mario 2026-10-20: "a graph showing the kW returned per day, so the generator
+  // owner can compare it with his load, to make sure it does not go below 20 % of the generator's capacity") ──────
+  // Daily bars = the highest kW sent back while Gen 1 / Gen 2 was on (server: mahab.js peakOut). The day curve = every
+  // 2-minute reading of that day (/api/mahab/day). The 20 % line: generator kVA × 0.8 power factor × 20 %.
+  let expMonth = null, expDay = null, genKva = 0;
+  try { genKva = +localStorage.getItem('mahabGenKva') || 0; } catch {}
+  const SC = { gen1: '#f38ba8', gen2: '#cba6f7', edl: '#89b4fa' };
+  const line20 = () => genKva > 0 ? genKva * 0.8 * 0.2 : 0;
+  function renderExport(S) {
+    const all = Object.keys(S.days).sort();
+    if (!all.length) return;
+    $('expBox').hidden = false;
+    const ms = [...new Set(all.map(d => d.slice(0, 7)))];
+    if (!expMonth) expMonth = ms[ms.length - 1];
+    if (!expDay) expDay = all.filter(d => d !== D.today).pop() || all[all.length - 1];   // yesterday: a whole day
+    if (genKva) $('genKva').value = genKva;
+    $('genLine').textContent = genKva ? `20 % = ${line20().toFixed(1)} kW (power factor 0.8)` : 'enter the size to draw the 20 % line';
+    $('expMonths').innerHTML = ms.length > 1 ? ms.map(m => `<button data-m="${m}" class="${m === expMonth ? 'on' : ''}">${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}</button>`).join(' ') : '';
+    const days = all.filter(d => d.startsWith(expMonth));
+    const peaks = days.map(d => ({ d, g1: (S.days[d].gen1.peakOut || 0) / 1000, g2: (S.days[d].gen2.peakOut || 0) / 1000 }));
+    const top = Math.max(5, line20() * 1.15, ...peaks.map(x => Math.max(x.g1, x.g2)));
+    const yMax = Math.ceil(top / 5) * 5, W = 1000, H = 240, L = 34, B = 26, T = 10, cw = (W - L - 6) / days.length;
+    const y = v => T + (H - T - B) * (1 - v / yMax);
+    let g = '';
+    for (let v = 0; v <= yMax; v += yMax > 30 ? 10 : 5) g += `<line x1="${L}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${L - 5}" y="${y(v) + 3}" class="ty">${v}</text>`;
+    peaks.forEach((x, i) => {
+      const x0 = L + i * cw + cw * 0.12, bw = cw * 0.36;
+      g += `<g class="db" data-d="${x.d}"><rect x="${L + i * cw}" y="${T}" width="${cw}" height="${H - T - B}" fill="${x.d === expDay ? 'rgba(242,169,59,.12)' : 'transparent'}"/>` +
+        `<rect x="${x0}" y="${y(x.g1)}" width="${bw}" height="${y(0) - y(x.g1)}" fill="${SC.gen1}"><title>${x.d} · ${SRCN.gen1} · highest ${x.g1.toFixed(1)} kW sent back</title></rect>` +
+        `<rect x="${x0 + bw}" y="${y(x.g2)}" width="${bw}" height="${y(0) - y(x.g2)}" fill="${SC.gen2}"><title>${x.d} · ${SRCN.gen2} · highest ${x.g2.toFixed(1)} kW sent back</title></rect>` +
+        `<text x="${L + i * cw + cw / 2}" y="${H - 8}" class="tx">${+x.d.slice(8)}</text></g>`;
+    });
+    if (line20()) g += `<line x1="${L}" x2="${W - 6}" y1="${y(line20())}" y2="${y(line20())}" class="l20"/><text x="${W - 8}" y="${y(line20()) - 4}" class="t20" text-anchor="end">20 % of ${genKva} kVA</text>`;
+    $('expBars').innerHTML = `<div class="lgx"><span><i style="background:${SC.gen1}"></i>${SRCN.gen1}</span><span><i style="background:${SC.gen2}"></i>${SRCN.gen2}</span><span>highest kW sent back each day — tap a day for its curve</span></div>` +
+      `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="ch">${g}</svg>`;
+    $('dSel').innerHTML = all.slice().reverse().map(d => `<option value="${d}"${d === expDay ? ' selected' : ''}>${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}</option>`).join('');
+    loadDay(expDay);
+  }
+  async function loadDay(d) {
+    expDay = d;
+    const j = await fetch('/api/mahab/day?d=' + d).then(r => r.json()).catch(() => null);
+    if (!j || !j.t || expDay !== d) return;
+    const W = 1000, H = 260, L = 34, B = 26, T = 10;
+    const tz = t => { const [h, m] = new Date(t * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }).split(':'); return +h * 60 + +m; };
+    const pts = j.t.map((t, i) => ({ m: tz(t), k: ({ 1: 'gen1', 2: 'gen2', e: 'edl' })[j.c[i]], kw: Math.max(0, -j.p[i] / 1000) }));
+    const peak = { gen1: 0, gen2: 0, edl: 0 }; pts.forEach(p => { if (p.k) peak[p.k] = Math.max(peak[p.k], p.kw); });
+    const yMax = Math.ceil(Math.max(5, line20() * 1.15, ...pts.map(p => p.kw)) / 5) * 5;
+    const x = m => L + (W - L - 6) * m / 1440, y = v => T + (H - T - B) * (1 - v / yMax);
+    let g = '';
+    // the source behind each stretch, as a light band
+    let run = null; const bands = [];
+    pts.forEach((p, i) => { if (!run || run.k !== p.k) { if (run) bands.push(run); run = { k: p.k, a: p.m, b: p.m }; } const nx = pts[i + 1]; run.b = nx && nx.m >= p.m ? nx.m : 1440; });
+    if (run) bands.push(run);
+    for (const b of bands) if (b.k) g += `<rect x="${x(b.a)}" y="${T}" width="${Math.max(0, x(b.b) - x(b.a))}" height="${H - T - B}" fill="${SC[b.k]}" opacity=".14"/>`;
+    for (let v = 0; v <= yMax; v += yMax > 30 ? 10 : 5) g += `<line x1="${L}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${L - 5}" y="${y(v) + 3}" class="ty">${v}</text>`;
+    for (let h = 0; h <= 24; h += 3) g += `<text x="${x(h * 60)}" y="${H - 8}" class="tx">${String(h).padStart(2, '0')}:00</text>`;
+    // the kW sent back, coloured by the source it went to
+    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; if (b.m < a.m || b.m - a.m > 6) continue;
+      g += `<path d="M${x(a.m)},${y(0)} L${x(a.m)},${y(a.kw)} L${x(b.m)},${y(b.kw)} L${x(b.m)},${y(0)}Z" fill="${SC[b.k] || '#6c7086'}" opacity=".85"/>`; }
+    if (line20()) g += `<line x1="${L}" x2="${W - 6}" y1="${y(line20())}" y2="${y(line20())}" class="l20"/><text x="${W - 8}" y="${y(line20()) - 4}" class="t20" text-anchor="end">20 % of ${genKva} kVA = ${line20().toFixed(1)} kW</text>`;
+    $('expDay').innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="ch">${g}</svg>`;
+    $('dPeak').textContent = `highest sent back — ${SRCN.gen1} ${peak.gen1.toFixed(1)} kW · ${SRCN.gen2} ${peak.gen2.toFixed(1)} kW · EDL ${peak.edl.toFixed(1)} kW`;
+    $('dSel').value = d;
+    $('expBars').querySelectorAll('.db').forEach(e => e.firstElementChild.setAttribute('fill', e.dataset.d === d ? 'rgba(242,169,59,.12)' : 'transparent'));
+  }
+  $('expBars').addEventListener('click', e => { const b = e.target.closest('.db'); if (b) loadDay(b.dataset.d); });
+  $('dSel').addEventListener('change', () => loadDay($('dSel').value));
+  const step = n => { const o = [...$('dSel').options].map(o => o.value), i = o.indexOf(expDay); if (o[i - n]) loadDay(o[i - n]); };
+  $('dPrev').onclick = () => step(-1); $('dNext').onclick = () => step(1);
+  $('genKva').addEventListener('change', () => { genKva = +$('genKva').value || 0; try { localStorage.setItem('mahabGenKva', String(genKva)); } catch {} renderExport(D.sources); });
+  $('expMonths').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { expMonth = b.dataset.m; renderExport(D.sources); } });
+
   $('srcTabs').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.soc != null) { showSoc = !showSoc; try { localStorage.setItem('mahabSoc', showSoc ? '1' : '0'); } catch {} }

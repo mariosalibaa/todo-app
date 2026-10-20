@@ -180,6 +180,10 @@ async function sources(ctx) {
     const sp = spans(docs[d]);
     for (const k of ['gen1', 'gen2', 'edl', 'off']) if (sp[k]) days[d][k].spans = sp[k];
     days[d].bar = sp.bar; days[d].soc = sp.soc;
+    // the highest kW sent back while each source was on (Mario 2026-10-20: the generator owner checks it against his
+    // load, so his generator never drops under 20 % of its size) — W, from the 2-minute readings
+    for (const k of ['gen1', 'gen2', 'edl']) days[d][k].peakOut = 0;
+    docs[d].p.forEach((w, i) => { const k = SRC[docs[d].c[i]]; if (w < 0 && days[d][k]) days[d][k].peakOut = Math.max(days[d][k].peakOut, -w); });
   }
   const t = srcToday.v, i = t ? t.t.length - 1 : -1;
   return { from: SRC_FROM, days, now: i >= 0 ? { src: SRC[t.c[i]], at: t.t[i], ...t.last } : null, docs };
@@ -219,4 +223,11 @@ async function meters(ctx, src) {
   return docs;
 }
 
-module.exports = { days, fill, srcDocs, STATION };
+// one day's 2-minute series for the export chart: { day, t, c, p } (finished days from Firestore, today live)
+async function srcSeries(ctx, ymd) {
+  if (ymd === beirutToday()) { await srcDocs(ctx, 0); const v = srcToday.v; return { day: ymd, t: v.t, c: v.c, p: v.p }; }
+  const d = (await srcCol(ctx).doc(ymd).get()).data();
+  return d ? { day: ymd, t: d.t, c: d.c, p: d.p } : null;
+}
+
+module.exports = { days, fill, srcDocs, srcSeries, STATION };

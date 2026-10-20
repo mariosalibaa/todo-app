@@ -67,7 +67,7 @@
   const n0 = v => v == null ? '' : Math.round(v).toLocaleString('en-US');
   const n1 = v => v == null ? '' : (Math.round(v * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const dday = d => `${+d.slice(8, 10)} ${MO[+d.slice(5, 7) - 1]}`;
-  const SRC = [['gen1', 'Generator 1', 'meter 0717'], ['gen2', 'Generator 2', 'meter 0719 (A)'], ['edl', 'EDL', 'meter 426955']];
+  const SRC = [['gen1', 'Generator 1 — block B', 'meter 0717'], ['gen2', 'Generator 2 — block A', 'meter 0719'], ['edl', 'EDL', 'meter 426955']];   // block A / B: Mario 2026-10-20
 
   $('pr').onclick = () => window.print();
   fetch('/api/mahab').then(r => r.json()).then(render).catch(e => { $('out').innerHTML = `<p class="err">Could not load the plant data (${e.message}).</p>`; });
@@ -156,7 +156,7 @@
   <p class="note">Generator 1 and Generator 2 meters count energy in both directions, so each one is compared with in + out. EDL's meter is an older disc meter: no solar went out while EDL was on during this period, so how it treats export is not yet known.</p>` : ''}
 
   <h2>How each source is recognised</h2>
-  <p class="note">Since 2 October 2026 EDL and both generators reach the inverter through the change-over switches on one input. The inverter logs that input's voltage and frequency every 2 minutes, and each source has its own signature: <b>Generator 1</b> ≈ 230 V, a steady 50.00 Hz · <b>Generator 2</b> ≈ 221 V, a steady 50.00 Hz · <b>EDL</b> frequency wandering between about 48.8 and 50.7 Hz. The split was checked against the three site meters (3 → 19 October: Generator 1 263 kWh vs meter +277, Generator 2 368 vs +378, EDL 11 vs +12).</p>
+  <p class="note">Since 2 October 2026 EDL and both generators reach the inverter through the change-over switches on one input. The inverter logs that input's voltage and frequency every 2 minutes, and each source has its own signature: <b>Generator 1 (block B)</b> ≈ 230 V, a steady 50.00 Hz · <b>Generator 2 (block A)</b> ≈ 221 V, a steady 50.00 Hz · <b>EDL</b> frequency wandering between about 48.8 and 50.7 Hz. The split was checked against the three site meters (3 → 19 October: Generator 1 263 kWh vs meter +277, Generator 2 368 vs +378, EDL 11 vs +12).</p>
   ${foot(1)}
 </div>
 <div class="sheet">

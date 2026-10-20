@@ -1372,6 +1372,14 @@ const handler = async (req, res) => {
     catch (e) { console.error('khoder:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
+  // /api/mahab/day?d=YYYY-MM-DD — one day's 2-minute grid-port series (time, source, W) for the export chart; PUBLIC like the page
+  if (url.split('?')[0] === '/api/mahab/day' && req.method === 'GET') {
+    const d = new URL(req.url, 'http://x').searchParams.get('d') || '';
+    if (!/^\d{4}-\d\d-\d\d$/.test(d)) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"d"}'); return; }
+    try { const v = await require('./mahab').srcSeries({ db, TEAM_ID }, d); res.writeHead(v ? 200 : 404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v || { error: 'no data' })); }
+    catch (e) { console.error('mahab day error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
   if (url.split('?')[0] === '/api/mahab' && req.method === 'GET') {
     // PUBLIC, no sign-in, no password (Mario 2026-10-20: "remove the password" → anyone with the link, like /energy/plants/tohme);
     // isAdmin only shows the Hub link. MAHAB_PASSWORD and /api/mahab/login are no longer used.
