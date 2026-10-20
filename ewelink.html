@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>eWeLink · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--red:#f38ba8;--blue:#89b4fa;}
+  *{box-sizing:border-box;}
+  html,body{background:var(--base);}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--surface0);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .hback{color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;}
+  main{max-width:760px;margin:0 auto;padding:20px 16px 60px;}
+  h1{font-size:1.25rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.82rem;margin:0 0 14px;line-height:1.5;} .lead a{color:var(--amber);}
+  .card{background:var(--mantle);border:1px solid var(--surface0);border-radius:14px;padding:0 16px;margin-bottom:14px;}
+  .dev{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--surface0);}
+  .dev:first-child{border-top:none;}
+  .n{font-weight:600;} .n small{display:block;color:var(--overlay0);font-size:.72rem;font-weight:400;}
+  .right{display:flex;align-items:center;gap:12px;flex:none;}
+  .temp{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:700;font-size:1.05rem;min-width:3.6em;text-align:right;}
+  .temp small{color:var(--overlay0);font-size:.68rem;font-weight:400;display:block;text-align:right;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:700;letter-spacing:.04em;}
+  .pill.off{background:rgba(243,139,168,.15);color:var(--red);}
+  .state{font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--sub);min-width:2.2em;text-align:right;} .state.on{color:var(--green);}
+  .tg{position:relative;width:54px;height:30px;border-radius:999px;background:var(--surface1);border:none;padding:0;cursor:pointer;transition:background .2s;flex:none;}
+  .tg::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:left .2s;}
+  .tg.on{background:var(--amber);} .tg.on::after{left:27px;} .tg:disabled{opacity:.5;cursor:default;}
+  .msg{color:var(--red);font-size:.82rem;margin:8px 0 12px;min-height:1.2em;}
+  .foot{color:var(--overlay0);font-size:.72rem;line-height:1.5;} #signin{display:none;padding:14px 0;} #signin a{color:var(--amber);}
+  @media (max-width:480px){ .dev{flex-wrap:wrap;} .right{width:100%;justify-content:flex-end;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark"><span>SHIFT</span> GROUP<small>EWELINK</small></div>
+  <a class="hback" href="/energy">‹ Energy</a>
+</header>
+<main>
+  <h1>eWeLink — the Sonoff devices</h1>
+  <p class="lead">Every Sonoff on the eWeLink account, live: its switch, and the water temperature where a probe is fitted (THR316D / TH16). Admins only. The MOES probe on the water heater is on the <a href="/energy/tuya">Tuya page</a>.</p>
+  <div class="card" id="list"><div id="signin">Sign in to the Shift Hub first (admins only) — <a href="/">open the hub</a>.</div></div>
+  <div class="msg" id="msg"></div>
+  <p class="foot">A grey device is offline: eWeLink has not heard from it, so it cannot be switched. Refreshes every 30 s.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let busy = false, DEVS = [];
+function row(d) {
+  const t = d.temp == null ? '' : `<div class="temp">${d.temp.toFixed(1)}°<small>${esc(d.sensor || 'probe')}${d.humidity != null ? ' · ' + d.humidity + '%' : ''}</small></div>`;
+  const sw = d.switch == null ? '' : `<span class="state ${d.switch ? 'on' : ''}">${d.switch ? 'ON' : 'OFF'}</span><button class="tg ${d.switch ? 'on' : ''}" data-id="${esc(d.id)}" role="switch" aria-checked="${d.switch}" aria-label="${esc(d.name)}" ${d.online ? '' : 'disabled'}></button>`;
+  return `<div class="dev" style="${d.online ? '' : 'opacity:.55'}"><div class="n">${esc(d.name)}<small>${esc(d.model || '')}${d.shared ? ' · shared with me' : ''}${d.online ? '' : ' · <span class="pill off">OFFLINE</span>'}</small></div><div class="right">${t}${sw}</div></div>`;
+}
+function paint() { $('list').innerHTML = DEVS.map(row).join('') || '<div class="dev">No devices on this eWeLink account.</div>'; }
+async function load() {
+  try {
+    const r = await fetch('/api/ewelink', { credentials: 'same-origin' });
+    if (r.status === 401) { $('list').innerHTML = ''; $('list').appendChild(Object.assign(document.createElement('div'), { id: 'signin', innerHTML: 'Sign in to the Shift Hub first (admins only) — <a href="/">open the hub</a>.', style: 'display:block;padding:14px 0' })); return; }
+    const v = await r.json();
+    if (v.error) { $('msg').textContent = v.error; return; }
+    $('msg').textContent = ''; DEVS = v.devices; paint();
+  } catch (e) { $('msg').textContent = 'Could not reach eWeLink: ' + e.message; }
+}
+$('list').addEventListener('click', async e => {
+  const b = e.target.closest('button.tg'); if (!b || busy) return;
+  busy = true; const want = !b.classList.contains('on');
+  document.querySelectorAll('button.tg').forEach(x => x.disabled = true); $('msg').textContent = '';
+  try {
+    const r = await fetch('/api/ewelink/set', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.dataset.id, on: want }) });
+    const v = await r.json();
+    if (!r.ok || v.error) $('msg').textContent = v.error || ('HTTP ' + r.status);
+    else if (v.device) { DEVS = DEVS.map(d => d.id === v.device.id ? v.device : d); paint(); }
+  } catch (err) { $('msg').textContent = err.message; }
+  busy = false; document.querySelectorAll('button.tg').forEach(x => { const d = DEVS.find(k => k.id === x.dataset.id); x.disabled = !(d && d.online); });
+});
+load(); setInterval(() => { if (!busy && !document.hidden) load(); }, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+</script>
+<script src="/phone-preview.js"></script>
+</body>
+</html>

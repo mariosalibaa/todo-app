@@ -172,6 +172,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'cars.html'));
   fs.readFileSync(path.join(__dirname, 'heater.html'));
   fs.readFileSync(path.join(__dirname, 'links.html'));
+  fs.readFileSync(path.join(__dirname, 'ewelink.html'));
   fs.readFileSync(path.join(__dirname, 'public/heater/moes-ms-103.jpg'));
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
@@ -766,6 +767,7 @@ const handler = async (req, res) => {
     'tohme.html': path.join(__dirname, 'tohme.html'),
     'heater.html': path.join(__dirname, 'heater.html'),
     'links.html': path.join(__dirname, 'links.html'),
+    'ewelink.html': path.join(__dirname, 'ewelink.html'),
     'khoder.html': path.join(__dirname, 'khoder.html'),
     'wa-outbox.html': path.join(__dirname, 'wa-outbox.html'),
     'makhlouf.html': path.join(__dirname, 'makhlouf.html'),
@@ -790,6 +792,7 @@ const handler = async (req, res) => {
     '/energy': 'hub.html',   // the Energy folder on its own link (Mario 2026-10-20: a folder's pages live under its path)
     '/energy/tuya': 'heater.html',   // the Tuya devices — the MOES probe in the water heater's box: temperature now + graph, the (unwired) relays; admins; HeaterWatch alerts (Mario 2026-10-19; /heater → /tuya → /energy/tuya 2026-10-20)
     '/links': 'links.html',   // the register of every hub link — icon, path, who may open it (Mario 2026-10-20)
+    '/energy/ewelink': 'ewelink.html',   // the Sonoff devices on eWeLink — switch + probe temperature; admins (Mario 2026-10-20)
     '/usa': 'usa.html',   // Youssef's well pump (Maryland): order of work + photos of the sand fixes; PUBLIC, nothing private (Mario 2026-10-06)
     '/contacts': 'contacts.html',   // business cards → Mario's Google Contacts (Mario, 2026-10-18)
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
@@ -963,7 +966,7 @@ const handler = async (req, res) => {
   // the Energy folder's pages moved under /energy on 2026-10-20 (folder rule) — the flat links, share links included (?k=, ?src=&id=&k=), go on working
   if (/^\/(mahab|cpr|cpr\/dynamic|cpr\/diesel|tohme|makhlouf|makhlouf\/offer\.pdf)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy' + req.url }); res.end(); return; }
   // /plants (and /energy/plants with a share query) → the master list at /energy/plants/all; bare /energy/plants is the folder
-  if (url.split('?')[0] === '/plants' || (url.split('?')[0] === '/energy/plants' && req.url.includes('?'))) { res.writeHead(301, { Location: '/energy/plants/all' + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
+  if (url.split('?')[0] === '/plants' || (url.split('?')[0] === '/energy/plants' && /[?&](src|id|k|s)=/.test(req.url))) { res.writeHead(301, { Location: '/energy/plants/all' + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const OLD = pu === '/ajaltoun' ? '/ajaltoun4193/accounting' : pu === '/partners' ? '/ajaltoun4193/partners' : /^\/ajaltoun\/excavation/.test(pu) ? pu.replace('/ajaltoun/excavation', '/ajaltoun4193/excavation') : /^\/ajaltoun\/machines/.test(pu) ? pu.replace('/ajaltoun/machines', '/ajaltoun4193/cameras') : '';
   if (OLD && pu === url && PAGES[pu]) { res.writeHead(301, { Location: OLD + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const page = PAGES[pu] || (pu === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
@@ -1228,6 +1231,23 @@ const handler = async (req, res) => {
       ];
       return json(200, { tiles, extra, apps: APPS });
     } catch (e) { console.error('hub-links error:', e); return json(500, { error: e.message }); }
+  }
+  // /api/ewelink — the Sonoff devices (ewelink.js): GET list, POST /set {id, on, outlet?}. Hub admins. (Mario 2026-10-20)
+  if (url.split('?')[0].startsWith('/api/ewelink')) {
+    const json = (code, v) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); };
+    const acc = await cprAccess();
+    if (!acc.isAdmin) return json(401, { error: 'admin' });
+    const ew = require('./ewelink'), p = url.split('?')[0];
+    try {
+      if (p === '/api/ewelink' && req.method === 'GET') return json(200, { devices: await ew.list({ db, TEAM_ID }), at: new Date().toISOString() });
+      if (p === '/api/ewelink/set' && req.method === 'POST') {
+        let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }
+        const { id, on, outlet } = JSON.parse(b || '{}');
+        if (!/^[0-9a-f]{10}$/i.test(String(id))) return json(400, { error: 'bad device id' });
+        return json(200, { device: await ew.setSwitch({ db, TEAM_ID }, String(id), !!on, outlet) });
+      }
+    } catch (e) { console.error('ewelink error:', e); return json(500, { error: e.message }); }
+    return json(404, { error: 'not found' });
   }
   // /api/heater — the water heater's Tuya controller (heater.js). GET status + POST /set {code,value}: hub admins
   // (the session cookie, as cprAccess reads it). /check: the laptop task HeaterWatch every 10 min (ACCOUNTING_API_KEY)
