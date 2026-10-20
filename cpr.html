@@ -133,8 +133,8 @@
   <div class="bar">
     <select id="range" onchange="render()"></select>
     <span class="sp"></span>
-    <a href="/cpr/dynamic" class="fuelbtn" title="Big generator: diesel used vs the Cummins datasheet, controller readings">📈 Big gen vs datasheet</a>
-    <a href="/cpr/diesel" class="fuelbtn" title="Kamal: a photo of the bill, the litres and the dollars each time a generator is filled">⛽ Diesel fills</a>
+    <a href="/energy/cpr/dynamic" class="fuelbtn" title="Big generator: diesel used vs the Cummins datasheet, controller readings">📈 Big gen vs datasheet</a>
+    <a href="/energy/cpr/diesel" class="fuelbtn" title="Kamal: a photo of the bill, the litres and the dollars each time a generator is filled">⛽ Diesel fills</a>
     <button onclick="exportCsv()" title="The table shown, as a CSV">⬇ CSV</button>
     <button onclick="load(true)" title="Read the meters and Deye again (or pull the page down)">↻ Refresh</button>
   </div>
@@ -389,7 +389,7 @@ function render() {
     : tab === 'cmp'
     ? `<div class="chips">${[['', 'Summary'], ...Object.entries(CMP).map(([k, c]) => [k, c.name])].map(([k, n]) => `<button class="${k === cmpKey() ? 'on' : ''}" onclick="store.set('cpr.cmp', '${k}'); render()">${n}</button>`).join('')}</div>${/^M\d/.test((CMP[cmpKey()] || {}).name || '') ? `<div class="ph"><label>Phases of ${CMP[cmpKey()].name.split(' ')[0]} on <input type="date" id="phday" value="${store.get('cpr.phDay') || today()}" onchange="store.set('cpr.phDay', this.value)"></label> <button onclick="phases()">⚡ Show phase by phase</button><div id="phout" style="overflow-x:auto"></div></div>` : ''}`
     : tab === 'dsl'
-    ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="${fuelPrice() ? fuelPrice().toFixed(2) + ' (fills)' : 'price'}" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
+    ? `<label>litres per kWh <input type="number" step="0.01" min="0.15" max="0.6" value="${store.get('cpr.lpk') || 0.3}" onchange="store.set('cpr.lpk', this.value); render()"></label><label>$ per litre <input type="number" step="0.01" min="0" value="${store.get('cpr.usd') || ''}" placeholder="${fuelPrice() ? fuelPrice().toFixed(2) + ' (fills)' : 'price'}" onchange="store.set('cpr.usd', this.value); render()"></label><span class="muted">A diesel generator burns about 0.25–0.35 L per kWh at a fair load, more when it runs nearly empty. Bought = the fills Kamal records.</span><a href="/energy/cpr/diesel" style="color:var(--amber)">⛽ Diesel fills page</a>`
     : '';
   const DASH = tab === 'yr' || tab === 'bat' || tab === 'live' || tab === 'chr' || tab === 'rd';
   document.getElementById('dash').style.display = DASH ? '' : 'none';

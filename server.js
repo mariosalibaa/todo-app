@@ -795,17 +795,17 @@ const handler = async (req, res) => {
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
     '/bonvin': 'bonvin.html',   // Sin El Fil 2292/A5 — deeds, leases, rent history, every file; admins only (Mario 2026-10-04)
     '/bonvin/shop': 'bonvin-shop.html',   // the same shop for a renter: plans, photos, office layout — PUBLIC, nothing private
-    '/plants': 'plants.html',   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
-    '/makhlouf': 'makhlouf.html',   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
+    '/energy/plants': 'plants.html',   // (was /plants, folder rule 2026-10-20)   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
+    '/energy/makhlouf': 'makhlouf.html',   // (was /makhlouf)   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
     '/whatsapp-outbox': 'wa-outbox.html',   // WhatsApp messages queued while the laptop is off (Mario 2026-10-07)
     '/dev': 'dev.html',   // the dev queue: what the ✦ assistant could not do because it needs code; Claude Code drains it (Mario 2026-10-07)
     '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
-    '/mahab': 'mahab.html',   // Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
-    '/tohme': 'tohme.html',   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025; PUBLIC, no sign-in (Mario 2026-10-13)
-    '/cpr': 'cpr.html',   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
+    '/energy/mahab': 'mahab.html',   // (was /mahab, folder rule 2026-10-20) Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
+    '/energy/tohme': 'tohme.html',   // (was /tohme)   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025; PUBLIC, no sign-in (Mario 2026-10-13)
+    '/energy/cpr': 'cpr.html',   // (was /cpr)   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
-    '/cpr/dynamic': 'cpr-dynamic.html',   // big generator fuel vs Cummins datasheet — PUBLIC snapshot for the supplier, no prices (Mario 2026-10-03)
-    '/cpr/diesel': 'cpr-fuel.html' };   // Kamal's diesel fills (private link: /cpr/diesel?k=CPR_FUEL_KEY)   // CPR energy — kWh per building / source per month; PUBLIC, no sign-in, no hub bar (Mario, 2026-09-26: "open for everyone")
+    '/energy/cpr/dynamic': 'cpr-dynamic.html',   // (was /cpr/dynamic)   // big generator fuel vs Cummins datasheet — PUBLIC snapshot for the supplier, no prices (Mario 2026-10-03)
+    '/energy/cpr/diesel': 'cpr-fuel.html' };   // (was /cpr/diesel)   // Kamal's diesel fills (private link: /cpr/diesel?k=CPR_FUEL_KEY)   // CPR energy — kWh per building / source per month; PUBLIC, no sign-in, no hub bar (Mario, 2026-09-26: "open for everyone")
   // /whatsapp — the WhatsApp Archive (whatsapp-local on Mario's laptop, 2013 → today, refreshed from
   // WhatsApp Web every 5 min). Admin only, by the session cookie; the laptop's tunnel URL comes from
   // the archive-daemon heartbeat (meta/whatsappArchive) and the short-lived token it gets is signed
@@ -959,6 +959,8 @@ const handler = async (req, res) => {
   let pu = url;
   for (const [re, to] of AJ) if (re.test(pu)) { pu = pu.replace(re, to); break; }
   if (/^\/(heater|tuya)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy/tuya' }); res.end(); return; }   // renamed 2026-10-20
+  // the Energy folder's pages moved under /energy on 2026-10-20 (folder rule) — the flat links, share links included (?k=, ?src=&id=&k=), go on working
+  if (/^\/(mahab|cpr|cpr\/dynamic|cpr\/diesel|tohme|plants|makhlouf|makhlouf\/offer\.pdf)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy' + req.url }); res.end(); return; }
   const OLD = pu === '/ajaltoun' ? '/ajaltoun4193/accounting' : pu === '/partners' ? '/ajaltoun4193/partners' : /^\/ajaltoun\/excavation/.test(pu) ? pu.replace('/ajaltoun/excavation', '/ajaltoun4193/excavation') : /^\/ajaltoun\/machines/.test(pu) ? pu.replace('/ajaltoun/machines', '/ajaltoun4193/cameras') : '';
   if (OLD && pu === url && PAGES[pu]) { res.writeHead(301, { Location: OLD + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const page = PAGES[pu] || (pu === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
@@ -975,7 +977,7 @@ const handler = async (req, res) => {
   // /makhlouf/offer.pdf — the offer to Maison M: rev 2, 14 Oct 2026, generator carries the EDL hours too (public/makhlouf/offer-20261014.pdf;
   // rev 1 of 13 Oct with EDL 4.8 h/day kept as offer-20261013.pdf). Admins only,
   // by the session cookie like /app/<key>; sits before the static whitelist, which would 404 it.
-  if (url.split('?')[0] === '/makhlouf/offer.pdf' && req.method === 'GET') {
+  if (url.split('?')[0] === '/energy/makhlouf/offer.pdf' && req.method === 'GET') {
     const u = await verifyToken(req);
     const acc = u && (AUTH_DISABLED ? { admin: true } : await accessFor(u.email));
     if (!acc || !acc.admin) { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Sign in to the Shift Hub first (admins only).'); return; }
@@ -1206,14 +1208,14 @@ const handler = async (req, res) => {
         ['/rent-law', '⚖️', 'Rent law', 'public', 'papers under /public/rent-law'],
         ['/usa', '🇺🇸', "Youssef's well pump", 'public', 'order of work + photos'],
         ['/bonvin/shop', '🏪', 'Bonvin shop', 'public', "the renter's page: plans, photos"],
-        ['/cpr', '⚡', 'CPR energy', 'public (or CPR_PASSWORD)', 'no hub bar'],
-        ['/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
-        ['/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
-        ['/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in'],
-        ['/mahab', '☀', 'Mahab plant', 'admin or MAHAB_PASSWORD', ''],
-        ['/plants', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
+        ['/energy/cpr', '⚡', 'CPR energy', 'public (or CPR_PASSWORD)', 'no hub bar; /cpr redirects'],
+        ['/energy/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
+        ['/energy/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
+        ['/energy/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
+        ['/energy/mahab', '☀', 'Mahab plant', 'admin or MAHAB_PASSWORD', '/mahab redirects'],
+        ['/energy/plants', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
         ['/khoder', '👷', 'Khoder × Walid', 'share key ?k=', ''],
-        ['/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
+        ['/energy/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
         ['/whatsapp', '🗄️', 'WhatsApp Archive', 'admin', 'through the laptop gateway'],
         ['/app/<name>', '💻', 'Laptop apps', 'admin', 'photo-map, lead-hub, invoice-renamer, power-analyzer — wake the laptop'],
         ['/energy', '📁', 'Energy folder', 'signed-in', 'the folder tile on its own link'],
