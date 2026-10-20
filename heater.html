@@ -29,10 +29,14 @@
   .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.04em;}
   .pill.on{background:rgba(166,227,161,.15);color:var(--green);} .pill.off{background:var(--surface0);color:var(--sub);}
   .pill.bad{background:rgba(243,139,168,.15);color:var(--red);}
-  .btns{display:flex;gap:6px;align-items:center;}
-  button{background:var(--base);color:var(--text);border:1px solid var(--surface0);border-radius:8px;padding:7px 14px;font-size:.82rem;font-family:inherit;cursor:pointer;}
-  button:hover{border-color:var(--amber);} button:disabled{opacity:.45;cursor:default;}
-  button.go{background:var(--amber);color:#1e1e2e;border-color:var(--amber);font-weight:700;}
+  .btns{display:flex;gap:10px;align-items:center;}
+  .state{font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--sub);min-width:2.2em;text-align:right;}
+  .state.on{color:var(--green);}
+  /* the toggle, as in the Smart Life app: grey = off, amber = on */
+  .tg{position:relative;width:54px;height:30px;border-radius:999px;background:var(--surface1);border:none;padding:0;cursor:pointer;transition:background .2s;flex:none;}
+  .tg::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:left .2s;}
+  .tg.on{background:var(--amber);} .tg.on::after{left:27px;}
+  .tg:disabled{opacity:.5;cursor:default;}
   .foot{color:var(--overlay0);font-size:.72rem;line-height:1.5;} .foot a{color:var(--amber);}
   .msg{color:var(--red);font-size:.82rem;margin:8px 0 0;min-height:1.2em;}
   #signin{display:none;} #signin a{color:var(--amber);}
@@ -59,9 +63,9 @@
   </div>
 
   <div class="card" id="switches">
-    <div class="sw"><div class="n">Master<small>switch_all — both channels follow it</small></div><div class="btns"><span class="pill off" id="p_all">—</span><button data-c="switch_all" data-v="1" class="go">On</button><button data-c="switch_all" data-v="0">Off</button></div></div>
-    <div class="sw"><div class="n">Channel 1<small>switch_1</small></div><div class="btns"><span class="pill off" id="p_ch1">—</span><button data-c="switch_1" data-v="1" class="go">On</button><button data-c="switch_1" data-v="0">Off</button></div></div>
-    <div class="sw"><div class="n">Channel 2<small>switch_2</small></div><div class="btns"><span class="pill off" id="p_ch2">—</span><button data-c="switch_2" data-v="1" class="go">On</button><button data-c="switch_2" data-v="0">Off</button></div></div>
+    <div class="sw"><div class="n">Master<small>switch_all — both channels follow it</small></div><div class="btns"><span class="state" id="s_all">—</span><button class="tg" id="t_all" data-c="switch_all" data-k="all" role="switch" aria-checked="false" aria-label="Master"></button></div></div>
+    <div class="sw"><div class="n">Channel 1<small>switch_1</small></div><div class="btns"><span class="state" id="s_ch1">—</span><button class="tg" id="t_ch1" data-c="switch_1" data-k="ch1" role="switch" aria-checked="false" aria-label="Channel 1"></button></div></div>
+    <div class="sw"><div class="n">Channel 2<small>switch_2</small></div><div class="btns"><span class="state" id="s_ch2">—</span><button class="tg" id="t_ch2" data-c="switch_2" data-k="ch2" role="switch" aria-checked="false" aria-label="Channel 2"></button></div></div>
     <div class="msg" id="msg"></div>
   </div>
 
@@ -76,7 +80,11 @@ function paint(s) {
   $('humNote').textContent = s.humidity == null ? 'no probe fitted' : 'from the probe';
   $('online').innerHTML = s.online ? '<span class="pill on">online</span>' : '<span class="pill bad">OFFLINE</span>';
   $('seen').textContent = 'read ' + new Date(s.at).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }) + (s.fault ? ' · fault ' + s.fault : '');
-  for (const [k, v] of Object.entries(s.switches)) { const p = $('p_' + k); p.textContent = v ? 'ON' : 'OFF'; p.className = 'pill ' + (v ? 'on' : 'off'); }
+  for (const [k, v] of Object.entries(s.switches)) {
+    const t = $('t_' + k), st = $('s_' + k);
+    t.classList.toggle('on', !!v); t.setAttribute('aria-checked', v ? 'true' : 'false');
+    st.textContent = v ? 'ON' : 'OFF'; st.className = 'state' + (v ? ' on' : '');
+  }
   $('devid').textContent = s.id;
   if (s.limits) { $('onH').textContent = s.limits.onHours; $('maxT').textContent = s.limits.maxTemp; }
 }
@@ -91,10 +99,11 @@ async function load() {
 }
 document.querySelectorAll('button[data-c]').forEach(b => b.addEventListener('click', async () => {
   if (busy) return; busy = true;
+  const want = !b.classList.contains('on');   // the toggle flips to the opposite of what it shows
   document.querySelectorAll('button[data-c]').forEach(x => x.disabled = true);
   $('msg').textContent = '';
   try {
-    const r = await fetch('/api/heater/set', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: b.dataset.c, value: b.dataset.v === '1' }) });
+    const r = await fetch('/api/heater/set', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: b.dataset.c, value: want }) });
     const s = await r.json();
     if (!r.ok || s.error) $('msg').textContent = s.error || ('HTTP ' + r.status); else paint(s);
   } catch (e) { $('msg').textContent = e.message; }
