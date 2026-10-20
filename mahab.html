@@ -111,7 +111,7 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="card"><table id="tbl"></table></div>
-    <h2 class="mh" id="srcH" hidden>Which source — Gen 1 (block B) · Gen 2 (block A) · EDL <a href="/energy/plants/mahab/report" style="float:right;font-size:.78rem;font-weight:600;color:var(--amber);text-decoration:none;border:1px solid var(--surface0);border-radius:8px;padding:4px 10px">📄 Month report (PDF)</a></h2>
+    <h2 class="mh" id="srcH" hidden>Which source — Block B · Block A · EDL <a href="/energy/plants/mahab/report" style="float:right;font-size:.78rem;font-weight:600;color:var(--amber);text-decoration:none;border:1px solid var(--surface0);border-radius:8px;padding:4px 10px">📄 Month report (PDF)</a></h2>
     <p class="lead" id="srcNow"></p>
     <div class="card" id="srcMonth" hidden style="margin-bottom:12px"><table id="srcM"></table></div>
     <div class="tabs" id="srcTabs" hidden><button data-v="time">Time view</button><button data-v="table">Table</button><button data-soc title="Battery state of charge at the start → end of each stretch">🔋 Battery SOC</button></div>
@@ -214,19 +214,19 @@
       `<b>How it is wired.</b> Until 1 July 2026 EDL came into the inverter on its grid port and there was no generator. ` +
       `From 2 July to 1 October EDL and the two generators went through ATSs into the inverter's generator port (site sketch "20260704 mahab gen control") — the purple column, all three together. ` +
       `Since the morning of 2 October they come in on the <b>grid port</b> (the blue column, and the export now goes back out through it). ` +
-      `<b>Which source.</b> From 2 October each one is recognised by its voltage and frequency: Gen 1 (block B, meter 0717) ≈ 230 V and Gen 2 (block A, meter 0719) ≈ 221 V, both a steady 50.00 Hz; EDL's frequency wanders (48.8–50.7 Hz). ` +
-      `Checked against the site meters, 3 → 19 Oct: Gen 1 263 kWh vs meter +277, Gen 2 368 vs +378, EDL 11 vs +12.<br>` +
+      `<b>Which source.</b> From 2 October each one is recognised by its voltage and frequency: Block B (meter 0717) ≈ 230 V and Block A (meter 0719) ≈ 221 V, both a steady 50.00 Hz; EDL's frequency wanders (48.8–50.7 Hz). ` +
+      `Checked against the site meters, 3 → 19 Oct: Block B 263 kWh vs meter +277, Block A 368 vs +378, EDL 11 vs +12.<br>` +
       `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
       `Checked against DeyeCloud's own Excel export. Tap a month for its days.`;
   }
 
-  // the site's own meters (Gen 1, Gen 2, EDL) as read by hand, with their sum. Mario's check (2026-10-03): what the
+  // the site's own meters (Block B, Block A, EDL) as read by hand, with their sum. Mario's check (2026-10-03): what the
   // three advance between two readings = DeyeCloud's grid import + export over exactly that time (server: mahab.js)
   function renderMeters() {
     const M = D.meters || [];
     $('metersH').hidden = $('metersCard').hidden = !M.length;
     if (!M.length) return;
-    let rows = `<tr><th>Read on</th><th>Gen 1<small>block B · 0717</small></th><th>Gen 2<small>block A · 0719</small></th><th>EDL</th><th>Sum</th><th>Meters since last<small>kWh</small></th><th>Deye import + export<small>same time, kWh</small></th><th>Gap<small>meters − Deye</small></th></tr>`;
+    let rows = `<tr><th>Read on</th><th>Block B<small>meter 0717</small></th><th>Block A<small>meter 0719</small></th><th>EDL</th><th>Sum</th><th>Meters since last<small>kWh</small></th><th>Deye import + export<small>same time, kWh</small></th><th>Gap<small>meters − Deye</small></th></tr>`;
     M.forEach((m, i) => {
       const p = M[i - 1], [d, t] = m.at.split(' ');
       const dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
@@ -247,8 +247,8 @@
     $('meters').innerHTML = rows;
   }
 
-  // Gen 1 / Gen 2 / EDL per day, told apart by the grid port's voltage and frequency (server: mahab.js sources())
-  const SRCN = { gen1: 'Gen 1 · block B', gen2: 'Gen 2 · block A', edl: 'EDL', off: 'nothing' };   // block A / B: Mario 2026-10-20
+  // Block B / Block A / EDL per day, told apart by the grid port's voltage and frequency (server: mahab.js sources())
+  const SRCN = { gen1: 'Block B', gen2: 'Block A', edl: 'EDL', off: 'nothing' };   // block A / B: Mario 2026-10-20
   function renderSources() {
     const S = D.sources, ds = S ? Object.keys(S.days).sort().reverse() : [];
     $('srcH').hidden = $('srcCard').hidden = !ds.length;
@@ -259,7 +259,7 @@
       `${(s.spans || []).length ? `<small class="spans">${s.spans.map(x => typeof x === 'string' ? x : x.t +
         (x.in != null ? ` <em class="io">in ${fmt1(x.in)} · out ${fmt1(x.out)}</em>` : '') +
         (showSoc && x.s0 != null ? ` <em class="soc">${x.s0}→${x.s1} %</em>` : '')).join('<br>')}</small>` : ''}</td>`;
-    let rows = `<tr><th>Day</th><th>Gen 1 · block B<small>≈ 230 V, 50.00 Hz</small></th><th>Gen 2 · block A<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
+    let rows = `<tr><th>Day</th><th>Block B<small>≈ 230 V, 50.00 Hz</small></th><th>Block A<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
     for (const d of ds) {
       const s = S.days[d], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
       rows += `<tr><td>${dd}${d === D.today ? ' <small>so far</small>' : ''}</td>${cell(s.gen1, 'gen')}${cell(s.gen2, 'mix')}${cell(s.edl, 'edl')}</tr>`;
@@ -279,7 +279,7 @@
       for (const k of ['gen1', 'gen2', 'edl']) { const s = S.days[d][k], t = m[k] = m[k] || { h: 0, in: 0, out: 0 }; t.h += s.h; t.in += s.in; t.out += s.out; }
     }
     const cell = (t, cls) => `<td class="${cls}">${fmt(t.in)}<small>${fmt(t.h)} h</small></td><td class="exp">${fmt(t.out)}</td>`;
-    let rows = `<tr><th>Month</th><th>Gen 1 in<small>block B · kWh · hours</small></th><th>Gen 1 out</th><th>Gen 2 in<small>block A</small></th><th>Gen 2 out</th><th>EDL in</th><th>EDL out</th><th>Total in</th><th>Total out</th></tr>`;
+    let rows = `<tr><th>Month</th><th>Block B in<small>kWh · hours</small></th><th>Block B out</th><th>Block A in</th><th>Block A out</th><th>EDL in</th><th>EDL out</th><th>Total in</th><th>Total out</th></tr>`;
     for (const k of Object.keys(M).sort().reverse()) {
       const m = M[k], [y, mo] = k.split('-'), tin = m.gen1.in + m.gen2.in + m.edl.in, tout = m.gen1.out + m.gen2.out + m.edl.out;
       rows += `<tr><td>${MONTHS[+mo - 1]} ${y}<small>${m.days} days${k === S.from.slice(0, 7) ? ' from ' + +S.from.slice(8) + ' ' + MONTHS[+mo - 1] : ''}${D.today && D.today.startsWith(k) ? ', to today' : ''}</small></td>` +
@@ -289,7 +289,7 @@
     $('srcMonth').hidden = false;
   }
 
-  // the time view (Mario 2026-10-20): each day a 24 h bar, Gen 1 / Gen 2 / EDL as coloured stretches; tap = the hours
+  // the time view (Mario 2026-10-20): each day a 24 h bar, Block B / Block A / EDL as coloured stretches; tap = the hours
   let srcView = 'time', showSoc = false;
   try { srcView = localStorage.getItem('mahabSrcView') || 'time'; showSoc = localStorage.getItem('mahabSoc') === '1'; } catch {}
   function renderTime(S, ds) {
@@ -316,7 +316,7 @@
   }
   // ── power sent back to the generators (Mario 2026-10-20: "a graph showing the kW returned per day, so the generator
   // owner can compare it with his load, to make sure it does not go below 20 % of the generator's capacity") ──────
-  // Daily bars = the highest kW sent back while Gen 1 / Gen 2 was on (server: mahab.js peakOut). The day curve = every
+  // Daily bars = the highest kW sent back while Block B / Block A was on (server: mahab.js peakOut). The day curve = every
   // 2-minute reading of that day (/api/mahab/day). The 20 % line: generator kVA × 0.8 power factor × 20 %.
   let expMonth = null, expDay = null, genKva = 0;
   try { genKva = +localStorage.getItem('mahabGenKva') || 0; } catch {}
