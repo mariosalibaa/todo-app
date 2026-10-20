@@ -1219,7 +1219,7 @@ const handler = async (req, res) => {
         ['/energy/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
         ['/energy/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
         ['/energy/mahab', '☀', 'Mahab plant', 'public', 'no sign-in since 2026-10-20; /mahab redirects'],
-        ['/energy/plants', '📁', 'Plants folder (inside Energy)', 'signed-in', 'Mahab, Tohme, All plants'],
+        ['/energy/plants', '📁', 'Plants folder (inside Energy)', 'signed-in', 'Mahab, Tohme, CPR, Makhlouf, All plants'],
         ['/energy/plants/all', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
         ['/khoder', '👷', 'Khoder × Walid', 'share key ?k=', ''],
         ['/energy/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
