@@ -101,6 +101,7 @@
     <div class="card"><table id="tbl"></table></div>
     <h2 class="mh" id="srcH" hidden>Which source — Gen 1 · Gen 2 · EDL</h2>
     <p class="lead" id="srcNow"></p>
+    <div class="card" id="srcMonth" hidden style="margin-bottom:12px"><table id="srcM"></table></div>
     <div class="tabs" id="srcTabs" hidden><button data-v="time">Time view</button><button data-v="table">Table</button><button data-soc title="Battery state of charge at the start → end of each stretch">🔋 Battery SOC</button></div>
     <div class="card tl" id="srcTime" hidden></div>
     <p class="lead" id="srcTip" style="margin:6px 0 0;min-height:1.2em"></p>
@@ -243,7 +244,27 @@
       rows += `<tr><td>${dd}${d === D.today ? ' <small>so far</small>' : ''}</td>${cell(s.gen1, 'gen')}${cell(s.gen2, 'mix')}${cell(s.edl, 'edl')}</tr>`;
     }
     $('src').innerHTML = rows;
+    renderSrcMonths(S, ds);
     renderTime(S, ds);
+  }
+
+  // per month, per source: hours, kWh in, kWh out (Mario 2026-10-20: "the summary for the in out per source per month")
+  function renderSrcMonths(S, ds) {
+    const M = {};
+    for (const d of ds) {
+      const m = M[d.slice(0, 7)] = M[d.slice(0, 7)] || { days: 0 };
+      m.days++;
+      for (const k of ['gen1', 'gen2', 'edl']) { const s = S.days[d][k], t = m[k] = m[k] || { h: 0, in: 0, out: 0 }; t.h += s.h; t.in += s.in; t.out += s.out; }
+    }
+    const cell = (t, cls) => `<td class="${cls}">${fmt(t.in)}<small>${fmt(t.h)} h</small></td><td class="exp">${fmt(t.out)}</td>`;
+    let rows = `<tr><th>Month</th><th>Gen 1 in<small>kWh · hours</small></th><th>Gen 1 out</th><th>Gen 2 in</th><th>Gen 2 out</th><th>EDL in</th><th>EDL out</th><th>Total in</th><th>Total out</th></tr>`;
+    for (const k of Object.keys(M).sort().reverse()) {
+      const m = M[k], [y, mo] = k.split('-'), tin = m.gen1.in + m.gen2.in + m.edl.in, tout = m.gen1.out + m.gen2.out + m.edl.out;
+      rows += `<tr><td>${MONTHS[+mo - 1]} ${y}<small>${m.days} days${k === S.from.slice(0, 7) ? ' from ' + +S.from.slice(8) + ' ' + MONTHS[+mo - 1] : ''}${D.today && D.today.startsWith(k) ? ', to today' : ''}</small></td>` +
+        cell(m.gen1, 'gen') + cell(m.gen2, 'mix') + cell(m.edl, 'edl') + `<td><b>${fmt(tin)}</b></td><td class="exp"><b>${fmt(tout)}</b></td></tr>`;
+    }
+    $('srcM').innerHTML = rows;
+    $('srcMonth').hidden = false;
   }
 
   // the time view (Mario 2026-10-20): each day a 24 h bar, Gen 1 / Gen 2 / EDL as coloured stretches; tap = the hours
