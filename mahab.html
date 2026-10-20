@@ -47,6 +47,10 @@
   .tl .b u{position:absolute;top:0;bottom:0;border-left:1px dashed rgba(166,173,200,.18);}
   .tl .ax{position:relative;height:14px;font-size:.6rem;color:var(--overlay0);}
   .tl .ax s{position:absolute;transform:translateX(-50%);text-decoration:none;}
+  .tl .b.tall{height:26px;}
+  .tl .b svg{position:absolute;inset:2px 0;width:100%;height:calc(100% - 4px);pointer-events:none;}
+  .tl .b polyline{fill:none;stroke:#f9e2af;stroke-width:2;vector-effect:non-scaling-stroke;}
+  td small.spans em.soc{font-style:normal;color:#f9e2af;}
   .s-gen1{background:var(--red);} .s-gen2{background:#cba6f7;} .s-edl{background:var(--blue);} .s-off{background:var(--surface1);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
   tr.day td{background:rgba(49,50,68,.35);font-size:.74rem;}
@@ -95,7 +99,7 @@
     <div class="card"><table id="tbl"></table></div>
     <h2 class="mh" id="srcH" hidden>Which source — Gen 1 · Gen 2 · EDL</h2>
     <p class="lead" id="srcNow"></p>
-    <div class="tabs" id="srcTabs" hidden><button data-v="time">Time view</button><button data-v="table">Table</button></div>
+    <div class="tabs" id="srcTabs" hidden><button data-v="time">Time view</button><button data-v="table">Table</button><button data-soc title="Battery state of charge at the start → end of each stretch">🔋 Battery SOC</button></div>
     <div class="card tl" id="srcTime" hidden></div>
     <p class="lead" id="srcTip" style="margin:6px 0 0;min-height:1.2em"></p>
     <div class="card" id="srcCard" hidden style="max-height:420px;overflow-y:auto"><table id="src"></table></div>
@@ -228,7 +232,8 @@
     const n = S.now, at = n ? new Date(n.at * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }) : '';
     $('srcNow').innerHTML = n ? `Now (${at}): <b>${SRCN[n.src]}</b> — ${n.v} V · ${n.hz} Hz` : '';
     const cell = (s, cls) => `<td class="${cls}">${fmt1(s.h)} h<small>in ${fmt1(s.in)} · out ${fmt1(s.out)}</small>` +
-      `${(s.spans || []).length ? `<small class="spans">${s.spans.join('<br>')}</small>` : ''}</td>`;
+      `${(s.spans || []).length ? `<small class="spans">${s.spans.map(x => typeof x === 'string' ? x : x.t +
+        (showSoc && x.s0 != null ? ` <em class="soc">${x.s0}→${x.s1} %</em>` : '')).join('<br>')}</small>` : ''}</td>`;
     let rows = `<tr><th>Day</th><th>Gen 1<small>≈ 230 V, 50.00 Hz</small></th><th>Gen 2<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
     for (const d of ds) {
       const s = S.days[d], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
@@ -239,25 +244,31 @@
   }
 
   // the time view (Mario 2026-10-20): each day a 24 h bar, Gen 1 / Gen 2 / EDL as coloured stretches; tap = the hours
-  let srcView = 'time'; try { srcView = localStorage.getItem('mahabSrcView') || 'time'; } catch {}
+  let srcView = 'time', showSoc = false;
+  try { srcView = localStorage.getItem('mahabSrcView') || 'time'; showSoc = localStorage.getItem('mahabSoc') === '1'; } catch {}
   function renderTime(S, ds) {
     const pos = m => (m / 1440 * 100).toFixed(3) + '%', hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
     const grid = [3, 6, 9, 12, 15, 18, 21].map(h => `<u style="left:${pos(h * 60)}"></u>`).join('');
     const ax = `<div class="r"><span></span><div class="ax">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => `<s style="left:${pos(h * 60)}">${h}</s>`).join('')}</div></div>`;
-    let h = `<div class="lg">${['gen1', 'gen2', 'edl'].map(k => `<span><i class="s-${k}"></i>${SRCN[k]}</span>`).join('')}<span><i class="s-off"></i>no source</span></div>` + ax;
+    let h = `<div class="lg">${['gen1', 'gen2', 'edl'].map(k => `<span><i class="s-${k}"></i>${SRCN[k]}</span>`).join('')}<span><i class="s-off"></i>no source</span>${showSoc ? '<span><i style="background:#f9e2af;height:3px;vertical-align:3px"></i>battery SOC (0–100 %)</span>' : ''}</div>` + ax;
     for (const d of ds) {
       const bar = S.days[d].bar || [], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
-      h += `<div class="r"><span>${dd}</span><div class="b">${grid}${bar.map(([k, a, b]) =>
-        `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd} · ${SRCN[k]} ${hm(a)}–${hm(b)}"></i>`).join('')}</div></div>`;
+      // SOC line over the bar (0 % bottom, 100 % top) when the 🔋 button is on; the tap tip carries the SOC either way
+      const soc = S.days[d].soc || [], at = m => { let v = null; for (const [t, x] of soc) { if (t > m) break; v = x; } return v; };
+      const line = showSoc && soc.length ? `<svg viewBox="0 0 1440 100" preserveAspectRatio="none"><polyline points="${soc.map(([t, x]) => `${t},${100 - x}`).join(' ')}"/></svg>` : '';
+      h += `<div class="r"><span>${dd}</span><div class="b${showSoc ? ' tall' : ''}">${grid}${bar.map(([k, a, b]) =>
+        `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd} · ${SRCN[k]} ${hm(a)}–${hm(b)}${at(a) != null ? ` · battery ${at(a)} → ${at(b - 1)} %` : ''}"></i>`).join('')}${line}</div></div>`;
     }
     $('srcTime').innerHTML = h + ax;
     $('srcTabs').hidden = false;
-    $('srcTabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === srcView));
+    $('srcTabs').querySelectorAll('button[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === srcView));
+    $('srcTabs').querySelector('[data-soc]').classList.toggle('on', showSoc);
     $('srcTime').hidden = srcView !== 'time'; $('srcCard').hidden = srcView !== 'table';
   }
   $('srcTabs').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    srcView = b.dataset.v; try { localStorage.setItem('mahabSrcView', srcView); } catch {}
+    if (b.dataset.soc != null) { showSoc = !showSoc; try { localStorage.setItem('mahabSoc', showSoc ? '1' : '0'); } catch {} }
+    else { srcView = b.dataset.v; try { localStorage.setItem('mahabSrcView', srcView); } catch {} }
     renderSources();
   });
   // tap a stretch on the phone (no hover): show its hours under the bar's day

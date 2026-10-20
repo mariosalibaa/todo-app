@@ -90,23 +90,23 @@ const INVERTER = 10243707, SRC_FROM = '2026-10-02', SRC = { 1: 'gen1', 2: 'gen2'
 const srcCol = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('mahabSources');
 let srcToday = { at: 0, day: null, v: null };
 
-async function srcDay(ctx, ymd) {   // → { day, t: [unix], c: '12eo…', p: [W, + import] }
+async function srcDay(ctx, ymd) {   // → { day, t: [unix], c: '12eo…', p: [W, + import], s: [battery SOC %] }
   const r = await fetch(`https://www.deyecloud.com/device-s/device/${INVERTER}/stats/day?day=${ymd.replace(/-/g, '%2F')}&lan=en`,
     { headers: { Authorization: 'bearer ' + await deye.token(ctx), Accept: 'application/json' } });
   if (!r.ok) throw new Error('DeyeCloud ' + r.status);
   const S = {};
-  for (const p of await r.json()) if (['G_V_L1', 'G_V_L2', 'G_V_L3', 'PG_F1', 'PG_Pt1'].includes(p.storageName))
+  for (const p of await r.json()) if (['G_V_L1', 'G_V_L2', 'G_V_L3', 'PG_F1', 'PG_Pt1', 'B_left_cap1'].includes(p.storageName))
     S[p.storageName] = new Map((p.detailList || []).map(x => [+x.collectionTime, +x.value]));
   const g = (k, t) => (S[k] && S[k].get(t)) || 0;
   const rows = [...(S.G_V_L1 || new Map()).keys()].sort((a, b) => a - b)
-    .map(t => ({ t, v: (g('G_V_L1', t) + g('G_V_L2', t) + g('G_V_L3', t)) / 3, hz: g('PG_F1', t), p: Math.round(g('PG_Pt1', t)) }));
+    .map(t => ({ t, v: (g('G_V_L1', t) + g('G_V_L2', t) + g('G_V_L3', t)) / 3, hz: g('PG_F1', t), p: Math.round(g('PG_Pt1', t)), s: Math.round(g('B_left_cap1', t)) }));
   const c = rows.map((r, i) => {
     if (r.v < 150) return 'o';
     const off = rows.slice(Math.max(0, i - 5), i + 6).filter(x => x.v > 150 && Math.abs(x.hz - 50) > 0.15).length;
     return off >= 4 ? 'e' : r.v < 226.5 ? '2' : '1';
   }).join('');
   const L = rows[rows.length - 1];
-  return { day: ymd, t: rows.map(r => r.t), c, p: rows.map(r => r.p), last: L ? { v: Math.round(L.v * 10) / 10, hz: L.hz } : null };
+  return { day: ymd, t: rows.map(r => r.t), c, p: rows.map(r => r.p), s: rows.map(r => r.s), last: L ? { v: Math.round(L.v * 10) / 10, hz: L.hz } : null };
 }
 
 // samples → { gen1: { h, in, out }, gen2, edl, off } between two unix times (each sample held ≤ 4 min)
@@ -128,20 +128,24 @@ function spans(d) {
   const runs = [];
   for (let i = 0; i < d.t.length; i++) {
     const k = SRC[d.c[i]], end = d.t[i] + Math.min(240, (d.t[i + 1] || d.t[i] + 120) - d.t[i]), r = runs[runs.length - 1];
-    if (r && r.k === k) r.b = end; else runs.push({ k, a: d.t[i], b: end });
+    if (r && r.k === k) { r.b = end; r.ib = i; } else runs.push({ k, a: d.t[i], b: end, ia: i, ib: i });
   }
   const out = {};
   for (const r of runs.filter(r => r.b - r.a >= 600)) {
     const list = out[r.k] = out[r.k] || [], last = list[list.length - 1];
-    if (last && r.a - last.b < 600) last.b = r.b; else list.push({ a: r.a, b: r.b });
+    if (last && r.a - last.b < 600) { last.b = r.b; last.ib = r.ib; } else list.push({ a: r.a, b: r.b, ia: r.ia, ib: r.ib });
   }
   // the time view (Mario 2026-10-20): every run as [source, from minute, to minute] of the Beirut day, 0–1440
   const min = t => { const [h, m] = hhmm(t).split(':'); return +h * 60 + +m; };
   const bar = [];
   for (const k in out) for (const r of out[k]) { const a = min(r.a), b = min(r.b); bar.push([k, a, b < a ? 1440 : b]); }
   bar.sort((x, y) => x[1] - y[1]);
-  for (const k in out) out[k] = out[k].map(r => { const a = hhmm(r.a), b = hhmm(r.b); return `${a}–${b < a ? '24:00' : b}`; });
+  // battery SOC at the start and the end of each stretch (Mario 2026-10-20) — shown on the page only when asked
+  const soc = i => d.s ? d.s[i] : null;
+  for (const k in out) out[k] = out[k].map(r => { const a = hhmm(r.a), b = hhmm(r.b); return { t: `${a}–${b < a ? '24:00' : b}`, s0: soc(r.ia), s1: soc(r.ib) }; });
   out.bar = bar;
+  // the SOC line for the time view: one point every ~10 min, [minute, %]
+  out.soc = d.s ? d.t.map((t, i) => [min(t), d.s[i]]).filter((x, i) => i % 5 === 0 || i === d.t.length - 1) : [];
   return out;
 }
 
@@ -151,7 +155,7 @@ async function srcDocs(ctx, max = 3) {
   (await srcCol(ctx).get()).forEach(d => { have[d.id] = d.data(); });
   let n = 0;
   for (let d = SRC_FROM; d < today && n < max; d = addDays(d, 1)) {
-    if (have[d]) continue;
+    if (have[d] && have[d].s) continue;   // days stored before the SOC was kept are read again
     have[d] = await srcDay(ctx, d); n++;
     if (have[d].t.length) await srcCol(ctx).doc(d).set(have[d]);
     await sleep(1100);
@@ -165,8 +169,8 @@ async function sources(ctx) {
   for (const d of Object.keys(docs).sort()) {
     days[d] = tally([docs[d]]);
     const sp = spans(docs[d]);
-    for (const [k, list] of Object.entries(sp)) if (days[d][k]) days[d][k].spans = list;
-    days[d].bar = sp.bar;
+    for (const k of ['gen1', 'gen2', 'edl', 'off']) if (sp[k]) days[d][k].spans = sp[k];
+    days[d].bar = sp.bar; days[d].soc = sp.soc;
   }
   const t = srcToday.v, i = t ? t.t.length - 1 : -1;
   return { from: SRC_FROM, days, now: i >= 0 ? { src: SRC[t.c[i]], at: t.t[i], ...t.last } : null, docs };
