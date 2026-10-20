@@ -216,7 +216,7 @@
         if (!p) return '';
         const d1 = m[k] - p[k], s = S && S[k];
         if (!s) return `<small>+${d1}</small>`;
-        return `<small>+${d1} · Deye ${fmt1(s.in + s.out)}${k === 'edl' ? ` (in ${fmt1(s.in)} · out ${fmt1(s.out)})` : ''}</small>`;
+        return `<small>+${d1} · Deye ${fmt1(s.in + s.out)} (in ${fmt1(s.in)} · out ${fmt1(s.out)})</small>`;
       };
       rows += `<tr title="${(m.note || '').replace(/"/g, '&quot;')}"><td>${dd} <small>${t || ''}</small></td><td>${m.gen1}${own('gen1')}</td><td>${m.gen2}${own('gen2')}</td><td>${m.edl}${own('edl')}</td>` +
         `<td><b>${m.sum}</b></td><td>${p ? dm : '<small>first reading</small>'}</td>` +
