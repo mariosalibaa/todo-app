@@ -121,6 +121,24 @@ function tally(docs, from = 0, to = Infinity) {
   return o;
 }
 
+// one day → when each source ran, Beirut time: { gen1: ['00:00–06:00', …], … } (Mario 2026-10-20: "from which hour
+// to which hour"). Runs under 10 min are switch-over noise and are dropped; the same source again within 10 min is one run.
+const hhmm = t => new Date(t * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' });
+function spans(d) {
+  const runs = [];
+  for (let i = 0; i < d.t.length; i++) {
+    const k = SRC[d.c[i]], end = d.t[i] + Math.min(240, (d.t[i + 1] || d.t[i] + 120) - d.t[i]), r = runs[runs.length - 1];
+    if (r && r.k === k) r.b = end; else runs.push({ k, a: d.t[i], b: end });
+  }
+  const out = {};
+  for (const r of runs.filter(r => r.b - r.a >= 600)) {
+    const list = out[r.k] = out[r.k] || [], last = list[list.length - 1];
+    if (last && r.a - last.b < 600) last.b = r.b; else list.push({ a: r.a, b: r.b });
+  }
+  for (const k in out) out[k] = out[k].map(r => { const a = hhmm(r.a), b = hhmm(r.b); return `${a}–${b < a ? '24:00' : b}`; });
+  return out;
+}
+
 // finished days from Firestore (at most `max` read from DeyeCloud per call) + today live
 async function srcDocs(ctx, max = 3) {
   const today = beirutToday(), have = {};
@@ -138,7 +156,10 @@ async function srcDocs(ctx, max = 3) {
 }
 async function sources(ctx) {
   const docs = await srcDocs(ctx), days = {};
-  for (const d of Object.keys(docs).sort()) days[d] = tally([docs[d]]);
+  for (const d of Object.keys(docs).sort()) {
+    days[d] = tally([docs[d]]);
+    for (const [k, list] of Object.entries(spans(docs[d]))) if (days[d][k]) days[d][k].spans = list;
+  }
   const t = srcToday.v, i = t ? t.t.length - 1 : -1;
   return { from: SRC_FROM, days, now: i >= 0 ? { src: SRC[t.c[i]], at: t.t[i], ...t.last } : null, docs };
 }

@@ -35,6 +35,7 @@
   td small{display:block;color:var(--overlay0);font-size:.64rem;}
   td.mix{color:#cba6f7;} td.edl{color:var(--blue);} td.gen{color:var(--red);} td.sol{color:var(--amber);} td.exp{color:var(--green,#a6e3a1);}
   td .z{color:var(--surface1);}
+  td small.spans{color:var(--sub);margin-top:3px;line-height:1.45;}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
   tr.day td{background:rgba(49,50,68,.35);font-size:.74rem;}
   tr.tot td{font-weight:600;border-top:2px solid var(--amber);color:var(--amber);background:rgba(242,169,59,.08);}
@@ -211,7 +212,8 @@
     if (!ds.length) return;
     const n = S.now, at = n ? new Date(n.at * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }) : '';
     $('srcNow').innerHTML = n ? `Now (${at}): <b>${SRCN[n.src]}</b> — ${n.v} V · ${n.hz} Hz` : '';
-    const cell = (s, cls) => `<td class="${cls}">${fmt1(s.h)} h<small>in ${fmt1(s.in)} · out ${fmt1(s.out)}</small></td>`;
+    const cell = (s, cls) => `<td class="${cls}">${fmt1(s.h)} h<small>in ${fmt1(s.in)} · out ${fmt1(s.out)}</small>` +
+      `${(s.spans || []).length ? `<small class="spans">${s.spans.join('<br>')}</small>` : ''}</td>`;
     let rows = `<tr><th>Day</th><th>Gen 1<small>≈ 230 V, 50.00 Hz</small></th><th>Gen 2<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
     for (const d of ds) {
       const s = S.days[d], dd = `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}`;
