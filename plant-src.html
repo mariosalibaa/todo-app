@@ -86,10 +86,12 @@
       <h2 class="mh">Generator refused by the inverters</h2>
       <div class="card"><table id="refT"></table></div>
     </div>
+    <div id="timeBox">
     <h2 class="mh">Which source, hour by hour</h2>
     <div class="row noprint"><button id="socBtn" title="Battery state of charge at the start → end of each stretch">🔋 Battery SOC</button></div>
     <div class="card tl" id="time"></div>
     <p class="lead noprint" id="tip"></p>
+    </div>
     <h2 class="mh">Day by day</h2>
     <div class="card"><table id="dayT"></table></div>
     <div class="note" id="note"></div>
@@ -169,7 +171,8 @@
       $('refT').innerHTML = rt;
     }
 
-    // time view
+    // time view — not for McKinsey (Mario 2026-10-20: "remove for mckinsey": the generator runs a few hours a month, the bars stay empty)
+    $('timeBox').hidden = D.key === 'mckinsey';
     const pos = m => (m / 1440 * 100).toFixed(3) + '%';
     const grid = [3, 6, 9, 12, 15, 18, 21].map(h => `<u style="left:${pos(h * 60)}"></u>`).join('');
     const ax = `<div class="r"><span></span><div class="ax">${[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => `<s style="left:${pos(h * 60)}">${h}</s>`).join('')}</div></div>`;
