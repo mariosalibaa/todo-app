@@ -1218,7 +1218,7 @@ const handler = async (req, res) => {
         ['/energy/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
         ['/energy/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
         ['/energy/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
-        ['/energy/mahab', '☀', 'Mahab plant', 'admin or MAHAB_PASSWORD', '/mahab redirects'],
+        ['/energy/mahab', '☀', 'Mahab plant', 'public', 'no sign-in since 2026-10-20; /mahab redirects'],
         ['/energy/plants', '📁', 'Plants folder (inside Energy)', 'signed-in', 'Mahab, Tohme, All plants'],
         ['/energy/plants/all', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
         ['/khoder', '👷', 'Khoder × Walid', 'share key ?k=', ''],
@@ -1334,10 +1334,9 @@ const handler = async (req, res) => {
     return;
   }
   if (url.split('?')[0] === '/api/mahab' && req.method === 'GET') {
-    const acc = await cprAccess();   // its isAdmin = the hub session check; the CPR password plays no part here
-    const tk = process.env.MAHAB_PASSWORD ? crypto.createHmac('sha256', process.env.MAHAB_PASSWORD).update('mahab-ok').digest('hex').slice(0, 32) : null;
-    const pw = !!tk && (/(?:^|;\s*)mahab_ok=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1] === tk;
-    if (!acc.isAdmin && !pw) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'password', needPassword: true, hasPassword: !!tk })); return; }
+    // PUBLIC, no sign-in, no password (Mario 2026-10-20: "remove the password" → anyone with the link, like /energy/tohme);
+    // isAdmin only shows the Hub link. MAHAB_PASSWORD and /api/mahab/login are no longer used.
+    const acc = await cprAccess();
     try { const v = await require('./mahab').days({ db, TEAM_ID }); v.isAdmin = acc.isAdmin; res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); }
     catch (e) { console.error('mahab error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
