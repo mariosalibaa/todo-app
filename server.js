@@ -1235,11 +1235,22 @@ const handler = async (req, res) => {
   // /api/ewelink — the Sonoff devices (ewelink.js): GET list, POST /set {id, on, outlet?}. Hub admins. (Mario 2026-10-20)
   if (url.split('?')[0].startsWith('/api/ewelink')) {
     const json = (code, v) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(v)); };
+    const ew = require('./ewelink'), p = url.split('?')[0];
+    // /check — the laptop task HeaterWatch every 10 min (ACCOUNTING_API_KEY) or a cron (CRON_SECRET): one temperature sample per probe
+    if (p === '/api/ewelink/check' && req.method === 'POST') {
+      const given = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (!(given.length >= 16 && (given === process.env.CRON_SECRET || given === process.env.ACCOUNTING_API_KEY))) return json(401, { error: 'unauthorized' });
+      try { return json(200, await ew.sample({ db, TEAM_ID })); } catch (e) { console.error('ewelink check error:', e); return json(500, { error: e.message }); }
+    }
     const acc = await cprAccess();
     if (!acc.isAdmin) return json(401, { error: 'admin' });
-    const ew = require('./ewelink'), p = url.split('?')[0];
     try {
-      if (p === '/api/ewelink' && req.method === 'GET') return json(200, { devices: await ew.list({ db, TEAM_ID }), at: new Date().toISOString() });
+      if (p === '/api/ewelink' && req.method === 'GET') {
+        const days = Math.max(1, Math.min(14, +(new URL(req.url, 'http://x').searchParams.get('days') || 1)));
+        let h = await ew.history({ db, TEAM_ID }, days).catch(() => ({ pts: {}, at: null }));
+        if (!h.at || Date.now() - new Date(h.at).getTime() > 20 * 60e3) { try { await ew.sample({ db, TEAM_ID }); h = await ew.history({ db, TEAM_ID }, days); } catch {} }   // stale (laptop off) → sample now
+        return json(200, { devices: await ew.list({ db, TEAM_ID }), history: h.pts, days, at: new Date().toISOString() });
+      }
       if (p === '/api/ewelink/set' && req.method === 'POST') {
         let b = ''; for await (const c of req) { b += c; if (b.length > 1e4) break; }
         const { id, on, outlet } = JSON.parse(b || '{}');

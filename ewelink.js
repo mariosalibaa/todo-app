@@ -52,4 +52,28 @@ async function setSwitch(ctx, id, on, outlet) {
   return (await list(ctx)).find(d => d.id === id) || null;
 }
 
-module.exports = { list, setSwitch };
+// Temperature history: eWeLink's cloud keeps no readings (only switch operations), so the laptop task HeaterWatch asks
+// /api/ewelink/check every 10 min and each probe's reading goes into meta/ewelinkTemps { pts: { <deviceid>: [{t,c}] }, names },
+// KEEP_DAYS back (14 d × 144 × ~5 probes ≈ 10k points, one doc). A page view samples too when the last one is stale.
+const KEEP_DAYS = 14;
+const tempsRef = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('meta').doc('ewelinkTemps');
+async function sample(ctx) {
+  const devs = await list(ctx), now = Date.now(), ref = tempsRef(ctx), d = (await ref.get()).data() || {};
+  const pts = d.pts || {}, names = d.names || {};
+  let added = 0;
+  for (const x of devs) {
+    if (!x.online || x.temp == null || x.temp < -30 || x.temp > 120) continue;
+    const arr = (pts[x.id] || []).filter(p => now - p.t < KEEP_DAYS * 864e5);
+    if (!arr.length || now - arr[arr.length - 1].t >= 5 * 60e3) { arr.push({ t: now, c: x.temp }); added++; }
+    pts[x.id] = arr; names[x.id] = x.name;
+  }
+  await ref.set({ pts, names, at: new Date(now).toISOString() });
+  return { ok: true, probes: Object.keys(pts).length, added, devices: devs.length };
+}
+async function history(ctx, days = 1) {
+  const d = (await tempsRef(ctx).get()).data() || {}, from = Date.now() - Math.min(days, KEEP_DAYS) * 864e5, out = {};
+  for (const [id, arr] of Object.entries(d.pts || {})) out[id] = arr.filter(p => p.t >= from);
+  return { pts: out, at: d.at || null };
+}
+
+module.exports = { list, setSwitch, sample, history };
