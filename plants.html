@@ -209,7 +209,7 @@
         `<td><span class="st ${x.online ? 'online' : 'offline'}"><i></i>${x.online ? 'online' : 'offline'}</span></td><td>${x.kw != null ? f1(x.kw) : ''}</td><td class="hide-sm">${x.today != null ? f1(x.today) : ''}</td>` +
         `<td>${when(x.last)}${!x.online && x.last ? '<small>' + ago(x.last) + '</small>' : ''}</td></tr>`).join('') + `</table>`;
     if (!share) {
-      const url = `${location.origin}/energy/plants?src=${p.src}&id=${p.id}&k=${p.share}`;
+      const url = `${location.origin}/energy/plants/all?src=${p.src}&id=${p.id}&k=${p.share}`;
       h += `<div class="links">${DETAIL[k] ? `<a href="${DETAIL[k]}">Open its page →</a>` : ''}<button data-copy="${esc(url)}">Copy client link</button></div>`;
     }
     return h;

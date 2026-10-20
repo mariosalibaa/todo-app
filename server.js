@@ -795,7 +795,8 @@ const handler = async (req, res) => {
     '/procurement': 'procurement.html',   // the price book — supplier, item, price, description; searchable (Mario, 2026-09-21)   // MEP reference: drainage legend (CB, MH, FD, WCO, SP/UG…) + notes log (Mario, 2026-09-19)
     '/bonvin': 'bonvin.html',   // Sin El Fil 2292/A5 — deeds, leases, rent history, every file; admins only (Mario 2026-10-04)
     '/bonvin/shop': 'bonvin-shop.html',   // the same shop for a renter: plans, photos, office layout — PUBLIC, nothing private
-    '/energy/plants': 'plants.html',   // (was /plants, folder rule 2026-10-20)   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
+    '/energy/plants': 'hub.html',   // the Plants folder inside Energy (Mario 2026-10-20) — the master list is /energy/plants/all
+    '/energy/plants/all': 'plants.html',   // every plant (was /plants, then /energy/plants); ?src=&id=&k= = one plant, read-only share link   // every DeyeCloud + Solarman plant, status, offline alerts (Mario 2026-10-03); ?s=&id=&k= = one plant, read-only share link
     '/energy/makhlouf': 'makhlouf.html',   // (was /makhlouf)   // Makhlouf (Maison M Naccache) generator — logger 3322205001 SD card, admins only (Mario 2026-10-03)
     '/whatsapp-outbox': 'wa-outbox.html',   // WhatsApp messages queued while the laptop is off (Mario 2026-10-07)
     '/dev': 'dev.html',   // the dev queue: what the ✦ assistant could not do because it needs code; Claude Code drains it (Mario 2026-10-07)
@@ -960,7 +961,9 @@ const handler = async (req, res) => {
   for (const [re, to] of AJ) if (re.test(pu)) { pu = pu.replace(re, to); break; }
   if (/^\/(heater|tuya)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy/tuya' }); res.end(); return; }   // renamed 2026-10-20
   // the Energy folder's pages moved under /energy on 2026-10-20 (folder rule) — the flat links, share links included (?k=, ?src=&id=&k=), go on working
-  if (/^\/(mahab|cpr|cpr\/dynamic|cpr\/diesel|tohme|plants|makhlouf|makhlouf\/offer\.pdf)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy' + req.url }); res.end(); return; }
+  if (/^\/(mahab|cpr|cpr\/dynamic|cpr\/diesel|tohme|makhlouf|makhlouf\/offer\.pdf)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy' + req.url }); res.end(); return; }
+  // /plants (and /energy/plants with a share query) → the master list at /energy/plants/all; bare /energy/plants is the folder
+  if (url.split('?')[0] === '/plants' || (url.split('?')[0] === '/energy/plants' && req.url.includes('?'))) { res.writeHead(301, { Location: '/energy/plants/all' + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const OLD = pu === '/ajaltoun' ? '/ajaltoun4193/accounting' : pu === '/partners' ? '/ajaltoun4193/partners' : /^\/ajaltoun\/excavation/.test(pu) ? pu.replace('/ajaltoun/excavation', '/ajaltoun4193/excavation') : /^\/ajaltoun\/machines/.test(pu) ? pu.replace('/ajaltoun/machines', '/ajaltoun4193/cameras') : '';
   if (OLD && pu === url && PAGES[pu]) { res.writeHead(301, { Location: OLD + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const page = PAGES[pu] || (pu === '/' ? (/^(hub|admin)\./.test(host) ? 'hub.html' : 'todo.html') : null);
@@ -1213,7 +1216,8 @@ const handler = async (req, res) => {
         ['/energy/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
         ['/energy/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
         ['/energy/mahab', '☀', 'Mahab plant', 'admin or MAHAB_PASSWORD', '/mahab redirects'],
-        ['/energy/plants', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
+        ['/energy/plants', '📁', 'Plants folder (inside Energy)', 'signed-in', 'Mahab, Tohme, All plants'],
+        ['/energy/plants/all', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
         ['/khoder', '👷', 'Khoder × Walid', 'share key ?k=', ''],
         ['/energy/makhlouf/offer.pdf', '📄', 'Makhlouf offer', 'admin', 'session cookie'],
         ['/whatsapp', '🗄️', 'WhatsApp Archive', 'admin', 'through the laptop gateway'],

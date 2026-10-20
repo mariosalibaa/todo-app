@@ -344,7 +344,7 @@ async function check(ctx, send) {
     }
   }
   await ref.set({ at: new Date().toISOString(), plants: seen, source: watch, srcState });
-  if (msgs.length && send) await send(msgs.join('\n\n') + '\n\nhttps://hub.shift-group.co/energy/plants');
+  if (msgs.length && send) await send(msgs.join('\n\n') + '\n\nhttps://hub.shift-group.co/energy/plants/all');
   return { ok: true, plants: L.plants.length, sent: msgs.length, first, sources: L.sources };
 }
 
