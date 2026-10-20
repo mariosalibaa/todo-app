@@ -51,6 +51,7 @@
   .tl .b svg{position:absolute;inset:2px 0;width:100%;height:calc(100% - 4px);pointer-events:none;}
   .tl .b polyline{fill:none;stroke:#f9e2af;stroke-width:2;vector-effect:non-scaling-stroke;}
   td small.spans em.soc{font-style:normal;color:#f9e2af;}
+  td small.spans em.io{font-style:normal;color:var(--overlay0);}
   .s-gen1{background:var(--red);} .s-gen2{background:#cba6f7;} .s-edl{background:var(--blue);} .s-off{background:var(--surface1);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
   tr.day td{background:rgba(49,50,68,.35);font-size:.74rem;}
@@ -233,6 +234,7 @@
     $('srcNow').innerHTML = n ? `Now (${at}): <b>${SRCN[n.src]}</b> — ${n.v} V · ${n.hz} Hz` : '';
     const cell = (s, cls) => `<td class="${cls}">${fmt1(s.h)} h<small>in ${fmt1(s.in)} · out ${fmt1(s.out)}</small>` +
       `${(s.spans || []).length ? `<small class="spans">${s.spans.map(x => typeof x === 'string' ? x : x.t +
+        (x.in != null ? ` <em class="io">in ${fmt1(x.in)} · out ${fmt1(x.out)}</em>` : '') +
         (showSoc && x.s0 != null ? ` <em class="soc">${x.s0}→${x.s1} %</em>` : '')).join('<br>')}</small>` : ''}</td>`;
     let rows = `<tr><th>Day</th><th>Gen 1<small>≈ 230 V, 50.00 Hz</small></th><th>Gen 2<small>≈ 221 V, 50.00 Hz</small></th><th>EDL<small>Hz wanders</small></th></tr>`;
     for (const d of ds) {
@@ -256,8 +258,8 @@
       // SOC line over the bar (0 % bottom, 100 % top) when the 🔋 button is on; the tap tip carries the SOC either way
       const soc = S.days[d].soc || [], at = m => { let v = null; for (const [t, x] of soc) { if (t > m) break; v = x; } return v; };
       const line = showSoc && soc.length ? `<svg viewBox="0 0 1440 100" preserveAspectRatio="none"><polyline points="${soc.map(([t, x]) => `${t},${100 - x}`).join(' ')}"/></svg>` : '';
-      h += `<div class="r"><span>${dd}</span><div class="b${showSoc ? ' tall' : ''}">${grid}${bar.map(([k, a, b]) =>
-        `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd} · ${SRCN[k]} ${hm(a)}–${hm(b)}${at(a) != null ? ` · battery ${at(a)} → ${at(b - 1)} %` : ''}"></i>`).join('')}${line}</div></div>`;
+      h += `<div class="r"><span>${dd}</span><div class="b${showSoc ? ' tall' : ''}">${grid}${bar.map(([k, a, b, io, ou]) =>
+        `<i class="s-${k}" style="left:${pos(a)};width:${pos(b - a)}" title="${dd} · ${SRCN[k]} ${hm(a)}–${hm(b)}${io != null ? ` · in ${io} · out ${ou} kWh` : ''}${at(a) != null ? ` · battery ${at(a)} → ${at(b - 1)} %` : ''}"></i>`).join('')}${line}</div></div>`;
     }
     $('srcTime').innerHTML = h + ax;
     $('srcTabs').hidden = false;

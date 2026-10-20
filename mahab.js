@@ -138,11 +138,20 @@ function spans(d) {
   // the time view (Mario 2026-10-20): every run as [source, from minute, to minute] of the Beirut day, 0–1440
   const min = t => { const [h, m] = hhmm(t).split(':'); return +h * 60 + +m; };
   const bar = [];
-  for (const k in out) for (const r of out[k]) { const a = min(r.a), b = min(r.b); bar.push([k, a, b < a ? 1440 : b]); }
+  // kWh in / out of each stretch, its own samples only (Mario 2026-10-20: "amount import and export next to each timing")
+  for (const k in out) for (const r of out[k]) {
+    r.in = 0; r.out = 0;
+    for (let i = r.ia; i <= r.ib; i++) if (SRC[d.c[i]] === k) {
+      const kwh = d.p[i] * Math.min(240, (d.t[i + 1] || d.t[i] + 120) - d.t[i]) / 3600 / 1000;
+      if (kwh > 0) r.in += kwh; else r.out -= kwh;
+    }
+    r.in = Math.round(r.in * 10) / 10; r.out = Math.round(r.out * 10) / 10;
+  }
+  for (const k in out) for (const r of out[k]) { const a = min(r.a), b = min(r.b); bar.push([k, a, b < a ? 1440 : b, r.in, r.out]); }
   bar.sort((x, y) => x[1] - y[1]);
   // battery SOC at the start and the end of each stretch (Mario 2026-10-20) — shown on the page only when asked
   const soc = i => d.s ? d.s[i] : null;
-  for (const k in out) out[k] = out[k].map(r => { const a = hhmm(r.a), b = hhmm(r.b); return { t: `${a}–${b < a ? '24:00' : b}`, s0: soc(r.ia), s1: soc(r.ib) }; });
+  for (const k in out) out[k] = out[k].map(r => { const a = hhmm(r.a), b = hhmm(r.b); return { t: `${a}–${b < a ? '24:00' : b}`, s0: soc(r.ia), s1: soc(r.ib), in: r.in, out: r.out }; });
   out.bar = bar;
   // the SOC line for the time view: one point every ~10 min, [minute, %]
   out.soc = d.s ? d.t.map((t, i) => [min(t), d.s[i]]).filter((x, i) => i % 5 === 0 || i === d.t.length - 1) : [];
