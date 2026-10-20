@@ -470,7 +470,7 @@
       const NAV = [['/', '⌂ Hub', null], ['/site', '💬 Shift WhatsApp', 'site'], ['/whatsapp', '📱 WhatsApp archive', 'admin'], ['/accounting/accounts', '▦ Accounts', 'accounting'],
         ['/accounting/daily', '📋 Day report', 'daily'], ['/accounting/statements', '🧾 Statements', 'accounting'], ['/ajaltoun', '🏡 Ajaltoun', 'ajaltoun'],
         ['/ajaltoun4193/excavation', '🚜 Excavation', 'excavation'], ['/ajaltoun4193/partners', '🤝 Partners', 'partners'], ['/reports', '📊 Reports', 'reports'],
-        ['/crm', '📇 CRM', 'crm'], ['/todo', '✅ To-Do', 'todo'], ['/energy/mahab', '☀️ Mahab plant', 'admin'], ['/khoder', '👷 Khoder & Walid', 'admin']];
+        ['/crm', '📇 CRM', 'crm'], ['/todo', '✅ To-Do', 'todo'], ['/energy/plants/mahab', '☀️ Mahab plant', 'admin'], ['/khoder', '👷 Khoder & Walid', 'admin']];
       const navHtml = () => { const me = A.me || {}, apps = me.apps || [], here = location.pathname.replace(/\/+$/, '') || '/';
         const items = NAV.filter(([h, , k]) => !k || (k === 'admin' ? me.admin : (me.admin || apps.includes(k))));
         return items.length > 1 ? '<div class="nav-go">' + items.map(([h, l]) => `<a href="${h}"${h === here ? ' class="on"' : ''}>${l}</a>`).join('') + '</div>' : ''; };

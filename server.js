@@ -806,8 +806,8 @@ const handler = async (req, res) => {
     '/whatsapp-outbox': 'wa-outbox.html',   // WhatsApp messages queued while the laptop is off (Mario 2026-10-07)
     '/dev': 'dev.html',   // the dev queue: what the ✦ assistant could not do because it needs code; Claude Code drains it (Mario 2026-10-07)
     '/khoder': 'khoder.html',   // Khoder's days with Shift and with Walid Hibri side by side — share link ?k= (Mario 2026-10-06)
-    '/energy/mahab/report': 'mahab-report.html',   // one month on two A4 pages for the owners + the generator supplier, ?m=YYYY-MM — PUBLIC like the page (Mario 2026-10-20)
-    '/energy/mahab': 'mahab.html',   // (was /mahab, folder rule 2026-10-20) Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
+    '/energy/plants/mahab/report': 'mahab-report.html',   // one month on two A4 pages for the owners + the generator supplier, ?m=YYYY-MM — PUBLIC like the page (Mario 2026-10-20)
+    '/energy/plants/mahab': 'mahab.html',   // (was /mahab, then /energy/mahab; inside Plants since 2026-10-20 — Mario: "place mahab inside plants, adjust the link") Taan / Machmouchi 25 kWp plant — kWh per month: solar, EDL, generator (Mario 2026-10-01)
     '/energy/tohme': 'tohme.html',   // (was /tohme)   // Villa Tohme 40.7 kWp plant (DeyeCloud 61475496) — same page as /mahab, since the install Apr 2025; PUBLIC, no sign-in (Mario 2026-10-13)
     '/energy/cpr': 'cpr.html',   // (was /cpr)   // /energy dropped (Mario 2026-09-27: "cancel this link, keep /cpr")
    
@@ -967,7 +967,9 @@ const handler = async (req, res) => {
   for (const [re, to] of AJ) if (re.test(pu)) { pu = pu.replace(re, to); break; }
   if (/^\/(heater|tuya)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy/tuya' }); res.end(); return; }   // renamed 2026-10-20
   // the Energy folder's pages moved under /energy on 2026-10-20 (folder rule) — the flat links, share links included (?k=, ?src=&id=&k=), go on working
-  if (/^\/(mahab|cpr|cpr\/dynamic|cpr\/diesel|tohme|makhlouf|makhlouf\/offer\.pdf)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy' + req.url }); res.end(); return; }
+  if (/^\/(cpr|cpr\/dynamic|cpr\/diesel|tohme|makhlouf|makhlouf\/offer\.pdf)$/.test(url.split('?')[0])) { res.writeHead(301, { Location: '/energy' + req.url }); res.end(); return; }
+  // Mahab lives in the Plants folder (2026-10-20): /mahab and /energy/mahab (+ /report) go on working
+  { const m = /^\/(?:energy\/)?mahab(\/report)?$/.exec(url.split('?')[0]); if (m) { res.writeHead(301, { Location: '/energy/plants/mahab' + (m[1] || '') + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; } }
   // /plants (and /energy/plants with a share query) → the master list at /energy/plants/all; bare /energy/plants is the folder
   if (url.split('?')[0] === '/plants' || (url.split('?')[0] === '/energy/plants' && /[?&](src|id|k|s)=/.test(req.url))) { res.writeHead(301, { Location: '/energy/plants/all' + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '') }); res.end(); return; }
   const OLD = pu === '/ajaltoun' ? '/ajaltoun4193/accounting' : pu === '/partners' ? '/ajaltoun4193/partners' : /^\/ajaltoun\/excavation/.test(pu) ? pu.replace('/ajaltoun/excavation', '/ajaltoun4193/excavation') : /^\/ajaltoun\/machines/.test(pu) ? pu.replace('/ajaltoun/machines', '/ajaltoun4193/cameras') : '';
@@ -1221,8 +1223,8 @@ const handler = async (req, res) => {
         ['/energy/cpr/dynamic', '⚡', 'CPR generator vs datasheet', 'public', 'snapshot for the supplier, no prices'],
         ['/energy/cpr/diesel', '⛽', "Kamal's diesel fills", 'share key ?k=', 'CPR_FUEL_KEY'],
         ['/energy/tohme', '☀', 'Villa Tohme plant', 'public', 'no sign-in; /tohme redirects'],
-        ['/energy/mahab', '☀', 'Mahab plant', 'public', 'no sign-in since 2026-10-20; /mahab redirects'],
-        ['/energy/mahab/report', '📄', 'Mahab month report (A4 / PDF)', 'public', '?m=YYYY-MM; owners + generator supplier'],
+        ['/energy/plants/mahab', '☀', 'Mahab plant', 'public', 'no sign-in since 2026-10-20; /mahab and /energy/mahab redirect'],
+        ['/energy/plants/mahab/report', '📄', 'Mahab month report (A4 / PDF)', 'public', '?m=YYYY-MM; owners + generator supplier'],
         ['/energy/plants', '📁', 'Plants folder (inside Energy)', 'signed-in', 'Mahab, Tohme, CPR, Makhlouf, All plants'],
         ['/energy/plants/all', '🔆', 'One plant share link', 'share key ?s=&id=&k=', 'read-only'],
         ['/khoder', '👷', 'Khoder × Walid', 'share key ?k=', ''],
