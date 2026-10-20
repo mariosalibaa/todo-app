@@ -96,7 +96,10 @@
   <div id="app" hidden>
     <h1>Dr Nazih Taan &amp; Dr Mahab Machmouchi — 25 kWp</h1>
     <p class="lead" id="lead">Energy per month from DeyeCloud (station 62112463), integrated from the 5-minute power readings.</p>
-    <div class="tabs" id="years"></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+      <div class="tabs" id="years"></div>
+      <a href="/energy/mahab/report" style="font-size:.85rem;font-weight:600;color:#1e1e2e;background:var(--amber);text-decoration:none;border-radius:999px;padding:7px 14px;margin-bottom:10px">📄 Month report (PDF)</a>
+    </div>
     <div class="kpis" id="kpis"></div>
     <div class="card"><table id="tbl"></table></div>
     <h2 class="mh" id="srcH" hidden>Which source — Gen 1 · Gen 2 · EDL <a href="/energy/mahab/report" style="float:right;font-size:.78rem;font-weight:600;color:var(--amber);text-decoration:none;border:1px solid var(--surface0);border-radius:8px;padding:4px 10px">📄 Month report (PDF)</a></h2>
