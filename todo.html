@@ -6186,22 +6186,10 @@ let vtTabs = (() => {
 })();
 const vtSave = () => localStorage.setItem('todo_view_tabs', JSON.stringify(vtTabs));
 
-// Looking at projects rather than tasks? The tabs switch to project formats.
-const PROJECT_VIEWS = ['projects-list', 'projects'];
 function renderViewTabs() {
   const el = document.getElementById('view-tabs');
   if (!el) return;
-  if (PROJECT_VIEWS.includes(currentView)) {
-    el.innerHTML = PROJECT_VIEWS.map(v => {
-      const d = viewDef(v);
-      return `<span class="vt-tab ${currentView === v ? 'active' : ''}" onclick="setView('${v}')" title="${d.label} of projects">
-        <span class="vt-ic">${d.icon}</span>${v === 'projects-list' ? 'List' : 'Board'}
-      </span>`;
-    }).join('')
-      + `<span class="vt-tab" onclick="setView('gantt')" title="Timeline of tasks"><span class="vt-ic">📊</span>Gantt</span>`
-      + `<span class="vt-add" onclick="vtAddMenu(event)" title="Add a view">＋ View</span>`;
-    return;
-  }
+  // Same full strip on the Projects pages too (no tab is highlighted there)
   // The view you're on always has a tab, even if it was opened from the + menu
   const shown = vtTabs.includes(currentView) || NO_TAB_VIEWS.includes(currentView) ? vtTabs : [...vtTabs, currentView];
   el.innerHTML = shown.map(v => {
@@ -6222,7 +6210,7 @@ function vtDrop(e, target) {
   e.preventDefault();
   const v = vtDragging; vtDragging = null;
   if (!v || v === target) { renderViewTabs(); return; }
-  const tabs = vtTabs.includes(currentView) ? vtTabs.slice() : [...vtTabs, currentView];
+  const tabs = vtTabs.includes(currentView) || NO_TAB_VIEWS.includes(currentView) ? vtTabs.slice() : [...vtTabs, currentView];
   const from = tabs.indexOf(v), to = tabs.indexOf(target);
   if (from < 0 || to < 0) { renderViewTabs(); return; }
   tabs.splice(from, 1);
