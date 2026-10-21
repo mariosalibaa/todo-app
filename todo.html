@@ -557,6 +557,7 @@
     }
     .vt-tab:hover { color: var(--text); background: var(--surface0); }
     .vt-tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+    .vt-tab.vt-drop { box-shadow: inset 2px 0 0 var(--accent); }
     .vt-ic { opacity: 0.85; font-size: 0.85rem; }
     .vt-x {
       opacity: 0; font-size: 0.62rem; color: var(--overlay0);
@@ -1613,6 +1614,34 @@
       border-bottom: 1px solid var(--surface0);
     }
     .ov-col-body > .ov-proj:last-child { border-bottom: none; }
+    /* Desktop: Board, Status and Overview fit one screen — every column the same
+       width, sharing the full width (no gaps, no sideways scroll), each column
+       scrolling inside itself instead of the page growing. */
+    @media (min-width: 701px) {
+      /* Board / Status: equal columns stretched across the width. Up to the
+         number that fit at 180px they share one screen; beyond that (e.g. Board
+         by project with 40+ columns) they wrap into more rows. A column never
+         grows taller than the screen — its cards scroll inside it. */
+      #kanban-board, #statusboard-view {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        align-content: start; overflow-x: hidden; overflow-y: auto;
+      }
+      #kanban-board > .kanban-col, #statusboard-view > .kanban-col {
+        width: auto; min-width: 0; max-height: calc(100vh - 200px); align-self: start;
+      }
+      /* narrower columns: the header's name + status badge wrap instead of overlapping the count */
+      .kanban-col-header > div { flex-wrap: wrap; row-gap: 3px; }
+      .kanban-col-header .status-badge { white-space: nowrap; }
+      .kanban-col-count { flex-shrink: 0; margin-left: 6px; }
+      #overview-view { flex-wrap: nowrap !important; overflow: hidden !important; }
+      #overview-view > .ov-col:not(.collapsed) {
+        flex: 1 1 0; width: auto; min-width: 0; max-height: 100%;
+      }
+      #overview-view > .ov-col.collapsed { max-height: 100%; }
+      #overview-view > .ov-col:not(.collapsed) > .ov-col-body {
+        overflow-y: auto; min-height: 0; flex: 0 1 auto;
+      }
+    }
     .ov-name { font-size: 0.76rem; font-weight: 700; cursor: pointer; }
     .ov-name:hover { text-decoration: underline; }
     .ov-count { font-size: 0.64rem; color: var(--overlay0); margin-left: 3px; }
@@ -3953,7 +3982,7 @@ function captureViewState() {
     listGroupDir: { ...listGroupDir },
     nlColOrder: [...nlColOrder], nlColWidths: { ...nlColWidths },
     nlColHidden: [...nlColHidden], nlColLabels: { ...nlColLabels },
-    nlSortKey, nlSortDir, vtTabs: [...vtTabs], nlSubMode, doneWindow, nlWrapText, nlShowEmptyGroups, doneOnly,
+    nlSortKey, nlSortDir, nlSubMode, doneWindow, nlWrapText, nlShowEmptyGroups, doneOnly,
   };
 }
 
@@ -3981,7 +4010,8 @@ function applyView(id) {
   if (Array.isArray(v.state.nlColHidden)) nlColHidden = new Set(v.state.nlColHidden);
   if (v.state.nlColLabels) nlColLabels = { ...v.state.nlColLabels };
   if ('nlSortKey' in v.state) { nlSortKey = v.state.nlSortKey || ''; nlSortDir = v.state.nlSortDir === -1 ? -1 : 1; }
-  if (Array.isArray(v.state.vtTabs) && v.state.vtTabs.length) { vtTabs = [...v.state.vtTabs]; vtSave(); }
+  // vtTabs (the view-tab strip) is no longer restored from a saved view: the strip
+  // is one per device — every view by default, in the order dragged.
   if (v.state.nlSubMode) { nlSubMode = v.state.nlSubMode; localStorage.setItem('todo_sub_mode', nlSubMode); }
   if (v.state.doneWindow) { doneWindow = v.state.doneWindow; localStorage.setItem('todo_done_window', doneWindow); }
   if ('nlWrapText' in v.state) { nlWrapText = !!v.state.nlWrapText; localStorage.setItem('todo_wrap_text', nlWrapText ? '1' : '0'); }
@@ -6177,10 +6207,26 @@ function renderViewTabs() {
     const d = viewDef(v);
     if (!d) return '';
     const act = currentView === v;
-    return `<span class="vt-tab ${act ? 'active' : ''}" onclick="setView('${v}')" title="${d.label} view">
+    return `<span class="vt-tab ${act ? 'active' : ''}" onclick="setView('${v}')" title="${d.label} view — drag to reorder"
+      draggable="true" ondragstart="vtDragStart(event,'${v}')" ondragover="vtDragOver(event)" ondragleave="this.classList.remove('vt-drop')" ondrop="vtDrop(event,'${v}')">
       <span class="vt-ic">${d.icon}</span>${d.label}${shown.length > 1 ? `<span class="vt-x" onclick="vtRemoveTab(event,'${v}')" title="Remove this tab">✕</span>` : ''}
     </span>`;
   }).join('') + `<span class="vt-add" onclick="vtAddMenu(event)" title="Add a view">＋ View</span>`;
+}
+// Drag a tab onto another to put it in that place; the order is saved per device.
+let vtDragging = null;
+function vtDragStart(e, v) { vtDragging = v; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', v); }
+function vtDragOver(e) { if (!vtDragging) return; e.preventDefault(); e.currentTarget.classList.add('vt-drop'); }
+function vtDrop(e, target) {
+  e.preventDefault();
+  const v = vtDragging; vtDragging = null;
+  if (!v || v === target) { renderViewTabs(); return; }
+  const tabs = vtTabs.includes(currentView) ? vtTabs.slice() : [...vtTabs, currentView];
+  const from = tabs.indexOf(v), to = tabs.indexOf(target);
+  if (from < 0 || to < 0) { renderViewTabs(); return; }
+  tabs.splice(from, 1);
+  tabs.splice(to, 0, v);
+  vtTabs = tabs; vtSave(); renderViewTabs();
 }
 function vtRemoveTab(e, v) {
   e.stopPropagation();
