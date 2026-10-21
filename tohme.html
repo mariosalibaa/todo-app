@@ -33,7 +33,7 @@
   th:first-child,td:first-child{text-align:left;}
   td{padding:7px 8px;border-bottom:1px solid var(--surface0);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   td small{display:block;color:var(--overlay0);font-size:.64rem;}
-  td.mix{color:#cba6f7;} td.edl{color:var(--blue);} td.gen{color:var(--red);} td.sol{color:var(--amber);} td.exp{color:var(--green,#a6e3a1);}
+  td.mix{color:#cba6f7;} td.edl{color:var(--blue);} td.gen{color:var(--red);} td.sol{color:var(--amber);} td.exp{color:var(--green,#a6e3a1);} td.def{color:var(--red);}
   td .z{color:var(--surface1);}
   tr.row{cursor:pointer;} tr.row:hover td{background:var(--surface0);}
   tr.day td{background:rgba(49,50,68,.35);font-size:.74rem;}
@@ -88,17 +88,22 @@
   const $ = id => document.getElementById(id);
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fmt = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : Math.round(v).toLocaleString('en-US'));
+  // solar − load; blank where there is no solar series (before 6 Aug 2025)
+  const dif = (t, one) => !t.pv ? '' : (one ? fmt1 : fmt)(t.pv - t.useS).replace(/^(?!<)/, t.pv - t.useS < 0 ? '' : '+');
   const fmt1 = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : (Math.round(v * 10) / 10).toLocaleString('en-US'));
   const pc = (a, b) => b > 0 ? Math.round(a / b * 100) + ' %' : '';
   let D = null, year = null, open = {}, view = 'energy', openDay = null, dayCache = {};
   const yearAgo = () => { const t = D.today || D.days[D.days.length - 1]; return (+t.slice(0, 4) - 1) + t.slice(4); };
   const fmtDay = d => `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
+  // the filter: a year, "last12" (the same date a year ago → today) or "all" (every day DeyeCloud has, since 26 Apr 2025)
+  const inYear = d => year === 'all' ? true : year === 'last12' ? d >= yearAgo() : d.slice(0, 4) === year;
+  const totLabel = from => year === 'all' ? `Total ${fmtDay(from)} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : year === 'last12' ? `Total ${fmtDay(yearAgo())} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : 'Total ' + year;
 
   // one day → the sources: the grid port = EDL, the generator port = the generator, export = what went out on either port
   function split(day, v) {
-    return { pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, exp: (v.genOut || 0) + (v.gridOut || 0), gen: v.gen || 0, mix: 0 };
+    return { pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, exp: (v.genOut || 0) + (v.gridOut || 0), gen: v.gen || 0, mix: 0, useS: v.pv == null ? 0 : (v.use || 0) };   // useS = load on days with a solar series (for solar − load)
   }
-  const add = (a, b) => { for (const k of ['pv', 'use', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
+  const add = (a, b) => { for (const k of ['pv', 'use', 'useS', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
 
   async function load() {
     const r = await fetch('/api/tohme', { credentials: 'same-origin' });
@@ -109,7 +114,7 @@
     const ys = [...new Set(D.days.map(d => d.slice(0, 4)))];
     if (!year) year = ys[ys.length - 1];
     // "Last 12 months" = the same date a year ago → today (Mario 2026-10-13: "13 oct 2025 to 13 oct 2026")
-    $('years').innerHTML = ys.map(y => `<button data-y="${y}" class="${y === year ? 'on' : ''}">${y}</button>`).join('') + `<button data-y="last12" class="${year === 'last12' ? 'on' : ''}">Last 12 months</button>`;
+    $('years').innerHTML = ys.map(y => `<button data-y="${y}" class="${y === year ? 'on' : ''}">${y}</button>`).join('') + `<button data-y="last12" class="${year === 'last12' ? 'on' : ''}">Last 12 months</button><button data-y="all" class="${year === 'all' ? 'on' : ''}">All</button>`;
     render();
   }
 
@@ -118,41 +123,46 @@
     const months = {};
     const fi = D.fields.reduce((o, f, i) => (o[f] = i, o), {});
     D.days.forEach((d, i) => {
-      if (year === 'last12' ? d < yearAgo() : d.slice(0, 4) !== year) return;
+      if (!inYear(d)) return;
       const a = D.data[i]; if (!a) return;
       const v = {}; for (const f in fi) v[f] = a[fi[f]];
       const s = split(d, v); s.day = d;
       const k = d.slice(0, 7); (months[k] = months[k] || { list: [], t: {} }).list.push(s); add(months[k].t, s);
     });
-    const keys = Object.keys(months).sort();
+    const keys = Object.keys(months).sort().reverse();
     const T = keys.reduce((t, k) => add(t, months[k].t), {}); T.days = keys.reduce((n, k) => n + months[k].list.length, 0);
     const supply = T.pv + T.edl + T.gen + T.mix;
+    const split1 = keys.flatMap(k => months[k].list).filter(s => s.day >= '2025-08-06');
+    const alone = split1.filter(s => s.edl + s.gen < 1).length;
+    const best = split1.reduce((b, s) => !b || s.edl + s.gen < b.edl + b.gen ? s : b, null);
     $('kpis').innerHTML =
       `<div class="kpi solar"><span>Solar</span><b>${fmt(T.pv)} kWh</b><small>${pc(T.pv, supply)} of supply</small></div>` +
       `<div class="kpi edl"><span>Port grid</span><b>${fmt(T.edl)} kWh</b><small>EDL — ${pc(T.edl, supply)} of supply</small></div>` +
       `<div class="kpi gen"><span>Port gen</span><b>${fmt(T.gen)} kWh</b><small>generator — ${pc(T.gen, supply)} of supply</small></div>` +
       `<div class="kpi exp"><span>Export</span><b>${fmt(T.exp)} kWh</b><small>sent out on the grid + gen ports</small></div>` +
-      `<div class="kpi"><span>Consumption</span><b>${fmt(T.use)} kWh</b><small>${T.days} days</small></div>`;
+      `<div class="kpi"><span>Consumption</span><b>${fmt(T.use)} kWh</b><small>${T.days} days</small></div>` +
+      `<div class="kpi solar"><span>Days on solar alone</span><b>${alone} days</b><small>of ${split1.length} — no EDL, no generator${best ? ` · best ${fmtDay(best.day)}: ${fmt(best.edl + best.gen)} kWh in` : ''}</small></div>`;
     const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>Solar</th><th>Port grid<small>EDL</small></th><th>Export<small>grid + gen port</small></th>` +
-      `<th>Port gen<small>generator</small></th><th>Load</th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
+      `<th>Port gen<small>generator</small></th><th class="hide-sm">EDL + gen<small>bought in</small></th><th>Load</th><th>Solar − load<small>deficit</small></th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
     const phx = t => `<span class="ph">${t.days} days · battery ${fmt(t.dis)} · solar ${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</span>`;
     const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}${phx(t)}</td><td class="hide-sm">${t.days}</td>` +
-      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="exp">${fmt(t.exp)}</td><td class="mix">${fmt(t.mix + t.gen)}</td>` +
-      `<td>${fmt(t.use)}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
+      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="exp">${fmt(t.exp)}</td><td class="mix">${fmt(t.mix + t.gen)}</td><td class="hide-sm">${fmt(t.edl + t.gen + t.mix)}</td>` +
+      `<td>${fmt(t.use)}</td><td class="def">${dif(t)}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
     let rows = '';
     for (const k of keys) {
       const m = months[k], [y, mo] = k.split('-');
       const live = D.today && D.today.startsWith(k);
       rows += line('row', `${MONTHS[+mo - 1]} ${y}${live ? ' <small>to today</small>' : ''}`, m.t, `data-m="${k}"`);
-      if (open[k]) for (const s of m.list) {
+      if (open[k]) for (const s of m.list.slice().reverse()) {
         const dd = +s.day.slice(8), t = { ...s, days: '' };
         rows += `<tr class="day${s.n < 250 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${s.n < 250 ? s.n + '/288 readings · ' : ''}solar ${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</span></td><td class="hide-sm">${s.n < 250 ? s.n + '/288' : ''}</td>` +
-          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td>${fmt1(s.use)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
+          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td class="hide-sm">${fmt1(s.edl + s.gen + s.mix)}</td><td>${fmt1(s.use)}</td><td class="def">${dif(s, 1)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
       }
     }
-    rows += line('tot', year === 'last12' ? `Total ${fmtDay(yearAgo())} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : 'Total ' + year, T);
+    rows += line('tot', totLabel(D.days[0]), T);
     $('tbl').innerHTML = head + rows;
     $('note').innerHTML =
+      `<b>Solar − load</b> = solar minus consumption — negative is what the panels fell short of the house (the deficit EDL + the generator filled). <b>Days on solar alone</b> = days with under 1 kWh in from EDL and the generator together, counted from 6 Aug 2025 (before that no split). ` +
       `<b>Ports.</b> EDL comes into the inverter on its grid port (blue), the generator on its generator port (purple); Export is what went back out on either port. ` +
       `<b>Before 6 Aug 2025</b> DeyeCloud kept only the total production, no solar / generator split — those months show load, grid and battery only. Until Jan 2026 the logger sent about 258 readings a day instead of 288. ` +
       `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
@@ -164,7 +174,7 @@
   // per day (server tohme-batt.js): battery full at, the daylight window it stayed full, solar thrown in that window
   // (clear-sky curve fitted to the same morning − what the panels gave), what a 60 kWh rack (90 % usable) would have
   // stored, the night's generator + grid, and what the rack would have replaced.
-  const inRange = d => d >= (D.rack.from || '0') && (year === 'last12' ? d >= yearAgo() : d.slice(0, 4) === year);
+  const inRange = d => d >= (D.rack.from || '0') && inYear(d);
   const hm = s => s ? +s.slice(0, 2) * 60 + +s.slice(3) : null;
   const mh = m => m == null ? '—' : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
   function renderBatt() {
@@ -177,7 +187,7 @@
       if (b.fullAt) { t.full++; t.mins += hm(b.fullAt); t.thrown += b.thrown || 0; t.store += b.store || 0; }
       if (b.night != null) { t.night += b.night; t.replaced += b.replaced || 0; t.nightDays++; }
     });
-    const keys = Object.keys(months).sort();
+    const keys = Object.keys(months).sort().reverse();
     const T = { days: 0, full: 0, mins: 0, thrown: 0, store: 0, night: 0, replaced: 0, nightDays: 0 };
     keys.forEach(k => { for (const f in T) T[f] += months[k].t[f]; });
     $('kpis').innerHTML =
@@ -193,7 +203,7 @@
     for (const k of keys) {
       const m = months[k], [y, mo] = k.split('-');
       rows += line('row', `${MONTHS[+mo - 1]} ${y}${D.today && D.today.startsWith(k) ? ' <small>to today</small>' : ''}`, m.t, `data-m="${k}"`);
-      if (open[k]) for (const b of m.list) {
+      if (open[k]) for (const b of m.list.slice().reverse()) {
         const dd = +b.day.slice(8);
         rows += `<tr class="row day" data-d="${b.day}"><td>${dd} ${MONTHS[+mo - 1]}${b.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${b.fullAt ? 'full ' + b.fullAt + ' → ' + b.clipTo : b.fullOther ? '100 % at ' + b.fullOther.at + ' from ' + b.fullOther.from : 'max ' + b.socMax + ' %'}</span></td>` +
           `<td class="hide-sm">${b.fullAt ? '<small>full ' + b.fullAt + ' → ' + b.clipTo + '</small>' : b.fullOther ? '<small>100 % at ' + b.fullOther.at + ' from ' + b.fullOther.from + '</small>' : '<small>max ' + b.socMax + ' %</small>'}</td><td>${b.fullAt || '—'}</td>` +
@@ -201,13 +211,13 @@
         if (openDay === b.day) rows += `<tr class="chart"><td colspan="7"><div class="legend"><span><i style="background:#cba6f7"></i>PV</span><span><i style="background:#F2A93B;opacity:.5"></i>PV the sun allowed (clear-sky fit)</span><span><i style="background:#fab387"></i>Consumption</span><span><i style="background:#89dceb"></i>Battery (− charging)</span><span><i style="background:#94e2d5"></i>Generator</span><span><i style="background:#b4befe"></i>Grid</span><span><i style="background:#89b4fa;height:2px"></i>SOC %</span></div><canvas class="pp" id="cv-${b.day}"></canvas><div class="chartNote" id="cn-${b.day}">Reading DeyeCloud…</div></td></tr>`;
       }
     }
-    rows += line('tot', year === 'last12' ? `Total ${fmtDay(yearAgo())} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : 'Total ' + year, T);
+    rows += line('tot', totLabel(D.rack.from || D.days[0]), T);
     $('tbl').innerHTML = head + rows;
     if (openDay && $('cv-' + openDay)) chart(openDay);
     $('note').innerHTML =
       `<b>The case.</b> One 60 kWh rack (12 × 5 kWh) fills from the panels by early afternoon. From that moment the inverter throttles the panels down to the house load — on DeyeCloud's Power Profile the PV line drops onto Consumption while SOC sits at 100 % — and in the evening the generator and EDL carry the house. ` +
       `<b>Solar thrown</b> = what the sun allowed minus what the panels gave, over the daylight window the battery stayed full. "What the sun allowed" is a clear-sky curve for that date in Lebanon, scaled to what the panels were giving in the <b>90 minutes before</b> the battery filled — a cloudy day gives a lower curve. ` +
-      `<b>A second rack</b> of 60 kWh at 90 % usable takes up to 54 kWh of that; <b>would replace</b> = the smaller of what it stores and what the generator + EDL gave that night (to the next sunrise). "Full at" counts only a battery filled by the panels in daylight; a battery that reaches 100 % in the evening from EDL or the generator threw no solar, so the line says so and counts nothing. Tap a month for its days, a day for its chart.`;
+      `<b>A second rack</b> of 60 kWh at 90 % usable takes up to 54 kWh of that; <b>would replace</b> = the smaller of what it stores and what the generator + EDL gave that night (to the next sunrise). "Full at" counts only a battery filled by the panels in daylight; a battery that reaches 100 % in the evening from EDL or the generator threw no solar, so the line says so and counts nothing. <b>Would replace</b> is below <b>would store</b> on summer nights where the generator + EDL gave less than 54 kWh — the rack would have had more than the night needed. Starts 6 Aug 2025: before that DeyeCloud kept no solar series, so a full battery can't be told from the sun. Tap a month for its days, a day for its chart.`;
   }
 
   async function chart(d) {
