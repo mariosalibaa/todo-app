@@ -6168,10 +6168,11 @@ const viewDef = v => VIEW_DEFS.find(d => d.v === v);
 // project views — still under + View). A device that saved a different strip
 // before this default gets it applied once (v4).
 const VT_ALL = ['kanban', 'list', 'gantt', ...VIEW_DEFS.map(d => d.v).filter(v => !['kanban', 'list', 'gantt', 'projects', 'projects-list'].includes(v))];
+const NO_TAB_VIEWS = ['projects', 'projects-list'];
 let vtTabs = (() => {
   let saved = [];
   try { saved = JSON.parse(localStorage.getItem('todo_view_tabs') || '[]'); } catch { saved = []; }
-  saved = saved.filter(viewDef);
+  saved = saved.filter(v => viewDef(v) && !NO_TAB_VIEWS.includes(v));
   let migrated = false;
   try { migrated = localStorage.getItem('todo_view_tabs_v4') === '1'; localStorage.setItem('todo_view_tabs_v4', '1'); } catch {}
   if (!saved.length) return VT_ALL.slice();
@@ -6202,7 +6203,7 @@ function renderViewTabs() {
     return;
   }
   // The view you're on always has a tab, even if it was opened from the + menu
-  const shown = vtTabs.includes(currentView) ? vtTabs : [...vtTabs, currentView];
+  const shown = vtTabs.includes(currentView) || NO_TAB_VIEWS.includes(currentView) ? vtTabs : [...vtTabs, currentView];
   el.innerHTML = shown.map(v => {
     const d = viewDef(v);
     if (!d) return '';
@@ -6241,7 +6242,8 @@ function vtAddMenu(e) {
   const m = document.createElement('div');
   m.id = 'ov-prio-menu';
   m.style.cssText = 'position:fixed;z-index:950;background:var(--mantle);border:1px solid var(--surface1);border-radius:8px;padding:4px;box-shadow:0 8px 32px #0008;display:flex;flex-direction:column;min-width:180px;max-height:70vh;overflow:auto;';
-  m.innerHTML = VIEW_DEFS.map(d => {
+  // Projects / Project List are not offered as tabs (reached from All Projects)
+  m.innerHTML = VIEW_DEFS.filter(d => !NO_TAB_VIEWS.includes(d.v)).map(d => {
     const on = vtTabs.includes(d.v);
     return `<div onclick="vtPickView('${d.v}')" style="display:flex;align-items:center;gap:9px;padding:6px 12px;cursor:pointer;border-radius:6px;font-size:0.78rem;font-weight:${on ? 600 : 400};"
          onmouseover="this.style.background='var(--surface0)'" onmouseout="this.style.background=''">
