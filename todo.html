@@ -6134,19 +6134,19 @@ const VIEW_DEFS = [
   { v: 'trash',         icon: '🗑', label: 'Recycle bin' },
 ];
 const viewDef = v => VIEW_DEFS.find(d => d.v === v);
-// Default = every view as a tab (Board, List, Gantt first) except Projects (the
-// board of projects — still under + View). A device that saved a different strip
-// before this default gets it applied once (v3).
-const VT_ALL = ['kanban', 'list', 'gantt', ...VIEW_DEFS.map(d => d.v).filter(v => !['kanban', 'list', 'gantt', 'projects'].includes(v))];
+// Default = every view as a tab (Board, List, Gantt first) except Projects and Project List (the
+// project views — still under + View). A device that saved a different strip
+// before this default gets it applied once (v4).
+const VT_ALL = ['kanban', 'list', 'gantt', ...VIEW_DEFS.map(d => d.v).filter(v => !['kanban', 'list', 'gantt', 'projects', 'projects-list'].includes(v))];
 let vtTabs = (() => {
   let saved = [];
   try { saved = JSON.parse(localStorage.getItem('todo_view_tabs') || '[]'); } catch { saved = []; }
   saved = saved.filter(viewDef);
   let migrated = false;
-  try { migrated = localStorage.getItem('todo_view_tabs_v3') === '1'; localStorage.setItem('todo_view_tabs_v3', '1'); } catch {}
+  try { migrated = localStorage.getItem('todo_view_tabs_v4') === '1'; localStorage.setItem('todo_view_tabs_v4', '1'); } catch {}
   if (!saved.length) return VT_ALL.slice();
   if (!migrated) {
-    const kept = saved.filter(v => v !== 'projects');
+    const kept = saved.filter(v => v !== 'projects' && v !== 'projects-list');
     const tabs = [...kept, ...VT_ALL.filter(v => !kept.includes(v))];
     try { localStorage.setItem('todo_view_tabs', JSON.stringify(tabs)); } catch {}
     return tabs;
