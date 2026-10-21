@@ -6134,11 +6134,18 @@ const VIEW_DEFS = [
   { v: 'trash',         icon: '🗑', label: 'Recycle bin' },
 ];
 const viewDef = v => VIEW_DEFS.find(d => d.v === v);
+// Default = every view as a tab (Board, List, Gantt first). A device that saved
+// a shorter strip before this default gets the missing views added once (v2).
+const VT_ALL = ['kanban', 'list', 'gantt', ...VIEW_DEFS.map(d => d.v).filter(v => !['kanban', 'list', 'gantt'].includes(v))];
 let vtTabs = (() => {
   let saved = [];
   try { saved = JSON.parse(localStorage.getItem('todo_view_tabs') || '[]'); } catch { saved = []; }
   saved = saved.filter(viewDef);
-  return saved.length ? saved : ['kanban', 'list', 'gantt'];
+  let migrated = false;
+  try { migrated = localStorage.getItem('todo_view_tabs_v2') === '1'; localStorage.setItem('todo_view_tabs_v2', '1'); } catch {}
+  if (!saved.length) return VT_ALL.slice();
+  if (!migrated) return [...saved, ...VT_ALL.filter(v => !saved.includes(v))];
+  return saved;
 })();
 const vtSave = () => localStorage.setItem('todo_view_tabs', JSON.stringify(vtTabs));
 
