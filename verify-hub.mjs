@@ -32,7 +32,7 @@ const PORT = Number(arg('port', 8099));
 // every route in server.js PAGES except the public hand-out page
 const PAGES = ['/admin', '/members', '/ask', '/todo', '/accounting', '/accounting/whish', '/accounting/daily', '/accounting/statements',
   '/accounting/transfers', '/accounting/wise', '/accounting/budget', '/accounting/dashboard', '/ajaltoun4193/partners', '/ajaltoun4193/accounting',
-  '/ajaltoun4193/excavation', '/ajaltoun4193/excavation/diesel', '/ajaltoun4193/excavation/summary', '/ajaltoun4193/cameras', '/site', '/reports', '/decisions', '/crm', '/rent-law', '/mechanical', '/bonvin', '/bonvin/shop', '/energy/plants/mahab', '/energy/plants/tohme', '/procurement', '/paper', '/contacts', '/cars', '/energy', '/energy/tuya', '/links', '/energy/ewelink', '/energy/plants/cpr'];
+  '/ajaltoun4193/excavation', '/ajaltoun4193/excavation/diesel', '/ajaltoun4193/excavation/summary', '/ajaltoun4193/cameras', '/site', '/reports', '/decisions', '/crm', '/rent-law', '/mechanical', '/bonvin', '/bonvin/shop', '/energy/plants/mahab', '/energy/plants/tohme', '/procurement', '/paper', '/board', '/contacts', '/cars', '/energy', '/energy/tuya', '/links', '/energy/ewelink', '/energy/plants/cpr'];
 const VIEWPORTS = { desk: { width: 1440, height: 900 }, phone: { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } };
 // noise that is not a hub bug
 const IGNORE = [/favicon/i, /sw\.js/i, /manifest/i, /ResizeObserver loop/i, /net::ERR_ABORTED/i, /api\.telegram\.org/i, /googleapis\.com.*401/i];

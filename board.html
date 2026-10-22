@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e2e">
+<title>Board · Shift Hub</title>
+<link rel="icon" href="/icons/hub-192.png">
+<link rel="manifest" href="/hub-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shift Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/hub-apple.png">
+<style>
+  :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--red:#f38ba8;--green:#a6e3a1;
+    --paper:#fbfaf6;--ink:#23262b;--pen:#2f3b52;--rule:#e3e7ee;--faint:#8b8f97;--hly:rgba(222,245,70,.6);--hlo:rgba(255,150,60,.5);}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--base);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--surface0);position:sticky;top:0;z-index:50;background:var(--base);}
+  .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
+  .wordmark span{color:var(--amber);}
+  .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
+  .hleft{display:flex;align-items:center;gap:16px;min-width:0;}
+  .who{font-size:.78rem;color:var(--sub);display:flex;gap:12px;align-items:center;}
+  .who a{color:var(--overlay0);text-decoration:none;} .who a:hover{color:var(--text);}
+  main{max-width:900px;margin:0 auto;padding:18px 16px 80px;}
+  .note{color:var(--sub);font-size:.8rem;margin:10px 0 12px;}
+
+  /* the tab strips */
+  .tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;padding:2px 0 8px;-webkit-overflow-scrolling:touch;}
+  @media (min-width:601px){.tabs{flex-wrap:wrap;overflow:visible;}}
+  .tabs.sub{padding-left:10px;border-left:2px solid var(--amber);margin:2px 0 4px;}
+  .tab{flex:none;display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--sub);border:1px solid var(--surface1);border-radius:10px;padding:8px 12px;font:inherit;font-size:.88rem;cursor:pointer;white-space:nowrap;}
+  .tab:hover{border-color:var(--amber);color:var(--text);}
+  .tab.on{background:var(--amber);border-color:var(--amber);color:#1e1e2e;font-weight:600;}
+  .tabs.sub .tab{font-size:.82rem;padding:6px 10px;border-radius:8px;}
+  .tabs.sub .tab.on{background:var(--surface0);border-color:var(--amber);color:var(--text);}
+  .tab .n{font-size:.7rem;border-radius:20px;padding:0 6px;background:var(--surface0);color:var(--sub);font-weight:600;}
+  .tab.on .n{background:rgba(30,30,46,.18);color:#1e1e2e;}
+  .tabs.sub .tab.on .n{background:var(--surface1);color:var(--text);}
+  .tab .ed{opacity:.6;font-size:.8rem;}
+  .tab.add{border-style:dashed;color:var(--overlay0);}
+  .tab input{font:inherit;font-size:inherit;border:0;background:transparent;color:inherit;width:14ch;min-width:6ch;padding:0;outline:none;}
+
+  /* the tab's menu */
+  #menu{position:fixed;z-index:90;background:var(--mantle);border:1px solid var(--surface1);border-radius:12px;padding:6px;min-width:200px;box-shadow:0 10px 30px rgba(0,0,0,.45);display:none;}
+  #menu.on{display:block;}
+  #menu button{display:block;width:100%;text-align:left;background:transparent;color:var(--text);border:0;border-radius:8px;padding:8px 10px;font:inherit;font-size:.86rem;cursor:pointer;}
+  #menu button:hover{background:var(--surface0);}
+  #menu button.del{color:var(--red);}
+  #menu button:disabled{opacity:.35;cursor:default;background:transparent;}
+
+  /* the sheet (same hand as the Daily Paper) */
+  .sheet{background:var(--paper);color:var(--ink);border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:20px 18px 26px 54px;position:relative;min-height:380px;}
+  .sheet .head{font-size:1.1rem;color:var(--pen);font-weight:600;margin:0 0 8px -10px;}
+  .sheet .head small{font-weight:400;color:var(--faint);font-size:.85rem;}
+  .add{display:flex;gap:8px;margin:0 0 8px -10px;}
+  .add input{flex:1;border:0;border-bottom:1.5px dashed #c9ccd3;background:transparent;font:inherit;font-size:1rem;color:var(--ink);padding:8px 4px;}
+  .add input:focus{outline:none;border-bottom-color:var(--amber);}
+  ol.lines{list-style:none;margin:0;padding:0;}
+  li.ln{position:relative;border-bottom:1px solid var(--rule);padding:7px 0;}
+  li.ln .row{display:flex;align-items:center;gap:8px;min-height:30px;}
+  li.ln .grip{position:absolute;left:-50px;top:9px;width:22px;text-align:center;color:#b9bcc4;cursor:grab;touch-action:none;user-select:none;font-size:1rem;line-height:1.4;}
+  li.ln .num{position:absolute;left:-28px;top:10px;width:20px;text-align:right;color:var(--faint);font-size:.75rem;font-variant-numeric:tabular-nums;}
+  li.ln .ck{flex:none;width:20px;height:20px;border-radius:50%;border:1.5px solid #9aa0aa;background:transparent;cursor:pointer;padding:0;color:#fff;font-size:.7rem;line-height:1;}
+  li.ln.done .ck{background:#6f9b6a;border-color:#6f9b6a;}
+  li.ln .tx{flex:1;min-width:0;font-size:1rem;line-height:1.45;cursor:pointer;word-break:break-word;}
+  li.ln .tx span{padding:1px 3px;border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
+  li.ln.hl-y .tx span{background:linear-gradient(transparent 18%,var(--hly) 18%,var(--hly) 88%,transparent 88%);}
+  li.ln.hl-o .tx span{background:linear-gradient(transparent 18%,var(--hlo) 18%,var(--hlo) 88%,transparent 88%);}
+  li.ln.done .tx{color:#9aa0aa;text-decoration:line-through;}
+  li.ln .meta{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
+  .chip{font-size:.7rem;border-radius:20px;padding:2px 8px;background:#eef0f4;color:#4b5263;white-space:nowrap;border:0;font-family:inherit;cursor:pointer;}
+  .chip.due.late{background:#fde2e4;color:#b42335;} .chip.due.today{background:#fdefd6;color:#9a5b00;}
+  li.ln.drag{opacity:.55;background:#f3f0e6;}
+  .acts{display:none;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 2px 28px;font-size:.8rem;}
+  li.ln.open .acts{display:flex;}
+  .acts .a{border:1px solid #d6d9e0;background:#fff;color:#3a3f4a;border-radius:8px;padding:5px 9px;font:inherit;font-size:.78rem;cursor:pointer;}
+  .acts .a:hover{border-color:var(--amber);}
+  .acts .a.del{color:#b42335;}
+  .acts .sw{width:24px;height:24px;border-radius:6px;border:1px solid #d6d9e0;cursor:pointer;padding:0;}
+  .acts .sw.on{outline:2px solid var(--pen);outline-offset:1px;}
+  .acts input[type=date],.acts select{border:1px solid #d6d9e0;border-radius:8px;padding:4px 6px;font:inherit;font-size:.78rem;color:#3a3f4a;background:#fff;}
+  li.ln input.edit{width:100%;font:inherit;font-size:1rem;border:0;border-bottom:1.5px solid var(--amber);background:transparent;color:var(--ink);padding:2px 0;}
+  li.ln input.edit:focus{outline:none;}
+  .sec{margin:22px 0 6px -10px;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);cursor:pointer;user-select:none;}
+  .empty{color:var(--faint);font-size:.9rem;padding:18px 0;list-style:none;}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--surface0);color:var(--text);padding:9px 16px;border-radius:10px;font-size:.85rem;display:none;z-index:120;}
+  @media (max-width:600px){
+    header{padding:14px 12px;} main{padding:12px 8px 80px;}
+    .sheet{padding:16px 10px 22px 46px;}
+    li.ln .grip{left:-44px;} li.ln .num{left:-24px;}
+    li.ln .row{flex-wrap:wrap;} li.ln .meta{width:100%;justify-content:flex-start;padding-left:28px;}
+    li.ln .meta:empty{display:none;}
+    .acts{margin-left:0;}
+    .add input,.tab input{font-size:16px;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="hleft">
+    <span id="crumbs"></span>
+    <div class="wordmark">SHIFT <span>GROUP</span><small>BOARD</small></div><script>document.addEventListener("DOMContentLoaded", () => Admin.crumbs([['Board']]));</script>
+  </div>
+  <div class="who" id="who"></div>
+</header>
+<main>
+  <div class="tabs" id="tabs"></div>
+  <div class="tabs sub" id="subtabs" style="display:none"></div>
+  <p class="note">Tap the open tab again to rename, move, add a sub-tab or delete it. Type and Enter to write a line; drag ⠿ for priority, tap a line for the highlighter, a due date or to move it to another tab.</p>
+  <div class="sheet" id="sheet"></div>
+</main>
+<div id="menu"></div>
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/admin-shared.js"></script>
+<script src="/phone-preview.js"></script>
+<script>
+const esc = Admin.esc;
+const $ = id => document.getElementById(id);
+let TABS = [], ITEMS = [], TODAY = '', OPEN = null, EDIT = null, RENAME = null, SHOW_DONE = false;
+let CUR = new URLSearchParams(location.search).get('t') || null;   // the tab open (a leaf: a tab with no sub-tabs, or a sub-tab)
+const LAST = {};   // the sub-tab last open under each tab
+try { Object.assign(LAST, JSON.parse(localStorage.getItem('board.last') || '{}')); } catch (e) {}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dObj = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); };
+const shortDay = d => { const x = dObj(d); return `${x.getDate()} ${MONTHS[x.getMonth()]}` + (x.getFullYear() !== dObj(TODAY).getFullYear() ? ' ' + x.getFullYear() : ''); };
+const toast = t => { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = 'none', 2600); };
+
+Admin.require(null, async me => {   // admin only — the server refuses /api/board to anyone else
+  $('who').innerHTML = `${esc(me.email)} <a href="#" onclick="Admin.signOut();return false;">Sign out</a>`;
+  await load();
+});
+
+async function load() {
+  const r = await Admin.api('GET', '/api/board');
+  TABS = r.tabs; ITEMS = r.items; TODAY = r.today;
+  render();
+}
+
+const tabById = id => TABS.find(t => t.id === id);
+const kidsOf = id => TABS.filter(t => (t.parent || null) === (id || null)).sort((a, b) => (a.order || 0) - (b.order || 0));
+const topOf = id => { const t = tabById(id); return t && t.parent ? tabById(t.parent) : t; };
+const openIn = id => ITEMS.filter(i => i.tab === id && !i.done).length + kidsOf(id).reduce((s, k) => s + openIn(k.id), 0);
+const label = t => t.parent ? `${tabById(t.parent) ? tabById(t.parent).name + ' › ' : ''}${t.name}` : t.name;
+// the leaf to show for a tab: itself, or its last / first sub-tab
+const leaf = id => { const k = kidsOf(id); if (!k.length) return id; return k.find(x => x.id === LAST[id]) ? LAST[id] : k[0].id; };
+
+function go(id) {
+  CUR = id; OPEN = null; EDIT = null; RENAME = null;
+  const t = tabById(id); if (t && t.parent) { LAST[t.parent] = id; try { localStorage.setItem('board.last', JSON.stringify(LAST)); } catch (e) {} }
+  history.replaceState(null, '', '/board?t=' + encodeURIComponent(id));
+  render();
+}
+
+function render() {
+  if (!CUR || !tabById(CUR)) CUR = kidsOf(null)[0] ? leaf(kidsOf(null)[0].id) : null;
+  else if (kidsOf(CUR).length) CUR = leaf(CUR);
+  const t = tabById(CUR), T = t ? topOf(CUR) : null;
+  $('tabs').innerHTML = strip(kidsOf(null), T && T.id, null);
+  const subs = T ? kidsOf(T.id) : [];
+  $('subtabs').style.display = subs.length ? '' : 'none';
+  $('subtabs').innerHTML = subs.length ? strip(subs, CUR, T.id) : '';
+  wireStrip($('tabs')); wireStrip($('subtabs'));
+  const on = document.querySelector('.tab.on'); if (on && !RENAME) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  renderSheet(t);
+}
+
+function strip(list, onId, parent) {
+  return list.map(t => RENAME === t.id
+    ? `<span class="tab on" data-tab="${t.id}"><input id="rn" value="${esc(t.name)}" maxlength="60" enterkeyhint="done"></span>`
+    : `<button class="tab${t.id === onId ? ' on' : ''}" data-tab="${t.id}" title="${t.id === onId ? 'Tap again: rename, move, sub-tab, delete' : esc(t.name)}">${esc(t.name)}${openIn(t.id) ? ` <span class="n">${openIn(t.id)}</span>` : ''}${t.id === onId ? ' <span class="ed">✎</span>' : ''}</button>`).join('')
+    + (RENAME === 'new:' + (parent || '') ? `<span class="tab on"><input id="rn" placeholder="${parent ? 'Sub-tab' : 'Tab'} name" maxlength="60" enterkeyhint="done"></span>`
+      : `<button class="tab add" data-new="${parent || ''}" title="${parent ? 'A new sub-tab' : 'A new tab'}">＋${parent ? '' : ' Tab'}</button>`);
+}
+
+function wireStrip(host) {
+  host.querySelectorAll('button[data-tab]').forEach(b => b.onclick = e => {
+    const id = b.dataset.tab;
+    if (b.classList.contains('on')) return menu(id, b);
+    go(leaf(id));
+  });
+  host.querySelectorAll('button[data-tab]').forEach(b => b.ondblclick = () => { RENAME = b.dataset.tab; render(); });
+  host.querySelectorAll('button[data-new]').forEach(b => b.onclick = () => { RENAME = 'new:' + b.dataset.new; render(); });
+  const rn = host.querySelector('#rn'); if (!rn) return;
+  rn.focus(); rn.select();
+  const finish = async keep => {
+    if (!RENAME) return;
+    const what = RENAME, v = rn.value.trim(); RENAME = null;
+    if (!keep || !v) return render();
+    try {
+      if (what.startsWith('new:')) {
+        const parent = what.slice(4) || null;
+        const hadKids = parent && kidsOf(parent).length;
+        const t = await Admin.api('POST', '/api/board/tab', { name: v, parent });
+        TABS.push(t);
+        if (parent && !hadKids) ITEMS.forEach(i => { if (i.tab === parent) i.tab = t.id; });   // the server moved them too
+        go(t.id); return;
+      }
+      const t = tabById(what); if (v === t.name) return render();
+      Object.assign(t, await Admin.api('POST', '/api/board/tab', { id: t.id, name: v }));
+    } catch (er) { toast('Not saved: ' + er.message); }
+    render();
+  };
+  rn.onkeydown = e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); };
+  rn.onblur = () => finish(true);
+}
+
+// ── the open tab's menu
+function menu(id, anchor) {
+  const t = tabById(id), sibs = kidsOf(t.parent), i = sibs.findIndex(x => x.id === id), m = $('menu');
+  const n = ITEMS.filter(x => x.tab === id || kidsOf(id).some(k => k.id === x.tab)).length, k = kidsOf(id).length;
+  m.innerHTML = `<button data-m="rename">✎ Rename</button>
+    ${t.parent ? '' : `<button data-m="sub">＋ Add a sub-tab</button>`}
+    <button data-m="left" ${i <= 0 ? 'disabled' : ''}>◀ Move left</button>
+    <button data-m="right" ${i >= sibs.length - 1 ? 'disabled' : ''}>▶ Move right</button>
+    <button data-m="del" class="del">Delete${k ? ` (with ${k} sub-tab${k > 1 ? 's' : ''})` : ''}${n ? ` · ${n} line${n > 1 ? 's' : ''}` : ''}</button>`;
+  const r = anchor.getBoundingClientRect();
+  m.classList.add('on');
+  m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.onclick = async e => {
+    const b = e.target.closest('button[data-m]'); if (!b || b.disabled) return;
+    m.classList.remove('on');
+    const a = b.dataset.m;
+    if (a === 'rename') { RENAME = id; render(); return; }
+    if (a === 'sub') { RENAME = 'new:' + id; render(); return; }
+    if (a === 'left' || a === 'right') {
+      const list = sibs.slice(), j = a === 'left' ? i - 1 : i + 1;
+      [list[i], list[j]] = [list[j], list[i]]; list.forEach((x, o) => x.order = o + 1); render();
+      try { await Admin.api('POST', '/api/board/tabs/order', { ids: list.map(x => x.id) }); } catch (er) { toast('Order not saved: ' + er.message); await load(); }
+      return;
+    }
+    if (a === 'del') {
+      if (!confirm(`Delete the tab “${t.name}”${k ? ', its ' + k + ' sub-tab(s)' : ''}${n ? ' and the ' + n + ' line(s) on it' : ''}?`)) return;
+      try {
+        const r = await Admin.api('DELETE', '/api/board/tab/' + id);
+        TABS = TABS.filter(x => !r.tabs.includes(x.id)); ITEMS = ITEMS.filter(x => !r.items.includes(x.id));
+        CUR = t.parent && kidsOf(t.parent).length ? kidsOf(t.parent)[0].id : t.parent || null; render();
+      } catch (er) { toast('Not deleted: ' + er.message); }
+    }
+  };
+}
+document.addEventListener('click', e => { if (!e.target.closest('#menu') && !e.target.closest('.tab.on')) $('menu').classList.remove('on'); });
+window.addEventListener('scroll', () => $('menu').classList.remove('on'), { passive: true });
+
+// ── the lines of the open tab
+function renderSheet(t) {
+  const sheet = $('sheet');
+  if (!t) { sheet.innerHTML = '<div class="empty">No tabs yet — press ＋ Tab.</div>'; return; }
+  const mine = ITEMS.filter(i => i.tab === t.id);
+  const active = mine.filter(i => !i.done).sort((a, b) => (a.order || 0) - (b.order || 0));
+  const done = mine.filter(i => i.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
+  sheet.innerHTML = `
+    <div class="head">${esc(t.name)}${t.parent && tabById(t.parent) ? ` <small>· ${esc(tabById(t.parent).name)}</small>` : ''}</div>
+    <div class="add"><input id="new" placeholder="Add to ${esc(t.name)}…" autocomplete="off" enterkeyhint="done"></div>
+    <ol class="lines" id="active">${active.map((l, i) => lineHtml(l, i + 1)).join('') || '<li class="empty">Nothing here yet.</li>'}</ol>
+    ${done.length ? `<div class="sec" onclick="SHOW_DONE=!SHOW_DONE;render()">${SHOW_DONE ? '▾' : '▸'} Done (${done.length})</div>
+      ${SHOW_DONE ? `<ol class="lines">${done.map(l => lineHtml(l, '')).join('')}</ol>` : ''}` : ''}`;
+  const inp = $('new');
+  inp.onkeydown = async e => {
+    if (e.key !== 'Enter' || !inp.value.trim()) return;
+    const text = inp.value.trim(); inp.value = '';
+    try { ITEMS.push(await Admin.api('POST', '/api/board/item', { text, tab: t.id })); render(); $('new').focus(); }
+    catch (er) { toast('Not saved: ' + er.message); inp.value = text; }
+  };
+  sheet.querySelectorAll('li.ln[data-id]').forEach(wire);
+  if (EDIT) { const el = sheet.querySelector('input.edit'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+}
+
+function lineHtml(l, n) {
+  const due = l.due ? `<button class="chip due ${l.due < TODAY ? 'late' : l.due === TODAY ? 'today' : ''}" data-act="open">📅 ${esc(shortDay(l.due))}</button>` : '';
+  const hl = l.hl === 'y' || l.hl === 'o';
+  const leaves = TABS.filter(x => !kidsOf(x.id).length).sort((a, b) => {
+    const pa = topOf(a.id), pb = topOf(b.id);
+    return ((pa.order || 0) - (pb.order || 0)) || (a.parent ? a.order || 0 : 0) - (b.parent ? b.order || 0 : 0);
+  });
+  return `<li class="ln${l.hl ? ' hl-' + l.hl : ''}${l.done ? ' done' : ''}${OPEN === l.id ? ' open' : ''}" data-id="${l.id}">
+    ${l.done ? '' : `<span class="grip" title="Drag to change the priority">⠿</span><span class="num">${n}</span>`}
+    <div class="row">
+      <button class="ck" data-act="done" title="${l.done ? 'Not done' : 'Done'}">${l.done ? '✓' : ''}</button>
+      <div class="tx" data-act="open">${EDIT === l.id ? `<input class="edit" value="${esc(l.text)}">` : `<span>${esc(l.text)}</span>`}</div>
+      <div class="meta">${due}</div>
+    </div>
+    ${OPEN === l.id ? `<div class="acts">
+      <button class="sw${!hl ? ' on' : ''}" data-hl="" title="No highlight" style="background:#fff"></button>
+      <button class="sw${l.hl === 'y' ? ' on' : ''}" data-hl="y" title="Yellow highlighter" style="background:#e6f55a"></button>
+      <button class="sw${l.hl === 'o' ? ' on' : ''}" data-hl="o" title="Orange highlighter" style="background:#ffad66"></button>
+      <input type="date" data-due value="${esc(l.due || '')}" title="Due date">
+      <select data-move title="Move to another tab">${leaves.map(x => `<option value="${x.id}"${x.id === l.tab ? ' selected' : ''}>${x.id === l.tab ? 'Move to…' : esc(label(x))}</option>`).join('')}</select>
+      <button class="a" data-act="edit">✎ Edit</button>
+      <button class="a del" data-act="del">Delete</button>
+    </div>` : ''}
+  </li>`;
+}
+
+async function save(l, patch) {
+  Object.assign(l, patch);
+  try { Object.assign(l, await Admin.api('POST', '/api/board/item', { id: l.id, ...patch })); }
+  catch (e) { toast('Not saved: ' + e.message); await load(); }
+}
+
+function wire(li) {
+  const l = ITEMS.find(x => x.id === li.dataset.id); if (!l) return;
+  li.addEventListener('click', async e => {
+    const t = e.target.closest('[data-act],[data-hl]'); if (!t) return;
+    const act = t.dataset.act;
+    if (t.dataset.hl !== undefined) { await save(l, { hl: t.dataset.hl }); render(); return; }
+    if (act === 'open') { if (EDIT === l.id) return; OPEN = OPEN === l.id ? null : l.id; render(); return; }
+    if (act === 'done') { await save(l, { done: !l.done }); if (l.done) toast('Done — under “Done” at the bottom'); render(); return; }
+    if (act === 'edit') { EDIT = l.id; render(); return; }
+    if (act === 'del') {
+      if (!confirm(`Delete “${l.text}”?`)) return;
+      try { await Admin.api('DELETE', '/api/board/item/' + l.id); ITEMS = ITEMS.filter(x => x.id !== l.id); OPEN = null; render(); }
+      catch (er) { toast('Not deleted: ' + er.message); }
+    }
+  });
+  const ed = li.querySelector('input.edit');
+  if (ed) {
+    const done = async keep => { const v = ed.value.trim(); EDIT = null; if (keep && v && v !== l.text) await save(l, { text: v }); render(); };
+    ed.onkeydown = e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+    ed.onblur = () => EDIT === l.id && done(true);
+  }
+  const due = li.querySelector('[data-due]');
+  if (due) due.onchange = async () => { await save(l, { due: due.value }); render(); };
+  const mv = li.querySelector('[data-move]');
+  if (mv) mv.onchange = async () => {
+    const to = tabById(mv.value); if (!to || to.id === l.tab) return;
+    l.order = ITEMS.filter(x => x.tab === to.id).reduce((m, x) => Math.max(m, x.order || 0), 0) + 1;
+    await save(l, { tab: to.id }); OPEN = null; toast('Moved to ' + label(to)); render();
+    Admin.api('POST', '/api/board/items/order', { ids: ITEMS.filter(x => x.tab === to.id && !x.done).sort((a, b) => (a.order || 0) - (b.order || 0)).map(x => x.id) }).catch(() => {});
+  };
+  const grip = li.querySelector('.grip'); if (grip) dragFrom(grip, li);
+}
+
+// ── drag ⠿ to reorder (mouse and finger alike)
+function dragFrom(grip, li) {
+  grip.addEventListener('pointerdown', e => {
+    e.preventDefault(); grip.setPointerCapture(e.pointerId);
+    const list = li.parentElement; li.classList.add('drag');
+    const move = ev => {
+      const sibs = [...list.querySelectorAll(':scope > li.ln')].filter(x => x !== li);
+      const after = sibs.find(x => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+      if (after) list.insertBefore(li, after); else list.appendChild(li);
+    };
+    const up = async () => {
+      grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up);
+      li.classList.remove('drag');
+      const ids = [...list.querySelectorAll(':scope > li.ln')].map(x => x.dataset.id);
+      ids.forEach((id, i) => { const x = ITEMS.find(y => y.id === id); if (x) x.order = i + 1; });
+      render();
+      try { await Admin.api('POST', '/api/board/items/order', { ids }); } catch (er) { toast('Order not saved: ' + er.message); await load(); }
+    };
+    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+  });
+}
+</script>
+</body>
+</html>

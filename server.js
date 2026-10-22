@@ -13,7 +13,8 @@ const crm = require('./crm');                  // /api/crm/* + /api/meta/webhook
 const partners = require('./partners');        // /api/partners/* (agreements a partner may read)
 const bonvin = require('./bonvin');            // /api/bonvin/* (Sin El Fil 2292/A5 dossier, admins) + /api/bonvin/public* (renter's share page)
 const procurement = require('./procurement');  // /api/procurement/* (the price book: supplier, item, price, description — admin only)
-const paper = require('./paper');              // /api/paper* (Mario's daily paper: priority list, highlighter, due dates, day copies — admin only)
+const paper = require('./paper');
+const board = require('./board');              // /api/board* (Mario's board of tabs + sub-tabs, each a list of lines — admin only)              // /api/paper* (Mario's daily paper: priority list, highlighter, due dates, day copies — admin only)
 const cprFuel = require('./cpr-fuel');        // /api/cpr/fuel (Kamal's diesel fills: photo + litres + $, private link key or admin)
 const energy = require('./energy');            // /api/cpr (CPR meters + Deye: kWh per building / source per day, history + live — PUBLIC, read-only)
 const waOutbox = require('./wa-outbox');
@@ -180,6 +181,7 @@ if (process.env.__BUNDLE_TRACE__) {
   fs.readFileSync(path.join(__dirname, 'usa.html'));
   fs.readFileSync(path.join(__dirname, 'procurement.html'));
   fs.readFileSync(path.join(__dirname, 'paper.html'));
+  fs.readFileSync(path.join(__dirname, 'board.html'));
   fs.readFileSync(path.join(__dirname, 'contacts.html'));
   fs.readFileSync(path.join(__dirname, 'cpr.html'));
   fs.readFileSync(path.join(__dirname, 'cpr-fuel.html'));
@@ -784,6 +786,7 @@ const handler = async (req, res) => {
     'bonvin.html': path.join(__dirname, 'bonvin.html'),
     'bonvin-shop.html': path.join(__dirname, 'bonvin-shop.html'),
     'paper.html': path.join(__dirname, 'paper.html'),
+    'board.html': path.join(__dirname, 'board.html'),
   };
   const PAGES = { '/todo': 'todo.html', '/admin': 'hub.html', '/members': 'hub.html', '/ask': 'hub.html',   // members & access, the decisions desk (admin views of the hub page)
     // /accounting is a chooser now; the Whish grid lives at /accounting/whish
@@ -798,6 +801,7 @@ const handler = async (req, res) => {
     '/naccache': 'naccache.html',   // public hand-out page for Maya (no login; papers under /public/naccache/)
     '/rent-law': 'rent-law.html',   // Mario's summary of the 2025 non-residential rent law + the two 2023 papers (public/rent-law/)
     '/mechanical': 'mechanical.html',
+    '/board': 'board.html',   // the board — tabs Mario can rename (projects in progress, Ajaltoun › site / design / sales / accounting, upselling, leads, accounting › Mahab / Ghassan Hibri, other to-do, development) (Mario 2026-10-22)
     '/paper': 'paper.html',   // the daily paper — Mario's priority list of ideas / projects running / to do, one living page + a copy per day (Mario 2026-10-20)
     '/cars': 'cars.html',   // the cars' insurance + driving licences, expiry and days left; reminders from tools CarsWatch (Mario 2026-10-18)
     '/energy': 'hub.html',   // the Energy folder on its own link (Mario 2026-10-20: a folder's pages live under its path)
@@ -1801,6 +1805,12 @@ const handler = async (req, res) => {
     if (!access.admin) return noApp('admin');
     try { const handled = await procurement.handle(req, res, url, user, { db, admin, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
     catch (e) { console.error('procurement error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+  if (url === '/api/board' || url.startsWith('/api/board/')) {
+    if (!access.admin) return noApp('admin');
+    try { const handled = await board.handle(req, res, url, user, { db, admin, TEAM_ID, access }); if (handled === false) { res.writeHead(404); res.end('not found'); } }
+    catch (e) { console.error('board error:', e); res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
     return;
   }
   if (url === '/api/paper' || url.startsWith('/api/paper/')) {
