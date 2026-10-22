@@ -257,7 +257,7 @@
   }
 
   $('views').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; view = b.dataset.v; open = {}; openDay = null; [...$('views').children].forEach(x => x.classList.toggle('on', x === b)); render(); });
-  $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; load(); });
+  $('years').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; year = b.dataset.y; open = {}; openDay = null; [...$('years').children].forEach(x => x.classList.toggle('on', x === b)); render(); });   // the data is already here — no new read
   $('tbl').addEventListener('click', e => { const tr = e.target.closest('tr.row'); if (!tr) return; if (tr.dataset.d) { openDay = openDay === tr.dataset.d ? null : tr.dataset.d; return render(); } open[tr.dataset.m] = !open[tr.dataset.m]; render(); });
   load().catch(e => { $('err').textContent = String(e.message || e); $('app').hidden = false; });
 

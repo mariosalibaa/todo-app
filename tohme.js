@@ -49,7 +49,11 @@ async function fill(ctx, max) {
   const todo = [];
   for (let d = addDays(HISTORY.last, 1); d <= yesterday; d = addDays(d, 1)) {
     const h = have[d];
-    if (!h || (d >= addDays(yesterday, -3) && (h.n < 280 || !h.batt || !h.batt.nightDone))) todo.push(d);
+    // a stored day is final once it was written after noon of the day after (Deye's late uploads are in, the night
+    // after has had its sunrise); before that it is read again, at most once an hour. (Was: n < 280 or no nightDone —
+    // a day the battery never filled has no nightDone, so every page load re-read the last 3 days: ~10 s a load.)
+    if (!h) todo.push(d);
+    else if (!(h.at >= addDays(d, 1) + 'T09:00:00Z') && !(Date.now() - Date.parse(h.at) < 3600e3)) todo.push(d);
   }
   const done = [];
   for (const d of todo.slice(0, max)) {
