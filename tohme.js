@@ -12,6 +12,8 @@ const D = require('./deye-calc');
 const deye = require('./deye');
 const HISTORY = require('./tohme-history.json');
 const B = require('./tohme-batt');   // the second-rack case: battery full at, solar thrown, what a 60 kWh rack would have replaced
+const MP = require('./tohme-mppt');   // the three panel series (PV1-3) in kWh/kWp — DeyeCloud keeps them ~90 days, so each day is kept here
+const MPPT_SEED = require('./tohme-mppt.json').days;
 
 const STATION = 61475496;
 const FIELDS = HISTORY.fields;   // ['pv', 'gen', 'genOut', 'gridIn', 'gridOut', 'use', 'charge', 'discharge', 'n']
@@ -62,6 +64,7 @@ async function fill(ctx, max) {
     const v = D.integrate(r);
     const next = await recs(ctx, addDays(d, 1));   // the night after: generator + grid until the next sunrise
     v.batt = B.analyze(r, next);
+    try { const m = await MP.day(await deye.token(ctx), d); if (m) v.mppt = m; } catch (e) { console.error('tohme mppt', d, e.message); }
     await col(ctx).doc(d).set({ day: d, ...v, at: new Date().toISOString() });
     have[d] = v; done.push(d);
     await sleep(1100);
@@ -71,12 +74,12 @@ async function fill(ctx, max) {
 
 async function days(ctx) {
   const out = { station: STATION, kwp: 40.71, fields: FIELDS, days: HISTORY.days.slice(), data: HISTORY.data.slice(), error: null, left: 0,
-    batt: { ...(HISTORY.batt || {}) }, rack: { kwh: B.RACK_KWH, usable: B.USABLE, extra: B.EXTRA_KWH, from: HISTORY.battFrom || null } };
+    batt: { ...(HISTORY.batt || {}) }, mppt: { ...MPPT_SEED }, series: { panels: MP.PANELS, panelW: MP.PANEL_W, kwp: MP.KWP }, rack: { kwh: B.RACK_KWH, usable: B.USABLE, extra: B.EXTRA_KWH, from: HISTORY.battFrom || null } };
   try {
     const f = await fill(ctx, 8);
     out.left = f.left;
     const today = beirutToday();
-    for (let d = addDays(HISTORY.last, 1); d < today; d = addDays(d, 1)) { const v = f.have[d]; out.days.push(d); out.data.push(v ? FIELDS.map(k => v[k]) : null); if (v && v.batt) out.batt[d] = v.batt; }
+    for (let d = addDays(HISTORY.last, 1); d < today; d = addDays(d, 1)) { const v = f.have[d]; out.days.push(d); out.data.push(v ? FIELDS.map(k => v[k]) : null); if (v && v.batt) out.batt[d] = v.batt; if (v && v.mppt) out.mppt[d] = v.mppt; }
     if (!(todayCache.day === today && Date.now() - todayCache.at < 10 * 60000)) { const r = await recs(ctx, today); todayCache = { at: Date.now(), day: today, v: D.integrate(r), batt: B.analyze(r, []) }; }
     out.days.push(today); out.data.push(FIELDS.map(k => todayCache.v[k])); out.batt[today] = todayCache.batt;
     out.today = today;

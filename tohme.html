@@ -76,7 +76,7 @@
     <h1>Villa Tohme — The House of Christmas — 40.7 kWp</h1>
     <p class="lead" id="lead">Energy per month from DeyeCloud (station 61475496), integrated from the 5-minute power readings, since Shift installed the plant in April 2025.</p>
     <div class="tabs" id="years"></div>
-    <div class="tabs views" id="views"><button data-v="energy" class="on">Energy</button><button data-v="batt">Second battery rack</button></div>
+    <div class="tabs views" id="views"><button data-v="energy" class="on">Energy</button><button data-v="batt">Second battery rack</button><button data-v="series">Panel series</button></div>
     <div class="kpis" id="kpis"></div>
     <div class="card"><table id="tbl"></table></div>
     <div class="err" id="err"></div>
@@ -90,6 +90,8 @@
   const fmt = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : Math.round(v).toLocaleString('en-US'));
   // solar − load; blank where there is no solar series (before 6 Aug 2025)
   const dif = (t, one) => !t.pv ? '' : (one ? fmt1 : fmt)(t.pv - t.useS).replace(/^(?!<)/, t.pv - t.useS < 0 ? '' : '+');
+  // extra kWp to cover the deficit = (load − solar) ÷ (kWh one installed kWp could give: (solar + thrown) ÷ 40.71)
+  const xkwp = t => { const d = t.useS - t.pv; return !t.pv || d <= 0 ? '' : (Math.round(d / (t.pot / (D.kwp || 40.71)) * 10) / 10).toLocaleString('en-US'); };
   const fmt1 = v => v == null ? '' : (Math.abs(v) < 0.05 ? '<span class="z">0</span>' : (Math.round(v * 10) / 10).toLocaleString('en-US'));
   const pc = (a, b) => b > 0 ? Math.round(a / b * 100) + ' %' : '';
   let D = null, year = null, open = {}, view = 'energy', openDay = null, dayCache = {};
@@ -101,9 +103,10 @@
 
   // one day → the sources: the grid port = EDL, the generator port = the generator, export = what went out on either port
   function split(day, v) {
-    return { pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, exp: (v.genOut || 0) + (v.gridOut || 0), gen: v.gen || 0, mix: 0, useS: v.pv == null ? 0 : (v.use || 0) };   // useS = load on days with a solar series (for solar − load)
+    return { pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, exp: (v.genOut || 0) + (v.gridOut || 0), gen: v.gen || 0, mix: 0, useS: v.pv == null ? 0 : (v.use || 0),
+      pot: v.pv == null ? 0 : (v.pv || 0) + ((D.batt[day] || {}).fullAt ? D.batt[day].thrown || 0 : 0) };   // pot = what the panels could give: solar + the part thrown while the battery was full   // useS = load on days with a solar series (for solar − load)
   }
-  const add = (a, b) => { for (const k of ['pv', 'use', 'useS', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
+  const add = (a, b) => { for (const k of ['pv', 'pot', 'use', 'useS', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
 
   async function load() {
     const r = await fetch('/api/tohme', { credentials: 'same-origin' });
@@ -120,6 +123,7 @@
 
   function render() {
     if (view === 'batt') return renderBatt();
+    if (view === 'series') return renderSeries();
     const months = {};
     const fi = D.fields.reduce((o, f, i) => (o[f] = i, o), {});
     D.days.forEach((d, i) => {
@@ -143,11 +147,11 @@
       `<div class="kpi"><span>Consumption</span><b>${fmt(T.use)} kWh</b><small>${T.days} days</small></div>` +
       `<div class="kpi solar"><span>Days on solar alone</span><b>${alone} days</b><small>of ${split1.length} — no EDL, no generator${best ? ` · best ${fmtDay(best.day)}: ${fmt(best.edl + best.gen)} kWh in` : ''}</small></div>`;
     const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>Solar</th><th>Port grid<small>EDL</small></th><th>Export<small>grid + gen port</small></th>` +
-      `<th>Port gen<small>generator</small></th><th class="hide-sm">EDL + gen<small>bought in</small></th><th>Load</th><th>Solar − load<small>deficit</small></th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
+      `<th>Port gen<small>generator</small></th><th class="hide-sm">EDL + gen<small>bought in</small></th><th>Load</th><th>Solar − load<small>deficit</small></th><th>Extra kWp<small>to cover it</small></th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
     const phx = t => `<span class="ph">${t.days} days · battery ${fmt(t.dis)} · solar ${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</span>`;
     const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}${phx(t)}</td><td class="hide-sm">${t.days}</td>` +
       `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="exp">${fmt(t.exp)}</td><td class="mix">${fmt(t.mix + t.gen)}</td><td class="hide-sm">${fmt(t.edl + t.gen + t.mix)}</td>` +
-      `<td>${fmt(t.use)}</td><td class="def">${dif(t)}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
+      `<td>${fmt(t.use)}</td><td class="def">${dif(t)}</td><td class="sol">${xkwp(t)}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
     let rows = '';
     for (const k of keys) {
       const m = months[k], [y, mo] = k.split('-');
@@ -156,13 +160,13 @@
       if (open[k]) for (const s of m.list.slice().reverse()) {
         const dd = +s.day.slice(8), t = { ...s, days: '' };
         rows += `<tr class="day${s.n < 250 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${s.n < 250 ? s.n + '/288 readings · ' : ''}solar ${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</span></td><td class="hide-sm">${s.n < 250 ? s.n + '/288' : ''}</td>` +
-          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td class="hide-sm">${fmt1(s.edl + s.gen + s.mix)}</td><td>${fmt1(s.use)}</td><td class="def">${dif(s, 1)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
+          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td class="hide-sm">${fmt1(s.edl + s.gen + s.mix)}</td><td>${fmt1(s.use)}</td><td class="def">${dif(s, 1)}</td><td class="sol">${xkwp(s)}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
       }
     }
     rows += line('tot', totLabel(D.days[0]), T);
     $('tbl').innerHTML = head + rows;
     $('note').innerHTML =
-      `<b>Solar − load</b> = solar minus consumption — negative is what the panels fell short of the house (the deficit EDL + the generator filled). <b>Days on solar alone</b> = days with under 1 kWh in from EDL and the generator together, counted from 6 Aug 2025 (before that no split). ` +
+      `<b>Solar − load</b> = solar minus consumption — negative is what the panels fell short of the house (the deficit EDL + the generator filled). <b>Extra kWp</b> = how many kWp more, producing like the 40.71 kWp on the roof did that day (solar + what was thrown while the battery was full), would have made the deficit — the energy only, it does not say when: most of the deficit is at night, so extra panels need battery to carry it there. <b>Days on solar alone</b> = days with under 1 kWh in from EDL and the generator together, counted from 6 Aug 2025 (before that no split). ` +
       `<b>Ports.</b> EDL comes into the inverter on its grid port (blue), the generator on its generator port (purple); Export is what went back out on either port. ` +
       `<b>Before 6 Aug 2025</b> DeyeCloud kept only the total production, no solar / generator split — those months show load, grid and battery only. Until Jan 2026 the logger sent about 258 readings a day instead of 288. ` +
       `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
@@ -218,6 +222,41 @@
       `<b>The case.</b> One 60 kWh rack (12 × 5 kWh) fills from the panels by early afternoon. From that moment the inverter throttles the panels down to the house load — on DeyeCloud's Power Profile the PV line drops onto Consumption while SOC sits at 100 % — and in the evening the generator and EDL carry the house. ` +
       `<b>Solar thrown</b> = what the sun allowed minus what the panels gave, over the daylight window the battery stayed full. "What the sun allowed" is a clear-sky curve for that date in Lebanon, scaled to what the panels were giving in the <b>90 minutes before</b> the battery filled — a cloudy day gives a lower curve. ` +
       `<b>A second rack</b> of 60 kWh at 90 % usable takes up to 54 kWh of that; <b>would replace</b> = the smaller of what it stores and what the generator + EDL gave that night (to the next sunrise). "Full at" counts only a battery filled by the panels in daylight; a battery that reaches 100 % in the evening from EDL or the generator threw no solar, so the line says so and counts nothing. <b>Would replace</b> is below <b>would store</b> on summer nights where the generator + EDL gave less than 54 kWh — the rack would have had more than the night needed. Starts 6 Aug 2025: before that DeyeCloud kept no solar series, so a full battery can't be told from the sun. Tap a month for its days, a day for its chart.`;
+  }
+
+  // ── the three panel series (inverter inputs PV1 / PV2 / PV3) in kWh per kWp ─────────────────────────────────────
+  // server tohme-mppt.js: per day e (kWh), eu (kWh while the battery < 97 % — panels running free), am / pm (eu before /
+  // after solar noon), im (highest A running free). Compared on eu ÷ kWp; a series under 90 % of the best is red.
+  function renderSeries() {
+    const S = D.series, K = S.kwp, Z = () => ({ days: 0, e: [0, 0, 0], eu: [0, 0, 0], am: [0, 0, 0], pm: [0, 0, 0], im: [0, 0, 0] });
+    const put = (t, m) => { t.days++; for (const k of ['e', 'eu', 'am', 'pm']) for (let i = 0; i < 3; i++) t[k][i] += m[k][i]; for (let i = 0; i < 3; i++) t.im[i] = Math.max(t.im[i], m.im[i]); };
+    const months = {}, T = Z();
+    D.days.forEach(d => { const m = D.mppt[d]; if (!m || !inYear(d)) return; const k = d.slice(0, 7); (months[k] = months[k] || { list: [], t: Z() }).list.push({ day: d, ...m }); put(months[k].t, m); put(T, m); });
+    const keys = Object.keys(months).sort().reverse();
+    const y = (t, i, k = 'eu') => t[k][i] / K[i];
+    const cells = (t, one) => { const r = [0, 1, 2].map(i => y(t, i)), best = Math.max(...r);
+      return r.map(v => `<td class="${best > 0 && v < best * 0.9 ? 'def' : 'exp'}">${best > 0 ? (Math.round(v * 100) / 100).toFixed(2) : ''}</td>`).join('') +
+        `<td>${best > 0 ? 'PV' + (r.indexOf(Math.min(...r)) + 1) + ' ' + Math.round((Math.min(...r) / best - 1) * 100) + ' %' : ''}</td>` +
+        [0, 1, 2].map(i => `<td class="hide-sm">${t.pm[i] + t.am[i] > 0 ? Math.round(t.pm[i] / (t.am[i] + t.pm[i]) * 100) + ' %' : ''}</td>`).join('') +
+        `<td class="hide-sm">${t.im.map(v => Math.round(v)).join(' · ')}</td>`; };
+    const r = [0, 1, 2].map(i => y(T, i)), best = Math.max(...r), wi = r.indexOf(Math.min(...r));
+    $('kpis').innerHTML = [0, 1, 2].map(i => `<div class="kpi ${best && r[i] < best * 0.9 ? 'gen' : 'rack'}"><span>PV${i + 1} · ${S.panels[i]} panels ≈ ${K[i].toFixed(1)} kWp</span><b>${(Math.round(r[i] * 100) / 100).toFixed(2)} kWh/kWp</b><small>${fmt(T.e[i])} kWh in ${T.days} days · ${fmt(T.eu[i])} running free</small></div>`).join('') +
+      `<div class="kpi"><span>Weakest</span><b>PV${wi + 1} ${best ? Math.round((r[wi] / best - 1) * 100) : 0} %</b><small>per kWp, against the best series</small></div>`;
+    const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>PV1<small>kWh/kWp</small></th><th>PV2<small>kWh/kWp</small></th><th>PV3<small>kWh/kWp</small></th><th>Weakest<small>vs best</small></th>` +
+      `<th class="hide-sm">PV1 pm<small>after noon</small></th><th class="hide-sm">PV2 pm<small>after noon</small></th><th class="hide-sm">PV3 pm<small>after noon</small></th><th class="hide-sm">Max A<small>PV1 · PV2 · PV3</small></th></tr>`;
+    let rows = '';
+    for (const k of keys) {
+      const m = months[k], [yy, mo] = k.split('-');
+      rows += `<tr class="row" data-m="${k}"><td>${MONTHS[+mo - 1]} ${yy}${D.today && D.today.startsWith(k) ? ' <small>to yesterday</small>' : ''}</td><td class="hide-sm">${m.t.days}</td>${cells(m.t)}</tr>`;
+      if (open[k]) for (const b of m.list.slice().reverse()) { const t = { days: 1, ...b }; rows += `<tr class="day"><td>${+b.day.slice(8)} ${MONTHS[+mo - 1]}<span class="ph">${fmt1(b.e[0] + b.e[1] + b.e[2])} kWh</span></td><td class="hide-sm"><small>${fmt1(b.e[0] + b.e[1] + b.e[2])} kWh</small></td>${cells(t, 1)}</tr>`; }
+    }
+    rows += `<tr class="tot"><td>${keys.length ? totLabel(keys[keys.length - 1] + '-01') : 'No days in this range'}</td><td class="hide-sm">${T.days}</td>${cells(T)}</tr>`;
+    $('tbl').innerHTML = head + rows;
+    $('note').innerHTML =
+      `<b>Panel series.</b> The inverter has three solar inputs (MPPT PV1, PV2, PV3), each with its own strings. kWh/kWp = what a series gave per installed kWp, counted only while the battery was below 97 % — once it is full the inverter throttles the panels, not evenly, and that says nothing about the panels. A series more than 10 % under the best is red. ` +
+      `<b>Pm</b> = share of the series' energy after solar noon: a series that drops in the afternoon while the others don't is shaded then (tree, wall, another row) or faces east. <b>Max A</b> = highest current running free — a string lost on a two-string input halves it, on sunny and cloudy days alike. ` +
+      `<b>kWp per series is estimated</b> (${S.panels.join(' / ')} panels × ${S.panelW} W): the drawings don't give the string layout, so it is taken from overcast days, when each series' share follows its size. Give the real count per input and the figures firm up. ` +
+      `DeyeCloud keeps the inverter's own series about 90 days — kept here from 24 Jul 2026 on (the oldest day it still had). Tap a month for its days.`;
   }
 
   async function chart(d) {
