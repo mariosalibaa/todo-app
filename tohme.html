@@ -15,7 +15,7 @@
   .wordmark{font-family:"Century Gothic",CenturyGothic,AppleGothic,system-ui,sans-serif;letter-spacing:.2em;font-size:1.05rem;}
   .wordmark span{color:var(--amber);} .wordmark small{display:block;letter-spacing:.3em;font-size:.55rem;color:var(--overlay0);margin-top:2px;}
   .hback{color:var(--amber);text-decoration:none;font-size:.85rem;font-weight:600;padding:6px 12px;border:1px solid var(--surface0);border-radius:8px;}
-  main{max-width:1100px;margin:0 auto;padding:20px 16px 60px;}
+  main{max-width:1240px;margin:0 auto;padding:20px 16px 60px;}
   h1{font-size:1.25rem;font-weight:600;margin:0 0 4px;} .lead{color:var(--sub);font-size:.82rem;margin:0 0 14px;line-height:1.5;}
   select,button,input{background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:7px;padding:6px 10px;font-size:.8rem;font-family:inherit;}
   button{cursor:pointer;} button:hover{border-color:var(--amber);}
@@ -50,10 +50,13 @@
   canvas.pp{width:100%;height:320px;display:block;} .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:.7rem;color:var(--sub);margin:6px 0 2px;} .legend i{display:inline-block;width:10px;height:3px;vertical-align:middle;margin-right:4px;}
   .chartNote{font-size:.74rem;color:var(--sub);line-height:1.5;margin-top:6px;}
   .sim{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;background:var(--mantle);border:1px solid var(--surface0);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:.78rem;color:var(--sub);}
-  .sim [hidden]{display:none !important;} .sim b{color:var(--text);font-weight:600;} .sim label{display:flex;align-items:center;gap:4px;white-space:nowrap;}
+  .sim[hidden],.sim [hidden]{display:none !important;} .scen{margin-bottom:14px;} .scen td:first-child{font-weight:600;} .scen tr.on td{background:rgba(242,169,59,.10);} .kgrp{font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--overlay0);margin:2px 0 6px;} .sim b{color:var(--text);font-weight:600;} .sim label{display:flex;align-items:center;gap:4px;white-space:nowrap;}
   .sim input{width:70px;padding:4px 6px;text-align:right;} .sim select{padding:4px 6px;}
   .kpi.thrown b{color:var(--amber);} .kpi.rack b{color:var(--green);}
   @media (max-width:640px){ canvas.pp{height:240px;} }
+  /* a laptop window: export, EDL + gen and battery out step aside (export is in the boxes, EDL + gen = grid + gen) so the table fits without a sideways scroll */
+  @media (max-width:1700px){ .hide-md{display:none;} th,td{padding-left:6px;padding-right:6px;} }
+  @media (max-width:1100px){ .hide-lg{display:none;} th,td{padding-left:4px;padding-right:4px;} table{font-size:.76rem;} }
   /* the phone: the table fits the width — days, battery and solar share move under the month name */
   @media (max-width:640px){
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
@@ -90,6 +93,7 @@
       <label>a kWh of EDL / generator = <input id="sK" type="number" min="0" step="0.01"> $</label>
     </div>
     <div class="kpis" id="kpis"></div>
+    <div class="card scen" id="scen" hidden></div>
     <div class="card"><table id="tbl"></table></div>
     <div class="err" id="err"></div>
     <div class="note" id="note"></div>
@@ -111,6 +115,11 @@
   const inYear = d => year === 'all' ? true : year === 'last12' ? d >= yearAgo() : d.slice(0, 4) === year;
   const totLabel = from => year === 'all' ? `Total ${fmtDay(from)} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : year === 'last12' ? `Total ${fmtDay(yearAgo())} → ${fmtDay(D.today || D.days[D.days.length - 1])}` : 'Total ' + year;
 
+  // one day of the add-panels model: n panels × w W, rack 0/1 → nk produced, uk replacing EDL / generator (see split)
+  function simDay(m, n, w, rack) {
+    const nk = n * w / 1000 * m.y;
+    return { nk, uk: rack ? Math.min(nk + m.thr, m.dft, m.room + 54) : Math.min(nk, m.dft, m.room) };
+  }
   // one day → the sources: the grid port = EDL, the generator port = the generator, export = what went out on either port
   function split(day, v) {
     // what the added panels would have done that day (only days with a solar series and the battery analysis):
@@ -122,18 +131,16 @@
     //         With a second rack: + 54 kWh room, and the thrown solar becomes usable too (rk = the rack alone).
     //   Daytime load carried by EDL / the generator while the battery was charging isn't counted — uk is low-side.
     const b = D.batt[day], pvOk = v.pv != null && !!b;
-    let nk = 0, uk = 0, rk = 0, dft = 0;
-    if (pvOk) {
-      const thr = b.fullAt ? b.thrown || 0 : 0, room = b.fullAt ? 0 : Math.max(0, 100 - (b.socMax || 0)) / 100 * 60;
-      nk = SIM.n * SIM.w / 1000 * ((v.pv || 0) + thr) / (D.kwp || 40.71);
-      dft = Math.max(0, (v.use || 0) - (v.pv || 0));
-      uk = SIM.b ? Math.min(nk + thr, dft, room + 54) : Math.min(nk, dft, room);
-      rk = SIM.b ? Math.min(thr, dft, room + 54) : 0;
-    }
-    return { nk, uk, rk, dft, pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, exp: (v.genOut || 0) + (v.gridOut || 0), gen: v.gen || 0, mix: 0, useS: v.pv == null ? 0 : (v.use || 0),
+    const sm = pvOk ? { thr: b.fullAt ? b.thrown || 0 : 0, room: b.fullAt ? 0 : Math.max(0, 100 - (b.socMax || 0)) / 100 * 60,
+      y: ((v.pv || 0) + (b.fullAt ? b.thrown || 0 : 0)) / (D.kwp || 40.71), dft: Math.max(0, (v.use || 0) - (v.pv || 0)) } : null;
+    const r0 = sm ? simDay(sm, SIM.n, SIM.w, SIM.b) : null, nk = r0 ? r0.nk : 0, uk = r0 ? r0.uk : 0, dft = sm ? sm.dft : 0, rk = sm && SIM.b ? simDay(sm, 0, 0, 1).uk : 0;
+    const bb = b && day >= (D.rack.from || '0') ? b : null;
+    const bat = bb ? { bD: 1, bF: bb.fullAt ? 1 : 0, bM: bb.fullAt ? hm(bb.fullAt) : 0, bT: bb.fullAt ? bb.thrown || 0 : 0, bS: bb.fullAt ? bb.store || 0 : 0,
+      bN: bb.night != null ? bb.night : 0, bNd: bb.night != null ? 1 : 0, bR: bb.replaced || 0 } : {};
+    return { ...bat, sm, nk, uk, rk, dft, pv: v.pv || 0, use: v.use || 0, dis: v.discharge || 0, n: v.n || 0, edl: v.gridIn || 0, exp: (v.genOut || 0) + (v.gridOut || 0), gen: v.gen || 0, mix: 0, useS: v.pv == null ? 0 : (v.use || 0),
       pot: v.pv == null ? 0 : (v.pv || 0) + ((D.batt[day] || {}).fullAt ? D.batt[day].thrown || 0 : 0) };   // useS = load on days with a solar series (for solar − load); pot = solar + the part thrown while the battery was full
   }
-  const add = (a, b) => { for (const k of ['nk', 'uk', 'rk', 'dft', 'pv', 'pot', 'use', 'useS', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
+  const add = (a, b) => { for (const k of ['bD', 'bF', 'bM', 'bT', 'bS', 'bN', 'bNd', 'bR', 'nk', 'uk', 'rk', 'dft', 'pv', 'pot', 'use', 'useS', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
 
   // the add-panels simulation — Mario sets the panels, W, prices; kept in this browser
   const SIM = { n: 20, w: 590, c: 0.30, b: 0, r: 10000, k: 0.30 };
@@ -155,7 +162,7 @@
   }
 
   function render() {
-    $('sim').hidden = view !== 'energy'; $('sRl').hidden = !SIM.b;
+    $('sim').hidden = $('scen').hidden = view !== 'energy'; $('sRl').hidden = !SIM.b;
     if (view === 'batt') return renderBatt();
     if (view === 'series') return renderSeries();
     const months = {};
@@ -173,7 +180,7 @@
     const split1 = keys.flatMap(k => months[k].list).filter(s => s.day >= '2025-08-06');
     const alone = split1.filter(s => s.edl + s.gen < 1).length;
     const best = split1.reduce((b, s) => !b || s.edl + s.gen < b.edl + b.gen ? s : b, null);
-    $('kpis').innerHTML =
+    $('kpis').innerHTML = '<div class="kgrp" style="grid-column:1/-1">Energy</div>' +
       `<div class="kpi solar"><span>Solar</span><b>${fmt(T.pv)} kWh</b><small>${pc(T.pv, supply)} of supply</small></div>` +
       `<div class="kpi edl"><span>Port grid</span><b>${fmt(T.edl)} kWh</b><small>EDL — ${pc(T.edl, supply)} of supply</small></div>` +
       `<div class="kpi gen"><span>Port gen</span><b>${fmt(T.gen)} kWh</b><small>generator — ${pc(T.gen, supply)} of supply</small></div>` +
@@ -184,18 +191,45 @@
     const kwpAdd = SIM.n * SIM.w / 1000, cost = kwpAdd * 1000 * SIM.c + (SIM.b ? SIM.r : 0);
     const simDays = split1.filter(s => D.batt[s.day]).length, perYear = simDays ? 365 / simDays : 0;
     const save = T.uk * SIM.k, saveY = save * perYear, pay = saveY > 0 ? cost / saveY : null;
-    $('kpis').innerHTML +=
+    $('kpis').innerHTML += '<div class="kgrp" style="grid-column:1/-1">Battery — what one 60 kWh rack leaves on the table</div>' +
+      `<div class="kpi"><span>Battery full</span><b>${T.bF || 0} days</b><small>of ${T.bD || 0} · on average at ${T.bF ? mh(T.bM / T.bF) : '—'}</small></div>` +
+      `<div class="kpi thrown"><span>Solar thrown</span><b>${fmt(T.bT)} kWh</b><small>panels throttled while the battery was full</small></div>` +
+      `<div class="kpi rack"><span>A second rack would store</span><b>${fmt(T.bS)} kWh</b><small>54 kWh a day at most (60 kWh, 90 % usable)</small></div>` +
+      `<div class="kpi mix"><span>Night generator + EDL</span><b>${fmt(T.bN)} kWh</b><small>${T.bNd || 0} nights after a full battery</small></div>` +
+      `<div class="kpi rack"><span>It would have replaced</span><b>${fmt(T.bR)} kWh</b><small>${pc(T.bR, T.bN)} of those nights</small></div>` +
+      '<div class="kgrp" style="grid-column:1/-1">Add panels / a rack — from the settings above</div>' +
       `<div class="kpi solar"><span>+ ${fmt1(kwpAdd)} kWp would produce</span><b>${fmt(T.nk)} kWh</b><small>${SIM.n} × ${SIM.w} W over ${simDays} days, per kWp like the panels on the roof</small></div>` +
       `<div class="kpi rack"><span>Would replace EDL + gen</span><b>${fmt(T.uk)} kWh</b><small>${pc(T.uk, T.dft)} of the ${fmt(T.dft)} kWh deficit${SIM.b ? ` · the rack alone ${fmt(T.rk)}` : ' · battery as now'}</small></div>` +
       `<div class="kpi"><span>Cost</span><b>$${fmt(cost)}</b><small>panels $${fmt(kwpAdd * 1000 * SIM.c)}${SIM.b ? ` + rack $${fmt(SIM.r)}` : ''}</small></div>` +
       `<div class="kpi exp"><span>Saves</span><b>$${fmt(saveY)} / year</b><small>$${fmt(save)} in these ${simDays} days at $${SIM.k} a kWh</small></div>` +
       `<div class="kpi ${pay && pay < 6 ? 'exp' : 'gen'}"><span>Pays back in</span><b>${pay ? (Math.round(pay * 10) / 10) + ' years' : 'never'}</b><small>cost ÷ yearly saving</small></div>`;
-    const head = `<tr><th>Month</th><th class="hide-sm">Days</th><th>Solar</th><th>Port grid<small>EDL</small></th><th>Export<small>grid + gen port</small></th>` +
-      `<th>Port gen<small>generator</small></th><th class="hide-sm">EDL + gen<small>bought in</small></th><th>Load</th><th>Solar − load<small>deficit</small></th><th>New panels<small>kWh</small></th><th>Replaces<small>EDL + gen kWh</small></th><th class="hide-sm">Battery out</th><th class="hide-sm">Solar share</th></tr>`;
+    // the two parts apart (Mario 2026-10-22): the rack alone (no new panels) and what the panels add on top of it
+    // (on top of the battery as now when no rack is chosen) — each with its own cost and payback
+    const yrs = (c, s) => s > 0 ? (Math.round(c / s * 10) / 10) + ' years' : 'never';
+    const pK = T.uk - T.rk, pY = pK * SIM.k * perYear, pCost = kwpAdd * 1000 * SIM.c, rY = T.rk * SIM.k * perYear;
+    $('kpis').innerHTML +=
+      `<div class="kpi solar"><span>Panels ${SIM.b ? 'on top of the rack' : 'alone'}</span><b>$${fmt(pY)} / year</b><small>${fmt(pK * perYear)} kWh a year · $${fmt(SIM.n ? pY / SIM.n : 0)} a year per panel (cost $${fmt(SIM.w * SIM.c)}) · pays back in ${yrs(pCost, pY)}</small></div>` +
+      (SIM.b ? `<div class="kpi rack"><span>Second rack alone</span><b>$${fmt(rY)} / year</b><small>${fmt(T.rk * perYear)} kWh a year from the solar thrown now · cost $${fmt(SIM.r)} · pays back in ${yrs(SIM.r, rY)}</small></div>` : '');
+    // the five options side by side (Mario 2026-10-22), at the W / prices set above, over the days of this range
+    const simList = keys.flatMap(k => months[k].list).filter(x => x.sm);
+    const SC = [['Second rack alone', 0, 1], ['10 panels alone', 10, 0], ['20 panels alone', 20, 0], ['10 panels + rack', 10, 1], ['20 panels + rack', 20, 1]];
+    if (SIM.n && ![10, 20].includes(SIM.n)) SC.push([`${SIM.n} panels${SIM.b ? ' + rack' : ' alone'} (set above)`, SIM.n, SIM.b]);
+    const dSum = simList.reduce((a, x) => a + x.sm.dft, 0);
+    $('scen').innerHTML = `<table><tr><th>Option<small>${SIM.w} W panels · $${SIM.c}/W · rack $${fmt(SIM.r)} · $${SIM.k} a kWh</small></th><th>New solar<small>kWh a year</small></th><th>Replaces<small>EDL + gen kWh a year</small></th><th class="hide-sm">Of the deficit</th><th>Cost</th><th>Saves<small>a year</small></th><th>Pays back</th></tr>` +
+      SC.map(([label, n, rack]) => {
+        const r = simList.reduce((a, x) => { const o = simDay(x.sm, n, SIM.w, rack); a.nk += o.nk; a.uk += o.uk; return a; }, { nk: 0, uk: 0 });
+        const c = n * SIM.w * SIM.c + (rack ? SIM.r : 0), sy = r.uk * perYear * SIM.k, on = n === SIM.n && rack === SIM.b;
+        return `<tr class="${on ? 'on' : ''}"><td>${label}</td><td class="sol">${n ? fmt(r.nk * perYear) : '—'}</td><td class="exp">${fmt(r.uk * perYear)}</td><td class="hide-sm">${pc(r.uk, dSum)}</td><td>$${fmt(c)}</td><td class="exp">$${fmt(sy)}</td><td class="${sy > 0 && c / sy < 6 ? 'exp' : 'def'}">${yrs(c, sy)}</td></tr>`;
+      }).join('') + '</table>';
+    const head = `<tr><th>Month</th><th class="hide-sm hide-lg">Days</th><th>Solar</th><th>Port grid<small>EDL</small></th><th class="hide-md">Export<small>grid + gen port</small></th>` +
+      `<th>Port gen<small>generator</small></th><th class="hide-sm hide-md">EDL + gen<small>bought in</small></th><th>Load</th><th>Solar − load<small>deficit</small></th><th>New panels<small>kWh</small></th><th>Replaces<small>EDL + gen kWh</small></th><th class="hide-sm hide-md">Battery out</th><th class="hide-sm hide-lg">Solar share</th><th class="hide-sm">Days full<small>battery</small></th><th class="hide-sm hide-md">Full at<small>average</small></th><th class="hide-sm">Solar thrown<small>kWh</small></th><th class="hide-sm hide-md">Rack would store<small>kWh</small></th><th class="hide-sm hide-md">Night gen + EDL<small>kWh</small></th><th class="hide-sm">Rack replaces<small>kWh</small></th></tr>`;
+    const bcells = (t, one) => !t.bD ? '<td class="hide-sm"></td><td class="hide-sm hide-md"></td><td class="hide-sm"></td><td class="hide-sm hide-md"></td><td class="hide-sm hide-md"></td><td class="hide-sm"></td>' :
+      `<td class="hide-sm">${one ? (t.bF ? '✓' : '') : t.bF + ' / ' + t.bD}</td><td class="hide-sm hide-md">${t.bF ? mh(t.bM / t.bF) : '—'}</td><td class="sol hide-sm">${(one ? fmt1 : fmt)(t.bT)}</td>` +
+      `<td class="exp hide-sm hide-md">${(one ? fmt1 : fmt)(t.bS)}</td><td class="mix hide-sm hide-md">${t.bNd ? (one ? fmt1 : fmt)(t.bN) : ''}</td><td class="exp hide-sm">${(one ? fmt1 : fmt)(t.bR)}</td>`;
     const phx = t => `<span class="ph">${t.days} days · battery ${fmt(t.dis)} · solar ${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</span>`;
-    const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}${phx(t)}</td><td class="hide-sm">${t.days}</td>` +
-      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="exp">${fmt(t.exp)}</td><td class="mix">${fmt(t.mix + t.gen)}</td><td class="hide-sm">${fmt(t.edl + t.gen + t.mix)}</td>` +
-      `<td>${fmt(t.use)}</td><td class="def">${dif(t)}</td><td class="sol">${t.nk ? fmt(t.nk) : ''}</td><td class="exp">${t.nk ? fmt(t.uk) : ''}</td><td class="hide-sm">${fmt(t.dis)}</td><td class="hide-sm">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td></tr>`;
+    const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}${phx(t)}</td><td class="hide-sm hide-lg">${t.days}</td>` +
+      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="exp hide-md">${fmt(t.exp)}</td><td class="mix">${fmt(t.mix + t.gen)}</td><td class="hide-sm hide-md">${fmt(t.edl + t.gen + t.mix)}</td>` +
+      `<td>${fmt(t.use)}</td><td class="def">${dif(t)}</td><td class="sol">${t.nk ? fmt(t.nk) : ''}</td><td class="exp">${t.nk ? fmt(t.uk) : ''}</td><td class="hide-sm hide-md">${fmt(t.dis)}</td><td class="hide-sm hide-lg">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td>${bcells(t)}</tr>`;
     let rows = '';
     for (const k of keys) {
       const m = months[k], [y, mo] = k.split('-');
@@ -203,14 +237,14 @@
       rows += line('row', `${MONTHS[+mo - 1]} ${y}${live ? ' <small>to today</small>' : ''}`, m.t, `data-m="${k}"`);
       if (open[k]) for (const s of m.list.slice().reverse()) {
         const dd = +s.day.slice(8), t = { ...s, days: '' };
-        rows += `<tr class="day${s.n < 250 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${s.n < 250 ? s.n + '/288 readings · ' : ''}solar ${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</span></td><td class="hide-sm">${s.n < 250 ? s.n + '/288' : ''}</td>` +
-          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td class="hide-sm">${fmt1(s.edl + s.gen + s.mix)}</td><td>${fmt1(s.use)}</td><td class="def">${dif(s, 1)}</td><td class="sol">${s.nk ? fmt1(s.nk) : ''}</td><td class="exp">${s.nk ? fmt1(s.uk) : ''}</td><td class="hide-sm">${fmt1(s.dis)}</td><td class="hide-sm">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td></tr>`;
+        rows += `<tr class="day${s.n < 250 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${s.n < 250 ? s.n + '/288 readings · ' : ''}solar ${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</span></td><td class="hide-sm hide-lg">${s.n < 250 ? s.n + '/288' : ''}</td>` +
+          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp hide-md">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td class="hide-sm hide-md">${fmt1(s.edl + s.gen + s.mix)}</td><td>${fmt1(s.use)}</td><td class="def">${dif(s, 1)}</td><td class="sol">${s.nk ? fmt1(s.nk) : ''}</td><td class="exp">${s.nk ? fmt1(s.uk) : ''}</td><td class="hide-sm hide-md">${fmt1(s.dis)}</td><td class="hide-sm hide-lg">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td>${bcells(s, 1)}</tr>`;
       }
     }
     rows += line('tot', totLabel(D.days[0]), T);
     $('tbl').innerHTML = head + rows;
     $('note').innerHTML =
-      `<b>Solar − load</b> = solar minus consumption — negative is what the panels fell short of the house (the deficit EDL + the generator filled). <b>Add panels.</b> <b>New panels</b> = what the added panels would have produced each day, per kWp like the 40.71 kWp on the roof (solar + what was thrown while the battery was full). <b>Replaces</b> = the part that would have taken over from EDL + the generator: never more than the deficit, and never more than the battery can still take — with the battery as now, a day it already filled from the sun gains nothing (the inverter is already throwing solar away), a day it didn't fill gains at most what was missing. With a second rack, 54 kWh more room and that day's thrown solar counts too. Daytime load EDL / the generator carried while the battery charged isn't counted, so Replaces is on the low side. Saves per year = Replaces scaled to 365 days. <b>Days on solar alone</b> = days with under 1 kWh in from EDL and the generator together, counted from 6 Aug 2025 (before that no split). ` +
+      `<b>Solar − load</b> = solar minus consumption — negative is what the panels fell short of the house (the deficit EDL + the generator filled). <b>Battery columns</b> = the Second battery rack tab, month by month (from 6 Aug 2025) — that tab has the method and each day's chart. <b>Add panels.</b> <b>New panels</b> = what the added panels would have produced each day, per kWp like the 40.71 kWp on the roof (solar + what was thrown while the battery was full). <b>Replaces</b> = the part that would have taken over from EDL + the generator: never more than the deficit, and never more than the battery can still take — with the battery as now, a day it already filled from the sun gains nothing (the inverter is already throwing solar away), a day it didn't fill gains at most what was missing. With a second rack, 54 kWh more room and that day's thrown solar counts too. Daytime load EDL / the generator carried while the battery charged isn't counted, so Replaces is on the low side. Saves per year = Replaces scaled to 365 days. <b>Days on solar alone</b> = days with under 1 kWh in from EDL and the generator together, counted from 6 Aug 2025 (before that no split). ` +
       `<b>Ports.</b> EDL comes into the inverter on its grid port (blue), the generator on its generator port (purple); Export is what went back out on either port. ` +
       `<b>Before 6 Aug 2025</b> DeyeCloud kept only the total production, no solar / generator split — those months show load, grid and battery only. Until Jan 2026 the logger sent about 258 readings a day instead of 288. ` +
       `<b>Method.</b> kWh = sum of the 5-minute readings × 5 min (288 a day). A day with missing readings (red dot, tap a month to see the days) is under-counted, never averaged up. ` +
