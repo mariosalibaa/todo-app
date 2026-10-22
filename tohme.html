@@ -212,8 +212,8 @@
       (SIM.b ? `<div class="kpi rack"><span>Second rack alone</span><b>$${fmt(rY)} / year</b><small>${fmt(T.rk * perYear)} kWh a year from the solar thrown now · cost $${fmt(SIM.r)} · pays back in ${yrs(SIM.r, rY)}</small></div>` : '');
     // the five options side by side (Mario 2026-10-22), at the W / prices set above, over the days of this range
     const simList = keys.flatMap(k => months[k].list).filter(x => x.sm);
-    const SC = [['Second rack alone', 0, 1], ['10 panels alone', 10, 0], ['20 panels alone', 20, 0], ['10 panels + rack', 10, 1], ['20 panels + rack', 20, 1]];
-    if (SIM.n && ![10, 20].includes(SIM.n)) SC.push([`${SIM.n} panels${SIM.b ? ' + rack' : ' alone'} (set above)`, SIM.n, SIM.b]);
+    const SC = [['Second rack alone', 0, 1], ['10 panels alone', 10, 0], ['20 panels alone', 20, 0], ['10 panels + rack', 10, 1], ['20 panels + rack', 20, 1], ['30 panels + rack', 30, 1], ['40 panels + rack', 40, 1]];
+    if (SIM.n && !(SIM.b ? [10, 20, 30, 40] : [10, 20]).includes(SIM.n)) SC.push([`${SIM.n} panels${SIM.b ? ' + rack' : ' alone'} (set above)`, SIM.n, SIM.b]);
     const dSum = simList.reduce((a, x) => a + x.sm.dft, 0);
     $('scen').innerHTML = `<table><tr><th>Option<small>${SIM.w} W panels · $${SIM.c}/W · rack $${fmt(SIM.r)} · $${SIM.k} a kWh</small></th><th>New solar<small>kWh a year</small></th><th>Replaces<small>EDL + gen kWh a year</small></th><th class="hide-sm">Of the deficit</th><th>Cost</th><th>Saves<small>a year</small></th><th>Pays back</th></tr>` +
       SC.map(([label, n, rack]) => {
