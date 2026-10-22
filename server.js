@@ -729,6 +729,10 @@ const handler = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  // a page link with a trailing slash (/energy/plants/) → the same page without it (Mario 2026-10-22: "returned nothing" — it was a 404)
+  if (req.method === 'GET' && url.length > 1 && url.endsWith('/') && !url.startsWith('/api/')) {
+    res.writeHead(301, { Location: url.replace(/\/+$/, '') + (req.url.includes('?') ? '?' + req.url.split('?').slice(1).join('?') : '') }); res.end(); return;
+  }
 
   // ── Pages ──
   // hub.shift-group.co is THE link (hub at /, apps under /todo, /accounting);
