@@ -17,14 +17,15 @@
 
 const P = require('./plants');
 
+// from = the first day read: the inverters' day series are kept ~90 days by DeyeCloud (2026-10-22: back to 24 Jul 2026, Mario: "what is the benefit of Oct 2026 alone")
 const PLANTS = {
   bookstop: {
-    name: 'Bookstop Kaslique', src: 'solarman', id: 2596285, kwp: 44.85, from: '2026-10-01', port: 'grid',
+    name: 'Bookstop Kaslique', src: 'solarman', id: 2596285, kwp: 44.85, from: '2026-07-24', port: 'grid',
     lead: '3 × 12 kW Deye in parallel · EDL and two generators on one input through the ATS',
     classes: { e: 'EDL', g: 'Generator (big or small)', r: 'Small generator — refused' },
   },
   mckinsey: {
-    name: 'McKinsey Electronics', src: 'deye', id: 61438093, kwp: 120, from: '2026-10-01', port: 'gen',
+    name: 'McKinsey Electronics', src: 'deye', id: 61438093, kwp: 120, from: '2026-07-24', port: 'gen',
     lead: '2 × 50 kW Deye (M1 + S2) · no EDL · the generator on the generator input',
     classes: { g: 'Generator (30 kVA)' },
     history: 'Generators on site: 30 kVA (moved to the Bekaa) → 150 kVA (bought, then sold) → 30 kVA (another one, on site now). A new 150 kVA is bought, not yet installed.',
