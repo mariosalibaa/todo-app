@@ -62,6 +62,7 @@
     header{padding:12px 16px;} main{padding:14px 12px 40px;}
     h1{font-size:1.05rem;} .lead{font-size:.76rem;}
     .kpis{grid-template-columns:1fr 1fr;gap:8px;} .kpi{padding:10px 12px;} .kpi b{font-size:1.1rem;} .kpi small{font-size:.64rem;}
+    #app:not(.cur) .pz{display:none;}   /* Upgrade view: the two upgrade columns take the place of the port columns (Solar − load = what EDL + gen carried) so the table fits */
     .hide-sm{display:none;} .ph{display:block;color:var(--overlay0);font-size:.6rem;margin-top:1px;}
     table{font-size:.74rem;} th{padding:7px 4px;font-size:.54rem;} td{padding:7px 4px;}
     td:first-child,th:first-child{padding-left:10px;} td:last-child,th:last-child{padding-right:10px;}
@@ -205,10 +206,10 @@
       `<div class="kpi rack up"><span>Would replace EDL + gen</span><b>${fmt(T.uk)} kWh</b><small>${pc(T.uk, T.dft)} of the ${fmt(T.dft)} kWh deficit${SIM.b ? ` · the rack alone ${fmt(T.rk)}` : ' · battery as now'}</small></div>` +
       `<div class="kpi up"><span>Cost</span><b>$${fmt(cost)}</b><small>panels $${fmt(kwpAdd * 1000 * SIM.c)}${SIM.b ? ` + rack $${fmt(SIM.r)}` : ''}</small></div>` +
       `<div class="kpi exp up"><span>Saves</span><b>$${fmt(saveY)} / year</b><small>$${fmt(save)} in these ${simDays} days at $${SIM.k} a kWh</small></div>` +
-      `<div class="kpi ${pay && pay < 6 ? 'exp' : 'gen'} up"><span>Pays back in</span><b>${pay ? (Math.round(pay * 10) / 10) + ' years' : 'never'}</b><small>cost ÷ yearly saving</small></div>`;
+      `<div class="kpi ${pay && pay < 6 ? 'exp' : 'gen'} up"><span>Pays back in</span><b>${pay ? (Math.round(pay * 10) / 10) + ' y' : 'never'}</b><small>cost ÷ yearly saving</small></div>`;
     // the two parts apart (Mario 2026-10-22): the rack alone (no new panels) and what the panels add on top of it
     // (on top of the battery as now when no rack is chosen) — each with its own cost and payback
-    const yrs = (c, s) => s > 0 ? (Math.round(c / s * 10) / 10) + ' years' : 'never';
+    const yrs = (c, s) => s > 0 ? (Math.round(c / s * 10) / 10) + ' y' : 'never';
     const pK = T.uk - T.rk, pY = pK * SIM.k * perYear, pCost = kwpAdd * 1000 * SIM.c, rY = T.rk * SIM.k * perYear;
     $('kpis').innerHTML +=
       `<div class="kpi solar up"><span>Panels ${SIM.b ? 'on top of the rack' : 'alone'}</span><b>$${fmt(pY)} / year</b><small>${fmt(pK * perYear)} kWh a year · $${fmt(SIM.n ? pY / SIM.n : 0)} a year per panel (cost $${fmt(SIM.w * SIM.c)}) · pays back in ${yrs(pCost, pY)}</small></div>` +
@@ -223,23 +224,23 @@
     const ukOf = (n, rack) => simList.reduce((a, x) => a + simDay(x.sm, n, SIM.w, rack).uk, 0);
     const rackSy = ukOf(0, 1) * perYear * SIM.k;
     const pbCell = (c, s) => `<td class="${s > 0 && c / s < 6 ? 'exp' : 'def'}">${yrs(c, s)}</td>`;
-    $('scen').innerHTML = `<table><tr><th>Option<small>${SIM.w} W panels · $${SIM.c}/W · rack $${fmt(SIM.r)} · $${SIM.k} a kWh</small></th><th>New solar<small>kWh a year</small></th><th>Replaces<small>EDL + gen kWh a year</small></th><th class="hide-sm">Of the deficit</th><th>Cost</th><th>Saves<small>a year</small></th><th>Pays back</th><th>Pays back<small>rack only</small></th><th>Pays back<small>panels alone</small></th></tr>` +
+    $('scen').innerHTML = `<table><tr><th>Option<small>${SIM.w} W panels · $${SIM.c}/W · rack $${fmt(SIM.r)} · $${SIM.k} a kWh</small></th><th class="hide-sm">New solar<small>kWh a year</small></th><th class="hide-sm">Replaces<small>EDL + gen kWh a year</small></th><th class="hide-sm">Of the deficit</th><th>Cost</th><th>Saves<small>a year</small></th><th>Pays back</th><th>Rack only<small>pays back</small></th><th>Panels alone<small>pays back</small></th></tr>` +
       SC.map(([label, n, rack]) => {
         const r = simList.reduce((a, x) => { const o = simDay(x.sm, n, SIM.w, rack); a.nk += o.nk; a.uk += o.uk; return a; }, { nk: 0, uk: 0 });
         const c = n * SIM.w * SIM.c + (rack ? SIM.r : 0), sy = r.uk * perYear * SIM.k, on = n === SIM.n && rack === SIM.b;
         const pSy = sy - (rack ? rackSy : 0), pC = n * SIM.w * SIM.c;
-        return `<tr class="${on ? 'on' : ''}"><td>${label}</td><td class="sol">${n ? fmt(r.nk * perYear) : '—'}</td><td class="exp">${fmt(r.uk * perYear)}</td><td class="hide-sm">${pc(r.uk, dSum)}</td><td>$${fmt(c)}</td><td class="exp">$${fmt(sy)}</td>${pbCell(c, sy)}` +
+        return `<tr class="${on ? 'on' : ''}"><td>${label}</td><td class="sol hide-sm">${n ? fmt(r.nk * perYear) : '—'}</td><td class="exp hide-sm">${fmt(r.uk * perYear)}</td><td class="hide-sm">${pc(r.uk, dSum)}</td><td>$${fmt(c)}</td><td class="exp">$${fmt(sy)}</td>${pbCell(c, sy)}` +
           (rack ? pbCell(SIM.r, rackSy) : '<td>—</td>') + (n ? pbCell(pC, pSy) : '<td>—</td>') + '</tr>';
       }).join('') + '</table>';
     if (window.GraphHover) GraphHover.attachAll();
-    const head = `<tr><th>Month</th><th class="hide-sm hide-lg">Days</th><th>Solar</th><th>Port grid<small>EDL</small></th><th class="hide-md">Export<small>grid + gen port</small></th>` +
-      `<th>Port gen<small>generator</small></th><th class="hide-sm hide-md">EDL + gen<small>bought in</small></th><th>Load</th><th>Solar − load<small>deficit</small></th><th class="up">New panels<small>kWh</small></th><th class="up">Replaces<small>EDL + gen kWh</small></th><th class="hide-sm hide-md">Battery out</th><th class="hide-sm hide-lg">Solar share</th><th class="hide-sm">Days full<small>battery</small></th><th class="hide-sm hide-md">Full at<small>average</small></th><th class="hide-sm">Solar thrown<small>kWh</small></th><th class="hide-sm hide-md up">Rack would store<small>kWh</small></th><th class="hide-sm hide-md">Night gen + EDL<small>kWh</small></th><th class="hide-sm up">Rack replaces<small>kWh</small></th></tr>`;
+    const head = `<tr><th>Month</th><th class="hide-sm hide-lg">Days</th><th>Solar</th><th class="pz">Port grid<small>EDL</small></th><th class="hide-md">Export<small>grid + gen port</small></th>` +
+      `<th class="pz">Port gen<small>generator</small></th><th class="hide-sm hide-md">EDL + gen<small>bought in</small></th><th>Load</th><th>Solar − load<small>deficit</small></th><th class="up">New panels<small>kWh</small></th><th class="up">Replaces<small>EDL + gen kWh</small></th><th class="hide-sm hide-md">Battery out</th><th class="hide-sm hide-lg">Solar share</th><th class="hide-sm">Days full<small>battery</small></th><th class="hide-sm hide-md">Full at<small>average</small></th><th class="hide-sm">Solar thrown<small>kWh</small></th><th class="hide-sm hide-md up">Rack would store<small>kWh</small></th><th class="hide-sm hide-md">Night gen + EDL<small>kWh</small></th><th class="hide-sm up">Rack replaces<small>kWh</small></th></tr>`;
     const bcells = (t, one) => !t.bD ? '<td class="hide-sm"></td><td class="hide-sm hide-md"></td><td class="hide-sm"></td><td class="hide-sm hide-md up"></td><td class="hide-sm hide-md"></td><td class="hide-sm up"></td>' :
       `<td class="hide-sm">${one ? (t.bF ? '✓' : '') : t.bF + ' / ' + t.bD}</td><td class="hide-sm hide-md">${t.bF ? mh(t.bM / t.bF) : '—'}</td><td class="sol hide-sm">${(one ? fmt1 : fmt)(t.bT)}</td>` +
       `<td class="exp hide-sm hide-md up">${(one ? fmt1 : fmt)(t.bS)}</td><td class="mix hide-sm hide-md">${t.bNd ? (one ? fmt1 : fmt)(t.bN) : ''}</td><td class="exp hide-sm up">${(one ? fmt1 : fmt)(t.bR)}</td>`;
     const phx = t => `<span class="ph">${t.days} days · battery ${fmt(t.dis)} · solar ${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</span>`;
     const line = (cls, label, t, attr) => `<tr class="${cls}" ${attr || ''}><td>${label}${phx(t)}</td><td class="hide-sm hide-lg">${t.days}</td>` +
-      `<td class="sol">${fmt(t.pv)}</td><td class="edl">${fmt(t.edl)}</td><td class="exp hide-md">${fmt(t.exp)}</td><td class="mix">${fmt(t.mix + t.gen)}</td><td class="hide-sm hide-md">${fmt(t.edl + t.gen + t.mix)}</td>` +
+      `<td class="sol">${fmt(t.pv)}</td><td class="edl pz">${fmt(t.edl)}</td><td class="exp hide-md">${fmt(t.exp)}</td><td class="mix pz">${fmt(t.mix + t.gen)}</td><td class="hide-sm hide-md">${fmt(t.edl + t.gen + t.mix)}</td>` +
       `<td>${fmt(t.use)}</td><td class="def">${dif(t)}</td><td class="sol up">${t.nk ? fmt(t.nk) : ''}</td><td class="exp up">${t.nk ? fmt(t.uk) : ''}</td><td class="hide-sm hide-md">${fmt(t.dis)}</td><td class="hide-sm hide-lg">${pc(t.pv, t.pv + t.edl + t.gen + t.mix)}</td>${bcells(t)}</tr>`;
     let rows = '';
     for (const k of keys) {
@@ -249,7 +250,7 @@
       if (open[k]) for (const s of m.list.slice().reverse()) {
         const dd = +s.day.slice(8), t = { ...s, days: '' };
         rows += `<tr class="day${s.n < 250 && s.day !== D.today ? ' short' : ''}"><td>${dd} ${MONTHS[+mo - 1]}${s.day === D.today ? ' <small>so far</small>' : ''}<span class="ph">${s.n < 250 ? s.n + '/288 readings · ' : ''}solar ${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</span></td><td class="hide-sm hide-lg">${s.n < 250 ? s.n + '/288' : ''}</td>` +
-          `<td class="sol">${fmt1(s.pv)}</td><td class="edl">${fmt1(s.edl)}</td><td class="exp hide-md">${fmt1(s.exp)}</td><td class="mix">${fmt1(s.mix + s.gen)}</td><td class="hide-sm hide-md">${fmt1(s.edl + s.gen + s.mix)}</td><td>${fmt1(s.use)}</td><td class="def">${dif(s, 1)}</td><td class="sol up">${s.nk ? fmt1(s.nk) : ''}</td><td class="exp up">${s.nk ? fmt1(s.uk) : ''}</td><td class="hide-sm hide-md">${fmt1(s.dis)}</td><td class="hide-sm hide-lg">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td>${bcells(s, 1)}</tr>`;
+          `<td class="sol">${fmt1(s.pv)}</td><td class="edl pz">${fmt1(s.edl)}</td><td class="exp hide-md">${fmt1(s.exp)}</td><td class="mix pz">${fmt1(s.mix + s.gen)}</td><td class="hide-sm hide-md">${fmt1(s.edl + s.gen + s.mix)}</td><td>${fmt1(s.use)}</td><td class="def">${dif(s, 1)}</td><td class="sol up">${s.nk ? fmt1(s.nk) : ''}</td><td class="exp up">${s.nk ? fmt1(s.uk) : ''}</td><td class="hide-sm hide-md">${fmt1(s.dis)}</td><td class="hide-sm hide-lg">${pc(s.pv, s.pv + s.edl + s.gen + s.mix)}</td>${bcells(s, 1)}</tr>`;
       }
     }
     rows += line('tot', totLabel(D.days[0]), T);
