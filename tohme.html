@@ -150,8 +150,9 @@
   for (const id in simIds) { $(id).value = SIM[simIds[id]]; $(id).addEventListener('input', () => { SIM[simIds[id]] = +$(id).value || 0; try { localStorage.setItem('tohmeSim', JSON.stringify(SIM)); } catch (e) {} render(); }); }
 
 
-  async function load() {
-    const r = await fetch('/api/tohme', { credentials: 'same-origin' });
+  // two calls (2026-10-22): the stored days first, then — only when today's reading is over 10 min — a live one that re-draws
+  async function load(live) {
+    const r = await fetch('/api/tohme' + (live ? '?live=1' : ''), { credentials: 'same-origin' });
     D = await r.json();
     if (D.isAdmin && !document.getElementById('plantCrumbs')) $('hubLink').hidden = false;
     $('app').hidden = false;
@@ -161,6 +162,7 @@
     // "Last 12 months" = the same date a year ago → today (Mario 2026-10-13: "13 oct 2025 to 13 oct 2026")
     $('years').innerHTML = ys.map(y => `<button data-y="${y}" class="${y === year ? 'on' : ''}">${y}</button>`).join('') + `<button data-y="last12" class="${year === 'last12' ? 'on' : ''}">Last 12 months</button><button data-y="all" class="${year === 'all' ? 'on' : ''}">All</button>`;
     render();
+    if (D.stale && !live) load(true).catch(() => {});
   }
 
   function render() {

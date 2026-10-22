@@ -70,7 +70,8 @@
   const SRC = [['gen1', 'Block B generator', 'meter 0717'], ['gen2', 'Block A generator', 'meter 0719'], ['edl', 'EDL', 'meter 426955']];   // block A / B: Mario 2026-10-20
 
   $('pr').onclick = () => window.print();
-  fetch('/api/mahab').then(r => r.json()).then(render).catch(e => { $('out').innerHTML = `<p class="err">Could not load the plant data (${e.message}).</p>`; });
+  // stored days first; a live call re-draws only when the server says something is still to read (2026-10-22)
+  fetch('/api/mahab').then(r => r.json()).then(D => { render(D); if (D.stale) fetch('/api/mahab?live=1').then(r => r.json()).then(render).catch(() => {}); }).catch(e => { $('out').innerHTML = `<p class="err">Could not load the plant data (${e.message}).</p>`; });
 
   function render(D) {
     const S = D.sources; if (!S) { $('out').innerHTML = '<p class="err">The source split is not available right now — try again in a minute.</p>'; return; }

@@ -22,7 +22,7 @@ const beirutToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(
 const addDays = (ymd, n) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
 const col = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('energyTohme');
 
-let todayCache = { at: 0, day: null, v: null };
+const T = require('./plant-today');
 
 async function fetchRecs(ctx, ymd) {
   try { return await D.dayRecords(await deye.token(ctx), ymd, STATION); }
@@ -72,16 +72,16 @@ async function fill(ctx, max) {
   return { have, done, left: Math.max(0, todo.length - done.length) };
 }
 
-async function days(ctx) {
+// live = false: Firestore only, today as last kept (plant-today.js); live = true: the page's second call (2026-10-22)
+async function days(ctx, { live = false } = {}) {
   const out = { station: STATION, kwp: 40.71, fields: FIELDS, days: HISTORY.days.slice(), data: HISTORY.data.slice(), error: null, left: 0,
     batt: { ...(HISTORY.batt || {}) }, mppt: { ...MPPT_SEED }, series: { panels: MP.PANELS, panelW: MP.PANEL_W, kwp: MP.KWP }, rack: { kwh: B.RACK_KWH, usable: B.USABLE, extra: B.EXTRA_KWH, from: HISTORY.battFrom || null } };
   try {
-    const f = await fill(ctx, 8);
-    out.left = f.left;
     const today = beirutToday();
+    const [f, td] = await Promise.all([fill(ctx, live ? 8 : 0), T.today(ctx, 'tohme', today, async () => { const r = await recs(ctx, today); return { v: D.integrate(r), batt: B.analyze(r, []) }; }, { live })]);
+    out.left = f.left; out.stale = td.stale || f.left > 0; out.todayAt = new Date(td.at).toISOString();
     for (let d = addDays(HISTORY.last, 1); d < today; d = addDays(d, 1)) { const v = f.have[d]; out.days.push(d); out.data.push(v ? FIELDS.map(k => v[k]) : null); if (v && v.batt) out.batt[d] = v.batt; if (v && v.mppt) out.mppt[d] = v.mppt; }
-    if (!(todayCache.day === today && Date.now() - todayCache.at < 10 * 60000)) { const r = await recs(ctx, today); todayCache = { at: Date.now(), day: today, v: D.integrate(r), batt: B.analyze(r, []) }; }
-    out.days.push(today); out.data.push(FIELDS.map(k => todayCache.v[k])); out.batt[today] = todayCache.batt;
+    out.days.push(today); out.data.push(FIELDS.map(k => td.v.v[k])); out.batt[today] = td.v.batt;
     out.today = today;
   } catch (e) {
     out.error = String(e.message || e);

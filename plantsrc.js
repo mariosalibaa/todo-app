@@ -58,13 +58,18 @@ function classify(key, rows) {
   }).join('');
 }
 
+const devMem = new Map();   // key → { at, inv } — the inverter list barely changes; kept 6 h
 async function readDay(ctx, key, ymd) {
   const cfg = PLANTS[key];
-  const inv = (await P.devices(ctx, cfg.src, String(cfg.id))).filter(d => d.type === 'inverter');
-  if (!inv.length) return { day: ymd, t: [], c: '', p: [], pv: [], l: [], s: [] };
+  let dm = devMem.get(key);
+  if (!(dm && Date.now() - dm.at < 6 * 3600e3)) { dm = { at: Date.now(), inv: (await P.devices(ctx, cfg.src, String(cfg.id))).filter(d => d.type === 'inverter') }; if (dm.inv.length) devMem.set(key, dm); }
+  const inv = dm.inv;
+  // no inverter listed = the sign-in or the cloud failed, not an empty day — never kept as one (2026-10-22)
+  if (!inv.length) throw new Error((cfg.src === 'solarman' ? 'SOLARMAN' : 'DeyeCloud') + ': no inverter listed');
   const master = inv.find(d => /^M/i.test(d.role || '')) || inv[0];
   const S = {};
-  for (const d of inv) { try { S[d.id] = await P.daySeries(ctx, cfg.src, d.id, ymd); } catch (e) { S[d.id] = {}; } }
+  // the inverters side by side, not one after the other (each day series is 1.4–7 MB)
+  await Promise.all(inv.map(async d => { try { S[d.id] = await P.daySeries(ctx, cfg.src, d.id, ymd); } catch (e) { S[d.id] = {}; } }));
   const m = S[master.id] || {}, clock = (m.S_P_T || m.B_left_cap1 || m.G_V_L1 || []).map(x => x[0]);
   const at = (d, k, t) => d.id === master.id ? near(m[k], t) : near((S[d.id] || {})[k], t);
   const sum = (k, t) => inv.reduce((s, d) => s + (+at(d, k, t) || 0), 0);
@@ -114,33 +119,45 @@ function summary(key, raw) {
   return o;
 }
 
-const today = {};   // key → { at, day, v }
-async function docs(ctx, key, max = 2) {
-  const cfg = PLANTS[key], now = beirutDay(), have = {};
-  (await col(ctx).where('key', '==', key).get()).forEach(x => { have[x.data().day] = x.data(); });
-  let n = 0;
-  for (let d = cfg.from; d < now && n < max; d = addDays(d, 1)) {
-    if (have[d]) continue;
-    const v = await readDay(ctx, key, d); n++;
-    // an empty finished day is kept too (the plant was not logging), so it is not asked for again on every load
-    have[d] = v; await col(ctx).doc(`${key}_${d}`).set({ key, ...v, at: new Date().toISOString() });
-    await sleep(800);
-  }
-  const c = today[key];
-  if (!(c && c.day === now && Date.now() - c.at < 10 * 60000)) today[key] = { at: Date.now(), day: now, v: await readDay(ctx, key, now) };
-  have[now] = today[key].v;
-  return { have, left: (() => { let l = 0; for (let d = cfg.from; d < now; d = addDays(d, 1)) if (!have[d]) l++; return l; })() };
-}
+// Firestore: plantSources/<key>_<day> = the raw day (t, c, p, pv, l, s, hz, v — kept for re-computing), and
+// plantSourceDays/<key>_<day> = its summary as JSON (`j`, ~3 KB) — the page reads only these (Mario 2026-10-22: the
+// raw days were ~10 KB each and every load re-summed them all). SUM_V: bump when summary() changes → re-summed from raw.
+const SUM_V = 1;
+const sumCol = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('plantSourceDays');
+const T = require('./plant-today');
 
-async function page(ctx, key, max) {
+// live = false: Firestore only (today as last kept) — the page's first paint. live = true: today read again when
+// over 10 min old, and up to `max` finished days not stored yet read from the cloud.
+async function page(ctx, key, max, { live = false } = {}) {
   const cfg = PLANTS[key]; if (!cfg) throw new Error('unknown plant');
-  const { have, left } = await docs(ctx, key, max);
-  const days = {};
-  for (const d of Object.keys(have).sort()) if (have[d].t.length) days[d] = summary(key, have[d]);
-  const t = today[key].v, i = t.t.length - 1;
-  const now = i >= 0 ? { at: t.t[i], src: t.c[i], soc: t.s[i], p: t.p[i], pv: t.pv[i], l: t.l[i], hz: t.hz ? t.hz[i] : null } : null;
+  const now = beirutDay(), days = {}, seen = new Set();
+  const [sums, td] = await Promise.all([
+    sumCol(ctx).where('key', '==', key).get(),
+    T.today(ctx, 'src_' + key, now, () => readDay(ctx, key, now), { live })
+      .catch(e => ({ v: { day: now, t: [], c: '', p: [], pv: [], l: [], s: [] }, at: Date.now(), stale: true, error: e.message })),
+  ]);
+  sums.forEach(x => { const d = x.data(); if (d.v === SUM_V && d.day < now) { seen.add(d.day); const v = JSON.parse(d.j); if (v) days[d.day] = v; } });
+  let n = 0, left = 0;
+  for (let d = cfg.from; d < now; d = addDays(d, 1)) {
+    if (seen.has(d)) continue;
+    let raw = (await col(ctx).doc(`${key}_${d}`).get()).data();
+    if (!raw && live && n < max) {
+      try { raw = await readDay(ctx, key, d); } catch (e) { console.error('plantsrc', key, d, e.message); n = max; left++; continue; }
+      n++;
+      // an empty finished day is kept too (the plant was not logging), so it is not asked for again on every load
+      await col(ctx).doc(`${key}_${d}`).set({ key, ...raw, at: new Date().toISOString() });
+      await sleep(800);
+    }
+    if (!raw) { left++; continue; }
+    const v = raw.t.length ? summary(key, raw) : null;
+    if (v) days[d] = v;
+    await sumCol(ctx).doc(`${key}_${d}`).set({ key, day: d, v: SUM_V, j: JSON.stringify(v), at: new Date().toISOString() });
+  }
+  const t = td.v, i = t.t.length - 1;
+  if (t.t.length) days[now] = summary(key, t);
+  const nowv = i >= 0 ? { at: t.t[i], src: t.c[i], soc: t.s[i], p: t.p[i], pv: t.pv[i], l: t.l[i], hz: t.hz ? t.hz[i] : null } : null;
   const { classes, name, kwp, lead, port, history, src, id } = cfg;
-  return { key, name, kwp, lead, port, history, src: src, id, classes, today: beirutDay(), days, now, left };
+  return { key, name, kwp, lead, port, history, src, id, classes, today: now, days, now: nowv, left, todayAt: new Date(td.at).toISOString(), todayError: td.error || null, stale: td.stale || left > 0, study: !!require('./plant-study').STUDIES[key] };
 }
 
 module.exports = { PLANTS, page, readDay, summary };

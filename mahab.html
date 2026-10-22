@@ -151,8 +151,10 @@
   }
   const add = (a, b) => { for (const k of ['pv', 'use', 'dis', 'edl', 'exp', 'gen', 'mix', 'n']) a[k] = (a[k] || 0) + (b[k] || 0); a.days = (a.days || 0) + 1; return a; };
 
-  async function load() {
-    const r = await fetch('/api/mahab', { credentials: 'same-origin' });
+  // two calls (2026-10-22): the stored days first (Firestore, ~1 s), then — only when today's reading is over 10 min
+  // or a day is missing — a live one that reads DeyeCloud and re-draws. The page never waits on DeyeCloud to show.
+  async function load(live) {
+    const r = await fetch('/api/mahab' + (live ? '?live=1' : ''), { credentials: 'same-origin' });
     if (r.status === 401) {
       const j = await r.json().catch(() => ({}));
       $('login').hidden = false; $('app').hidden = true;
@@ -167,6 +169,7 @@
     if (!year) year = ys[ys.length - 1];
     $('years').innerHTML = ys.map(y => `<button data-y="${y}" class="${y === year ? 'on' : ''}">${y}</button>`).join('');
     render();
+    if (D.stale && !live) load(true).catch(() => {});
   }
 
   function render() {
