@@ -230,10 +230,10 @@
     // the refused generator (Bookstop)
     $('refusedBox').hidden = !C.r;
     if (C.r) {
-      let rt = `<tr><th>Day</th><th>From – to</th><th>Minutes</th><th>Frequency<small>highest, Hz</small></th><th>Battery<small>start → end (lowest) %</small></th></tr>`;
+      let rt = `<tr><th>Day</th><th>From – to</th><th>Minutes</th><th>Frequency<small>highest, Hz</small></th><th>Voltage<small>lowest – highest, V</small></th><th>Battery<small>start → end (lowest) %</small></th></tr>`;
       const all = days.flatMap(d => D.days[d].refused.map(x => ({ d, ...x }))).reverse();
-      for (const x of all) rt += `<tr><td>${dd(x.d)}</td><td>${x.a} – ${x.b}</td><td>${x.min}</td><td>${x.hz ?? ''}</td><td>${x.s0} → ${x.s1} (${x.sMin})</td></tr>`;
-      if (!all.length) rt += `<tr><td colspan="5" style="text-align:left;color:var(--green)">No refused stretch in ${mName}.</td></tr>`;
+      for (const x of all) rt += `<tr><td>${dd(x.d)}</td><td>${x.a} – ${x.b}</td><td>${x.min}</td><td>${x.hz ?? ''}</td><td>${x.vMin != null ? x.vMin + ' – ' + x.vMax : ''}</td><td>${x.s0} → ${x.s1} (${x.sMin})</td></tr>`;
+      if (!all.length) rt += `<tr><td colspan="6" style="text-align:left;color:var(--green)">No refused stretch in ${mName}.</td></tr>`;
       $('refT').innerHTML = rt;
     }
 

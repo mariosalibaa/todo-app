@@ -134,7 +134,9 @@ function summary(key, raw) {
   });
   // the refused source (Bookstop): when, how long, how far the battery fell, the frequency it sat at
   o.refused = merged.filter(r => r.k === 'r').map(r => { const hz = d.hz ? d.hz.slice(r.ia, r.ib + 1).filter(x => x > 40) : [];
-    return { a: hhmm(r.a), b: hhmm(r.b), min: Math.round((r.b - r.a) / 60), s0: d.s[r.ia], s1: d.s[r.ib], sMin: Math.min(...d.s.slice(r.ia, r.ib + 1)), hz: hz.length ? Math.max(...hz) : null }; });
+    const v = d.v ? d.v.slice(r.ia, r.ib + 1).filter(x => x > 150) : [];   // Mario 2026-10-23: "add voltage"
+    return { a: hhmm(r.a), b: hhmm(r.b), min: Math.round((r.b - r.a) / 60), s0: d.s[r.ia], s1: d.s[r.ib], sMin: Math.min(...d.s.slice(r.ia, r.ib + 1)), hz: hz.length ? Math.max(...hz) : null,
+      vMin: v.length ? Math.round(Math.min(...v)) : null, vMax: v.length ? Math.round(Math.max(...v)) : null }; });
   for (const k in o.src) for (const f in o.src[k]) o.src[k][f] = Math.round(o.src[k][f] * 10) / 10;
   o.pv = Math.round(o.pv * 10) / 10; o.load = Math.round(o.load * 10) / 10; o.full = Math.round(o.full * 10) / 10;
   return o;
@@ -143,7 +145,7 @@ function summary(key, raw) {
 // Firestore: plantSources/<key>_<day> = the raw day (t, c, p, pv, l, s, hz, v — kept for re-computing), and
 // plantSourceDays/<key>_<day> = its summary as JSON (`j`, ~3 KB) — the page reads only these (Mario 2026-10-22: the
 // raw days were ~10 KB each and every load re-summed them all). SUM_V: bump when summary() changes → re-summed from raw.
-const SUM_V = 2;   // 2 = 2026-10-23: Bookstop's four sources, solar thrown
+const SUM_V = 3;   // 2 = 2026-10-23: Bookstop's four sources, solar thrown · 3: voltage on the refused stretches
 const sumCol = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('plantSourceDays');
 const T = require('./plant-today');
 
