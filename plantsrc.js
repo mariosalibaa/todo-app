@@ -23,7 +23,7 @@ const PLANTS = {
   bookstop: {
     name: 'Bookstop Kaslique', src: 'solarman', id: 2596285, kwp: 44.85, from: '2026-07-24', port: 'grid',
     lead: '3 × 12 kW Deye in parallel · EDL and two generators on one input through the ATS',
-    classes: { e: 'EDL', b: 'Big generator (150 kW)', s: 'Small generator (80 kW)', r: 'Small generator — refused' },
+    classes: { e: 'EDL', b: 'Big gen (150 kW)', s: 'Small gen (80 kW)', r: 'Small gen refused' },
   },
   mckinsey: {
     name: 'McKinsey Electronics', src: 'deye', id: 61438093, kwp: 120, from: '2026-07-24', port: 'gen',
@@ -175,6 +175,8 @@ async function page(ctx, key, max, { live = false } = {}) {
     await sumCol(ctx).doc(`${key}_${d}`).set({ key, day: d, v: SUM_V, j: JSON.stringify(v), at: new Date().toISOString() });
   }
   const t = td.v, i = t.t.length - 1;
+  // today's kept reading carries the letters of the code that read it — Bookstop's are re-made from Hz / V like summary()
+  if (key === 'bookstop' && t.hz && t.v) t.c = classify(key, t.t.map((x, n) => ({ t: x, v: t.v[n], hz: t.hz[n], p: t.p[n] })));
   if (t.t.length) days[now] = summary(key, t);
   const nowv = i >= 0 ? { at: t.t[i], src: t.c[i], soc: t.s[i], p: t.p[i], pv: t.pv[i], l: t.l[i], hz: t.hz ? t.hz[i] : null } : null;
   const { classes, name, kwp, lead, port, history, src, id } = cfg;

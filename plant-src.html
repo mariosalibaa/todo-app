@@ -205,20 +205,22 @@
 
     // month by month — click a month for its days, a total row at the end (Mario 2026-10-23)
     const months = [...new Set(Object.keys(D.days).map(d => d.slice(0, 7)))].sort().reverse();
-    const io = D.port === 'grid';
-    let mt = `<tr><th>Month</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>hours · kWh in${io ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>lowest %</small></th><th>Solar thrown<small>kWh · full h</small></th></tr>`;
-    const tot = ds => { const t = { pv: 0, load: 0, full: 0, thrown: 0, low: null, src: {} };
+    const io = false;   // kWh out is always ~0 (zero export) — dropped from the tables so they fit (2026-10-23); the bars still show it
+    let mt = `<tr><th>Month</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th><th>Solar thrown<small>kWh</small></th><th>Battery 100 % at<small>days full · usual time</small></th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>hours · kWh in${io ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>lowest %</small></th></tr>`;
+    // the usual time the battery reached 100 % = the middle one of the days it did (Mario 2026-10-23: "at what time batt become 100%")
+    const midAt = ds => { const a = ds.map(d => D.days[d].fullAt).filter(Boolean).sort(); return { n: a.length, at: a.length ? a[a.length >> 1] : '' }; };
+    const tot = ds => { const t = { pv: 0, load: 0, full: 0, thrown: 0, low: null, src: {}, fa: midAt(ds), n: ds.length };
       for (const k of K) t.src[k] = { h: 0, in: 0, out: 0 };
       for (const d of ds) { const s = D.days[d]; t.pv += s.pv; t.load += s.load; t.full += s.full; t.thrown += s.thrown || 0; if (s.socMin != null) t.low = t.low == null ? s.socMin : Math.min(t.low, s.socMin); for (const k of K) for (const f of ['h', 'in', 'out']) t.src[k][f] += s.src[k][f]; }
       return t; };
-    const cells = (t, f) => `<td>${f(t.pv)}</td><td>${f(t.load)}</td>` + K.map(k => `<td>${f(t.src[k].h)} h · ${f(t.src[k].in)}${io ? ' · ' + f(t.src[k].out) : ''}</td>`).join('') + `<td>${t.low ?? ''}</td><td class="thr">${f(t.thrown)} · ${f(t.full)} h</td>`;
+    const cells = (t, f) => `<td>${f(t.pv)}</td><td>${f(t.load)}</td><td class="thr">${f(t.thrown)}</td><td>${t.fa.n ? `${t.fa.n} days · ${t.fa.at}` : '—'}</td>` + K.map(k => `<td>${f(t.src[k].h)} h · ${f(t.src[k].in)}${io ? ' · ' + f(t.src[k].out) : ''}<small>${t.n ? f1(t.src[k].h / t.n) + ' h a day' : ''}</small></td>`).join('') + `<td>${t.low ?? ''}</td>`;
     for (const m of months) {
       const ds = Object.keys(D.days).filter(d => d.startsWith(m)).sort();
       mt += `<tr class="mrow" data-m="${m}"><td>${mOpen[m] ? '▾' : '▸'} ${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}<small>${ds.length} days${ds.includes(D.today) ? ', to today' : ''}</small></td>${cells(tot(ds), f0)}</tr>`;
       if (mOpen[m]) for (const d of ds.slice().reverse()) {
         const x = D.days[d];
-        mt += `<tr class="dy"><td>${dd(d)}${d === D.today ? '<small>so far</small>' : x.n < 250 ? '<small>' + x.n + ' readings</small>' : ''}</td><td>${f1(x.pv)}</td><td>${f1(x.load)}</td>` +
-          K.map(k => `<td>${f1(x.src[k].h)} h · ${f1(x.src[k].in)}${io ? ' · ' + f1(x.src[k].out) : ''}</td>`).join('') + `<td>${x.socMin ?? ''}${x.socMax != null ? '–' + x.socMax : ''}</td><td class="thr">${f1(x.thrown || 0)} · ${f1(x.full)} h</td></tr>`;
+        mt += `<tr class="dy"><td>${dd(d)}${d === D.today ? '<small>so far</small>' : x.n < 250 ? '<small>' + x.n + ' readings</small>' : ''}</td><td>${f1(x.pv)}</td><td>${f1(x.load)}</td><td class="thr">${f1(x.thrown || 0)}</td><td>${x.fullAt || '—'}</td>` +
+          K.map(k => `<td>${f1(x.src[k].h)} h · ${f1(x.src[k].in)}${io ? ' · ' + f1(x.src[k].out) : ''}</td>`).join('') + `<td>${x.socMin ?? ''}${x.socMax != null ? '–' + x.socMax : ''}</td></tr>`;
       }
     }
     const allDays = Object.keys(D.days);
@@ -252,10 +254,10 @@
 
     // day by day — not for McKinsey either (Mario 2026-10-20: "remove for mckinsey")
     $('dayBox').hidden = D.key === 'mckinsey';
-    let dt = `<tr><th>Day</th><th>Solar</th><th>Load</th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>h · in${D.port === 'grid' ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>min–max %</small></th><th>Solar thrown<small>kWh · full at</small></th><th class="tm">Timing</th></tr>`;
+    let dt = `<tr><th>Day</th><th>Solar</th><th>Load</th><th>Solar thrown<small>kWh</small></th><th>Battery 100 % at</th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>h · kWh in</small></th>`).join('')}<th>Battery<small>min–max %</small></th><th class="tm">Timing</th></tr>`;
     for (const d of days.slice().reverse()) { const s = D.days[d];
-      dt += `<tr><td>${dd(d)}${d === D.today ? '<small>so far</small>' : ''}${s.n < 250 && d !== D.today ? '<small>' + s.n + ' readings</small>' : ''}</td><td>${f1(s.pv)}</td><td>${f1(s.load)}</td>` +
-        K.map(k => `<td>${f1(s.src[k].h)} · ${f1(s.src[k].in)}${D.port === 'grid' ? ' · ' + f1(s.src[k].out) : ''}</td>`).join('') + `<td>${s.socMin ?? ''}–${s.socMax ?? ''}</td><td class="thr">${f1(s.thrown || 0)}${s.fullAt ? ' · ' + s.fullAt : ''}</td>` +
+      dt += `<tr><td>${dd(d)}${d === D.today ? '<small>so far</small>' : ''}${s.n < 250 && d !== D.today ? '<small>' + s.n + ' readings</small>' : ''}</td><td>${f1(s.pv)}</td><td>${f1(s.load)}</td><td class="thr">${f1(s.thrown || 0)}</td><td>${s.fullAt || '—'}</td>` +
+        K.map(k => `<td>${f1(s.src[k].h)} · ${f1(s.src[k].in)}</td>`).join('') + `<td>${s.socMin ?? ''}–${s.socMax ?? ''}</td>` +
         `<td class="tm">${(s.bar || []).map(([k, a, b]) => `<i><span class="dot c-${k}"></span>${hm(a)}–${hm(b)}</i>`).join('')}</td></tr>`; }
     $('dayT').innerHTML = dt;
 
