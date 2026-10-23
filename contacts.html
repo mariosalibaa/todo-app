@@ -120,6 +120,7 @@
     <button class="btn g" onclick="syncGoogle()" title="Write every contact that is not in Google yet (or changed) into your Google Contacts">⟳ Save all to Google</button>
     <button class="btn" onclick="openEd()">+ Add a card</button>
   </div>
+  <div class="bar"><div class="tabs" id="tabs"><button data-t="cards" class="on">Cards</button><button data-t="shared">Contacts shared</button></div></div>
   <div class="hintline" id="say"></div>
   <div class="tw"><table>
     <colgroup><col style="width:19%"><col style="width:19%"><col style="width:17%"><col style="width:18%"><col style="width:14%"><col style="width:5%"><col style="width:8%"></colgroup>
@@ -151,7 +152,8 @@
       <div class="full"><label>Notes</label><textarea id="f-notes" placeholder="Where we met, what they sell, why they matter"></textarea></div>
       <div><label>Date received</label><input id="f-date" type="date"></div>
       <div><label>Project</label><input id="f-project" placeholder="AJ4193 · general"></div>
-      <div class="full"><label>Source</label><input id="f-source" placeholder="Business card · WhatsApp · visit"></div>
+      <div><label>Source</label><input id="f-source" placeholder="Business card · WhatsApp · visit"></div>
+      <div><label>Shared by</label><input id="f-sharedBy" list="dl-by" placeholder="Richard Beeld"></div>
     </div>
     <div class="acts">
       <span class="err" id="ed-err"></span>
@@ -166,7 +168,7 @@
   <div class="vbar"><a class="vback" href="#" onclick="closeViewer();return false;">&lsaquo; Back</a><div class="vtitle" id="vtitle"></div><a class="vbtn" id="vtab" href="#" target="_blank" rel="noopener">Open in new tab</a></div>
   <div class="vbody" id="vbody"></div>
 </div>
-<datalist id="dl-co"></datalist><datalist id="dl-trade"></datalist>
+<datalist id="dl-co"></datalist><datalist id="dl-by"></datalist><datalist id="dl-trade"></datalist>
 <datalist id="dl-div"><option value="Mechanical"><option value="Electrical"><option value="Civil"><option value="Architectural"><option value="Steel"><option value="Solar"><option value="Survey"><option value="Accounting"><option value="General"></datalist>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -180,7 +182,10 @@
 // the person's resourceName comes back onto the row so a second press updates instead of duplicating.
 const esc = Admin.esc;
 let ROWS = [], SORT = { k: 'date', dir: -1 }, EDIT = null, GTOKEN = null;
-const F = ['name', 'title', 'company', 'trade', 'phone', 'email', 'website', 'social', 'division', 'address', 'notes', 'date', 'project', 'source'];
+// Cards = business cards we met; Contacts shared = people someone passed us, with who and when (Mario 2026-10-23)
+let TAB = /[?&]tab=shared/.test(location.search) ? 'shared' : 'cards';
+const F = ['name', 'title', 'company', 'trade', 'phone', 'email', 'website', 'social', 'division', 'address', 'notes', 'date', 'project', 'source', 'sharedBy'];
+const inTab = r => TAB === 'shared' ? !!r.sharedBy : !r.sharedBy;
 const say = (t, err) => { const el = document.getElementById('say'); el.textContent = t || ''; el.style.color = err ? 'var(--red)' : ''; };
 
 Admin.require(null, async me => {   // admin only — the server refuses /api/contacts to anyone else
@@ -189,6 +194,7 @@ Admin.require(null, async me => {   // admin only — the server refuses /api/co
   await load();
   const q = document.getElementById('q');
   q.addEventListener('input', render);
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { TAB = b.dataset.t; history.replaceState(null, '', TAB === 'shared' ? '?tab=shared' : location.pathname); render(); });
   if (location.hash.length > 1) { q.value = decodeURIComponent(location.hash.slice(1)); render(); }
   document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; SORT = { k, dir: SORT.k === k ? -SORT.dir : (k === 'date' ? -1 : 1) }; render(); });
   if (/[?&]add=1/.test(location.search)) openEd();
@@ -200,6 +206,7 @@ async function load() {
   const opts = f => [...new Set(ROWS.map(f).filter(Boolean))].sort().map(s => `<option value="${esc(s)}">`).join('');
   document.getElementById('dl-co').innerHTML = opts(r => r.company);
   document.getElementById('dl-trade').innerHTML = opts(r => r.trade);
+  document.getElementById('dl-by').innerHTML = opts(r => r.sharedBy);
   render();
 }
 
@@ -210,29 +217,32 @@ const phUrl = (r, p) => `/api/contacts/${encodeURIComponent(r.id)}/photo/${encod
 const clip = r => (r.photos && r.photos.length) ? `<button class="pin" title="${esc(r.photos.map(p => p.name || '').join('\n'))}" onclick="event.stopPropagation();openViewer('${esc(r.id)}','${esc(r.photos[0].id)}')">📎 ${r.photos.length}</button>` : '';
 const gLink = r => r.google && r.google.resourceName ? 'https://contacts.google.com/person/' + encodeURIComponent(r.google.resourceName.split('/')[1] || '') : '';
 // in Google and not edited since → ✓; edited after the last write → "changed"
-const gState = r => !(r.google && r.google.resourceName) ? 'no' : (r.updatedAt && r.google.syncedAt && r.updatedAt > r.google.syncedAt ? 'changed' : 'ok');
+// inPhone = saved on the phone through WhatsApp (sync to phone), so Google has it already — never pushed twice
+const gState = r => !(r.google && r.google.resourceName) ? (r.inPhone ? 'phone' : 'no') : (r.updatedAt && r.google.syncedAt && r.updatedAt > r.google.syncedAt ? 'changed' : 'ok');
 
 function render() {
   const terms = document.getElementById('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const hay = r => F.map(k => r[k] == null ? '' : String(r[k])).join(' ').toLowerCase();
-  let list = ROWS.filter(r => terms.every(t => hay(r).includes(t)));
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
+  const mine = ROWS.filter(inTab);
+  let list = mine.filter(r => terms.every(t => hay(r).includes(t)));
   const { k, dir } = SORT;
   const val = r => k === 'google' ? gState(r) : (r[k] == null ? '' : String(r[k]));
   list.sort((a, b) => val(a).localeCompare(val(b)) * dir);
   document.querySelectorAll('th[data-k]').forEach(th => th.classList.toggle('on', th.dataset.k === k));
-  const inG = ROWS.filter(r => gState(r) === 'ok').length;
-  document.getElementById('count').textContent = (list.length === ROWS.length ? `${ROWS.length} contacts` : `${list.length} of ${ROWS.length}`) + ` · ${inG} in Google`;
+  const inG = mine.filter(r => gState(r) !== 'no').length;
+  document.getElementById('count').textContent = (list.length === mine.length ? `${mine.length} contacts` : `${list.length} of ${mine.length}`) + ` · ${inG} in Google`;
   const tb = document.getElementById('rows');
-  if (!list.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">${ROWS.length ? 'Nothing matches.' : 'No contacts yet — add the first card.'}</td></tr>`; return; }
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">${mine.length ? 'Nothing matches.' : TAB === 'shared' ? 'No shared contacts yet.' : 'No contacts yet — add the first card.'}</td></tr>`; return; }
   tb.innerHTML = list.map(r => { const g = gState(r);
     return `<tr class="row" onclick="openEd('${esc(r.id)}')">
     <td class="sup" title="${tip(r.name, r.title)}"><span class="l1">${hi(r.name || r.company, terms)}</span>${r.title ? `<span class="sub">${hi(r.title, terms)}</span>` : ''}</td>
     <td title="${tip(r.company, r.trade, r.division)}"><span class="l1">${hi(r.name ? r.company : '', terms)}</span><span class="sub">${hi([r.trade, r.division].filter(Boolean).join(' · '), terms)}</span></td>
     <td title="${tip(r.phone)}"><span class="clamp">${hi(r.phone, terms)}</span></td>
     <td title="${tip(r.email, r.website, r.social)}"><span class="l1">${hi(r.email, terms)}</span><span class="sub">${hi([r.website, r.social].filter(Boolean).join(' · '), terms)}</span></td>
-    <td title="${tip(r.notes, r.address)}"><span class="desc clamp">${hi(r.notes, terms)}</span></td>
+    <td title="${tip(r.sharedBy && 'shared by ' + r.sharedBy + ' · ' + dmy(r.date), r.notes, r.address)}">${r.sharedBy ? `<span class="l1">${hi(r.sharedBy, terms)}</span><span class="sub">${esc(dmy(r.date))} · ${hi(r.notes, terms)}</span>` : `<span class="desc clamp">${hi(r.notes, terms)}</span>`}</td>
     <td>${clip(r)}</td>
-    <td onclick="event.stopPropagation()">${g === 'ok' ? `<span class="gstat ok"><a href="${gLink(r)}" target="_blank" rel="noopener" title="Open in Google Contacts">✓ in Google</a></span>`
+    <td onclick="event.stopPropagation()">${g === 'phone' ? `<span class="gstat ok" title="Saved on the phone through WhatsApp (sync to phone) — already in Google Contacts">✓ in phone</span>` : g === 'ok' ? `<span class="gstat ok"><a href="${gLink(r)}" target="_blank" rel="noopener" title="Open in Google Contacts">✓ in Google</a></span>`
       : `<button class="pin" onclick="syncGoogle(['${esc(r.id)}'])" title="Write this person into your Google Contacts">${g === 'changed' ? '⟳ update' : '→ Google'}</button>`}</td>
   </tr>`; }).join('');
 }
@@ -256,7 +266,7 @@ function person(c) {
     urls: [...parts(c.website).map(x => ({ value: /^https?:/i.test(x) ? x : 'https://' + x, type: 'work' })),
            ...parts(c.social).map(x => ({ value: x.startsWith('@') ? 'https://instagram.com/' + x.slice(1) : x, type: 'Instagram' }))],
     addresses: c.address ? [{ formattedValue: c.address, type: 'work' }] : [],
-    biographies: [{ value: [c.notes, c.trade && 'Trade: ' + c.trade, 'Shift Hub contact · ' + (c.source || 'business card') + (c.date ? ' · ' + c.date : '')].filter(Boolean).join('\n'), contentType: 'TEXT_PLAIN' }],
+    biographies: [{ value: [c.notes, c.trade && 'Trade: ' + c.trade, c.sharedBy && 'Shared by ' + c.sharedBy, 'Shift Hub contact · ' + (c.source || 'business card') + (c.date ? ' · ' + c.date : '')].filter(Boolean).join('\n'), contentType: 'TEXT_PLAIN' }],
   };
   return p;
 }
@@ -290,7 +300,7 @@ async function pushOne(token, c) {
   return Admin.api('POST', '/api/contacts', { id: c.id, google: { resourceName: out.resourceName, etag: out.etag || '' } });
 }
 async function syncGoogle(ids) {
-  const list = ROWS.filter(r => ids ? ids.includes(r.id) : gState(r) !== 'ok');
+  const list = ROWS.filter(r => ids ? ids.includes(r.id) : gState(r) === 'no' || gState(r) === 'changed');
   if (!list.length) { say('Everything is already in Google.'); return; }
   let token; try { say('Opening Google…'); token = await gToken(); } catch (e) { say('Google sign-in cancelled: ' + e.message, true); return; }
   let ok = 0; const bad = [];
@@ -309,7 +319,7 @@ function openEd(id) {
   document.getElementById('ed-title').textContent = EDIT ? 'Edit contact' : 'Add a card';
   document.getElementById('ed-del').style.display = EDIT ? '' : 'none';
   document.getElementById('ed-err').textContent = '';
-  for (const k of F) document.getElementById('f-' + k).value = EDIT ? (EDIT[k] == null ? '' : EDIT[k]) : (k === 'date' ? today() : k === 'source' ? 'Business card' : '');
+  for (const k of F) document.getElementById('f-' + k).value = EDIT ? (EDIT[k] == null ? '' : EDIT[k]) : (k === 'date' ? today() : k === 'source' ? (TAB === 'shared' ? 'WhatsApp' : 'Business card') : '');
   renderPhotos();
   document.getElementById('ed').classList.add('on');
   if (EDIT) setTimeout(() => document.getElementById('f-name').focus(), 50);

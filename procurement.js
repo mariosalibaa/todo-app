@@ -16,7 +16,9 @@
 // Contacts (Mario 2026-10-18: "business cards should be linked to Google Contacts, not procurement"):
 // the same handler serves /api/contacts/* off workspaces/<team>/contacts/<id>
 //   { id, name, company, title, phone, email, website, social, trade, division, address, notes, source, date,
-//     project, photos [...], google { resourceName, etag, syncedAt } }
+//     project, sharedBy, inPhone, photos [...], google { resourceName, etag, syncedAt } }
+// sharedBy = who passed us the contact (Mario 2026-10-23: "contacts shared" tab — e.g. Richard Beeld's suppliers);
+// inPhone = already saved on the phone through WhatsApp's sync, so it is in Google without a resourceName here.
 // — the card's people, with the card photos; the page writes each one to Mario's Google Contacts from the
 // browser (People API, his own Google token) and stores the resourceName back here.
 
@@ -28,7 +30,7 @@ const now = () => new Date().toISOString();
 // trade + division (Mario 2026-09-22: "add trade column: topography", "supplier list for ppr; division mechanical")
 const KINDS = {
   procurement: { fields: ['supplier', 'contact', 'item', 'brand', 'unit', 'description', 'source', 'date', 'project', 'currency', 'trade', 'division'], need: ['supplier', 'item'], label: r => r.supplier || 'offer' },
-  contacts: { fields: ['name', 'company', 'title', 'phone', 'email', 'website', 'social', 'trade', 'division', 'address', 'notes', 'source', 'date', 'project'], need: ['name', 'company'], label: r => r.name || r.company || 'contact' },
+  contacts: { fields: ['name', 'company', 'title', 'phone', 'email', 'website', 'social', 'trade', 'division', 'address', 'notes', 'source', 'date', 'project', 'sharedBy'], need: ['name', 'company'], label: r => r.name || r.company || 'contact' },
 };
 
 function readBody(req, limit) {
