@@ -19,6 +19,8 @@
 :root[data-theme="dark"] body{background:var(--base);color:var(--text);}
 .hub-theme-btn{position:fixed;left:14px;bottom:62px;z-index:60;width:34px;height:34px;border-radius:50%;border:1px solid var(--surface1,#888);background:var(--mantle,#222);color:var(--text,#eee);font-size:16px;line-height:1;cursor:pointer;opacity:.75;box-shadow:0 2px 6px rgba(0,0,0,.25);}
 .hub-theme-btn:hover{opacity:1;}
+.hub-logo-btn{bottom:104px;font-size:14px;}
+:root[data-logo="right"] .wordmark{margin-left:auto;text-align:right;}
 @media print{.hub-theme-btn{display:none;}}`;
   const st = document.createElement('style'); st.id = 'hub-theme-css'; st.textContent = css;
   (document.head || root).appendChild(st);
@@ -30,6 +32,23 @@
     const btn = document.createElement('button'); btn.className = 'hub-theme-btn'; btn.type = 'button';
     btn.onclick = () => { const next = isLight() ? 'dark' : 'light'; root.dataset.theme = next; try { localStorage.setItem(KEY, next); } catch (e) {} paint(btn); };
     document.body.appendChild(btn); paint(btn);
+    // Logo side, one choice for the whole hub (Mario, 2026-10-23: "make it option on hub to move logo to right").
+    // The wordmark is moved to the end of its header; a marker keeps its old place so ⇄ can put it back.
+    const LKEY = 'hub.logoSide';
+    const mark = document.querySelector('header .wordmark') || document.querySelector('.wordmark');
+    if (!mark) return;
+    const home = document.createComment('wordmark'); mark.before(home);
+    const bar = mark.closest('header') || mark.parentElement;
+    function place(side) {
+      if (side === 'right') { root.dataset.logo = 'right'; bar.appendChild(mark); }
+      else { delete root.dataset.logo; home.after(mark); }
+    }
+    let side = null; try { side = localStorage.getItem(LKEY); } catch (e) {}
+    place(side);
+    const lb = document.createElement('button'); lb.className = 'hub-theme-btn hub-logo-btn'; lb.type = 'button'; lb.textContent = '⇄';
+    const tip = () => { lb.title = root.dataset.logo === 'right' ? 'logo on the left' : 'logo on the right'; };
+    lb.onclick = () => { const next = root.dataset.logo === 'right' ? 'left' : 'right'; place(next); try { localStorage.setItem(LKEY, next); } catch (e) {} tip(); };
+    tip(); document.body.appendChild(lb);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 })();
