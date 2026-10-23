@@ -10,6 +10,7 @@
 //                           (clear-sky curve fitted on the same day's readings before the battery filled — tohme-batt)
 //   genBefore, genAfter     generator + grid kWh in before that window and after it (whole day = genBefore when the
 //                           battery never filled)
+//   genH                    hours the generator ran (> 0.5 kW in) — Mario 2026-10-23: generator hours before / after an upgrade
 // The page runs the extra battery through the days in order (it carries charge from one day to the next): it takes
 // the solar thrown, up to its usable kWh, and gives it back in place of the generator. Size and prices are set on the page.
 // A future plant = one line in STUDIES. Read-only: nothing here writes to an inverter.
@@ -19,7 +20,8 @@ const deye = require('./deye');
 const B = require('./tohme-batt');
 
 const STUDIES = {
-  mckinsey: { station: 61438093, from: '2025-08-01', battKwh: 120, invKw: 100, extraKwh: 120, usable: 0.9 },   // pvPower is logged from Aug 2025
+  // battery now: 2 racks × 12 × 5 kWh (Mario 2026-10-23); the upgrade he asks about: 4 racks × 9 × 5 kWh = 180 kWh
+  mckinsey: { station: 61438093, from: '2025-08-01', battKwh: 120, invKw: 100, usable: 0.9, batt: { racks: 2, per: 12, kwh: 5 }, upgrade: { racks: 4, per: 9, kwh: 5 } },   // pvPower is logged from Aug 2025
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -38,7 +40,7 @@ async function recs(ctx, station, ymd) {
 
 function dayOf(r) {
   const v = D.integrate(r);
-  const out = { pv: r1(v.pv), gen: r1(v.gen + v.gridIn), use: r1(v.use), n: v.n, kwp: null, socMin: null, socMax: null, fullAt: null, clipTo: null, thrown: 0, genBefore: 0, genAfter: 0 };
+  const out = { pv: r1(v.pv), gen: r1(v.gen + v.gridIn), use: r1(v.use), n: v.n, kwp: null, socMin: null, socMax: null, fullAt: null, clipTo: null, thrown: 0, genBefore: 0, genAfter: 0, genH: 0 };
   if (!r.length) return out;
   const caps = r.filter(x => +x.generationCapacity > 0.05 && +x.pvPower > 0).map(x => +x.pvPower / +x.generationCapacity / 1000).sort((a, b) => a - b);
   if (caps.length) out.kwp = Math.round(caps[caps.length >> 1]);
@@ -51,8 +53,9 @@ function dayOf(r) {
     const dt = Math.min(600, (r[i + 1] ? r[i + 1].dateTime : x.dateTime + 300) - x.dateTime) / 3600;
     const kin = (Math.max(0, +x.generatorPower || 0) + Math.max(0, +x.wirePower || 0)) / 1000 * dt;
     if (i < iFull) out.genBefore += kin; else if (i > iEnd) out.genAfter += kin;
+    if (kin / dt > 0.5) out.genH += dt;
   });
-  out.genBefore = r1(out.genBefore); out.genAfter = r1(out.genAfter);
+  out.genBefore = r1(out.genBefore); out.genAfter = r1(out.genAfter); out.genH = Math.round(out.genH * 100) / 100;
   return out;
 }
 
@@ -63,7 +66,7 @@ async function fill(ctx, key, max) {
   const todo = [];
   for (let d = cfg.from; d <= yesterday; d = addDays(d, 1)) {
     const h = have[d];
-    if (!h) todo.push(d);
+    if (!h || h.genH == null) todo.push(d);   // genH added 2026-10-23: days stored before it are read again
     else if (!(h.at >= addDays(d, 1) + 'T09:00:00Z') && !(Date.now() - Date.parse(h.at) < 3600e3)) todo.push(d);
   }
   const done = [];

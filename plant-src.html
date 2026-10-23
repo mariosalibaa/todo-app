@@ -12,7 +12,7 @@
      supplier get the link. Print = a light A4 version (the controls drop out). -->
 <style>
   :root{--base:#1e1e2e;--mantle:#181825;--surface0:#313244;--surface1:#45475a;--text:#cdd6f4;--sub:#a6adc8;--overlay0:#6c7086;--amber:#F2A93B;--green:#a6e3a1;--blue:#89b4fa;--red:#f38ba8;}
-  *{box-sizing:border-box;}
+  *{box-sizing:border-box;} [hidden]{display:none !important;}
   html,body{background:var(--base);}
   body{margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
   header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--surface0);}
@@ -62,6 +62,13 @@
   .sim input{width:96px;background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:8px;padding:6px 8px;font:inherit;font-size:.85rem;}
   td.sol{color:var(--amber);} td.gen{color:#cba6f7;} td.sav{color:var(--green);}
   .kpi.sav b{color:var(--green);} .kpi.thr b{color:var(--amber);}
+  .sim .sg{width:70px;font-size:.78rem;font-weight:600;color:var(--sub);align-self:center;}
+  .sim .tot{align-self:center;font-size:.82rem;color:var(--text);font-variant-numeric:tabular-nums;}
+  .sim input{width:84px;}
+  tr.mrow{cursor:pointer;} tr.mrow:hover td{background:rgba(242,169,59,.06);}
+  tr.dy td{font-size:.74rem;color:var(--sub);background:var(--base);}
+  #stT th.grp{text-align:center;border-bottom:1px solid var(--surface1);}
+  .after{color:var(--green);}
   @media (max-width:640px){ header{padding:12px 16px;} main{padding:14px 12px 40px;} .kpis{grid-template-columns:1fr 1fr;gap:8px;} table{font-size:.74rem;} th{padding:7px 4px;font-size:.54rem;} td{padding:7px 4px;} }
   /* print: light, A4, no controls — the page itself is the report for the owner and the generator supplier */
   @page{size:A4;margin:12mm;}
@@ -86,8 +93,9 @@
     <p class="lead" id="nowLine"></p>
     <div class="row noprint"><span id="months"></span><button class="sp" onclick="print()">📄 Print / PDF</button></div>
     <div class="kpis" id="kpis"></div>
-    <h2 class="mh">Month by month</h2>
+    <div id="mmBox"><h2 class="mh">Month by month</h2>
     <div class="card"><table id="monthT"></table></div>
+    <p class="lead noprint">Click a month for its days.</p></div>
     <div id="refusedBox" hidden>
       <h2 class="mh">Generator refused by the inverters</h2>
       <div class="card"><table id="refT"></table></div>
@@ -101,16 +109,31 @@
     <div id="dayBox"><h2 class="mh">Day by day</h2>
     <div class="card"><table id="dayT"></table></div></div>
     <div id="studyBox" hidden>
-      <h2 class="mh" id="stTitle">Battery — what more storage would bring</h2>
+      <h2 class="mh" id="stTitle">Battery — now and after an upgrade</h2>
       <div class="row noprint" id="stRange"></div>
       <div class="sim noprint">
-        <label>Extra battery kWh<input id="sKwh" type="number" min="0" step="10"></label>
+        <span class="sg">Now</span>
+        <label>Racks<input id="bR" type="number" min="0" step="1"></label>
+        <label>Batteries a rack<input id="bP" type="number" min="0" step="1"></label>
+        <label>kWh a battery<input id="bK" type="number" min="0" step="0.1"></label>
+        <span class="tot" id="bT"></span>
+      </div>
+      <div class="sim noprint">
+        <span class="sg">Upgrade</span>
+        <label>Racks<input id="uR" type="number" min="0" step="1"></label>
+        <label>Batteries a rack<input id="uP" type="number" min="0" step="1"></label>
+        <label>kWh a battery<input id="uK" type="number" min="0" step="0.1"></label>
+        <span class="tot" id="uT"></span>
+      </div>
+      <div class="sim noprint">
+        <span class="sg">Prices</span>
         <label>Usable %<input id="sUse" type="number" min="10" max="100" step="5"></label>
-        <label>Battery cost $<input id="sCost" type="number" min="0" step="500"></label>
+        <label>$ a new battery<input id="sCost" type="number" min="0" step="50"></label>
         <label>Generator $ / kWh<input id="sKw" type="number" min="0" step="0.01"></label>
       </div>
       <div class="kpis" id="stKpis"></div>
       <div class="card"><table id="stT"></table></div>
+      <p class="lead noprint">Click a month for its days.</p>
       <div class="note" id="stNote"></div>
     </div>
     <div class="note" id="note"></div>
@@ -127,7 +150,7 @@
   const dd = d => `${+d.slice(8)} ${MO[+d.slice(5, 7) - 1]}`;
   const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   const key = location.pathname.replace(/\/$/, '').split('/').pop();
-  let D = null, month = null, showSoc = false;
+  let D = null, month = null, showSoc = false, mOpen = {};
   try { showSoc = localStorage.getItem('plantSrcSoc') === '1'; } catch {}
 
   // two calls (2026-10-22): the stored days first (Firestore, ~1 s), then — only when today's reading is over 10 min or
@@ -144,6 +167,7 @@
     $('months').innerHTML = ms.map(m => `<button data-m="${m}">${MO[+m.slice(5) - 1]} ${m.slice(0, 4)}</button>`).join(' ');
     $('months').onclick = e => { const b = e.target.closest('button'); if (b) { month = b.dataset.m; render(); } };
     $('socBtn').onclick = () => { showSoc = !showSoc; try { localStorage.setItem('plantSrcSoc', showSoc ? '1' : '0'); } catch {} render(); };
+    $('monthT').onclick = e => { const tr = e.target.closest('tr.mrow'); if (tr) { mOpen[tr.dataset.m] = !mOpen[tr.dataset.m]; render(); } };
     $('time').onclick = e => { const i = e.target.closest('.b i'); $('tip').textContent = i ? i.title : ''; };
     $('app').hidden = false; render();
   }).catch(e => { $('title').textContent = 'Plant'; $('err').textContent = 'Could not load the plant (' + e.message + ').'; });
@@ -157,6 +181,9 @@
       const at = new Date(n.at * 1000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' });
       $('nowLine').innerHTML = `Now (${at}): <b>${n.src === 'o' ? 'no source — on battery and sun' : C[n.src]}</b>${n.hz && n.src !== 'o' ? ' · ' + n.hz + ' Hz' : ''} · battery ${n.soc} % · solar ${f1(n.pv / 1000)} kW · load ${f1(n.l / 1000)} kW`;
     }
+    // a plant with the battery study (McKinsey): the month buttons, these tiles and the month table go — the battery table has every
+    // month (Mario 2026-10-23: "month by month dashboard is useless, I already have the table")
+    $('months').hidden = $('kpis').hidden = $('mmBox').hidden = !!D.study;
     $('months').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === month));
     $('socBtn').classList.toggle('on', showSoc);
     const days = Object.keys(D.days).filter(d => d.startsWith(month)).sort();
@@ -173,16 +200,26 @@
       `<div class="kpi"><span>Battery full, sun up</span><b>${f0(T.full)} h</b><small>solar held back — nowhere to put it</small></div>` +
       (C.r ? `<div class="kpi"><span>Generator refused</span><b style="color:${T.ref ? '#fab387' : 'var(--green)'}">${T.ref}×</b><small>${f0(T.src.r.h)} h in ${mName.split(' ')[0]}</small></div>` : '');
 
-    // month by month
+    // month by month — click a month for its days, a total row at the end (Mario 2026-10-23)
     const months = [...new Set(Object.keys(D.days).map(d => d.slice(0, 7)))].sort().reverse();
-    let mt = `<tr><th>Month</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>hours · kWh in${D.port === 'grid' ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>lowest %</small></th><th>Full, sun up<small>hours</small></th></tr>`;
-    for (const m of months) {
-      const ds = Object.keys(D.days).filter(d => d.startsWith(m)), t = { pv: 0, load: 0, full: 0, low: null, src: {} };
+    const io = D.port === 'grid';
+    let mt = `<tr><th>Month</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>hours · kWh in${io ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>lowest %</small></th><th>Full, sun up<small>hours</small></th></tr>`;
+    const tot = ds => { const t = { pv: 0, load: 0, full: 0, low: null, src: {} };
       for (const k of K) t.src[k] = { h: 0, in: 0, out: 0 };
       for (const d of ds) { const s = D.days[d]; t.pv += s.pv; t.load += s.load; t.full += s.full; if (s.socMin != null) t.low = t.low == null ? s.socMin : Math.min(t.low, s.socMin); for (const k of K) for (const f of ['h', 'in', 'out']) t.src[k][f] += s.src[k][f]; }
-      mt += `<tr><td>${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}<small>${ds.length} days${ds.includes(D.today) ? ', to today' : ''}</small></td><td>${f0(t.pv)}</td><td>${f0(t.load)}</td>` +
-        K.map(k => `<td>${f0(t.src[k].h)} h · ${f0(t.src[k].in)}${D.port === 'grid' ? ' · ' + f0(t.src[k].out) : ''}</td>`).join('') + `<td>${t.low ?? ''}</td><td>${f0(t.full)}</td></tr>`;
+      return t; };
+    const cells = (t, f) => `<td>${f(t.pv)}</td><td>${f(t.load)}</td>` + K.map(k => `<td>${f(t.src[k].h)} h · ${f(t.src[k].in)}${io ? ' · ' + f(t.src[k].out) : ''}</td>`).join('') + `<td>${t.low ?? ''}</td><td>${f(t.full)}</td>`;
+    for (const m of months) {
+      const ds = Object.keys(D.days).filter(d => d.startsWith(m)).sort();
+      mt += `<tr class="mrow" data-m="${m}"><td>${mOpen[m] ? '▾' : '▸'} ${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}<small>${ds.length} days${ds.includes(D.today) ? ', to today' : ''}</small></td>${cells(tot(ds), f0)}</tr>`;
+      if (mOpen[m]) for (const d of ds.slice().reverse()) {
+        const x = D.days[d];
+        mt += `<tr class="dy"><td>${dd(d)}${d === D.today ? '<small>so far</small>' : x.n < 250 ? '<small>' + x.n + ' readings</small>' : ''}</td><td>${f1(x.pv)}</td><td>${f1(x.load)}</td>` +
+          K.map(k => `<td>${f1(x.src[k].h)} h · ${f1(x.src[k].in)}${io ? ' · ' + f1(x.src[k].out) : ''}</td>`).join('') + `<td>${x.socMin ?? ''}${x.socMax != null ? '–' + x.socMax : ''}</td><td>${f1(x.full)}</td></tr>`;
+      }
     }
+    const allDays = Object.keys(D.days);
+    mt += `<tr class="tot"><td>Total<small>${allDays.length} days</small></td>${cells(tot(allDays), f0)}</tr>`;
     $('monthT').innerHTML = mt;
 
     // the refused generator (Bookstop)
@@ -234,31 +271,48 @@
   // solar thrown while the battery sat full, generator kWh before / after that window. The extra battery runs through
   // the days in order: it fills from the thrown solar (up to its usable kWh) and gives it back in place of the generator,
   // carrying what is left to the next day. Settings kept in this browser.
-  let S = null, stRange = 'now';
-  const SIM = { kwh: 120, use: 90, cost: 24000, k: 0.30 };
-  try { Object.assign(SIM, JSON.parse(localStorage.getItem('plantStudy_' + key) || '{}')); } catch {}
+  let S = null, stRange = 'now', stOpen = {};
+  // Mario 2026-10-23: "mckinsey has rack1 12×5 = 60 kWh, rack2 12×5 = 60 kWh; if I upgrade to 4 racks × 9 batt = 180 kWh,
+  // the difference before and after — generator hours / kWh per day / month — with the battery customised (number and kWh)"
+  const SIM = { bR: 2, bP: 12, bK: 5, uR: 4, uP: 9, uK: 5, use: 90, cost: 1000, k: 0.30 };
+  let simSet = false;
   function loadStudy() {
+    try { const v = JSON.parse(localStorage.getItem('plantStudy2_' + key) || 'null'); if (v) { Object.assign(SIM, v); simSet = true; } } catch {}
     const go = live => fetch('/api/plant-study?p=' + encodeURIComponent(key) + (live ? '&live=1' : '')).then(r => r.json());
-    go(false).then(j => { if (j.error) return; S = j; renderStudy(); if (j.left) go(true).then(k => { if (!k.error) { S = k; renderStudy(); } }).catch(() => {}); }).catch(() => {});
-    for (const [id, f] of [['sKwh', 'kwh'], ['sUse', 'use'], ['sCost', 'cost'], ['sKw', 'k']]) {
+    go(false).then(j => {
+      if (j.error) return; S = j;
+      if (!simSet && S.batt) { Object.assign(SIM, { bR: S.batt.racks, bP: S.batt.per, bK: S.batt.kwh }); if (S.upgrade) Object.assign(SIM, { uR: S.upgrade.racks, uP: S.upgrade.per, uK: S.upgrade.kwh }); }
+      for (const f of ['bR', 'bP', 'bK', 'uR', 'uP', 'uK']) $(f).value = SIM[f];
+      renderStudy();
+      if (j.left) go(true).then(k => { if (!k.error) { S = k; renderStudy(); } }).catch(() => {});
+    }).catch(() => {});
+    for (const [id, f] of [['bR', 'bR'], ['bP', 'bP'], ['bK', 'bK'], ['uR', 'uR'], ['uP', 'uP'], ['uK', 'uK'], ['sUse', 'use'], ['sCost', 'cost'], ['sKw', 'k']]) {
       $(id).value = SIM[f];
-      $(id).addEventListener('input', () => { SIM[f] = +$(id).value || 0; try { localStorage.setItem('plantStudy_' + key, JSON.stringify(SIM)); } catch {} renderStudy(); });
+      $(id).addEventListener('input', () => { SIM[f] = +$(id).value || 0; simSet = true; try { localStorage.setItem('plantStudy2_' + key, JSON.stringify(SIM)); } catch {} renderStudy(); });
     }
-    $('stRange').onclick = e => { const b = e.target.closest('button'); if (b) { stRange = b.dataset.r; renderStudy(); } };
+    $('stRange').onclick = e => { const b = e.target.closest('button'); if (b) { stRange = b.dataset.r; stOpen = {}; renderStudy(); } };
+    $('stT').onclick = e => { const tr = e.target.closest('tr.mrow'); if (tr) { stOpen[tr.dataset.m] = !stOpen[tr.dataset.m]; renderStudy(); } };
   }
-  function simulate(days) {   // → per day { rep, e } with the extra battery carried along
-    const cap = SIM.kwh * SIM.use / 100; let e = 0;
+  // the added kWh runs through the days in order: it fills from the solar thrown (up to its usable part) and gives it
+  // back in place of the generator — the same day before the battery filled, or the evening / night after — carrying
+  // what is left to the next day. Generator hours after = that day's hours × the share of its kWh still needed.
+  function simulate(days, extra) {
+    const cap = Math.max(0, extra) * SIM.use / 100; let e = 0;
     return days.map(d => {
       const a = Math.min(e, d.genBefore); e -= a;
-      const st = Math.min(cap - e, d.thrown); e += st;
+      e += Math.min(cap - e, d.thrown);
       const b = Math.min(e, d.genAfter); e -= b;
-      return { ...d, rep: a + b, stored: Math.min(cap, d.thrown) };   // stored = what it could take that day (as Tohme's rack); rep = the generator kWh it would have replaced
+      const rep = Math.min(d.gen, a + b), g2 = Math.max(0, d.gen - rep);
+      return { ...d, rep, gen2: g2, h2: d.gen > 0 ? (d.genH || 0) * g2 / d.gen : 0 };
     });
   }
   function renderStudy() {
     if (!S || !D) return;
     $('studyBox').hidden = false;
-    const all = simulate(S.days.filter(d => d.n > 0));
+    const nowK = SIM.bR * SIM.bP * SIM.bK, upK = SIM.uR * SIM.uP * SIM.uK, extra = upK - nowK, addN = SIM.uR * SIM.uP - SIM.bR * SIM.bP;
+    $('bT').innerHTML = `= <b>${f0(nowK)} kWh</b> (${SIM.bR * SIM.bP} batteries)`;
+    $('uT').innerHTML = `= <b>${f0(upK)} kWh</b> (${SIM.uR * SIM.uP} batteries) · <b class="${extra > 0 ? 'after' : ''}">${extra >= 0 ? '+' : ''}${f0(extra)} kWh</b>${addN > 0 ? ` · ${addN} batteries to buy` : ''}`;
+    const all = simulate(S.days.filter(d => d.n > 0), extra);
     if (!all.length) { $('stKpis').innerHTML = '<p class="lead">No day stored yet.</p>'; return; }
     // the plant as it is now: from the first day DeyeCloud had the present kWp (it grew)
     const kNow = all[all.length - 1].kwp, since = (all.find((d, i) => all.slice(i).every(x => !x.kwp || x.kwp >= kNow * 0.9)) || all[0]).day;
@@ -266,37 +320,42 @@
     const R = { now: [`Since ${kNow} kWp (${dd(since)} ${since.slice(0, 4)})`, d => d.day >= since], y: ['Last 12 months', d => d.day > yAgo], all: ['All', () => true] };
     $('stRange').innerHTML = Object.entries(R).map(([k, [l]]) => `<button data-r="${k}" class="${k === stRange ? 'on' : ''}">${l}</button>`).join(' ');
     const list = all.filter(R[stRange][1]), N = list.length, perYear = N ? 365 / N : 0;
-    const sum = (a, f) => a.reduce((s, d) => s + (d[f] || 0), 0);
-    const full = list.filter(d => d.fullAt), thrown = sum(list, 'thrown'), gen = sum(list, 'gen'), rep = sum(list, 'rep'), stored = sum(list, 'stored');
-    const low = list.filter(d => d.socMin != null && d.socMin < 20).length, genDays = list.filter(d => d.gen >= 1).length;
-    const mAvg = full.length ? full.reduce((s, d) => { const [h, m] = d.fullAt.split(':'); return s + +h * 60 + +m; }, 0) / full.length : null;
-    const saveY = rep * SIM.k * perYear, pay = saveY > 0 ? SIM.cost / saveY : null;
-    $('stTitle').textContent = `Battery — what ${SIM.kwh} kWh more would bring (now ${S.battKwh} kWh, ${S.invKw} kW of inverters)`;
+    const sum = (a, f) => a.reduce((s, d) => s + (d[f] || 0), 0), cnt = (a, f) => a.filter(d => (d[f] || 0) >= 0.5).length;
+    const G = { k: sum(list, 'gen'), h: sum(list, 'genH'), d: cnt(list, 'gen') }, G2 = { k: sum(list, 'gen2'), h: sum(list, 'h2'), d: cnt(list, 'gen2') };
+    const full = list.filter(d => d.fullAt), thrown = sum(list, 'thrown'), rep = G.k - G2.k;
+    const cost = Math.max(0, addN) * SIM.cost, saveY = rep * SIM.k * perYear, pay = saveY > 0 ? cost / saveY : null;
+    const h1 = h => h < 10 ? (Math.round(h * 10) / 10).toLocaleString('en-US') : f0(h);
+    $('stTitle').textContent = `Battery — ${f0(nowK)} kWh now → ${f0(upK)} kWh (${S.invKw} kW of inverters)`;
     $('stKpis').innerHTML =
-      `<div class="kpi"><span>Battery full from the sun</span><b>${full.length} days</b><small>of ${N} · on average at ${mAvg == null ? '—' : hm(Math.round(mAvg))}</small></div>` +
-      `<div class="kpi thr"><span>Solar thrown</span><b>${f0(thrown)} kWh</b><small>${f0(thrown * perYear)} a year · panels held back while the battery was full</small></div>` +
-      `<div class="kpi"><span>From the generator</span><b style="color:#cba6f7">${f0(gen)} kWh</b><small>${genDays} days it ran · ${low} days battery under 20 %</small></div>` +
-      `<div class="kpi"><span>+${SIM.kwh} kWh could take</span><b>${f0(stored)} kWh</b><small>of the solar thrown, ${f0(SIM.kwh * SIM.use / 100)} kWh a day at most</small></div>` +
-      `<div class="kpi sav"><span>It would replace</span><b>${f0(rep)} kWh</b><small>${gen > 0 ? Math.round(rep / gen * 100) : 0} % of the generator · ${f0(rep * perYear)} kWh a year</small></div>` +
-      `<div class="kpi sav"><span>Saves</span><b>$${f0(saveY)} / year</b><small>at $${SIM.k} a generator kWh</small></div>` +
-      `<div class="kpi"><span>Pays back in</span><b style="color:${pay && pay < 6 ? 'var(--green)' : 'var(--red)'}">${pay ? (pay > 99 ? 'over 99 y' : (Math.round(pay * 10) / 10) + ' y') : 'never'}</b><small>$${f0(SIM.cost)} ÷ the yearly saving</small></div>`;
-    // month by month
+      `<div class="kpi"><span>Battery full from the sun</span><b>${full.length} days</b><small>of ${N} with ${f0(nowK)} kWh</small></div>` +
+      `<div class="kpi thr"><span>Solar thrown</span><b>${f0(thrown)} kWh</b><small>${f0(thrown * perYear)} a year · held back while the battery was full</small></div>` +
+      `<div class="kpi"><span>Generator now · ${f0(nowK)} kWh</span><b style="color:#cba6f7">${f0(G.k)} kWh</b><small>${h1(G.h)} h · ${G.d} days · ${f0(G.k * perYear)} kWh a year</small></div>` +
+      `<div class="kpi sav"><span>Generator after · ${f0(upK)} kWh</span><b>${f0(G2.k)} kWh</b><small>${h1(G2.h)} h · ${G2.d} days · ${f0(G2.k * perYear)} kWh a year</small></div>` +
+      `<div class="kpi sav"><span>Saves</span><b>$${f0(saveY)} / year</b><small>${f0(rep)} kWh in these ${N} days · ${f0(G.h - G2.h)} h less · $${SIM.k} a kWh</small></div>` +
+      `<div class="kpi"><span>Pays back in</span><b style="color:${pay && pay < 6 ? 'var(--green)' : 'var(--red)'}">${addN <= 0 ? '—' : pay ? (pay > 99 ? 'over 99 y' : (Math.round(pay * 10) / 10) + ' y') : 'never'}</b><small>${addN > 0 ? `${addN} × $${f0(SIM.cost)} = $${f0(cost)}` : 'no battery to buy'}</small></div>`;
     const ms = [...new Set(list.map(d => d.day.slice(0, 7)))].sort().reverse();
-    let t = `<tr><th>Month</th><th>kWp</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th><th>Battery full<small>days · at</small></th><th>Solar thrown<small>kWh</small></th><th>Generator<small>kWh · days</small></th><th>Under 20 %<small>days</small></th><th>+${SIM.kwh} kWh stores<small>kWh</small></th><th>Replaces<small>generator kWh</small></th><th>Saves<small>$</small></th></tr>`;
+    const gcell = (k, h, n, cls) => `<td class="${cls}">${f0(k)}</td><td class="${cls}">${h1(h)}</td><td class="${cls}">${n}</td>`;
+    let t = `<tr><th></th><th></th><th></th><th></th><th></th><th class="grp" colspan="3">Generator now · ${f0(nowK)} kWh</th><th class="grp" colspan="3">Generator after · ${f0(upK)} kWh</th><th></th><th></th></tr>` +
+      `<tr><th>Month</th><th>kWp</th><th>Solar<small>kWh</small></th><th>Battery full<small>days</small></th><th>Solar thrown<small>kWh</small></th>` +
+      `<th>kWh</th><th>hours</th><th>days</th><th>kWh</th><th>hours</th><th>days</th><th>Saved<small>kWh</small></th><th>Saves<small>$</small></th></tr>`;
     for (const m of ms) {
-      const x = list.filter(d => d.day.startsWith(m)), f = x.filter(d => d.fullAt);
-      const at = f.length ? hm(Math.round(f.reduce((s, d) => { const [h, mm] = d.fullAt.split(':'); return s + +h * 60 + +mm; }, 0) / f.length)) : '';
-      const ks = x.map(d => d.kwp).filter(Boolean);
-      t += `<tr><td>${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}<small>${x.length} days</small></td><td>${ks.length ? Math.max(...ks) : ''}</td><td>${f0(sum(x, 'pv'))}</td><td>${f0(sum(x, 'use'))}</td><td>${f.length}${at ? ' · ' + at : ''}</td>` +
-        `<td class="sol">${f0(sum(x, 'thrown'))}</td><td class="gen">${f0(sum(x, 'gen'))} · ${x.filter(d => d.gen >= 1).length}</td><td>${x.filter(d => d.socMin != null && d.socMin < 20).length}</td>` +
-        `<td>${f0(sum(x, 'stored'))}</td><td class="sav">${f0(sum(x, 'rep'))}</td><td class="sav">${f0(sum(x, 'rep') * SIM.k)}</td></tr>`;
+      const x = list.filter(d => d.day.startsWith(m)), ks = x.map(d => d.kwp).filter(Boolean);
+      const r = sum(x, 'gen') - sum(x, 'gen2');
+      t += `<tr class="mrow" data-m="${m}"><td>${stOpen[m] ? '▾' : '▸'} ${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}<small>${x.length} days</small></td><td>${ks.length ? Math.max(...ks) : ''}</td><td>${f0(sum(x, 'pv'))}</td><td>${x.filter(d => d.fullAt).length}</td><td class="sol">${f0(sum(x, 'thrown'))}</td>` +
+        gcell(sum(x, 'gen'), sum(x, 'genH'), cnt(x, 'gen'), 'gen') + gcell(sum(x, 'gen2'), sum(x, 'h2'), cnt(x, 'gen2'), 'sav') + `<td class="sav">${f0(r)}</td><td class="sav">${f0(r * SIM.k)}</td></tr>`;
+      if (stOpen[m]) for (const d of x.slice().reverse()) {
+        const r2 = d.gen - d.gen2;
+        t += `<tr class="dy"><td>${dd(d.day)}<small>${d.fullAt ? 'full at ' + d.fullAt : 'battery not full'} · ${d.socMin ?? ''}–${d.socMax ?? ''} %</small></td><td>${d.kwp || ''}</td><td>${f1(d.pv)}</td><td>${d.fullAt ? '✓' : ''}</td><td class="sol">${f1(d.thrown)}</td>` +
+          `<td class="gen">${f1(d.gen)}</td><td class="gen">${f1(d.genH)}</td><td></td><td class="sav">${f1(d.gen2)}</td><td class="sav">${f1(d.h2)}</td><td></td><td class="sav">${f1(r2)}</td><td class="sav">${f1(r2 * SIM.k)}</td></tr>`;
+      }
     }
-    t += `<tr class="tot"><td>${R[stRange][0]}<small>${N} days</small></td><td></td><td>${f0(sum(list, 'pv'))}</td><td>${f0(sum(list, 'use'))}</td><td>${full.length}</td><td>${f0(thrown)}</td><td>${f0(gen)} · ${genDays}</td><td>${low}</td><td>${f0(stored)}</td><td>${f0(rep)}</td><td>${f0(rep * SIM.k)}</td></tr>`;
+    t += `<tr class="tot"><td>${R[stRange][0]}<small>${N} days</small></td><td></td><td>${f0(sum(list, 'pv'))}</td><td>${full.length}</td><td>${f0(thrown)}</td>` +
+      `<td>${f0(G.k)}</td><td>${h1(G.h)}</td><td>${G.d}</td><td>${f0(G2.k)}</td><td>${h1(G2.h)}</td><td>${G2.d}</td><td>${f0(rep)}</td><td>${f0(rep * SIM.k)}</td></tr>`;
     $('stT').innerHTML = t;
     $('stNote').innerHTML =
-      `<b>Solar thrown.</b> Once the battery is full (99–100 %) in daylight, the inverters hold the panels down to the load. What the panels could have given is a clear-sky curve for that date, fitted on the same day's readings in the 90 minutes before the battery filled (a cloudy day gives a lower curve — nothing is taken from a weather report); thrown = that curve minus what the panels gave, until the battery starts to empty or the sun sets. Same method as Villa Tohme. ` +
-      `<b>The extra battery</b> is run through the days in order: it fills from the thrown solar, up to ${f0(SIM.kwh * SIM.use / 100)} kWh (${SIM.kwh} kWh × ${SIM.use} % usable), and gives it back whenever the generator ran — the same day before the battery filled, or the evening and night after — carrying what is left to the next day. It can only replace what the generator actually gave, so on a site where the generator runs a few hours a month most of the thrown solar stays thrown. ` +
-      `Daytime solar on a day the battery never filled is already used, so it adds nothing. Losses in and out of the battery are not counted (a few %). <b>kWp</b> = what DeyeCloud had installed that day — the plant grew, so the first range is the plant as it is now. From the station's 5-minute power profile on DeyeCloud.`;
+      `<b>Generator now</b> = what the generator actually gave, from the station's 5-minute readings (hours = readings with more than 0.5 kW coming in). ` +
+      `<b>Generator after</b> = the same days with the battery set above: the ${f0(Math.max(0, extra))} kWh added (${SIM.use} % usable = ${f0(Math.max(0, extra) * SIM.use / 100)} kWh) is run through the days in order. It fills from the solar thrown — the solar the inverters hold back once the battery is full (clear-sky curve fitted on the same day's readings before the battery filled, same method as Villa Tohme) — and gives it back whenever the generator ran: the same morning before the battery filled, or the evening and night after, carrying what is left to the next day. ` +
+      `A day's generator hours after = its hours × the share of its kWh still needed. Losses in and out of the battery are not counted (a few %), so the saving is slightly on the high side. Nothing is guessed for days with no readings. <b>kWp</b> = what DeyeCloud had installed that day — the plant grew, so the first range is the plant as it is now.`;
   }
 })();
 </script>
