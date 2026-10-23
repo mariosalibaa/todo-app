@@ -476,6 +476,7 @@ const APPS = ['todo', 'accounting', 'partners', 'ajaltoun', 'daily', 'site', 're
 const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || 'mario.salibaa@gmail.com')
   .toLowerCase().split(',').map(x => x.trim()).filter(Boolean));
 let _allowCache = { map: null, at: 0 };
+let makhloufBody = null;   // /api/makhlouf, slimmed once per instance
 // ---- web push ----
 const pushCol = () => db.collection('workspaces').doc(TEAM_ID).collection('pushSubs');
 const subId = endpoint => crypto.createHash('sha256').update(String(endpoint)).digest('hex').slice(0, 40);
@@ -1363,7 +1364,10 @@ const handler = async (req, res) => {
     const acc = await cprAccess();
     if (!acc.isAdmin) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'admin' })); return; }
     // the file changes only with a deploy: a reopen paints from the browser's copy and refreshes it behind (fast to open, Mario 2026-10-23)
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300, stale-while-revalidate=604800' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'))); return;
+    // every minute carries only the columns the page charts; the full last minute (phase table) rides along — half the download
+    if (!makhloufBody) { const d = JSON.parse(fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'), 'utf8')), keep = ['at', 'UA', 'UB', 'UC', 'IA', 'IB', 'IC', 'IN', 'PA', 'PB', 'PC', 'PSum', 'ITHAvg'], ix = keep.map(k => d.cols.indexOf(k));
+      makhloufBody = JSON.stringify({ ...d, last: d.rows[d.rows.length - 1], lastCols: d.cols, cols: keep, rows: d.rows.map(r => ix.map(i => r[i])) }); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300, stale-while-revalidate=604800' }); res.end(makhloufBody); return;
   }
   // /api/makhlouf-sun — a year of 5-min production per 540 W panel from the reference plant (refsun/build.js). Admins only.
   if (url.split('?')[0] === '/api/makhlouf-sun' && req.method === 'GET') {

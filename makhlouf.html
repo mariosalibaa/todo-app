@@ -251,7 +251,8 @@
     if (D.error) { $('err').textContent = D.error; return; }
     $('app').hidden = false;
     const C = D.cols.reduce((o, k, i) => (o[k] = i, o), {});
-    const R = D.rows, L = R[R.length - 1];
+    const R = D.rows, L = D.last || R[R.length - 1];   // rows: the charted columns only; last: the full last minute (lastCols)
+    const CL = D.lastCols ? D.lastCols.reduce((o, k, i) => (o[k] = i, o), {}) : C;
 
     // energy since the clean start from the meter's counters (they count even when the card does not record).
     // Mario 2026-10-04: disregard the house data — everything starts at D.start (first clean Makhlouf row).
@@ -284,16 +285,16 @@
 
     // per phase now (Mario 2026-10-03: "show also the phase reading") + each phase's own kWh counter and its share
     if (L) {
-      const imb = Math.max(L[C.IA], L[C.IB], L[C.IC]) / ((L[C.IA] + L[C.IB] + L[C.IC]) / 3) - 1;
+      const imb = Math.max(L[CL.IA], L[CL.IB], L[CL.IC]) / ((L[CL.IA] + L[CL.IB] + L[CL.IC]) / 3) - 1;
       const pf = v => v == null || isNaN(v) ? '—' : v.toFixed(2);
       const PA = D.peakA || {}, mx = pk => pk ? `${f0(pk.amps)}<small>${when(pk.at)}</small>` : '—';
-      const ph = (n, x, cnt, e, note, pk, pkA) => `<tr><td>${n}</td><td>${f1(L[C['U' + x]])}</td><td>${f0(L[C['I' + x]])}</td><td>${f1(L[C['P' + x]] / 1000)}</td><td>${pf(L[C['PF' + x]])}</td>` +
-        `<td class="hide-sm">${f1(L[C['UTH' + x]])} %</td><td class="hide-sm">${f1(L[C['ITH' + x]])} %</td><td>${f1(cnt / 1000)}<small class="hide-sm">kWh on the meter</small></td><td>${f0(e)}<small>${note}</small></td><td>${f1(pk.kw)}<small>${when(pk.at)}</small></td><td>${mx(pkA)}</td></tr>`;
+      const ph = (n, x, cnt, e, note, pk, pkA) => `<tr><td>${n}</td><td>${f1(L[CL['U' + x]])}</td><td>${f0(L[CL['I' + x]])}</td><td>${f1(L[CL['P' + x]] / 1000)}</td><td>${pf(L[CL['PF' + x]])}</td>` +
+        `<td class="hide-sm">${f1(L[CL['UTH' + x]])} %</td><td class="hide-sm">${f1(L[CL['ITH' + x]])} %</td><td>${f1(cnt / 1000)}<small class="hide-sm">kWh on the meter</small></td><td>${f0(e)}<small>${note}</small></td><td>${f1(pk.kw)}<small>${when(pk.at)}</small></td><td>${mx(pkA)}</td></tr>`;
       $('phases').innerHTML = `<tr><th>Phase</th><th>Volts</th><th>Amps</th><th>kW</th><th>PF</th><th class="hide-sm">Voltage THD</th><th class="hide-sm">Current THD</th><th>Counter<small>at ${when(K.at)}</small></th><th>kWh<small>since ${when(S.at)}</small></th><th>Max kW<small>highest minute</small></th><th>Max A<small>highest minute</small></th></tr>` +
         ph('A', 'A', K.epa, eA, '', D.peak.a, PA.a) + ph('B', 'B', K.epb, eB, '', D.peak.b, PA.b) + ph('C', 'C', K.epc, eC, '', D.peak.c, PA.c) +
-        `<tr><td>Neutral</td><td></td><td class="${L[C.IN] > 80 ? 'warn' : ''}">${f0(L[C.IN])}</td><td></td><td></td><td class="hide-sm"></td><td class="hide-sm"></td><td></td><td></td><td></td><td>${mx(PA.n)}</td></tr>` +
-        `<tr class="tot"><td>Total</td><td>${f1((L[C.UA] + L[C.UB] + L[C.UC]) / 3)}<small>average</small></td><td class="${imb > 0.2 ? 'warn' : ''}">${Math.round(imb * 100)} %<small>imbalance</small></td><td>${f1(L[C.PSum] / 1000)}<small>${C.SSum != null ? f1(L[C.SSum] / 1000) + ' kVA' : ''}</small></td><td>${pf(L[C.PFAvg])}</td>` +
-        `<td class="hide-sm">${f1(L[C.UTHAvg])} %</td><td class="hide-sm">${f1(L[C.ITHAvg])} %</td><td>${f1(K.epsum / 1000)}</td><td>${f0(eTot)}</td><td>${f1(D.peak.sum.kw)}<small>${when(D.peak.sum.at)}</small></td><td></td></tr>`;
+        `<tr><td>Neutral</td><td></td><td class="${L[CL.IN] > 80 ? 'warn' : ''}">${f0(L[CL.IN])}</td><td></td><td></td><td class="hide-sm"></td><td class="hide-sm"></td><td></td><td></td><td></td><td>${mx(PA.n)}</td></tr>` +
+        `<tr class="tot"><td>Total</td><td>${f1((L[CL.UA] + L[CL.UB] + L[CL.UC]) / 3)}<small>average</small></td><td class="${imb > 0.2 ? 'warn' : ''}">${Math.round(imb * 100)} %<small>imbalance</small></td><td>${f1(L[CL.PSum] / 1000)}<small>${CL.SSum != null ? f1(L[CL.SSum] / 1000) + ' kVA' : ''}</small></td><td>${pf(L[CL.PFAvg])}</td>` +
+        `<td class="hide-sm">${f1(L[CL.UTHAvg])} %</td><td class="hide-sm">${f1(L[CL.ITHAvg])} %</td><td>${f1(K.epsum / 1000)}</td><td>${f0(eTot)}</td><td>${f1(D.peak.sum.kw)}<small>${when(D.peak.sum.at)}</small></td><td></td></tr>`;
     }
 
     // chart: total + each phase, kW per minute; a gap > 3 min breaks the line
@@ -443,11 +444,12 @@
       const set = { lm, floorOf: src => GK[gm === 'log' ? src : gm].kva * 0.8 * pct / 100, minP, maxP, P: 375, sP, tP: Math.min(100, Math.max(sP * 100 + 1, +$('batT').value || 40)) / 100 };
       const all = Object.keys(SUNDATA.days).sort();
       const fct = m => { const r = SUNDATA.months[m], g = SUNDATA.pvgis[+m.slice(5) - 1] * 0.54; return pv && r && g ? g / r.kwh : 1; };
+      const PK = {}; for (const d of all) { const f = fct(d.slice(0, 7)); PK[d] = SUNDATA.days[d].p.map(v => v * f / 1000); }   // once, not per proposal
       const year = (N, cap) => {   // a year: average day of each month × days, the 12 month slots summed
         const slot = {}, K = ['made', 'used', 'lost', 'bat', 'gen', 'genH', 'fuel'];
         for (const m of [...new Set(all.map(d => d.slice(0, 7)))]) {
           const ds = all.filter(d => d.startsWith(m)), [y, mm] = m.split('-'), dim = new Date(Date.UTC(+y, +mm, 0)).getUTCDate();
-          const rs = ds.map(d => simDay(SUNDATA.days[d].p.map(v => v * fct(m) / 1000), N, W, cap > 0, cap, set));
+          const rs = ds.map(d => simDay(PK[d], N, W, cap > 0, cap, set));
           (slot[mm] = slot[mm] || []).push(Object.fromEntries(K.map(k => [k, rs.reduce((a, r) => a + r[k], 0) / rs.length * dim])));
         }
         return Object.fromEntries(K.map(k => [k, Object.values(slot).reduce((a, v) => a + v.reduce((x, y) => x + y[k], 0) / v.length, 0)]));
@@ -479,14 +481,14 @@
     const simDay = (pk, N, W, hyb, cap, set) => {   // pk: 288 × kW per 540 W panel
       const { floorOf, minP, maxP, P, sP, tP } = set, eff = 0.95, lo = cap * minP, hi = cap * maxP, startAt = cap * sP, stopAt = cap * tP;
       let soc = lo, genOn = true, r;
-      const lmA = set.lm || LM, sl = slotsOf(lmA);
+      const lmA = set.lm || LM, sl = slotsOf(lmA), fl = { G1: floorOf('G1'), G2: floorOf('G2') }, flOf = src => fl[src] ?? floorOf(src);
       for (let pass = 0; pass < (hyb ? 2 : 1); pass++) {
         r = { made: 0, used: 0, lost: 0, bat: 0, gen: 0, edl: 0, fuel: 0, genH: 0 };
         for (let i = 0; i < lmA.length; i++) {
           const [, kw, , src] = lmA[i], p = N * pk[sl[i]] * W / 540, onEdl = src === 'EDL', net = kw - p;
           r.made += p / 60;
           if (!hyb) {
-            const fk = onEdl ? 0 : Math.min(floorOf(src), kw), used = Math.min(p, Math.max(kw - fk, 0));
+            const fk = onEdl ? 0 : Math.min(flOf(src), kw), used = Math.min(p, Math.max(kw - fk, 0));
             r.used += used / 60; r.lost += (p - used) / 60;
             if (onEdl) r.edl += (kw - used) / 60; else { r.gen += (kw - used) / 60; r.fuel += fuelLh(src, kw - used) / 60; r.genH += 1 / 60; }
             continue;
@@ -497,7 +499,7 @@
           else {
             if (genOn && soc >= stopAt) genOn = false;
             if (!genOn && (soc <= startAt || net > P)) genOn = true;
-            if (genOn) { const fk = Math.min(floorOf(src), kw); g = Math.max(net, fk); gOn = true; const spare = p - (kw - g); if (spare > 0) { b = -Math.min(spare, P, room); ls = spare + b; } }
+            if (genOn) { const fk = Math.min(flOf(src), kw); g = Math.max(net, fk); gOn = true; const spare = p - (kw - g); if (spare > 0) { b = -Math.min(spare, P, room); ls = spare + b; } }
             else if (net <= 0) { b = -Math.min(-net, P, room); ls = -net + b; }
             else { b = Math.min(net, P, Math.max((soc - lo) * eff * 60, 0)); g = net - b; gOn = g > 0.05; }
           }
@@ -747,7 +749,7 @@
       $('prodN').oninput = $('prodW').oninput = $('prodPv').onchange = prodRender;
       ['yrN', 'yrW', 'yrC', 'yrL'].forEach(i => $(i).oninput = yrRender); ['prPP', 'prSK', 'prD'].forEach(i => $(i).oninput = propRender); $('prPv').onchange = propRender; $('yrL').addEventListener('input', propRender); $('yrS').onchange = $('yrPv').onchange = yrRender;
       $('solP').onchange = $('sunD').onchange = $('sunPv').onchange = () => { pickSun(); solar(); };
-      sunP.then(r => r.ok ? r.json() : null).then(j => { if (j && j.days) { SUNDATA = j; const ks = Object.keys(j.days).sort(); $('sunD').min = ks[0]; $('sunD').max = [ks[ks.length - 1], ymdOf(loadMin[loadMin.length - 1][0])].sort()[1]; } pickSun(); solar(); prodRender(); yrRender(); propRender(); $('prodH').hidden = $('prodCard').hidden = !SUNDATA; }).catch(() => { pickSun(); solar(); });
+      sunP.then(r => r.ok ? r.json() : null).then(j => { if (j && j.days) { SUNDATA = j; const ks = Object.keys(j.days).sort(); $('sunD').min = ks[0]; $('sunD').max = [ks[ks.length - 1], ymdOf(loadMin[loadMin.length - 1][0])].sort()[1]; } pickSun(); solar(); prodRender(); requestAnimationFrame(() => setTimeout(() => { yrRender(); propRender(); }));   /* the two year tables (lower down, the heavy part) after the top has painted */ $('prodH').hidden = $('prodCard').hidden = !SUNDATA; }).catch(() => { pickSun(); solar(); });
       $('solN').oninput = $('solW').oninput = $('solDL').oninput = $('solF').oninput = $('solX').oninput = $('solGap').onchange = $('solG').onchange = $('batOn').onchange = $('batC').oninput = $('batM').oninput = $('batX').oninput = $('batP').oninput = $('batS').oninput = $('batT').oninput = solar; solar();
       $('solNote').innerHTML = `<b>Solar vs load.</b> One Period filter: “one day” runs that date's logged load against that date's sun (a date the logger did not record uses the average logged day); “whole logger record” runs every logged minute against its own day's sun (a day not yet in the reference uses the latest one before it); “1 week / 1 month / 1 year · estimate” runs the average logged day (full days only, minute by minute) against the average sun of the 7 days to the date, of the month, or of the year, and multiplies the tiles by 7, the days in the month, or 365. Sun from a reference Deye plant in Naccache (8 × 540 W, 8 kW inverter, so never clipped): a year of real days at 5-minute steps, per panel. When the reference battery was full (often filled from EDL overnight) its inverter throttled the panels to the house load; those 5-minute steps are topped up from a clear-sky model of the array (42° south, fitted to its clean clear days), scaled to how clear that day was. In winter the reference also loses the low morning and afternoon sun to shading, so its months run under the PVGIS average for Naccache — tick “scale to PVGIS” to lift the chosen sun to that month's PVGIS average (unshaded, optimal tilt). Other panel sizes scale by watts (645 W = × 1.19).  Dashed green = solar made, filled green = solar used. Red = solar lost: solar − generator floor − load, shown only where it is above zero (the solar the load cannot take once the running generator keeps its floor). Its area is the kWh in the legend and the “thrown away” tile. ` +
         `“Thrown away” also counts the solar cut so the running generator never drops under its floor: floor % × kVA × 0.8 (20 % of G1 350 kVA = 56 kW, of G2 600 kVA = 96 kW). The ceiling line is the running generator's upper limit, ceiling % × kVA × 0.8 (80 %: G1 224 kW, G2 384 kW). “As logged” follows the generator that actually ran each minute (told apart by voltage) and drops the floor while on EDL. “Logger gaps” decides who carried the estimated load while the logger was dark: EDL (no floor, no fuel, the battery waits) or the generator that came back after the gap (floor, fuel, the battery may discharge). Load in the generator-off gaps is the estimate.`;
