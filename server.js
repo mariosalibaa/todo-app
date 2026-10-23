@@ -730,7 +730,7 @@ const handler = async (req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   // a page link with a trailing slash (/energy/plants/) → the same page without it (Mario 2026-10-22: "returned nothing" — it was a 404)
-  if (req.method === 'GET' && url.length > 1 && url.endsWith('/') && !url.startsWith('/api/')) {
+  if (req.method === 'GET' && url.length > 1 && url.endsWith('/') && !url.startsWith('/api/') && !/^\/(whatsapp|03165168|70165168)\//.test(url)) {   // the archive proxy wants its slash (2026-10-23: /whatsapp/ looped)
     res.writeHead(301, { Location: url.replace(/\/+$/, '') + (req.url.includes('?') ? '?' + req.url.split('?').slice(1).join('?') : '') }); res.end(); return;
   }
 
