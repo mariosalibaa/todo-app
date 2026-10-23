@@ -1362,13 +1362,14 @@ const handler = async (req, res) => {
   if (url.split('?')[0] === '/api/makhlouf' && req.method === 'GET') {
     const acc = await cprAccess();
     if (!acc.isAdmin) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'admin' })); return; }
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'))); return;
+    // the file changes only with a deploy: a reopen paints from the browser's copy and refreshes it behind (fast to open, Mario 2026-10-23)
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300, stale-while-revalidate=604800' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-data.json'))); return;
   }
   // /api/makhlouf-sun — a year of 5-min production per 540 W panel from the reference plant (refsun/build.js). Admins only.
   if (url.split('?')[0] === '/api/makhlouf-sun' && req.method === 'GET') {
     const acc = await cprAccess();
     if (!acc.isAdmin) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'admin' })); return; }
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=3600' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-sun.json'))); return;
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=3600, stale-while-revalidate=604800' }); res.end(fs.readFileSync(path.join(__dirname, 'makhlouf-sun.json'))); return;
   }
   // /api/khoder — khoder.js. A hub admin signed in, or the share link's key (HMAC of the machine key) for Walid.
   if (url.split('?')[0] === '/api/khoder' && req.method === 'GET') {
