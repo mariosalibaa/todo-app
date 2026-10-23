@@ -3,9 +3,9 @@
 //
 //   Bookstop   SOLARMAN 2596285, 3 × 12 kW Deye in parallel. EDL, the small generator (80 kW) and the big one (150 kW)
 //              come in on the GRID port through an ATS; each has its own frequency (memory bookstop-kaslique-solarman):
-//              EDL ≈ 50.0 Hz steady · the big gen 49.3 Hz at its 24 kW, rising toward 50.5 Hz as the load drops ·
-//              small gen idles at 51.6–51.8 Hz and the inverters REFUSE it (import ≈ 0, the battery drains — 3 Oct 2026),
-//              loaded it hunts 48–50.7 Hz. Mario 2026-10-20: the refused one is the small gen; no kWh meters on site.
+//              big gen = steady 50 Hz at any load · EDL = 49.0–49.5 Hz at 222–231 V, 2–3 h blocks on the hour · small gen =
+//              48.6–49.1 Hz at 217–219 V loaded, 51.6–53 Hz unloaded and REFUSED (see classify; confirmed by Mario 2026-10-23).
+//              No kWh meters on site.
 //   McKinsey   DeyeCloud 61438093, 2 × 50 kW (M1 + S2). No EDL. One generator on the GEN port — 30 kVA now; history
 //              (Mario 2026-10-20): 30 kVA (sent to the Bekaa) → 150 kVA (bought, sold) → 30 kVA (another, on site);
 //              a new 150 kVA is bought, not yet installed.
@@ -16,13 +16,14 @@
 // writes to an inverter.
 
 const P = require('./plants');
+const B = require('./tohme-batt');   // the solar thrown while the battery sat full
 
 // from = the first day read: the inverters' day series are kept ~90 days by DeyeCloud (2026-10-22: back to 24 Jul 2026, Mario: "what is the benefit of Oct 2026 alone")
 const PLANTS = {
   bookstop: {
     name: 'Bookstop Kaslique', src: 'solarman', id: 2596285, kwp: 44.85, from: '2026-07-24', port: 'grid',
     lead: '3 × 12 kW Deye in parallel · EDL and two generators on one input through the ATS',
-    classes: { e: 'EDL', g: 'Generator (big or small)', r: 'Small generator — refused' },
+    classes: { e: 'EDL', b: 'Big generator (150 kW)', s: 'Small generator (80 kW)', r: 'Small generator — refused' },
   },
   mckinsey: {
     name: 'McKinsey Electronics', src: 'deye', id: 61438093, kwp: 120, from: '2026-07-24', port: 'gen',
@@ -46,17 +47,30 @@ const near = (a, t) => { if (!a || !a.length) return null; let lo = 0, hi = a.le
 
 function classify(key, rows) {
   if (key === 'mckinsey') return rows.map(r => r.v > 150 || Math.abs(r.p) > 300 ? 'g' : 'o').join('');
-  // Bookstop: by frequency, looking at ±2 samples (±10 min) so one odd reading does not flip the source
-  return rows.map((r, i) => {
+  // Bookstop, re-read 2026-10-23 with Mario ("EDL does not come 10 hours a day" — the old "steady 50 Hz = EDL" was the big
+  // generator). Four signatures on the one grid input, looking at ±2 samples (±10 min) so one odd reading does not flip it:
+  //   big gen (150 kW)    49.7–50.35 Hz whatever the load (its governor holds 50), ~220 V — the working day, ~07:45–21:30, not Sundays
+  //   EDL                 49.0–49.5 Hz, 222–231 V, blocks of 2–3 h starting on the hour; or below 49.7 Hz with ~nothing taken
+  //                       (an unloaded small gen runs fast, never below 50)
+  //   small gen (80 kW)   loaded 48.6–49.1 Hz at 217–219 V, short runs early morning / late night; hunting 49–51 Hz (before its
+  //                       governor was set, Oct 2026); with no load it runs at 51.6–53 Hz and the inverters refuse it
+  const med = a => { const b = a.slice().sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0; };
+  const c = rows.map((r, i) => {
     if (r.v < 150) return 'o';
     if (r.hz > 51.3) return 'r';
-    const w = rows.slice(Math.max(0, i - 2), i + 3).filter(x => x.v > 150 && x.hz > 40).map(x => x.hz).sort((a, b) => a - b);
-    if (!w.length) return 'g';
-    if (w.every(h => h >= 49.8 && h <= 50.2)) return 'e';
-    // a generator's frequency follows its load (the big one: 49.3 Hz at 24 kW, 50.5 Hz at 4 kW) and the voltages overlap
-    // (218–231 V for both), so the two running generators are not told apart — one class (checked 2026-10-20, 1–20 Oct)
-    return 'g';
-  }).join('');
+    const hz = rows.slice(Math.max(0, i - 2), i + 3).filter(x => x.v > 150 && x.hz > 40).map(x => x.hz);
+    return hz.length && hz.filter(h => h >= 49.7 && h <= 50.35).length >= Math.max(1, hz.length - 1) ? 'b' : 'x';
+  });
+  // EDL or small gen is decided per stretch, not per reading: EDL's voltage sags under the inverters' 24 kW (19 Oct 18:00–20:00
+  // read 219–223 V), so the stretch's middle voltage / power decides it
+  for (let i = 0; i < c.length;) {
+    if (c[i] !== 'x') { i++; continue; }
+    let j = i; while (j < c.length && c[j] === 'x') j++;
+    const w = rows.slice(i, j), k = med(w.map(x => x.v)) >= 221.5 || med(w.map(x => x.p)) < 2000 ? 'e' : 's';
+    for (let n = i; n < j; n++) c[n] = k;
+    i = j;
+  }
+  return c.join('');
 }
 
 const devMem = new Map();   // key → { at, inv } — the inverter list barely changes; kept 6 h
@@ -84,8 +98,14 @@ async function readDay(ctx, key, ymd) {
 // one stored day → the figures the page shows
 function summary(key, raw) {
   const cls = Object.keys(PLANTS[key].classes);
-  const d = key === 'bookstop' ? { ...raw, c: raw.c.replace(/[bs]/g, 'g') } : raw;   // days stored before 2026-10-20 split big / small
-  const o = { pv: 0, load: 0, socMin: null, socMax: null, full: 0, n: d.t.length, src: {} };
+  // Bookstop: classes re-made from the stored Hz / V on every summary (the rules changed 2026-10-23; old days carry old letters)
+  const d = key === 'bookstop' && raw.hz && raw.v ? { ...raw, c: classify(key, raw.t.map((t, i) => ({ t, v: raw.v[i], hz: raw.hz[i], p: raw.p[i] }))) } : raw;
+  const o = { pv: 0, load: 0, socMin: null, socMax: null, full: 0, thrown: 0, fullAt: null, n: d.t.length, src: {} };
+  // solar thrown (Mario 2026-10-23: "energy thrown per month and day") — Villa Tohme's method (tohme-batt.analyze): a clear-sky
+  // curve fitted on the same day's readings before the battery filled, minus what the panels gave while it sat full.
+  // Battery power is not stored here: load − solar − source (+ = discharging).
+  const a = B.analyze(d.t.map((t, i) => ({ dateTime: t, pvPower: d.pv[i], batterySoc: d.s[i], batteryPower: d.l[i] - d.pv[i] - d.p[i], generatorPower: 0, wirePower: Math.max(0, d.p[i]) })), []);
+  o.thrown = a.thrown || 0; o.fullAt = a.fullAt;
   for (const k of cls) o.src[k] = { h: 0, in: 0, out: 0 };
   const dt = i => Math.min(600, (d.t[i + 1] || d.t[i] + 300) - d.t[i]) / 3600;   // hours this sample stands for (≤ 10 min)
   for (let i = 0; i < d.t.length; i++) {
@@ -123,7 +143,7 @@ function summary(key, raw) {
 // Firestore: plantSources/<key>_<day> = the raw day (t, c, p, pv, l, s, hz, v — kept for re-computing), and
 // plantSourceDays/<key>_<day> = its summary as JSON (`j`, ~3 KB) — the page reads only these (Mario 2026-10-22: the
 // raw days were ~10 KB each and every load re-summed them all). SUM_V: bump when summary() changes → re-summed from raw.
-const SUM_V = 1;
+const SUM_V = 2;   // 2 = 2026-10-23: Bookstop's four sources, solar thrown
 const sumCol = ctx => ctx.db.collection('workspaces').doc(ctx.TEAM_ID).collection('plantSourceDays');
 const T = require('./plant-today');
 

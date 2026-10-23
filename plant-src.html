@@ -62,6 +62,7 @@
   .sim input{width:96px;background:var(--mantle);color:var(--text);border:1px solid var(--surface0);border-radius:8px;padding:6px 8px;font:inherit;font-size:.85rem;}
   td.sol{color:var(--amber);} td.gen{color:#cba6f7;} td.sav{color:var(--green);}
   .kpi.sav b{color:var(--green);} .kpi.thr b{color:var(--amber);}
+  td.thr{color:var(--amber);} th.tm,td.tm{text-align:left;white-space:normal;min-width:260px;font-size:.72rem;} td.tm i{display:inline-block;white-space:nowrap;font-style:normal;margin-right:10px;}
   .sim .sg{width:70px;font-size:.78rem;font-weight:600;color:var(--sub);align-self:center;}
   .sim .tot{align-self:center;font-size:.82rem;color:var(--text);font-variant-numeric:tabular-nums;}
   .sim input{width:84px;}
@@ -183,7 +184,9 @@
     }
     // a plant with the battery study (McKinsey): the month buttons, these tiles and the month table go — the battery table has every
     // month (Mario 2026-10-23: "month by month dashboard is useless, I already have the table")
-    $('months').hidden = $('kpis').hidden = $('mmBox').hidden = !!D.study;
+    // Bookstop too (Mario 2026-10-23: "dashboard per month useless") — the month table and the days carry it
+    $('months').hidden = $('kpis').hidden = true;
+    $('mmBox').hidden = !!D.study;
     $('months').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === month));
     $('socBtn').classList.toggle('on', showSoc);
     const days = Object.keys(D.days).filter(d => d.startsWith(month)).sort();
@@ -203,19 +206,19 @@
     // month by month — click a month for its days, a total row at the end (Mario 2026-10-23)
     const months = [...new Set(Object.keys(D.days).map(d => d.slice(0, 7)))].sort().reverse();
     const io = D.port === 'grid';
-    let mt = `<tr><th>Month</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>hours · kWh in${io ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>lowest %</small></th><th>Full, sun up<small>hours</small></th></tr>`;
-    const tot = ds => { const t = { pv: 0, load: 0, full: 0, low: null, src: {} };
+    let mt = `<tr><th>Month</th><th>Solar<small>kWh</small></th><th>Load<small>kWh</small></th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>hours · kWh in${io ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>lowest %</small></th><th>Solar thrown<small>kWh · full h</small></th></tr>`;
+    const tot = ds => { const t = { pv: 0, load: 0, full: 0, thrown: 0, low: null, src: {} };
       for (const k of K) t.src[k] = { h: 0, in: 0, out: 0 };
-      for (const d of ds) { const s = D.days[d]; t.pv += s.pv; t.load += s.load; t.full += s.full; if (s.socMin != null) t.low = t.low == null ? s.socMin : Math.min(t.low, s.socMin); for (const k of K) for (const f of ['h', 'in', 'out']) t.src[k][f] += s.src[k][f]; }
+      for (const d of ds) { const s = D.days[d]; t.pv += s.pv; t.load += s.load; t.full += s.full; t.thrown += s.thrown || 0; if (s.socMin != null) t.low = t.low == null ? s.socMin : Math.min(t.low, s.socMin); for (const k of K) for (const f of ['h', 'in', 'out']) t.src[k][f] += s.src[k][f]; }
       return t; };
-    const cells = (t, f) => `<td>${f(t.pv)}</td><td>${f(t.load)}</td>` + K.map(k => `<td>${f(t.src[k].h)} h · ${f(t.src[k].in)}${io ? ' · ' + f(t.src[k].out) : ''}</td>`).join('') + `<td>${t.low ?? ''}</td><td>${f(t.full)}</td>`;
+    const cells = (t, f) => `<td>${f(t.pv)}</td><td>${f(t.load)}</td>` + K.map(k => `<td>${f(t.src[k].h)} h · ${f(t.src[k].in)}${io ? ' · ' + f(t.src[k].out) : ''}</td>`).join('') + `<td>${t.low ?? ''}</td><td class="thr">${f(t.thrown)} · ${f(t.full)} h</td>`;
     for (const m of months) {
       const ds = Object.keys(D.days).filter(d => d.startsWith(m)).sort();
       mt += `<tr class="mrow" data-m="${m}"><td>${mOpen[m] ? '▾' : '▸'} ${MONTHS[+m.slice(5) - 1]} ${m.slice(0, 4)}<small>${ds.length} days${ds.includes(D.today) ? ', to today' : ''}</small></td>${cells(tot(ds), f0)}</tr>`;
       if (mOpen[m]) for (const d of ds.slice().reverse()) {
         const x = D.days[d];
         mt += `<tr class="dy"><td>${dd(d)}${d === D.today ? '<small>so far</small>' : x.n < 250 ? '<small>' + x.n + ' readings</small>' : ''}</td><td>${f1(x.pv)}</td><td>${f1(x.load)}</td>` +
-          K.map(k => `<td>${f1(x.src[k].h)} h · ${f1(x.src[k].in)}${io ? ' · ' + f1(x.src[k].out) : ''}</td>`).join('') + `<td>${x.socMin ?? ''}${x.socMax != null ? '–' + x.socMax : ''}</td><td>${f1(x.full)}</td></tr>`;
+          K.map(k => `<td>${f1(x.src[k].h)} h · ${f1(x.src[k].in)}${io ? ' · ' + f1(x.src[k].out) : ''}</td>`).join('') + `<td>${x.socMin ?? ''}${x.socMax != null ? '–' + x.socMax : ''}</td><td class="thr">${f1(x.thrown || 0)} · ${f1(x.full)} h</td></tr>`;
       }
     }
     const allDays = Object.keys(D.days);
@@ -249,18 +252,21 @@
 
     // day by day — not for McKinsey either (Mario 2026-10-20: "remove for mckinsey")
     $('dayBox').hidden = D.key === 'mckinsey';
-    let dt = `<tr><th>Day</th><th>Solar</th><th>Load</th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>h · in${D.port === 'grid' ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>min–max %</small></th><th>Full<small>h</small></th></tr>`;
+    let dt = `<tr><th>Day</th><th>Solar</th><th>Load</th>${K.map(k => `<th><span class="dot c-${k}"></span>${C[k]}<small>h · in${D.port === 'grid' ? ' · out' : ''}</small></th>`).join('')}<th>Battery<small>min–max %</small></th><th>Solar thrown<small>kWh · full at</small></th><th class="tm">Timing</th></tr>`;
     for (const d of days.slice().reverse()) { const s = D.days[d];
       dt += `<tr><td>${dd(d)}${d === D.today ? '<small>so far</small>' : ''}${s.n < 250 && d !== D.today ? '<small>' + s.n + ' readings</small>' : ''}</td><td>${f1(s.pv)}</td><td>${f1(s.load)}</td>` +
-        K.map(k => `<td>${f1(s.src[k].h)} · ${f1(s.src[k].in)}${D.port === 'grid' ? ' · ' + f1(s.src[k].out) : ''}</td>`).join('') + `<td>${s.socMin ?? ''}–${s.socMax ?? ''}</td><td>${f1(s.full)}</td></tr>`; }
+        K.map(k => `<td>${f1(s.src[k].h)} · ${f1(s.src[k].in)}${D.port === 'grid' ? ' · ' + f1(s.src[k].out) : ''}</td>`).join('') + `<td>${s.socMin ?? ''}–${s.socMax ?? ''}</td><td class="thr">${f1(s.thrown || 0)}${s.fullAt ? ' · ' + s.fullAt : ''}</td>` +
+        `<td class="tm">${(s.bar || []).map(([k, a, b]) => `<i><span class="dot c-${k}"></span>${hm(a)}–${hm(b)}</i>`).join('')}</td></tr>`; }
     $('dayT').innerHTML = dt;
 
     $('note').innerHTML = (D.key === 'bookstop'
-      ? `<b>How each source is recognised.</b> EDL and both generators reach the inverters through the ATS on one input; the inverter logs that input's voltage and frequency. ` +
-        `<b>EDL</b> holds a steady 50.0 Hz, whatever the load. A <b>generator</b>'s frequency follows its load (the big one: about 49.3 Hz when the inverters take their 24 kW, rising toward 50.5 Hz as they take less), and the two generators' voltages overlap, so a running generator is shown as one — big or small. ` +
-        `The <b>small generator (80 kW)</b> has one clear mark: with no load it runs fast, at 51.6–52.4 Hz, and ` +
-        `the inverters <b>refuse</b> it then (nothing comes in, the battery keeps draining). That is the orange stretch and the table above; the fix is the small generator's speed (governor), not a setting on the inverters.<br>`
+      ? `<b>How each source is recognised.</b> EDL and both generators reach the inverters through the ATS on one input; the inverter logs that input's voltage and frequency every 5 minutes. ` +
+        `<b>Big generator (150 kW)</b>: holds 50.0 Hz whatever the load (its governor), about 220 V — it runs the working day, about 07:45 to 21:30, not on Sundays. ` +
+        `<b>EDL</b>: 49.0–49.5 Hz at a higher voltage (222–231 V), in blocks of 2–3 hours that start on the hour. ` +
+        `<b>Small generator (80 kW)</b>: loaded it sags to 48.6–49.1 Hz at 217–219 V — short runs early morning and late night; with no load it runs fast (51.6–53 Hz) and the inverters <b>refuse</b> it (nothing comes in, the battery keeps draining) — the orange stretch and the table above. ` +
+        `Re-read with Mario on 23 Oct 2026 (before that, the steady 50 Hz was wrongly shown as EDL).<br>`
       : `<b>The generator.</b> No EDL on this site; the generator is on the inverters' generator input, so every hour it ran and every kWh it gave is counted directly. ${D.history || ''}<br>`) +
+      `<b>Solar thrown</b> = what the panels could have given while the battery sat full, minus what they gave: a clear-sky curve for that date, fitted on the same day's readings in the 90 min before the battery filled (a cloudy day gives a lower curve) — the same method as Villa Tohme. ` +
       `<b>Battery full, sun up</b> = hours the battery sat at 99–100 % while the panels produced: the inverters hold the solar back then, because there is nowhere to put it. ` +
       `<b>Method.</b> kWh = each reading's power × the time to the next one (about 5 minutes), summed; the inverters in parallel are added together. A day with missing readings is under-counted, never averaged up.`;
     renderStudy();
